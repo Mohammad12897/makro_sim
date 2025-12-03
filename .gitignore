@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.DS_Store
+.env
+data/
+*.parquet
+*.csv
+/content/drive/
+colab_keys/
