@@ -199,3 +199,4 @@ def run_simulation_extended(params, N=200, seed=0, return_samples=False,
     del imp_parts, res_parts, vola_parts, imp_all, res_all, vola_all
     gc.collect()
     return None, summary
+

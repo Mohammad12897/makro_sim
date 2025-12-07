@@ -1,4 +1,4 @@
-# src/tests/test_integration_real.py
+# Datei: /src/tests/test_integration_real.py
 import pytest
 from src.etl.transforms import fetch_reserves
 from src.config import default_params
@@ -24,31 +24,36 @@ class MockAPI:
             })
         return []
 
-def test_etl_and_simulation_end_to_end(tmp_path):
-    # ETL: benutze MockAPI statt realer API
+def test_etl_and_simulation_end_to_end(tmp_path, monkeypatch):
+    # setze DATA_DIR auf temporären Ordner
+    from src import config
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+
     api = MockAPI()
-    s, path, flag = fetch_reserves(api)  # kein use_comtrade Keyword nötig
+    s, path, flag = fetch_reserves(api)
     assert flag in ("ok", "empty")
     assert hasattr(s, "shape") or s is None
 
-    # build params
     params = default_params.copy()
     if s is not None and len(s) > 0:
         params["Reserven_Monate"] = int(round(float(s.iloc[-1])))
 
-    # run a small simulation (in-memory)
-    samples, summary = run_simulation_extended(params, N=200, seed=123, return_samples=True)
+    # kleiner In‑Memory Lauf
+    samples, summary = run_simulation_extended(params, N=100, seed=123, return_samples=True)
     assert "importkosten_mult" in summary.index
     assert "median" in summary.columns
 
-    # run a CSV streaming run (small) to ensure path creation
+    # CSV Streaming in tmp_path
+    csv_name = "test_integration_samples.csv"
     csv_path, summary2 = run_simulation_extended(
         params,
-        N=500,
+        N=200,
         seed=124,
         return_samples=True,
         save_samples_to_csv=True,
-        csv_name="test_integration_samples.csv"
+        csv_name=csv_name
     )
     assert Path(csv_path).exists()
-    assert "median" in summary2.columns
+    df_csv = pd.read_csv(csv_path)
+    assert set(["importkosten_mult","netto_resilienz","system_volatilitaet"]).issubset(df_csv.columns)
+    assert len(df_csv) > 0
