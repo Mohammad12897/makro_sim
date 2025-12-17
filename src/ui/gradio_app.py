@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import gradio as gr
 import matplotlib.pyplot as plt
+from fastapi.responses import PlainTextResponse
 
 from ..config import default_params, DATA_DIR
 from ..utils.validators import sanitize_params
@@ -444,12 +445,90 @@ def run_years_explicit(
         return None, None, pd.DataFrame()
 
 # -------------------------
-# UI Aufbau
+# Lexikon (Markdown) und UI Aufbau
 # -------------------------
+def lexikon_erweitert_markdown() -> str:
+    return r"""
+## 📖 Lexikon: Erweiterte Parameter in der Simulation
+
+### Kernparameter (Standard)
+- **USD Dominanz (`USD_Dominanz`)**
+  - Anteil der globalen Transaktionen/Reservierungen in US-Dollar.
+  - Höhere USD‑Dominanz → stärkere Abhängigkeit; kann Importkosten erhöhen.
+
+- **RMB Akzeptanz (`RMB_Akzeptanz`)**
+  - Grad der internationalen Nutzung des Renminbi.
+  - Höhere Akzeptanz → alternative Abwicklungswege; kann USD‑Risiko mindern.
+
+- **Zugangsresilienz (`Zugangsresilienz`)**
+  - Fähigkeit, Zahlungs- und Handelswege bei Störungen aufrechtzuerhalten.
+  - Hohe Resilienz → geringere Volatilität und stabilere Versorgung.
+
+- **Reserven Monate (`Reserven_Monate`)**
+  - Anzahl Monate, die durch Devisenreserven finanziert werden können.
+  - Mehr Monate → höhere Pufferkapazität.
+
+- **FX Schockempfindlichkeit (`FX_Schockempfindlichkeit`)**
+  - Empfindlichkeit gegenüber Wechselkursschocks (UI erlaubt 0.0–2.0).
+  - Höhere Werte → größere Schwankungen in Preisen und Kosten.
+
+- **Sanktions Exposure (`Sanktions_Exposure`)**
+  - Anteil der Wirtschaftsbeziehungen, die durch Sanktionen gefährdet sind.
+  - Höheres Exposure → erhöhtes Risiko für Handelsunterbrechungen.
+
+- **Alternativnetz Abdeckung (`Alternativnetz_Abdeckung`)**
+  - Verfügbarkeit alternativer Zahlungs‑/Abwicklungsnetzwerke.
+  - Größere Abdeckung → bessere Ausweichmöglichkeiten bei Störungen.
+
+- **Liquiditaetsaufschlag (`Liquiditaetsaufschlag`)**
+  - Zusatzkosten bei knapper Liquidität.
+  - Höherer Aufschlag → steigende Importkosten.
+
+- **CBDC Nutzung (`CBDC_Nutzung`)**
+  - Verbreitung digitaler Zentralbankwährungen.
+  - Höhere Nutzung → potenziell effizientere Abwicklung, Einfluss auf Resilienz.
+
+- **Golddeckung (`Golddeckung`)**
+  - Anteil der Reserven in Gold.
+  - Höhere Golddeckung → stabilisierender Puffer in Krisen.
+
+### Erweiterte Parameter (Erweitert‑Simulation)
+- **Innovationskraft (`innovation`)**
+  - Technologische und wirtschaftliche Innovationsfähigkeit.
+  - Schwache Innovation → höhere Importkosten; starke Innovation → senkt Importkosten.
+
+- **Fachkräfteangebot (`fachkraefte`)**
+  - Verfügbarkeit qualifizierter Arbeitskräfte.
+  - Mehr Fachkräfte → höhere Resilienz.
+
+- **Politische Stabilität (`stabilitaet`)**
+  - Institutionelle und politische Verlässlichkeit.
+  - Hohe Stabilität → stärkt Resilienz.
+
+- **Energiepreise / Wettbewerbsfähigkeit (`energie`)**
+  - Einfluss der Energiepreise auf Kostenstruktur.
+  - Hohe Energiepreise → mehr Volatilität.
+
+- **Staatsverschuldung (`verschuldung`)**
+  - Verhältnis der Schulden zum BIP (UI 0–2 möglich).
+  - Höhere Verschuldung → tendenziell höhere Volatilität; intern optional auf 0–1 skaliert.
+
+### Neuer Parameter: Demokratie (`demokratie`)
+- **Definition**
+  - Skala **0.0 – 1.0**; 0 = autoritär/geringe Rechenschaftspflicht, 1 = stabile, inklusive Demokratie mit funktionierenden Institutionen.
+- **Direkte Effekte im Modell**
+  - **Resilienz**: Demokratie erhöht `netto_resilienz` (z. B. additiv), weil Rechtsstaat, Transparenz und Rechenschaft Investitions‑ und Anpassungsfähigkeit fördern.
+  - **Volatilität**: Demokratie reduziert `system_volatilitaet` (z. B. kleinerer Basiseffekt), da Informationsflüsse und Institutionen Schocks dämpfen.
+  - **Importkosten**: Demokratie kann `importkosten_mult` leicht senken durch besseren Eigentumsschutz und geringere Transaktionskosten.
+
+... (voller Text in der Originaldatei kann hier stehen) ...
+"""
+
 def build_demo():
     with gr.Blocks() as demo:
         gr.Markdown("## Makro‑Simulator — interaktive Oberfläche")
 
+        # Layout: drei Spalten (Parameter | Aktionen/Ergebnisse | Lexikon)
         with gr.Row():
             with gr.Column(scale=2):
                 gr.Markdown("### Parameter")
@@ -477,7 +556,7 @@ def build_demo():
                 trends_json = gr.Textbox(label="Annual Trends (JSON)", value='{"innovation": 0.01}', lines=2)
                 shocks_json = gr.Textbox(label="Shock Events (JSON)", value='[{"year":3,"changes":{"CBDC_Nutzung":0.2}}]', lines=2)
 
-            with gr.Column(scale=3):
+            with gr.Column(scale=2):
                 gr.Markdown("### Aktionen")
                 btn_run = gr.Button("Einmalige Simulation ausführen")
                 btn_years = gr.Button("Mehrjahres‑Simulation ausführen")
@@ -488,6 +567,20 @@ def build_demo():
                 years_table = gr.Dataframe(headers=["Jahr","Importkosten","Resilienz","Volatilität"], label="Mehrjahres‑Tabelle", row_count=20)
                 years_plot = gr.Plot(label="Mehrjahres‑Plot")
                 csv_output = gr.File(label="CSV Ergebnis (Download)")
+
+            # Rechts: Lexikon (erscheint nur wenn Platz vorhanden); initial sichtbar
+            with gr.Column(scale=1):
+                gr.Markdown("### Lexikon")
+                lexikon_md = gr.Markdown(lexikon_erweitert_markdown(), elem_id="lexikon-panel", visible=True)
+                lexikon_state = gr.State(value=True)
+                toggle_btn = gr.Button("Lexikon ein-/ausblenden")
+
+                # Toggle callback: nimmt aktuellen State, gibt Update und neuen State zurück
+                def _toggle_lexikon(state: bool):
+                    new_state = not bool(state)
+                    return gr.update(visible=new_state), new_state
+
+                toggle_btn.click(fn=_toggle_lexikon, inputs=[lexikon_state], outputs=[lexikon_md, lexikon_state])
 
         # Inputs list: slider components in order + controls
         slider_components = [sliders[name] for name, _, _, _ in PARAM_SLIDERS]
@@ -511,3 +604,13 @@ def build_demo():
     return demo
 
 demo = build_demo()
+
+# --- HTTP Endpunkt /lexikon registrieren (liefert reines Markdown) ---
+try:
+    app = demo.app  # FastAPI app, verfügbar bei Gradio >= 3.x
+    @app.get("/lexikon")
+    def _get_lexikon():
+        return PlainTextResponse(lexikon_erweitert_markdown(), media_type="text/markdown")
+except Exception:
+    # Falls demo.app nicht verfügbar ist (sehr alte Gradio-Version), ignorieren wir still.
+    pass
