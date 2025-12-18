@@ -524,6 +524,82 @@ def lexikon_erweitert_markdown() -> str:
 ... (voller Text in der Originaldatei kann hier stehen) ...
 """
 
+# --- Preset-Manager Hilfsfunktionen ---
+PRESETS_FILENAME = DATA_DIR / "presets.json" if DATA_DIR is not None else Path("presets.json")
+
+def _ensure_presets_file():
+    try:
+        PRESETS_FILENAME.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    if not PRESETS_FILENAME.exists():
+        # initial example presets (illustrative, not real-world accurate)
+        example = {
+            "Exportorientiertes_Land": {
+                "USD_Dominanz": 0.6, "RMB_Akzeptanz": 0.1, "Zugangsresilienz": 0.85,
+                "Sanktions_Exposure": 0.02, "Alternativnetz_Abdeckung": 0.6, "Liquiditaetsaufschlag": 0.02,
+                "CBDC_Nutzung": 0.3, "Golddeckung": 0.2, "innovation": 0.7, "fachkraefte": 0.8,
+                "energie": 0.5, "stabilitaet": 0.9, "verschuldung": 0.6, "demokratie": 0.8,
+                "FX_Schockempfindlichkeit": 0.7, "Reserven_Monate": 6
+            },
+            "Importabhängiges_Land": {
+                "USD_Dominanz": 0.8, "RMB_Akzeptanz": 0.05, "Zugangsresilienz": 0.6,
+                "Sanktions_Exposure": 0.1, "Alternativnetz_Abdeckung": 0.3, "Liquiditaetsaufschlag": 0.05,
+                "CBDC_Nutzung": 0.1, "Golddeckung": 0.1, "innovation": 0.4, "fachkraefte": 0.5,
+                "energie": 0.7, "stabilitaet": 0.6, "verschuldung": 1.0, "demokratie": 0.5,
+                "FX_Schockempfindlichkeit": 1.2, "Reserven_Monate": 3
+            },
+            "Hohe_Resilienz": {
+                "USD_Dominanz": 0.5, "RMB_Akzeptanz": 0.2, "Zugangsresilienz": 0.95,
+                "Sanktions_Exposure": 0.01, "Alternativnetz_Abdeckung": 0.9, "Liquiditaetsaufschlag": 0.01,
+                "CBDC_Nutzung": 0.6, "Golddeckung": 0.4, "innovation": 0.9, "fachkraefte": 0.9,
+                "energie": 0.4, "stabilitaet": 0.95, "verschuldung": 0.4, "demokratie": 0.9,
+                "FX_Schockempfindlichkeit": 0.5, "Reserven_Monate": 12
+            }
+        }
+        try:
+            PRESETS_FILENAME.write_text(json.dumps(example, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+def load_presets():
+    _ensure_presets_file()
+    try:
+        text = PRESETS_FILENAME.read_text(encoding="utf-8")
+        return json.loads(text)
+    except Exception:
+        return {}
+
+def save_presets(presets: dict):
+    _ensure_presets_file()
+    try:
+        PRESETS_FILENAME.write_text(json.dumps(presets, indent=2), encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+def get_preset_names():
+    p = load_presets()
+    return sorted(list(p.keys()))
+
+def get_preset(name: str):
+    p = load_presets()
+    return p.get(name)
+
+def save_preset(name: str, params: dict):
+    if not name or not isinstance(name, str):
+        return False
+    p = load_presets()
+    p[name] = params
+    return save_presets(p)
+
+def delete_preset(name: str):
+    p = load_presets()
+    if name in p:
+        del p[name]
+        return save_presets(p)
+    return False
+
 def build_demo():
     with gr.Blocks() as demo:
         gr.Markdown("## Makro‑Simulator — interaktive Oberfläche")
@@ -539,6 +615,20 @@ def build_demo():
                     else:
                         sliders[name] = gr.Slider(label=name, minimum=lo, maximum=hi, value=float(val), step=0.01)
 
+                
+                # Preset-Manager UI
+                gr.Markdown("### Preset Manager")
+                preset_dropdown = gr.Dropdown(choices=get_preset_names(), label="Preset wählen", value=None)
+                btn_load_preset = gr.Button("Preset laden")
+                preset_name = gr.Textbox(label="Neuer Preset-Name", value="", placeholder="Name für aktuelles Set")
+                btn_save_preset = gr.Button("Als Preset speichern")
+                btn_delete_preset = gr.Button("Preset löschen")
+                btn_export_preset = gr.Button("Export (JSON)")
+                btn_import_preset = gr.File(label="Importiere Preset JSON", file_count="single")
+                
+                
+
+                
                 gr.Markdown("### Lauf‑Einstellungen")
                 N = gr.Number(label="Samples N", value=500, precision=0)
                 seed = gr.Number(label="Seed", value=42, precision=0)
@@ -564,9 +654,18 @@ def build_demo():
                 gr.Markdown("### Ergebnisse")
                 summary_table = gr.Dataframe(headers=["metric","p05","median","p95"], label="Summary (Quantile)", row_count=10)
                 summary_plot = gr.Plot(label="Summary Plot")
+                # right column components created above
                 years_table = gr.Dataframe(headers=["Jahr","Importkosten","Resilienz","Volatilität"], label="Mehrjahres‑Tabelle", row_count=20)
                 years_plot = gr.Plot(label="Mehrjahres‑Plot")
                 csv_output = gr.File(label="CSV Ergebnis (Download)")
+
+                # Jetzt export_file auf die bereits existierende csv_output-Instanz setzen
+                export_file = csv_output
+
+                # Status-Komponenten für Preset-Operationen (einmalig anlegen)
+                save_status = gr.Textbox(label="save_ok", visible=False)
+                del_status = gr.Textbox(label="del_ok", visible=False)
+                import_status = gr.Textbox(label="import_ok", visible=False)
 
             # Rechts: Lexikon (erscheint nur wenn Platz vorhanden); initial sichtbar
             with gr.Column(scale=1):
@@ -587,6 +686,57 @@ def build_demo():
         inputs_run = slider_components + [N, seed, extended_flag, save_csv, csv_name, use_chunk, chunk, upload_calib]
         inputs_years = slider_components + [N, seed, extended_flag, use_chunk, chunk, years, trends_json, shocks_json, upload_calib]
 
+        # --- Preset Callback-Funktionen ---
+        def _apply_preset_to_sliders(preset_name):
+            preset = get_preset(preset_name)
+            if not preset:
+                return [gr.update(value=None) for _ in slider_components]  # no change
+            updates = []
+            for name, _, _, _ in PARAM_SLIDERS:
+                val = preset.get(name)
+                updates.append(gr.update(value=val))
+            return updates
+
+        def _save_current_as_preset(*slider_vals, name):
+            params = _collect_params_from_values(slider_vals)
+            ok = save_preset(name.strip(), params)
+            # Rückgabe: (bool, gr.update für Dropdown)
+            return ok, gr.update(choices=get_preset_names(), value=name.strip())
+
+
+        def _delete_preset(name):
+            ok = delete_preset(name)
+            return ok, gr.update(choices=get_preset_names(), value=None)
+
+        def _export_preset(name):
+            p = get_preset(name)
+            if not p:
+                return None
+            # write temp file and return path for gr.File
+            tmp = tempfile.NamedTemporaryFile(prefix="preset_", suffix=".json", delete=False)
+            tmp.write(json.dumps({name: p}, indent=2).encode("utf-8"))
+            tmp.close()
+            return tmp.name
+
+        def _import_preset_file(uploaded):
+            df = _load_uploaded_file(uploaded)  # try to reuse loader for csv/parquet; but here we expect JSON file
+            # fallback: read raw bytes
+            try:
+                if uploaded is None:
+                    return False, gr.update(choices=get_preset_names())
+                # uploaded may be a path string
+                path = getattr(uploaded, "name", None) or (uploaded[0] if isinstance(uploaded, (list, tuple)) else None)
+                text = Path(path).read_text(encoding="utf-8")
+                data = json.loads(text)
+                presets = load_presets()
+                presets.update(data)
+                save_presets(presets)
+                return True, gr.update(choices=get_preset_names())
+            except Exception as e:
+                print("Import Preset Fehler:", e)
+                return False, gr.update(choices=get_preset_names())
+
+
         # Verkabelung: Einmalige Simulation (explizite Variante)
         btn_run.click(
             fn=run_once_wrapper,
@@ -599,6 +749,37 @@ def build_demo():
             fn=run_years_wrapper,
             inputs=inputs_years,
             outputs=[summary_table, years_plot, years_table]
+        )
+
+
+
+        # Wiring: verwende die Komponenten-Instanzen, nicht gr.Textbox(...) Konstruktoren
+        btn_load_preset.click(fn=_apply_preset_to_sliders, inputs=[preset_dropdown], outputs=slider_components)
+
+        # Save current as preset: inputs are sliders + name; outputs: success flag (ignored) and updated dropdown
+        btn_save_preset.click(
+            fn=_save_current_as_preset,
+            inputs=slider_components + [preset_name],
+            outputs=[save_status, preset_dropdown]   # <-- save_status ist die Instanz oben
+        )
+
+        btn_delete_preset.click(
+            fn=_delete_preset,
+            inputs=[preset_dropdown],
+            outputs=[del_status, preset_dropdown]  # reuse csv_output as file download
+        )
+
+        btn_export_preset.click(
+            fn=_export_preset,
+            inputs=[preset_dropdown],
+            outputs=[export_file]   # File-Output (Pfad) — csv_output ist bereits ein gr.File
+        )
+
+        # Für File-Import: input ist die File-Komponente (btn_import_preset), outputs sind Instanzen
+        btn_import_preset.upload(
+            fn=_import_preset_file,
+            inputs=[btn_import_preset],
+            outputs=[import_status, preset_dropdown]
         )
 
     return demo
