@@ -600,6 +600,160 @@ def delete_preset(name: str):
         return save_presets(p)
     return False
 
+
+def _preview_import_file(uploaded):
+    """
+    Robust: akzeptiert Gradio UploadedFile oder Pfad-String.
+    Returns: (preview_rows, parsed_json_or_error_str)
+    preview_rows: list of [preset_name, status, sample_keys]
+    parsed_json_or_error_str: dict (parsed JSON) oder Fehler-String
+    """
+    try:
+        if not uploaded:
+            return [], "Keine Datei ausgewählt."
+
+        # 1) Wenn Gradio UploadedFile-Objekt (has .file or .name)
+        content_text = None
+        # uploaded may be a tuple/list (older gradio) -> take first
+        if isinstance(uploaded, (list, tuple)):
+            uploaded = uploaded[0]
+
+        # If it's a path-like string
+        if isinstance(uploaded, str):
+            p = Path(uploaded)
+            if not p.exists():
+                return [], f"Dateipfad nicht gefunden: {uploaded}"
+            content_text = p.read_text(encoding="utf-8")
+
+        else:
+            # Try common attributes
+            #  - uploaded.name may be filename only
+            #  - uploaded.file is a file-like object
+            #  - uploaded.read() may exist
+            if hasattr(uploaded, "file") and hasattr(uploaded.file, "read"):
+                uploaded.file.seek(0)
+                raw = uploaded.file.read()
+                if isinstance(raw, bytes):
+                    content_text = raw.decode("utf-8")
+                else:
+                    content_text = str(raw)
+            elif hasattr(uploaded, "read"):
+                raw = uploaded.read()
+                if isinstance(raw, bytes):
+                    content_text = raw.decode("utf-8")
+                else:
+                    content_text = str(raw)
+            else:
+                # fallback: try name as path
+                path = getattr(uploaded, "name", None)
+                if path and Path(path).exists():
+                    content_text = Path(path).read_text(encoding="utf-8")
+                else:
+                    return [], "Konnte Dateiinhalt nicht lesen (unbekannter Upload‑Typ)."
+
+        # Trim and quick empty check
+        if content_text is None or not content_text.strip():
+            return [], "Datei ist leer oder enthält nur Whitespaces."
+
+        # Parse JSON
+        try:
+            data = json.loads(content_text)
+        except Exception as e:
+            return [], f"Fehler beim Parsen der JSON: {e}"
+
+        if not isinstance(data, dict):
+            return [], "Ungültiges Format: JSON muss ein Objekt (dict) mit Preset-Namen sein."
+
+        existing = load_presets()
+        rows = []
+        for name, params in data.items():
+            status = "neu" if name not in existing else "konflikt"
+            sample_keys = ",".join(list(params.keys())[:3]) if isinstance(params, dict) else ""
+            rows.append([name, status, sample_keys])
+        return rows, data
+
+    except Exception as e:
+        import traceback
+        print("Preview import Fehler:", e)
+        print(traceback.format_exc())
+        return [], f"Unerwarteter Fehler: {e}"
+
+def _atomic_save_presets(presets: dict) -> bool:
+    try:
+        PRESETS_FILENAME.parent.mkdir(parents=True, exist_ok=True)
+        from tempfile import NamedTemporaryFile
+        tmp = NamedTemporaryFile(delete=False, dir=PRESETS_FILENAME.parent, suffix=".tmp")
+        tmp.write(json.dumps(presets, indent=2, ensure_ascii=False).encode("utf-8"))
+        tmp.close()
+        Path(tmp.name).replace(PRESETS_FILENAME)
+        return True
+    except Exception as e:
+        print("atomic save error:", e)
+        return False
+
+
+def _confirm_import(parsed_json, strategy: str):
+    """
+    parsed_json: dict (aus _preview_import_file)
+    strategy: "überschreiben" | "überspringen" | "umbenennen"
+    """
+    try:
+        if not isinstance(parsed_json, dict):
+            return "Keine gültigen Presets zum Importieren.", gr.update(choices=get_preset_names())
+        presets = load_presets()
+        added = []
+        skipped = []
+        renamed = []
+        for name, params in parsed_json.items():
+            if name in presets:
+                if strategy == "überspringen":
+                    skipped.append(name)
+                    continue
+                if strategy == "überschreiben":
+                    presets[name] = params
+                    added.append(name)
+                    continue
+                if strategy == "umbenennen":
+                    base = name
+                    i = 1
+                    candidate = f"{base}_{i}"
+                    while candidate in presets:
+                        i += 1
+                        candidate = f"{base}_{i}"
+                    presets[candidate] = params
+                    renamed.append((name, candidate))
+                    continue
+            else:
+                presets[name] = params
+                added.append(name)
+        # atomisch speichern
+        ok = _atomic_save_presets(presets)
+        if not ok:
+            return "Fehler beim Schreiben der Presets.", gr.update(choices=get_preset_names())
+        msg = f"Import fertig. Hinzugefügt: {len(added)}; Übersprungen: {len(skipped)}; Umbenannt: {len(renamed)}"
+        return msg, gr.update(choices=get_preset_names(), value=None)
+    except Exception as e:
+        return f"Import-Fehler: {e}", gr.update(choices=get_preset_names())
+
+
+def _export_preset_with_meta(preset_name: str, author: str):
+    p = get_preset(preset_name)
+    if not p:
+        return None
+    export_obj = {
+        "metadata": {
+            "exported_at": datetime.utcnow().isoformat() + "Z",
+            "author": author or "unknown",
+            "source_file": str(PRESETS_FILENAME.resolve())
+        },
+        "presets": { preset_name: p }
+    }
+    # temporäre Datei erzeugen
+    tmp = tempfile.NamedTemporaryFile(prefix=f"preset_export_{preset_name}_", suffix=".json", delete=False)
+    tmp.write(json.dumps(export_obj, indent=2, ensure_ascii=False).encode("utf-8"))
+    tmp.close()
+    return tmp.name   # Gradio akzeptiert Pfad als File-Output
+
 def build_demo():
     with gr.Blocks() as demo:
         gr.Markdown("## Makro‑Simulator — interaktive Oberfläche")
@@ -615,7 +769,7 @@ def build_demo():
                     else:
                         sliders[name] = gr.Slider(label=name, minimum=lo, maximum=hi, value=float(val), step=0.01)
 
-                
+
                 # Preset-Manager UI
                 gr.Markdown("### Preset Manager")
                 preset_dropdown = gr.Dropdown(choices=get_preset_names(), label="Preset wählen", value=None)
@@ -623,11 +777,23 @@ def build_demo():
                 preset_name = gr.Textbox(label="Neuer Preset-Name", value="", placeholder="Name für aktuelles Set")
                 btn_save_preset = gr.Button("Als Preset speichern")
                 btn_delete_preset = gr.Button("Preset löschen")
-                btn_export_preset = gr.Button("Export (JSON)")
-                btn_import_preset = gr.File(label="Importiere Preset JSON", file_count="single")
-                
                 
 
+
+                # Import UI (neben bestehendem btn_import_preset)
+                # UI: Import-Komponente (Datei auswählen)
+                btn_import_file = gr.File(label="Preset JSON auswählen", file_types=[".json"])
+                import_preview = gr.Dataframe(headers=["preset_name","status","sample_keys"], label="Import Vorschau", row_count=10)
+                import_status = gr.Textbox(label="Import Status", visible=True)
+                conflict_strategy = gr.Radio(choices=["überschreiben","überspringen","umbenennen"], value="überschreiben")
+                btn_confirm_import = gr.Button("Import bestätigen")
+                # Hidden state to carry parsed JSON between callbacks
+                parsed_json_store = gr.State()
+
+                # Export: Autor-Feld (optional) und Export-Button (falls nicht vorhanden)
+                export_author = gr.Textbox(label="Autor (für Export‑Metadaten)", value="")
+                btn_export_preset = gr.Button("Export (JSON mit Metadaten)")
+                btn_import_preset = gr.File(label="Importiere Preset JSON", file_count="single")
                 
                 gr.Markdown("### Lauf‑Einstellungen")
                 N = gr.Number(label="Samples N", value=500, precision=0)
@@ -660,7 +826,9 @@ def build_demo():
                 csv_output = gr.File(label="CSV Ergebnis (Download)")
 
                 # Jetzt export_file auf die bereits existierende csv_output-Instanz setzen
-                export_file = csv_output
+                #export_file = csv_output
+                export_file = gr.File(label="Exportdatei")
+                
 
                 # Status-Komponenten für Preset-Operationen (einmalig anlegen)
                 save_status = gr.Textbox(label="save_ok", visible=False)
@@ -697,12 +865,45 @@ def build_demo():
                 updates.append(gr.update(value=val))
             return updates
 
-        def _save_current_as_preset(*slider_vals, name):
-            params = _collect_params_from_values(slider_vals)
-            ok = save_preset(name.strip(), params)
-            # Rückgabe: (bool, gr.update für Dropdown)
-            return ok, gr.update(choices=get_preset_names(), value=name.strip())
+        
+        # UI: make save_status visible
+        save_status = gr.Textbox(label="Save status", value="", visible=True)
 
+        def _save_current_as_preset(*all_vals):
+            """
+            Robust: akzeptiert entweder (*slider_vals, name) oder (*all_vals) und extrahiert Name.
+            Erwartet NUM_SLIDERS Slider-Werte + optional Name als letztes Element.
+            """
+            import traceback
+            try:
+                # Falls du NUM_SLIDERS definiert hast:
+                num = NUM_SLIDERS if 'NUM_SLIDERS' in globals() else len(PARAM_SLIDERS)
+                # Wenn genug Werte, extrahiere Name als letztes Element
+                name = None
+                if len(all_vals) >= num + 1:
+                    # letzter Wert ist Name
+                    name = all_vals[num]
+                    slider_vals = all_vals[:num]
+                else:
+                    slider_vals = all_vals[:num]
+                print("DEBUG save called; len(all_vals)=", len(all_vals), "extracted name repr=", repr(name))
+                if not name or not isinstance(name, str) or not name.strip():
+                    return "Kein Preset-Name angegeben.", gr.update(choices=get_preset_names())
+                name = name.strip()
+                params = _collect_params_from_values(slider_vals)
+                try:
+                    params = sanitize_params(params)
+                except Exception:
+                    pass
+                ok = save_preset(name, params)
+                if ok:
+                    return f"Preset '{name}' gespeichert.", gr.update(choices=get_preset_names(), value=name)
+                else:
+                    return f"Fehler beim Speichern von '{name}'.", gr.update(choices=get_preset_names())
+            except Exception as e:
+                print("Exception in save:", e)
+                print(traceback.format_exc())
+                return f"Fehler: {e}", gr.update(choices=get_preset_names())
 
         def _delete_preset(name):
             ok = delete_preset(name)
@@ -751,8 +952,6 @@ def build_demo():
             outputs=[summary_table, years_plot, years_table]
         )
 
-
-
         # Wiring: verwende die Komponenten-Instanzen, nicht gr.Textbox(...) Konstruktoren
         btn_load_preset.click(fn=_apply_preset_to_sliders, inputs=[preset_dropdown], outputs=slider_components)
 
@@ -770,8 +969,8 @@ def build_demo():
         )
 
         btn_export_preset.click(
-            fn=_export_preset,
-            inputs=[preset_dropdown],
+            fn=_export_preset_with_meta,
+            inputs=[preset_dropdown, export_author],
             outputs=[export_file]   # File-Output (Pfad) — csv_output ist bereits ein gr.File
         )
 
@@ -781,6 +980,15 @@ def build_demo():
             inputs=[btn_import_preset],
             outputs=[import_status, preset_dropdown]
         )
+
+        # btn_import_file ist die gr.File-Komponente
+        btn_import_file.upload(fn=_preview_import_file, inputs=[btn_import_file], outputs=[import_preview, parsed_json_store, import_status])
+        # oder
+        btn_import_file.change(fn=_preview_import_file, inputs=[btn_import_file], outputs=[import_preview, import_status])
+
+        # oder bei neueren Gradio-Versionen evtl .change(...)
+        btn_confirm_import.click(fn=_confirm_import, inputs=[parsed_json_store, conflict_strategy], outputs=[import_status, preset_dropdown])
+
 
     return demo
 
