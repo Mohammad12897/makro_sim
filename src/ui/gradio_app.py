@@ -450,79 +450,30 @@ def run_years_explicit(
 # -------------------------
 def lexikon_erweitert_markdown() -> str:
     return r"""
-## 📖 Lexikon: Erweiterte Parameter in der Simulation
 
-### Kernparameter (Standard)
-- **USD Dominanz (`USD_Dominanz`)**
-  - Anteil der globalen Transaktionen/Reservierungen in US-Dollar.
-  - Höhere USD‑Dominanz → stärkere Abhängigkeit; kann Importkosten erhöhen.
+### Kritische Werte und Hinweise
 
-- **RMB Akzeptanz (`RMB_Akzeptanz`)**
-  - Grad der internationalen Nutzung des Renminbi.
-  - Höhere Akzeptanz → alternative Abwicklungswege; kann USD‑Risiko mindern.
+| **Parameter** | **Risiko Schwelle** | **Warum kritisch** | **Empfohlene Aktion** |
+|---|---:|---|---|
+| **USD_Dominanz** | **> 0.75** | Starke Abhängigkeit vom US‑Dollar erhöht Import‑ und Finanzrisiko | Diversifikation prüfen; RMB_Akzeptanz erhöhen |
+| **RMB_Akzeptanz** | **< 0.05** | Sehr geringe Akzeptanz reduziert Ausweichmöglichkeiten | Zahlungsrails und Handelsabkommen fördern |
+| **Zugangsresilienz** | **< 0.5** | Niedrige Resilienz → hohe Unterbrechungsanfälligkeit | Infrastruktur und Alternativnetz ausbauen |
+| **Reserven_Monate** | **< 3** Monate | Geringe Puffer für Importfinanzierung | Reserven aufstocken; Kreditlinien sichern |
+| **FX_Schockempfindlichkeit** | **> 1.2** | Hohe Empfindlichkeit → starke Preisvolatilität | Hedging, Liquiditätsmanagement verstärken |
+| **Sanktions_Exposure** | **> 0.1** | Hohes Exposure → reale Handelsrisiken | Lieferketten diversifizieren; Compliance prüfen |
+| **Alternativnetz_Abdeckung** | **< 0.3** | Wenig Ausweichnetz → eingeschränkte Optionen bei Störungen | Alternative Zahlungswege aufbauen |
+| **Liquiditaetsaufschlag** | **> 0.05** | Hohe Zusatzkosten bei Knappheit | Liquiditätsreserven erhöhen |
+| **CBDC_Nutzung** | **< 0.1 oder > 0.9** | Sehr niedrig: verpasste Effizienz; sehr hoch: neue Abhängigkeiten | Technologie und Governance prüfen |
+| **Golddeckung** | **< 0.05** | Sehr geringe Golddeckung reduziert Krisenpuffer | Diversifikation der Reserven erwägen |
+| **verschuldung** | **> 1.0 (UI Skala)** | Sehr hohe Verschuldung erhöht fiskalische Verwundbarkeit | Konsolidierung, externe Finanzierung prüfen |
+| **demokratie** | **< 0.3** | Geringe Rechenschaft → erhöhtes politisches Risiko | Governance Maßnahmen und Transparenz stärken |
 
-- **Zugangsresilienz (`Zugangsresilienz`)**
-  - Fähigkeit, Zahlungs- und Handelswege bei Störungen aufrechtzuerhalten.
-  - Hohe Resilienz → geringere Volatilität und stabilere Versorgung.
+#### Validierungsregeln beim Import
+- **Typprüfung**: `Reserven_Monate` muss **int** sein; andere numerische Parameter **float**.  
+- **Bereichsprüfung**: Werte außerhalb der UI‑Grenzen werden **geclamped** (auf nächstzulässigen Wert) oder als Fehler markiert.  
+- **Sanity Checks**: Kombinationen wie `Reserven_Monate < 3` und `USD_Dominanz > 0.7` erzeugen eine **Kritisch**‑Warnung.  
+- **UI Verhalten**: In der Import‑Vorschau werden Presets mit `Warnung` oder `Kritisch` markiert; beim Bestätigen wird eine Zusammenfassung angezeigt.
 
-- **Reserven Monate (`Reserven_Monate`)**
-  - Anzahl Monate, die durch Devisenreserven finanziert werden können.
-  - Mehr Monate → höhere Pufferkapazität.
-
-- **FX Schockempfindlichkeit (`FX_Schockempfindlichkeit`)**
-  - Empfindlichkeit gegenüber Wechselkursschocks (UI erlaubt 0.0–2.0).
-  - Höhere Werte → größere Schwankungen in Preisen und Kosten.
-
-- **Sanktions Exposure (`Sanktions_Exposure`)**
-  - Anteil der Wirtschaftsbeziehungen, die durch Sanktionen gefährdet sind.
-  - Höheres Exposure → erhöhtes Risiko für Handelsunterbrechungen.
-
-- **Alternativnetz Abdeckung (`Alternativnetz_Abdeckung`)**
-  - Verfügbarkeit alternativer Zahlungs‑/Abwicklungsnetzwerke.
-  - Größere Abdeckung → bessere Ausweichmöglichkeiten bei Störungen.
-
-- **Liquiditaetsaufschlag (`Liquiditaetsaufschlag`)**
-  - Zusatzkosten bei knapper Liquidität.
-  - Höherer Aufschlag → steigende Importkosten.
-
-- **CBDC Nutzung (`CBDC_Nutzung`)**
-  - Verbreitung digitaler Zentralbankwährungen.
-  - Höhere Nutzung → potenziell effizientere Abwicklung, Einfluss auf Resilienz.
-
-- **Golddeckung (`Golddeckung`)**
-  - Anteil der Reserven in Gold.
-  - Höhere Golddeckung → stabilisierender Puffer in Krisen.
-
-### Erweiterte Parameter (Erweitert‑Simulation)
-- **Innovationskraft (`innovation`)**
-  - Technologische und wirtschaftliche Innovationsfähigkeit.
-  - Schwache Innovation → höhere Importkosten; starke Innovation → senkt Importkosten.
-
-- **Fachkräfteangebot (`fachkraefte`)**
-  - Verfügbarkeit qualifizierter Arbeitskräfte.
-  - Mehr Fachkräfte → höhere Resilienz.
-
-- **Politische Stabilität (`stabilitaet`)**
-  - Institutionelle und politische Verlässlichkeit.
-  - Hohe Stabilität → stärkt Resilienz.
-
-- **Energiepreise / Wettbewerbsfähigkeit (`energie`)**
-  - Einfluss der Energiepreise auf Kostenstruktur.
-  - Hohe Energiepreise → mehr Volatilität.
-
-- **Staatsverschuldung (`verschuldung`)**
-  - Verhältnis der Schulden zum BIP (UI 0–2 möglich).
-  - Höhere Verschuldung → tendenziell höhere Volatilität; intern optional auf 0–1 skaliert.
-
-### Neuer Parameter: Demokratie (`demokratie`)
-- **Definition**
-  - Skala **0.0 – 1.0**; 0 = autoritär/geringe Rechenschaftspflicht, 1 = stabile, inklusive Demokratie mit funktionierenden Institutionen.
-- **Direkte Effekte im Modell**
-  - **Resilienz**: Demokratie erhöht `netto_resilienz` (z. B. additiv), weil Rechtsstaat, Transparenz und Rechenschaft Investitions‑ und Anpassungsfähigkeit fördern.
-  - **Volatilität**: Demokratie reduziert `system_volatilitaet` (z. B. kleinerer Basiseffekt), da Informationsflüsse und Institutionen Schocks dämpfen.
-  - **Importkosten**: Demokratie kann `importkosten_mult` leicht senken durch besseren Eigentumsschutz und geringere Transaktionskosten.
-
-... (voller Text in der Originaldatei kann hier stehen) ...
 """
 
 # --- Preset-Manager Hilfsfunktionen ---
@@ -602,83 +553,6 @@ def delete_preset(name: str):
     return False
 
 
-def _preview_import_file(uploaded):
-    """
-    Robust: akzeptiert Gradio UploadedFile oder Pfad-String.
-    Returns: (preview_rows, parsed_json_or_error_str)
-    preview_rows: list of [preset_name, status, sample_keys]
-    parsed_json_or_error_str: dict (parsed JSON) oder Fehler-String
-    """
-    try:
-        if not uploaded:
-            return [], "Keine Datei ausgewählt."
-
-        # 1) Wenn Gradio UploadedFile-Objekt (has .file or .name)
-        content_text = None
-        # uploaded may be a tuple/list (older gradio) -> take first
-        if isinstance(uploaded, (list, tuple)):
-            uploaded = uploaded[0]
-
-        # If it's a path-like string
-        if isinstance(uploaded, str):
-            p = Path(uploaded)
-            if not p.exists():
-                return [], f"Dateipfad nicht gefunden: {uploaded}"
-            content_text = p.read_text(encoding="utf-8")
-
-        else:
-            # Try common attributes
-            #  - uploaded.name may be filename only
-            #  - uploaded.file is a file-like object
-            #  - uploaded.read() may exist
-            if hasattr(uploaded, "file") and hasattr(uploaded.file, "read"):
-                uploaded.file.seek(0)
-                raw = uploaded.file.read()
-                if isinstance(raw, bytes):
-                    content_text = raw.decode("utf-8")
-                else:
-                    content_text = str(raw)
-            elif hasattr(uploaded, "read"):
-                raw = uploaded.read()
-                if isinstance(raw, bytes):
-                    content_text = raw.decode("utf-8")
-                else:
-                    content_text = str(raw)
-            else:
-                # fallback: try name as path
-                path = getattr(uploaded, "name", None)
-                if path and Path(path).exists():
-                    content_text = Path(path).read_text(encoding="utf-8")
-                else:
-                    return [], "Konnte Dateiinhalt nicht lesen (unbekannter Upload‑Typ)."
-
-        # Trim and quick empty check
-        if content_text is None or not content_text.strip():
-            return [], "Datei ist leer oder enthält nur Whitespaces."
-
-        # Parse JSON
-        try:
-            data = json.loads(content_text)
-        except Exception as e:
-            return [], f"Fehler beim Parsen der JSON: {e}"
-
-        if not isinstance(data, dict):
-            return [], "Ungültiges Format: JSON muss ein Objekt (dict) mit Preset-Namen sein."
-
-        existing = load_presets()
-        rows = []
-        for name, params in data.items():
-            status = "neu" if name not in existing else "konflikt"
-            sample_keys = ",".join(list(params.keys())[:3]) if isinstance(params, dict) else ""
-            rows.append([name, status, sample_keys])
-        return rows, data
-
-    except Exception as e:
-        import traceback
-        print("Preview import Fehler:", e)
-        print(traceback.format_exc())
-        return [], f"Unerwarteter Fehler: {e}"
-
 def _atomic_save_presets(presets: dict) -> bool:
     try:
         PRESETS_FILENAME.parent.mkdir(parents=True, exist_ok=True)
@@ -692,68 +566,6 @@ def _atomic_save_presets(presets: dict) -> bool:
         print("atomic save error:", e)
         return False
 
-
-def _confirm_import(parsed_json, strategy: str):
-    """
-    parsed_json: dict (aus _preview_import_file)
-    strategy: "überschreiben" | "überspringen" | "umbenennen"
-    """
-    try:
-        if not isinstance(parsed_json, dict):
-            return "Keine gültigen Presets zum Importieren.", gr.update(choices=get_preset_names())
-        presets = load_presets()
-        added = []
-        skipped = []
-        renamed = []
-        for name, params in parsed_json.items():
-            if name in presets:
-                if strategy == "überspringen":
-                    skipped.append(name)
-                    continue
-                if strategy == "überschreiben":
-                    presets[name] = params
-                    added.append(name)
-                    continue
-                if strategy == "umbenennen":
-                    base = name
-                    i = 1
-                    candidate = f"{base}_{i}"
-                    while candidate in presets:
-                        i += 1
-                        candidate = f"{base}_{i}"
-                    presets[candidate] = params
-                    renamed.append((name, candidate))
-                    continue
-            else:
-                presets[name] = params
-                added.append(name)
-        # atomisch speichern
-        ok = _atomic_save_presets(presets)
-        if not ok:
-            return "Fehler beim Schreiben der Presets.", gr.update(choices=get_preset_names())
-        msg = f"Import fertig. Hinzugefügt: {len(added)}; Übersprungen: {len(skipped)}; Umbenannt: {len(renamed)}"
-        return msg, gr.update(choices=get_preset_names(), value=None)
-    except Exception as e:
-        return f"Import-Fehler: {e}", gr.update(choices=get_preset_names())
-
-
-def _export_preset_with_meta(preset_name: str, author: str):
-    p = get_preset(preset_name)
-    if not p:
-        return None
-    export_obj = {
-        "metadata": {
-            "exported_at": datetime.utcnow().isoformat() + "Z",
-            "author": author or "unknown",
-            "source_file": str(PRESETS_FILENAME.resolve())
-        },
-        "presets": { preset_name: p }
-    }
-    # temporäre Datei erzeugen
-    tmp = tempfile.NamedTemporaryFile(prefix=f"preset_export_{preset_name}_", suffix=".json", delete=False)
-    tmp.write(json.dumps(export_obj, indent=2, ensure_ascii=False).encode("utf-8"))
-    tmp.close()
-    return tmp.name   # Gradio akzeptiert Pfad als File-Output
 
 def _import_preset_file(uploaded):
     """
@@ -803,6 +615,314 @@ def _import_preset_file(uploaded):
         print(traceback.format_exc())
         return False, gr.update(choices=get_preset_names())
 
+# --- Zusätzliche Importe (falls noch nicht vorhanden) ---
+
+# --- Export mit Metadaten (gibt temporären Dateipfad zurück oder None) ---
+def _export_preset_with_meta(preset_name: str, author: str):
+    """
+    Exportiert ein einzelnes Preset als JSON mit metadata.
+    Rückgabe: (tmp_path_or_None, status_text)
+    """
+    try:
+        if not preset_name:
+            return None, "Kein Preset ausgewählt."
+        p = get_preset(preset_name)
+        if not p:
+            return None, f"Preset '{preset_name}' nicht gefunden."
+        export_obj = {
+            "metadata": {
+                "exported_at": datetime.utcnow().isoformat() + "Z",
+                "author": author or "unknown",
+                "source_file": str(PRESETS_FILENAME.resolve()) if 'PRESETS_FILENAME' in globals() else ""
+            },
+            "presets": { preset_name: p }
+        }
+        tmp = tempfile.NamedTemporaryFile(prefix=f"preset_export_{preset_name}_", suffix=".json", delete=False)
+        tmp.write(json.dumps(export_obj, indent=2, ensure_ascii=False).encode("utf-8"))
+        tmp.close()
+        return tmp.name, "Export erfolgreich."
+    except Exception as e:
+        import traceback
+        print("Export Fehler:", e)
+        print(traceback.format_exc())
+        return None, f"Export fehlgeschlagen: {e}"
+
+# --- Robustes Lesen von Upload-Objekten (Hilfsfunktion) ---
+def _read_uploaded_content(uploaded):
+    """
+    Liefert den Textinhalt eines Gradio-Uploads oder Pfad-Strings zurück.
+    Gibt None bei Fehlern.
+    """
+    try:
+        if not uploaded:
+            return None
+        if isinstance(uploaded, (list, tuple)):
+            uploaded = uploaded[0]
+        # UploadedFile-like (has .file)
+        if hasattr(uploaded, "file") and hasattr(uploaded.file, "read"):
+            uploaded.file.seek(0)
+            raw = uploaded.file.read()
+            return raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
+        # direct path string
+        if isinstance(uploaded, str) and Path(uploaded).exists():
+            return Path(uploaded).read_text(encoding="utf-8")
+        # object with .name that is a path
+        if hasattr(uploaded, "name") and Path(getattr(uploaded, "name")).exists():
+            return Path(getattr(uploaded, "name")).read_text(encoding="utf-8")
+        # fallback: .read()
+        if hasattr(uploaded, "read"):
+            raw = uploaded.read()
+            return raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
+        return None
+    except Exception as e:
+        print("read_uploaded_content Fehler:", e)
+        print(traceback.format_exc())
+        return None
+
+# --- Preview Import Funktion (gibt immer 3 Werte zurück) ---
+def _preview_import_file(uploaded):
+    """
+    Robust: akzeptiert Gradio UploadedFile, Pfad-String oder list/tuple.
+    Returns: (preview_rows, parsed_json_or_None, status_text)
+    preview_rows: list of [preset_name, status, sample_keys]
+    parsed_json_or_None: dict (parsed JSON) oder None
+    status_text: str
+    """
+    try:
+        content_text = _read_uploaded_content(uploaded)
+        if not content_text or not content_text.strip():
+            return [], None, "Keine Datei ausgewählt oder Datei ist leer."
+        try:
+            data = json.loads(content_text)
+        except Exception as e:
+            return [], None, f"Fehler beim Parsen der JSON: {e}"
+        # Falls Export-Meta-Format: extrahiere "presets"
+        if isinstance(data, dict) and "presets" in data and isinstance(data["presets"], dict):
+            data = data["presets"]
+        if not isinstance(data, dict):
+            return [], None, "Ungültiges Format: JSON muss ein Objekt (dict) mit Preset-Namen sein."
+        existing = load_presets()
+        #rows = []
+        #for name, params in data.items():
+            #status = "neu" if name not in existing else "konflikt"
+            #sample_keys = ",".join(list(params.keys())[:3]) if isinstance(params, dict) else ""
+            #rows.append([name, status, sample_keys])
+        #return rows, data, "Vorschau geladen. Wähle Strategie und bestätige den Import."
+
+        rows = _rows_with_warnings(data)
+        # Hinweis: import_preview Dataframe muss jetzt 5 Spalten anzeigen:
+        # ["preset_name","status","sample_keys","warning_level","warning_msg"]
+        return rows, data, "Vorschau geladen. Markierte Presets enthalten Warnungen."
+
+    except Exception as e:
+        print("Preview import Fehler:", e)
+        print(traceback.format_exc())
+        return [], None, f"Unerwarteter Fehler: {e}"
+
+# --- Confirm Import (Konfliktstrategien: überschreiben | überspringen | umbenennen) ---
+def _confirm_import(parsed_json, strategy: str):
+    try:
+        if not isinstance(parsed_json, dict):
+            return "Keine gültigen Presets zum Importieren.", gr.update(choices=get_preset_names())
+        presets = load_presets()
+        added = []
+        skipped = []
+        renamed = []
+        for name, params in parsed_json.items():
+            if name in presets:
+                if strategy == "überspringen":
+                    skipped.append(name)
+                    continue
+                if strategy == "überschreiben":
+                    presets[name] = params
+                    added.append(name)
+                    continue
+                if strategy == "umbenennen":
+                    base = name
+                    i = 1
+                    candidate = f"{base}_{i}"
+                    while candidate in presets:
+                        i += 1
+                        candidate = f"{base}_{i}"
+                    presets[candidate] = params
+                    renamed.append((name, candidate))
+                    continue
+            else:
+                presets[name] = params
+                added.append(name)
+
+        # atomisch speichern
+        ok = _atomic_save_presets(presets) if "_atomic_save_presets" in globals() else save_presets(presets)
+        if not ok:
+            return "Fehler beim Schreiben der Presets.", gr.update(choices=get_preset_names())
+
+        # nach dem Speichern: bestimme Warnstatistik
+        crit_count = 0
+        warn_count = 0
+        for name in added + [r[1] for r in renamed]:
+            p = presets.get(name, {})
+            _, ws = validate_preset(p, clamp=False)
+            if any(w[0] == "critical" for w in ws):
+                crit_count += 1
+            elif ws:
+                warn_count += 1
+
+        msg = f"Import fertig. Hinzugefügt: {len(added)}; Übersprungen: {len(skipped)}; Umbenannt: {len(renamed)}."
+        if crit_count or warn_count:
+            msg += f" Kritisch: {crit_count}; Warnungen: {warn_count}."
+
+        return msg, gr.update(choices=get_preset_names(), value=None)
+    except Exception as e:
+        return f"Import-Fehler: {e}", gr.update(choices=get_preset_names())
+
+# --- Optional: Wrapper für direkten Preset-Import (ohne Preview) ---
+def _import_preset_file_direct(uploaded):
+    """
+    Direktes Importieren einer Preset-JSON (ohne Preview). Gibt (ok: bool, dropdown_update) zurück.
+    """
+    try:
+        content = _read_uploaded_content(uploaded)
+        if not content:
+            return False, gr.update(choices=get_preset_names())
+        data = json.loads(content)
+        # handle export-with-meta
+        if isinstance(data, dict) and "presets" in data and isinstance(data["presets"], dict):
+            data = data["presets"]
+        if not isinstance(data, dict):
+            return False, gr.update(choices=get_preset_names())
+        presets = load_presets()
+        presets.update(data)
+        ok = save_presets(presets)
+        return bool(ok), gr.update(choices=get_preset_names())
+    except Exception as e:
+        print("Import Preset Fehler:", e)
+        print(traceback.format_exc())
+        return False, gr.update(choices=get_preset_names())
+
+
+# --- Validierung / Warnungen für Presets ---
+def validate_preset(params: dict, clamp: bool = True):
+    """
+    Prüft ein Preset-Dict und gibt (clean_params, warnings) zurück.
+    - clean_params: ggf. geclampte/konvertierte Parameter
+    - warnings: Liste von (level, message) mit level in {"info","warn","critical"}
+    """
+    warnings = []
+    clean = dict(params) if isinstance(params, dict) else {}
+    # Hilfs: get numeric with fallback
+    def _get(key, default=None):
+        return clean.get(key, default)
+
+    # Typkonvertierungen / Clamping nach PARAM_SLIDERS
+    for key, lo, hi, default in PARAM_SLIDERS:
+        if key not in clean:
+            clean[key] = default
+            continue
+        val = clean[key]
+        # Reserven als int
+        if key == "Reserven_Monate":
+            try:
+                v = int(val)
+            except Exception:
+                v = int(default)
+                warnings.append(("warn", f"{key} war ungültig, auf {v} gesetzt"))
+            if clamp:
+                v = max(int(lo), min(int(hi), v))
+            clean[key] = v
+        else:
+            try:
+                v = float(val)
+            except Exception:
+                v = float(default)
+                warnings.append(("warn", f"{key} war ungültig, auf {v} gesetzt"))
+            if clamp:
+                v = max(float(lo), min(float(hi), v))
+            clean[key] = v
+
+    # Regeln für kritische Schwellen
+    if clean.get("USD_Dominanz", 0.0) > 0.75 and clean.get("Reserven_Monate", 0) < 3:
+        warnings.append(("critical", "Hohe USD_Dominanz kombiniert mit niedrigen Reserven → Kritisches Importrisiko"))
+    if clean.get("FX_Schockempfindlichkeit", 0.0) > 1.2:
+        warnings.append(("warn", "Hohe FX Schockempfindlichkeit → erhöhte Volatilität"))
+    if clean.get("Sanktions_Exposure", 0.0) > 0.1:
+        warnings.append(("warn", "Sanktions Exposure hoch → Lieferkettenrisiko"))
+    if clean.get("Zugangsresilienz", 1.0) < 0.5:
+        warnings.append(("warn", "Zugangsresilienz niedrig → erhöhte Unterbrechungsanfälligkeit"))
+    if clean.get("demokratie", 1.0) < 0.3:
+        warnings.append(("warn", "Niedrige Demokratie‑Skala → politisches Risiko"))
+    if clean.get("Alternativnetz_Abdeckung", 1.0) < 0.3:
+        warnings.append(("warn", "Geringe Alternativnetz‑Abdeckung → wenige Ausweichoptionen"))
+    # weitere Regeln nach Bedarf...
+
+    return clean, warnings
+
+def _rows_with_warnings(parsed_presets: dict):
+    """
+    Erzeugt Vorschau‑Zeilen mit Warnstufen.
+    Rückgabe: rows: [[name, status, sample_keys, warning_level, warning_msg], ...]
+    warning_level: '', 'warn', 'critical'
+    """
+    rows = []
+    existing = load_presets()
+    for name, params in parsed_presets.items():
+        status = "neu" if name not in existing else "konflikt"
+        sample_keys = ",".join(list(params.keys())[:3]) if isinstance(params, dict) else ""
+        _, warnings = validate_preset(params, clamp=False)  # nur prüfen, nicht clampen in Vorschau
+        if any(w[0] == "critical" for w in warnings):
+            level = "critical"
+        elif warnings:
+            level = "warn"
+        else:
+            level = ""
+        # kombiniere Warntexte kurz
+        warning_msg = "; ".join([w[1] for w in warnings]) if warnings else ""
+        rows.append([name, status, sample_keys, level, warning_msg])
+    return rows
+
+def _load_preset_with_warning(preset_name):
+    """
+    Lädt ein Preset, validiert es (nur prüfen, nicht clampen) und gibt:
+    (slider_update_1, slider_update_2, ..., slider_update_N, status_text)
+    zurück. Die Anzahl der Slider muss mit len(PARAM_SLIDERS) übereinstimmen.
+    """
+    try:
+        # Falls kein Preset ausgewählt, gib None-Updates für alle Slider zurück
+        if not preset_name:
+            none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
+            return (*none_updates, "Kein Preset ausgewählt.")
+
+        preset = get_preset(preset_name)
+        if not preset:
+            none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
+            return (*none_updates, f"Preset '{preset_name}' nicht gefunden.")
+
+        # Validieren (nur prüfen, nicht clampen)
+        clean, warnings = validate_preset(preset, clamp=False)
+
+        # Erzeuge die Updates in der Reihenfolge von PARAM_SLIDERS
+        updates = []
+        for key, lo, hi, default in PARAM_SLIDERS:
+            val = clean.get(key, default)
+            updates.append(gr.update(value=val))
+
+        # Statustext je nach Warnungen
+        if any(w[0] == "critical" for w in warnings):
+            status = "Achtung: Preset enthält kritische Werte."
+        elif warnings:
+            status = "Warnungen im Preset vorhanden."
+        else:
+            status = "Preset geladen."
+
+        # WICHTIG: entpacke die Liste beim Zurückgeben
+        return (*updates, status)
+    except Exception as e:
+        import traceback
+        print("Fehler in _load_preset_with_warning:", e)
+        print(traceback.format_exc())
+        # Fallback: None für alle Slider + Fehlermeldung
+        none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
+        return (*none_updates, f"Fehler beim Laden des Presets: {e}")
+        
 def build_demo():
     with gr.Blocks() as demo:
         gr.Markdown("## Makro‑Simulator — interaktive Oberfläche")
@@ -828,7 +948,8 @@ def build_demo():
 
                 # Import UI
                 btn_import_file = gr.File(label="Preset JSON auswählen", file_types=[".json"], file_count="single")
-                import_preview = gr.Dataframe(headers=["preset_name","status","sample_keys"], label="Import Vorschau", row_count=10)
+                #import_preview = gr.Dataframe(headers=["preset_name","status","sample_keys"], label="Import Vorschau", row_count=10)
+                import_preview = gr.Dataframe(headers=["preset_name","status","sample_keys","warning_level","warning_msg"], label="Import Vorschau", row_count=10)
                 import_status = gr.Textbox(label="Import Status", visible=True)
                 conflict_strategy = gr.Radio(choices=["überschreiben","überspringen","umbenennen"], value="überschreiben")
                 btn_confirm_import = gr.Button("Import bestätigen")
@@ -1006,19 +1127,21 @@ def build_demo():
         btn_years.click(fn=run_years_wrapper, inputs=inputs_years, outputs=[summary_table, years_plot, years_table])
 
         # Preset Buttons
-        btn_load_preset.click(fn=_apply_preset_to_sliders, inputs=[preset_dropdown], outputs=slider_components)
+        #btn_load_preset.click(fn=_apply_preset_to_sliders, inputs=[preset_dropdown], outputs=slider_components)
+        btn_load_preset.click(fn=_load_preset_with_warning, inputs=[preset_dropdown], outputs=[*slider_components, import_status])
         btn_save_preset.click(fn=_save_current_as_preset, inputs=slider_components + [preset_name], outputs=[save_status, preset_dropdown])
         btn_delete_preset.click(fn=_delete_preset, inputs=[preset_dropdown], outputs=[del_status, preset_dropdown])
-        btn_export_preset.click(fn=_on_export_preset, inputs=[preset_dropdown, export_author], outputs=[export_file, import_status])
+        btn_export_preset.click(fn=_export_preset_with_meta, inputs=[preset_dropdown, export_author], outputs=[export_file, import_status])
+        #btn_export_preset.click(fn=_on_export_preset, inputs=[preset_dropdown, export_author], outputs=[export_file, import_status])
 
         # File import (preview) -> gibt (rows, parsed_json, status)
         # parsed_json_store ist gr.State und erhält das geparste dict
         btn_import_file.upload(fn=_preview_import_file, inputs=[btn_import_file], outputs=[import_preview, parsed_json_store, import_status])
         # Bestätigen des Imports: parsed_json_store + strategy -> status + dropdown update
-        btn_confirm_import.click(fn=_on_confirm_import, inputs=[parsed_json_store, conflict_strategy], outputs=[import_status, preset_dropdown])
+        btn_confirm_import.click(fn=_confirm_import, inputs=[parsed_json_store, conflict_strategy], outputs=[import_status, preset_dropdown])
 
         # Direktes Preset-Import (alternative, falls Nutzer eine Preset-Datei direkt importieren will)
-        btn_import_preset.upload(fn=_import_preset_file, inputs=[btn_import_preset], outputs=[import_status, preset_dropdown])
+        btn_import_preset.upload(fn=_import_preset_file_direct, inputs=[btn_import_preset], outputs=[import_status, preset_dropdown])
 
     return demo
 
