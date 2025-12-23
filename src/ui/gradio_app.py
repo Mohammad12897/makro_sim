@@ -469,15 +469,26 @@ def lexikon_erweitert_markdown() -> str:
 | **demokratie** | **< 0.3** | Geringe Rechenschaft → erhöhtes politisches Risiko | Governance Maßnahmen und Transparenz stärken |
 
 #### Validierungsregeln beim Import
-- **Typprüfung**: `Reserven_Monate` muss **int** sein; andere numerische Parameter **float**.  
-- **Bereichsprüfung**: Werte außerhalb der UI‑Grenzen werden **geclamped** (auf nächstzulässigen Wert) oder als Fehler markiert.  
-- **Sanity Checks**: Kombinationen wie `Reserven_Monate < 3` und `USD_Dominanz > 0.7` erzeugen eine **Kritisch**‑Warnung.  
+- **Typprüfung**: `Reserven_Monate` muss **int** sein; andere numerische Parameter **float**.
+- **Bereichsprüfung**: Werte außerhalb der UI‑Grenzen werden **geclamped** (auf nächstzulässigen Wert) oder als Fehler markiert.
+- **Sanity Checks**: Kombinationen wie `Reserven_Monate < 3` und `USD_Dominanz > 0.7` erzeugen eine **Kritisch**‑Warnung.
 - **UI Verhalten**: In der Import‑Vorschau werden Presets mit `Warnung` oder `Kritisch` markiert; beim Bestätigen wird eine Zusammenfassung angezeigt.
+
+### Neuer Parameter: Demokratie (`demokratie`)
+- **Definition**
+  - Skala **0.0 – 1.0**; 0 = autoritär/geringe Rechenschaftspflicht, 1 = stabile, inklusive Demokratie mit funktionierenden Institutionen.
+- **Direkte Effekte im Modell**
+  - **Resilienz**: Demokratie erhöht `netto_resilienz` (z. B. additiv), weil Rechtsstaat, Transparenz und Rechenschaft Investitions‑ und Anpassungsfähigkeit fördern.
+  - **Volatilität**: Demokratie reduziert `system_volatilitaet` (z. B. kleinerer Basiseffekt), da Informationsflüsse und Institutionen Schocks dämpfen.
+  - **Importkosten**: Demokratie kann `importkosten_mult` leicht senken durch besseren Eigentumsschutz und geringere Transaktionskosten.
+
 
 """
 
 # --- Preset-Manager Hilfsfunktionen ---
 PRESETS_FILENAME = DATA_DIR / "presets.json" if DATA_DIR is not None else Path("presets.json")
+# /content/makro_sim/data/presets.json
+PRESETS_FILENAME = Path("data/presets.json")
 
 def _ensure_presets_file():
     try:
@@ -922,7 +933,7 @@ def _load_preset_with_warning(preset_name):
         # Fallback: None für alle Slider + Fehlermeldung
         none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
         return (*none_updates, f"Fehler beim Laden des Presets: {e}")
-        
+
 def build_demo():
     with gr.Blocks() as demo:
         gr.Markdown("## Makro‑Simulator — interaktive Oberfläche")

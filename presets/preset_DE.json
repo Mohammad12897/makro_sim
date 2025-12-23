@@ -1,0 +1,32 @@
+{
+  "name": "preset_DE",
+  "description": "Preset für Land DE",
+  "version": "1.0",
+  "indicator_snapshot": {
+    "FI_RES_TOTL": {
+      "value": null,
+      "year": null,
+      "source": "missing",
+      "indicator": "FI.RES.TOTL",
+      "note": "invalid_indicator"
+    },
+    "NE_IMP_GNFS_CD": {
+      "value": 1764438191610.94,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "NE.IMP.GNFS.CD",
+      "monthly_imports_usd": 147036515967.57834
+    },
+    "DT_DOD_DECT_GN_ZS": {
+      "value": null,
+      "year": null,
+      "source": "WB_empty",
+      "indicator": "DT.DOD.DECT.GN.ZS",
+      "note": "no_values"
+    }
+  },
+  "metadata": {
+    "created_by": "auto-generator",
+    "created_at": "2025-12-23T07:01:29.867036Z"
+  }
+}

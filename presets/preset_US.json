@@ -1,0 +1,32 @@
+{
+  "name": "preset_US",
+  "description": "Preset für Land US",
+  "version": "1.0",
+  "indicator_snapshot": {
+    "FI_RES_TOTL": {
+      "value": null,
+      "year": null,
+      "source": "missing",
+      "indicator": "FI.RES.TOTL",
+      "note": "invalid_indicator"
+    },
+    "NE_IMP_GNFS_CD": {
+      "value": 4103100000000,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "NE.IMP.GNFS.CD",
+      "monthly_imports_usd": 341925000000.0
+    },
+    "DT_DOD_DECT_GN_ZS": {
+      "value": null,
+      "year": null,
+      "source": "WB_empty",
+      "indicator": "DT.DOD.DECT.GN.ZS",
+      "note": "no_values"
+    }
+  },
+  "metadata": {
+    "created_by": "auto-generator",
+    "created_at": "2025-12-23T07:01:31.015388Z"
+  }
+}

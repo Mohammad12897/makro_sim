@@ -1,114 +1,334 @@
 #!/usr/bin/env python3
-# scripts/generate_presets.py
-# Erzeugt Preset-JSONs für Länder basierend auf src.etl.DataAPI und src.etl.transforms
-# Robust: timezone-aware timestamps, Backup, Debug-Logging, optional test_overrides
+# coding: utf-8
 
-import sys
-from pathlib import Path
-from datetime import datetime, timezone
+"""
+generate_presets.py
+- Validiert Indikatoren (World Bank metadata)
+- Holt Indikatorwerte pro Land (World Bank)
+- Rechnet Monatswerte aus Jahreswerten (konfigurierbar)
+- Versucht Fallback-Quellen (lokale CSV oder custom fetcher)
+- Schreibt presets/preset_<COUNTRY>.json
+"""
+
+import os
 import json
+import time
+import logging
+import requests
+from datetime import datetime
+from typing import List, Dict, Any, Optional
 
-# Sicherstellen, dass Projekt-Root im sys.path ist (macht das Script portabel)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+# ---------- Konfiguration ----------
+OUTPUT_DIR = "presets"
+LOG_FILE = "generate_presets.log"
+INDICATORS_CSV = "indicators.csv"
+INDICATORS_JSON = "indicators.json"
+INDICATOR_CACHE = "indicator_cache.json"
+WB_BASE = "https://api.worldbank.org/v2"
+REQUEST_TIMEOUT = 10
+MAX_RETRIES = 3
+BACKOFF_FACTOR = 1.5
+VALIDATION_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 Tage
+COUNTRIES = ["DE", "CN", "US", "IR", "BR", "IN"]
+USE_FALLBACK = True
+FALLBACK_CSV = "fallback_data.csv"
+# -----------------------------------
 
-from src.etl.fetchers import DataAPI
-from src.etl.transforms import map_indicators_to_preset
+# Logging konfigurieren
+logger = logging.getLogger("generate_presets")
+logger.setLevel(logging.DEBUG)
+fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+ch = logging.StreamHandler()
+ch.setFormatter(fmt)
+ch.setLevel(logging.INFO)
+fh = logging.FileHandler(LOG_FILE)
+fh.setFormatter(fmt)
+fh.setLevel(logging.DEBUG)
+logger.addHandler(ch)
+logger.addHandler(fh)
 
-# Ausgabe-Pfade
-OUT = Path("data/presets.json")
-OUT.parent.mkdir(parents=True, exist_ok=True)
-BACKUP_DIR = OUT.parent / "backups"
-BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+# ----------------- Hilfsfunktionen -----------------
+def load_indicators() -> List[str]:
+    if os.path.exists(INDICATORS_JSON):
+        logger.info(f"Lade Indikatoren aus {INDICATORS_JSON}")
+        with open(INDICATORS_JSON, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return list(data) if isinstance(data, list) else data.get("indicators", [])
+    if os.path.exists(INDICATORS_CSV):
+        logger.info(f"Lade Indikatoren aus {INDICATORS_CSV}")
+        inds = []
+        with open(INDICATORS_CSV, "r", encoding="utf-8") as f:
+            for line in f:
+                s = line.strip()
+                if s and not s.startswith("#"):
+                    inds.append(s)
+        return inds
+    logger.info("Keine Indikator-Datei gefunden, verwende eingebaute Liste")
+    return ["FI.RES.TOTL", "NE.IMP.GNFS.CD", "DT.DOD.DECT.GN.ZS"]
 
-# Länderliste: ISO2 -> Reporter (optional)
-COUNTRIES = {
-    "DE": {"iso": "DE", "reporter": "276"},
-    "CN": {"iso": "CN", "reporter": "156"},
-    "US": {"iso": "US", "reporter": "840"},
-    "IR": {"iso": "IR", "reporter": "364"},
-    "BR": {"iso": "BR", "reporter": "076"},
-    "IN": {"iso": "IN", "reporter": "356"},
-}
-
-def load_existing():
-    if OUT.exists():
+def load_cache() -> Dict[str, Any]:
+    if os.path.exists(INDICATOR_CACHE):
         try:
-            return json.loads(OUT.read_text(encoding="utf-8"))
+            with open(INDICATOR_CACHE, "r", encoding="utf-8") as f:
+                return json.load(f)
         except Exception as e:
-            print("[load_existing] failed to read existing presets:", e)
-            return {}
+            logger.warning("Cache konnte nicht geladen werden: %s", e)
     return {}
 
-def backup_existing():
-    if OUT.exists():
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        b = BACKUP_DIR / f"presets_{ts}.json"
-        try:
-            b.write_text(OUT.read_text(encoding="utf-8"), encoding="utf-8")
-            print("Backup written:", b)
-        except Exception as e:
-            print("[backup_existing] failed to write backup:", e)
-
-def build_for_country(code, meta):
-    print("Processing", code)
-    api = DataAPI(country_iso=meta["iso"], reporter_code=meta.get("reporter", ""))
-    # --- Optional: temporäre Test-Overrides für Debug (auskommentieren im Produktivbetrieb) ---
-    # if code == "DE":
-    #     api.test_overrides = {"reserves_usd": 250e9, "monthly_imports_usd": 147e9, "cofer_usd_share": 0.55}
-    # elif code == "CN":
-    #     api.test_overrides = {"reserves_usd": 3200e9, "monthly_imports_usd": 268e9, "cofer_usd_share": 0.50}
-    # ------------------------------------------------------------------------------
-
-    inds = api.build_indicators_snapshot()
-    # Debug: zeige verwendete Indikatoren
+def save_cache(cache: Dict[str, Any]) -> None:
     try:
-        print(f"{code} indicators:", json.dumps(inds, indent=2, ensure_ascii=False))
-    except Exception:
-        print(f"{code} indicators: (could not pretty-print)")
-
-    # Markiere, ob lokale COFER/Reserves-Dateien vorhanden sind
-    inds["cofer_present"] = bool(api.cache_dir.joinpath(f"cofer_{code}.json").exists() or api.cache_dir.joinpath(f"cofer_{code}.csv").exists())
-    inds["reserves_local_present"] = bool(api.cache_dir.joinpath(f"reserves_{code}.csv").exists() or api.cache_dir.joinpath(f"reserves_{code}.json").exists())
-
-    preset_params, meta_info = map_indicators_to_preset(inds, country_iso=code)
-
-    # Ergänze/vereinheitliche Metadaten
-    metadata = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "country": code,
-        "sources": meta_info.get("source_map", {}),
-        "confidence": meta_info.get("confidence", inds.get("confidence", "low")),
-        "notes": meta_info.get("notes", "")
-    }
-
-    preset_obj = {
-        "params": preset_params,
-        "metadata": metadata
-    }
-    return f"preset_{code}", preset_obj
-
-def main():
-    existing = load_existing()
-    new_presets = {}
-
-    for code, meta in COUNTRIES.items():
-        key, preset_obj = build_for_country(code, meta)
-        new_presets[key] = preset_obj
-
-    # Backup vorheriger Datei
-    backup_existing()
-
-    # Merge (überschreibt gleiche Keys)
-    merged = existing.copy()
-    merged.update(new_presets)
-
-    try:
-        OUT.write_text(json.dumps(merged, indent=2, ensure_ascii=False), encoding="utf-8")
-        print("Wrote presets:", list(new_presets.keys()))
+        with open(INDICATOR_CACHE, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print("[main] failed to write presets.json:", e)
+        logger.warning("Cache konnte nicht gespeichert werden: %s", e)
+
+def save_json(path: str, data: Dict[str, Any]) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ----------------- World Bank GET mit Retries -----------------
+def _wb_get(url: str, params: Dict[str, Any]) -> Optional[Any]:
+    attempt = 0
+    while attempt <= MAX_RETRIES:
+        try:
+            r = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+            r.raise_for_status()
+            try:
+                return r.json()
+            except ValueError:
+                logger.error("Ungültige JSON-Antwort von WB: %s", r.text[:500])
+                return None
+        except requests.RequestException as e:
+            logger.warning("WB RequestException %s (attempt %d)", e, attempt)
+            sleep = BACKOFF_FACTOR * (2 ** attempt)
+            time.sleep(sleep)
+            attempt += 1
+    logger.error("Max retries erreicht für URL %s", url)
+    return None
+
+# ----------------- Validierung (metadata endpoint) -----------------
+def validate_indicator(indicator: str, cache: Dict[str, Any]) -> bool:
+    now = time.time()
+    cache_key = f"validate:{indicator}"
+    cached = cache.get(cache_key)
+    if cached:
+        age = now - cached.get("checked_at", 0)
+        if age < VALIDATION_TTL_SECONDS:
+            logger.debug("Verwende Validierungs-Cache für %s (age %ds)", indicator, int(age))
+            return cached.get("valid", False)
+
+    url = f"{WB_BASE}/indicator/{indicator}"
+    params = {"format": "json"}
+    head = _wb_get(url, params)
+    valid = False
+    if head is None:
+        logger.warning("Keine Antwort bei Validierung von %s", indicator)
+        valid = False
+    else:
+        if isinstance(head, list) and head and isinstance(head[0], dict) and "message" in head[0]:
+            logger.info("WB metadata returned message for indicator %s: %s", indicator, head[0].get("message"))
+            valid = False
+        else:
+            valid = True
+
+    cache[cache_key] = {"valid": valid, "checked_at": now}
+    save_cache(cache)
+    return valid
+
+# ----------------- Fetch indicator for country -----------------
+def fetch_worldbank_indicator(country: str, indicator: str) -> Dict[str, Any]:
+    url = f"{WB_BASE}/country/{country}/indicator/{indicator}"
+    params = {"format": "json", "per_page": 100}
+    head = _wb_get(url, params)
+    if head is None:
+        return {"status": "error", "message": "no_response"}
+    if isinstance(head, list) and head and isinstance(head[0], dict) and "message" in head[0]:
+        return {"status": "error", "message": head[0].get("message"), "raw_head": head}
+    if isinstance(head, list) and len(head) > 1:
+        paging = head[0]
+        data = head[1]
+        if not data:
+            return {"status": "empty", "paging": paging}
+        return {"status": "ok", "paging": paging, "data": data}
+    return {"status": "unexpected", "raw": head}
+
+def latest_value_from_data(data: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    for entry in data:
+        if entry.get("value") is not None:
+            return entry
+    return None
+
+# ----------------- Fallback: lokale CSV loader -----------------
+def load_fallback_csv(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    fallback = {}
+    if not os.path.exists(path):
+        return fallback
+    import csv
+    with open(path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            c = row.get("country")
+            ind = row.get("indicator")
+            year = row.get("year")
+            val = row.get("value")
+            src = row.get("source") or "fallback_csv"
+            if not (c and ind and val):
+                continue
+            try:
+                v = float(val)
+            except:
+                continue
+            fallback.setdefault(c, {})[ind] = {"year": year, "value": v, "source": src}
+    return fallback
+
+# ----------------- Fallback: placeholder for IMF/COFER or other API -----------------
+def fetch_from_imf_cofer(country: str, indicator: str) -> Optional[Dict[str, Any]]:
+    # Platzhalter: implementiere echten Abruf hier, falls verfügbar.
+    return None
+
+# ----------------- Monatsregeln (neu) -----------------
+def apply_monthly_rules(indicator: str, snapshot: Dict[str, Any]) -> None:
+    """
+    Ergänzt snapshot um monatliche Ableitungen oder zusätzliche Felder.
+    Modifiziert snapshot in-place.
+    """
+    val = snapshot.get("value")
+    if val is None:
+        return
+
+    # lineare Monatsableitung für nominale Jahreswerte (USD)
+    if indicator == "NE.IMP.GNFS.CD":
+        snapshot["monthly_imports_usd"] = val / 12.0
+    elif indicator == "FI.RES.TOTL":
+        snapshot["monthly_reserves_usd"] = val / 12.0
+    elif indicator == "NY.GDP.MKTP.CD":
+        snapshot["monthly_gdp_usd"] = val / 12.0
+    elif indicator == "NE.EXP.GNFS.CD":
+        snapshot["monthly_exports_usd"] = val / 12.0
+    elif indicator == "BX.KLT.DINV.CD.WD":
+        snapshot["monthly_fdi_net_usd"] = val / 12.0
+
+    # Für Wachstumsraten / Prozentangaben: dokumentiere latest_annual_change
+    if indicator in ("FP.CPI.TOTL.ZG", "GC.XPN.TOTL.GD.ZS"):
+        snapshot["latest_annual_change"] = val
+
+# ----------------- Preset-Building mit Monatswerten und Fallback -----------------
+def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any], fallback_data: Dict[str, Any]) -> Dict[str, Any]:
+    preset = {
+        "name": f"preset_{country_code}",
+        "description": f"Preset für Land {country_code}",
+        "version": "1.0",
+        "indicator_snapshot": {},
+        "metadata": {
+            "created_by": "auto-generator",
+            "created_at": datetime.utcnow().isoformat() + "Z"
+        }
+    }
+
+    for ind in indicators:
+        key = ind.replace(".", "_")
+        # Validierung
+        if not validate_indicator(ind, cache):
+            logger.warning("Indikator %s ist ungültig oder nicht verfügbar. Versuche Fallback.", ind)
+            snapshot = {"value": None, "year": None, "source": "missing", "indicator": ind, "note": "invalid_indicator"}
+            fb = None
+            if USE_FALLBACK:
+                fb = fallback_data.get(country_code, {}).get(ind) or fetch_from_imf_cofer(country_code, ind)
+            if fb:
+                snapshot["value"] = fb.get("value")
+                snapshot["year"] = fb.get("year")
+                snapshot["source"] = fb.get("source", "fallback")
+                snapshot["note"] = "from_fallback"
+                apply_monthly_rules(ind, snapshot)
+            preset["indicator_snapshot"][key] = snapshot
+            cache[f"{country_code}:{ind}"] = snapshot
+            continue
+
+        # Normaler WB-Abruf
+        res = fetch_worldbank_indicator(country_code, ind)
+        snapshot = {"value": None, "year": None, "source": None, "indicator": ind}
+        if res["status"] == "ok":
+            entry = latest_value_from_data(res["data"])
+            if entry:
+                snapshot["value"] = entry.get("value")
+                snapshot["year"] = entry.get("date")
+                snapshot["source"] = "WB"
+                apply_monthly_rules(ind, snapshot)
+                logger.info("Got %s %s -> %s (year %s)", country_code, ind, snapshot["value"], snapshot.get("year"))
+            else:
+                snapshot["source"] = "WB_empty"
+                snapshot["note"] = "no_values"
+                logger.info("WB liefert keine Werte für %s %s", country_code, ind)
+                if USE_FALLBACK:
+                    fb = fallback_data.get(country_code, {}).get(ind) or fetch_from_imf_cofer(country_code, ind)
+                    if fb:
+                        snapshot["value"] = fb.get("value")
+                        snapshot["year"] = fb.get("year")
+                        snapshot["source"] = fb.get("source", "fallback")
+                        snapshot["note"] = "wb_empty_used_fallback"
+                        apply_monthly_rules(ind, snapshot)
+        elif res["status"] == "empty":
+            snapshot["source"] = "WB_empty"
+            snapshot["note"] = "empty"
+            logger.info("WB empty für %s %s", country_code, ind)
+            if USE_FALLBACK:
+                fb = fallback_data.get(country_code, {}).get(ind) or fetch_from_imf_cofer(country_code, ind)
+                if fb:
+                    snapshot["value"] = fb.get("value")
+                    snapshot["year"] = fb.get("year")
+                    snapshot["source"] = fb.get("source", "fallback")
+                    snapshot["note"] = "wb_empty_used_fallback"
+                    apply_monthly_rules(ind, snapshot)
+        else:
+            snapshot["source"] = "WB_error"
+            snapshot["note"] = res.get("message") or res.get("raw")
+            logger.warning("WB error für %s %s: %s", country_code, ind, snapshot["note"])
+            if USE_FALLBACK:
+                fb = fallback_data.get(country_code, {}).get(ind) or fetch_from_imf_cofer(country_code, ind)
+                if fb:
+                    snapshot["value"] = fb.get("value")
+                    snapshot["year"] = fb.get("year")
+                    snapshot["source"] = fb.get("source", "fallback")
+                    snapshot["note"] = "wb_error_used_fallback"
+                    apply_monthly_rules(ind, snapshot)
+
+        preset["indicator_snapshot"][key] = snapshot
+        cache[f"{country_code}:{ind}"] = snapshot
+
+    return preset
+
+# ----------------- CLI / Main -----------------
+def main(validate_only: bool = False):
+    indicators = load_indicators()
+    logger.info("Indikatoren: %s", indicators)
+    cache = load_cache()
+    fallback_data = load_fallback_csv(FALLBACK_CSV) if USE_FALLBACK else {}
+
+    if validate_only:
+        logger.info("Validierungsmodus: prüfe Indikatoren und beende.")
+        for ind in indicators:
+            ok = validate_indicator(ind, cache)
+            logger.info("Indicator %s valid=%s", ind, ok)
+        return
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    written = []
+    for c in COUNTRIES:
+        try:
+            logger.info("Processing %s", c)
+            preset = build_preset(c, indicators, cache, fallback_data)
+            out_path = os.path.join(OUTPUT_DIR, f"preset_{c}.json")
+            save_json(out_path, preset)
+            written.append(f"preset_{c}")
+            logger.info("Wrote %s", out_path)
+        except Exception as e:
+            logger.exception("Fehler beim Verarbeiten von %s: %s", c, e)
+
+    save_cache(cache)
+    logger.info("Wrote presets: %s", written)
+    print("Wrote presets:", written)
 
 if __name__ == "__main__":
-    main()
+    validate_only = os.environ.get("VALIDATE_ONLY", "0") == "1"
+    main(validate_only=validate_only)
