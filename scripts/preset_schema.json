@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Preset schema",
+  "type": "object",
+  "required": ["name", "indicator_snapshot", "metadata"],
+  "properties": {
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "version": { "type": "string" },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "created_by": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["created_by", "created_at"]
+    },
+    "indicator_snapshot": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "indicator": { "type": "string" },
+          "value": { "type": ["number", "null"] },
+          "year": { "type": ["string", "null"] },
+          "source": { "type": ["string", "null"] },
+          "note": { "type": ["string", "null"] },
+          "monthly_imports_usd": { "type": "number" },
+          "monthly_reserves_usd": { "type": "number" },
+          "monthly_gdp_usd": { "type": "number" },
+          "monthly_exports_usd": { "type": "number" },
+          "monthly_fdi_net_usd": { "type": "number" },
+          "latest_annual_change": { "type": "number" }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}
