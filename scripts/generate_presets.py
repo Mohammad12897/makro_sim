@@ -8,6 +8,7 @@ generate_presets.py
 - Rechnet Monatswerte aus Jahreswerten (konfigurierbar)
 - Versucht Fallback-Quellen (lokale CSV oder custom fetcher)
 - Schreibt presets/preset_<COUNTRY>.json
+- Optional: Validiert erzeugte Presets gegen scripts/preset_schema.json
 """
 
 import os
@@ -15,14 +16,18 @@ import json
 import time
 import logging
 import requests
-from datetime import datetime
+import glob
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+
+# jsonschema wird nur in der optionalen Validierungsfunktion benötigt
+from jsonschema import validate as js_validate, ValidationError
 
 # ---------- Konfiguration ----------
 OUTPUT_DIR = "presets"
 LOG_FILE = "generate_presets.log"
-INDICATORS_CSV = "indicators.csv"
-INDICATORS_JSON = "indicators.json"
+INDICATORS_CSV = "scripts/indicators.csv"
+INDICATORS_JSON = "scripts/indicators.json"
 INDICATOR_CACHE = "indicator_cache.json"
 WB_BASE = "https://api.worldbank.org/v2"
 REQUEST_TIMEOUT = 10
@@ -31,7 +36,8 @@ BACKOFF_FACTOR = 1.5
 VALIDATION_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 Tage
 COUNTRIES = ["DE", "CN", "US", "IR", "BR", "IN"]
 USE_FALLBACK = True
-FALLBACK_CSV = "fallback_data.csv"
+FALLBACK_CSV = "scripts/fallback_data.csv"
+COUNTRY_CODES_FILE = "scripts/country_codes.json"
 # -----------------------------------
 
 # Logging konfigurieren
@@ -159,33 +165,66 @@ def latest_value_from_data(data: List[Dict[str, Any]]) -> Optional[Dict[str, Any
             return entry
     return None
 
-# ----------------- Fallback: lokale CSV loader -----------------
+# ----------------- Fallback: lokale CSV loader (überarbeitet) -----------------
 def load_fallback_csv(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """
+    Lädt fallback_data.csv und sammelt alle Einträge pro country+indicator.
+    Reduziert anschließend auf den Eintrag mit dem neuesten Jahr (wenn Jahr numerisch).
+    Erwartetes CSV-Feldset: country,indicator,year,value,source
+    Rückgabe: { country: { indicator: { "year": ..., "value": ..., "source": ... } } }
+    """
     fallback = {}
     if not os.path.exists(path):
-        return fallback
+        return {}
     import csv
     with open(path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            c = row.get("country")
-            ind = row.get("indicator")
-            year = row.get("year")
+            c = (row.get("country") or "").strip()
+            ind = (row.get("indicator") or "").strip()
+            year = (row.get("year") or "").strip()
             val = row.get("value")
-            src = row.get("source") or "fallback_csv"
+            src = (row.get("source") or "fallback_csv").strip()
             if not (c and ind and val):
                 continue
             try:
                 v = float(val)
-            except:
+            except Exception:
                 continue
-            fallback.setdefault(c, {})[ind] = {"year": year, "value": v, "source": src}
-    return fallback
+            fallback.setdefault(c, {}).setdefault(ind, []).append({"year": year, "value": v, "source": src})
+
+    # reduce to latest-year entry per country+indicator
+    reduced = {}
+    for c, inds in fallback.items():
+        reduced[c] = {}
+        for ind, entries in inds.items():
+            def year_key(e):
+                y = e.get("year")
+                try:
+                    return int(y)
+                except Exception:
+                    # fallback: lexicographic order if year not numeric
+                    return y or ""
+            latest = max(entries, key=year_key)
+            reduced[c][ind] = latest
+    return reduced
 
 # ----------------- Fallback: placeholder for IMF/COFER or other API -----------------
 def fetch_from_imf_cofer(country: str, indicator: str) -> Optional[Dict[str, Any]]:
     # Platzhalter: implementiere echten Abruf hier, falls verfügbar.
     return None
+
+# ----------------- Country codes loader -----------------
+def load_country_codes(path: str = COUNTRY_CODES_FILE) -> Dict[str, Any]:
+    if not os.path.exists(path):
+        logger.warning("Country codes file %s not found", path)
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning("Fehler beim Laden von %s: %s", path, e)
+        return {}
 
 # ----------------- Monatsregeln (neu) -----------------
 def apply_monthly_rules(indicator: str, snapshot: Dict[str, Any]) -> None:
@@ -214,7 +253,8 @@ def apply_monthly_rules(indicator: str, snapshot: Dict[str, Any]) -> None:
         snapshot["latest_annual_change"] = val
 
 # ----------------- Preset-Building mit Monatswerten und Fallback -----------------
-def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any], fallback_data: Dict[str, Any]) -> Dict[str, Any]:
+def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any], fallback_data: Dict[str, Any], country_codes: Dict[str, Any]) -> Dict[str, Any]:
+    cc = country_codes.get(country_code, {})
     preset = {
         "name": f"preset_{country_code}",
         "description": f"Preset für Land {country_code}",
@@ -222,7 +262,16 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
         "indicator_snapshot": {},
         "metadata": {
             "created_by": "auto-generator",
-            "created_at": datetime.utcnow().isoformat() + "Z"
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "country_info": {
+                "alpha2": country_code,
+                "alpha3": cc.get("alpha3"),
+                "numeric": cc.get("numeric"),
+                "country_de": cc.get("country_de"),
+                "country_en": cc.get("country_en"),
+                "timezone": cc.get("timezone"),
+                "currency": cc.get("currency")
+            }
         }
     }
 
@@ -240,6 +289,10 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
                 snapshot["year"] = fb.get("year")
                 snapshot["source"] = fb.get("source", "fallback")
                 snapshot["note"] = "from_fallback"
+                # country metadata
+                if cc:
+                    snapshot["country_currency"] = cc.get("currency")
+                    snapshot["country_timezone"] = cc.get("timezone")
                 apply_monthly_rules(ind, snapshot)
             preset["indicator_snapshot"][key] = snapshot
             cache[f"{country_code}:{ind}"] = snapshot
@@ -254,6 +307,9 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
                 snapshot["value"] = entry.get("value")
                 snapshot["year"] = entry.get("date")
                 snapshot["source"] = "WB"
+                if cc:
+                    snapshot["country_currency"] = cc.get("currency")
+                    snapshot["country_timezone"] = cc.get("timezone")
                 apply_monthly_rules(ind, snapshot)
                 logger.info("Got %s %s -> %s (year %s)", country_code, ind, snapshot["value"], snapshot.get("year"))
             else:
@@ -267,6 +323,9 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
                         snapshot["year"] = fb.get("year")
                         snapshot["source"] = fb.get("source", "fallback")
                         snapshot["note"] = "wb_empty_used_fallback"
+                        if cc:
+                            snapshot["country_currency"] = cc.get("currency")
+                            snapshot["country_timezone"] = cc.get("timezone")
                         apply_monthly_rules(ind, snapshot)
         elif res["status"] == "empty":
             snapshot["source"] = "WB_empty"
@@ -279,6 +338,9 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
                     snapshot["year"] = fb.get("year")
                     snapshot["source"] = fb.get("source", "fallback")
                     snapshot["note"] = "wb_empty_used_fallback"
+                    if cc:
+                        snapshot["country_currency"] = cc.get("currency")
+                        snapshot["country_timezone"] = cc.get("timezone")
                     apply_monthly_rules(ind, snapshot)
         else:
             snapshot["source"] = "WB_error"
@@ -291,6 +353,9 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
                     snapshot["year"] = fb.get("year")
                     snapshot["source"] = fb.get("source", "fallback")
                     snapshot["note"] = "wb_error_used_fallback"
+                    if cc:
+                        snapshot["country_currency"] = cc.get("currency")
+                        snapshot["country_timezone"] = cc.get("timezone")
                     apply_monthly_rules(ind, snapshot)
 
         preset["indicator_snapshot"][key] = snapshot
@@ -298,12 +363,30 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
 
     return preset
 
+# ----------------- Validierung der erzeugten Presets (gewünscht) -----------------
+def validate_generated_presets(schema_path="scripts/preset_schema.json"):
+    import glob, json
+    from jsonschema import validate, ValidationError
+    schema = json.load(open(schema_path,"r",encoding="utf-8"))
+    errs = 0
+    for p in glob.glob("presets/*.json"):
+        d = json.load(open(p,"r",encoding="utf-8"))
+        try:
+            validate(instance=d, schema=schema)
+            print("OK:", p)
+        except ValidationError as e:
+            errs += 1
+            print("INVALID:", p, e.message)
+    if errs:
+        raise SystemExit(f"{errs} invalid preset(s)")
+
 # ----------------- CLI / Main -----------------
 def main(validate_only: bool = False):
     indicators = load_indicators()
     logger.info("Indikatoren: %s", indicators)
     cache = load_cache()
     fallback_data = load_fallback_csv(FALLBACK_CSV) if USE_FALLBACK else {}
+    country_codes = load_country_codes()
 
     if validate_only:
         logger.info("Validierungsmodus: prüfe Indikatoren und beende.")
@@ -317,7 +400,7 @@ def main(validate_only: bool = False):
     for c in COUNTRIES:
         try:
             logger.info("Processing %s", c)
-            preset = build_preset(c, indicators, cache, fallback_data)
+            preset = build_preset(c, indicators, cache, fallback_data, country_codes)
             out_path = os.path.join(OUTPUT_DIR, f"preset_{c}.json")
             save_json(out_path, preset)
             written.append(f"preset_{c}")
@@ -332,3 +415,6 @@ def main(validate_only: bool = False):
 if __name__ == "__main__":
     validate_only = os.environ.get("VALIDATE_ONLY", "0") == "1"
     main(validate_only=validate_only)
+    # Optional: nach erfolgreichem Run Presets validieren
+    # Entferne das Kommentar, wenn du immer validieren willst:
+    # validate_generated_presets("scripts/preset_schema.json")
