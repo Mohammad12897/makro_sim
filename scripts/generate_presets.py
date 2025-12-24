@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # coding: utf-8
-
 """
 generate_presets.py
 - Validiert Indikatoren (World Bank metadata)
@@ -21,7 +20,11 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 # jsonschema wird nur in der optionalen Validierungsfunktion benötigt
-from jsonschema import validate as js_validate, ValidationError
+try:
+    from jsonschema import validate as js_validate, ValidationError
+except Exception:
+    js_validate = None
+    ValidationError = Exception
 
 # ---------- Konfiguration ----------
 OUTPUT_DIR = "presets"
@@ -38,6 +41,10 @@ COUNTRIES = ["DE", "CN", "US", "IR", "BR", "IN", "GR", "FR"]
 USE_FALLBACK = True
 FALLBACK_CSV = "scripts/fallback_data.csv"
 COUNTRY_CODES_FILE = "scripts/country_codes.json"
+
+# Auto-skip configuration: after N failed validations mark indicator as invalid
+AUTO_SKIP_AFTER = 3
+INVALID_LOG = "scripts/invalid_indicators.json"
 # -----------------------------------
 
 # Logging konfigurieren
@@ -67,7 +74,12 @@ def load_indicators() -> List[str]:
             for line in f:
                 s = line.strip()
                 if s and not s.startswith("#"):
-                    inds.append(s)
+                    # support CSV lines like "DE,FI.RES.TOTL,2023,..." -> indicator is second column
+                    parts = [p.strip() for p in s.split(",")]
+                    if len(parts) >= 2 and parts[1]:
+                        inds.append(parts[1])
+                    else:
+                        inds.append(parts[0])
         return inds
     logger.info("Keine Indikator-Datei gefunden, verwende eingebaute Liste")
     return ["FI.RES.TOTL", "NE.IMP.GNFS.CD", "DT.DOD.DECT.GN.ZS"]
@@ -138,7 +150,31 @@ def validate_indicator(indicator: str, cache: Dict[str, Any]) -> bool:
         else:
             valid = True
 
+    # update cache
     cache[cache_key] = {"valid": valid, "checked_at": now}
+
+    # handle fail counts and auto-skip logging
+    if not valid:
+        fails = cache.get("fail_counts", {})
+        fails[indicator] = fails.get(indicator, 0) + 1
+        cache["fail_counts"] = fails
+
+        if fails[indicator] >= AUTO_SKIP_AFTER:
+            bad = {}
+            if os.path.exists(INVALID_LOG):
+                try:
+                    with open(INVALID_LOG, "r", encoding="utf-8") as f:
+                        bad = json.load(f)
+                except Exception:
+                    bad = {}
+            bad[indicator] = {"first_failed_at": now, "reason": "wb_invalid", "fail_count": fails[indicator]}
+            try:
+                with open(INVALID_LOG, "w", encoding="utf-8") as f:
+                    json.dump(bad, f, ensure_ascii=False, indent=2)
+                logger.warning("Auto-skip: %s marked as invalid and logged in %s", indicator, INVALID_LOG)
+            except Exception as e:
+                logger.warning("Could not write invalid log %s: %s", INVALID_LOG, e)
+
     save_cache(cache)
     return valid
 
@@ -178,20 +214,42 @@ def load_fallback_csv(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
         return {}
     import csv
     with open(path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            c = (row.get("country") or "").strip()
-            ind = (row.get("indicator") or "").strip()
-            year = (row.get("year") or "").strip()
-            val = row.get("value")
-            src = (row.get("source") or "fallback_csv").strip()
-            if not (c and ind and val):
-                continue
-            try:
-                v = float(val)
-            except Exception:
-                continue
-            fallback.setdefault(c, {}).setdefault(ind, []).append({"year": year, "value": v, "source": src})
+        # Support both header and headerless CSV: try DictReader, fallback to manual parse
+        first = f.readline()
+        f.seek(0)
+        has_header = "," in first and not first.strip().split(",")[0].isalpha()  # heuristic
+        f.seek(0)
+        if has_header:
+            reader = csv.DictReader(f)
+            for row in reader:
+                c = (row.get("country") or "").strip()
+                ind = (row.get("indicator") or "").strip()
+                year = (row.get("year") or "").strip()
+                val = row.get("value")
+                src = (row.get("source") or "fallback_csv").strip()
+                if not (c and ind and val):
+                    continue
+                try:
+                    v = float(val)
+                except Exception:
+                    continue
+                fallback.setdefault(c, {}).setdefault(ind, []).append({"year": year, "value": v, "source": src})
+        else:
+            # headerless: each line like "DE,FI.RES.TOTL,2023,150000000000,central_bank"
+            for line in f:
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                parts = [p.strip() for p in s.split(",")]
+                if len(parts) < 4:
+                    continue
+                c, ind, year, val = parts[0], parts[1], parts[2], parts[3]
+                src = parts[4] if len(parts) > 4 else "fallback_csv"
+                try:
+                    v = float(val)
+                except Exception:
+                    continue
+                fallback.setdefault(c, {}).setdefault(ind, []).append({"year": year, "value": v, "source": src})
 
     # reduce to latest-year entry per country+indicator
     reduced = {}
@@ -203,7 +261,6 @@ def load_fallback_csv(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
                 try:
                     return int(y)
                 except Exception:
-                    # fallback: lexicographic order if year not numeric
                     return y or ""
             latest = max(entries, key=year_key)
             reduced[c][ind] = latest
@@ -276,6 +333,16 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
     }
 
     for ind in indicators:
+        # Laufzeit-Check: überspringe Indikatoren, die zuvor automatisch als invalid protokolliert wurden
+        if os.path.exists(INVALID_LOG):
+            try:
+                invalids = set(json.load(open(INVALID_LOG, "r", encoding="utf-8")).keys())
+            except Exception:
+                invalids = set()
+            if ind in invalids:
+                logger.info("Skipping indicator %s because it is marked invalid", ind)
+                continue
+
         key = ind.replace(".", "_")
         # Validierung
         if not validate_indicator(ind, cache):
@@ -301,7 +368,7 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
         # Normaler WB-Abruf
         res = fetch_worldbank_indicator(country_code, ind)
         snapshot = {"value": None, "year": None, "source": None, "indicator": ind}
-        if res["status"] == "ok":
+        if res.get("status") == "ok":
             entry = latest_value_from_data(res["data"])
             if entry:
                 snapshot["value"] = entry.get("value")
@@ -327,7 +394,7 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
                             snapshot["country_currency"] = cc.get("currency")
                             snapshot["country_timezone"] = cc.get("timezone")
                         apply_monthly_rules(ind, snapshot)
-        elif res["status"] == "empty":
+        elif res.get("status") == "empty":
             snapshot["source"] = "WB_empty"
             snapshot["note"] = "empty"
             logger.info("WB empty für %s %s", country_code, ind)
@@ -366,11 +433,15 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
 # ----------------- Validierung der erzeugten Presets (gewünscht) -----------------
 def validate_generated_presets(schema_path="scripts/preset_schema.json"):
     import glob, json
-    from jsonschema import validate, ValidationError
-    schema = json.load(open(schema_path,"r",encoding="utf-8"))
+    try:
+        from jsonschema import validate, ValidationError
+    except Exception:
+        raise RuntimeError("jsonschema ist nicht installiert; bitte 'pip install jsonschema'")
+
+    schema = json.load(open(schema_path, "r", encoding="utf-8"))
     errs = 0
     for p in glob.glob("presets/*.json"):
-        d = json.load(open(p,"r",encoding="utf-8"))
+        d = json.load(open(p, "r", encoding="utf-8"))
         try:
             validate(instance=d, schema=schema)
             print("OK:", p)
@@ -383,6 +454,18 @@ def validate_generated_presets(schema_path="scripts/preset_schema.json"):
 # ----------------- CLI / Main -----------------
 def main(validate_only: bool = False):
     indicators = load_indicators()
+
+    # filter out permanently invalid indicators
+    invalids = set()
+    if os.path.exists(INVALID_LOG):
+        try:
+            invalids = set(json.load(open(INVALID_LOG, "r", encoding="utf-8")).keys())
+        except Exception:
+            invalids = set()
+    if invalids:
+        logger.info("Skipping permanently invalid indicators: %s", ", ".join(sorted(invalids)))
+        indicators = [i for i in indicators if i not in invalids]
+
     logger.info("Indikatoren: %s", indicators)
     cache = load_cache()
     fallback_data = load_fallback_csv(FALLBACK_CSV) if USE_FALLBACK else {}
