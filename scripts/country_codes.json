@@ -4,5 +4,14 @@
   "US": {"alpha3": "USA", "country_de": "Vereinigte Staaten", "country_en": "United States"},
   "IR": {"alpha3": "IRN", "country_de": "Iran", "country_en": "Iran"},
   "BR": {"alpha3": "BRA", "country_de": "Brasilien", "country_en": "Brazil"},
-  "IN": {"alpha3": "IND", "country_de": "Indien", "country_en": "India"}
+  "IN": {"alpha3": "IND", "country_de": "Indien", "country_en": "India"},
+  "FR": {"alpha3": "FRA","numeric": "250","country_de": "Frankreich","country_en": "France","timezone": "Europe/Paris","currency": "EUR"},
+"GB": {
+  "alpha3": "GBR",
+  "numeric": "826",
+  "country_de": "Vereinigtes Königreich",
+  "country_en": "United Kingdom",
+  "timezone": "Europe/London",
+  "currency": "GBP"
+}
 }

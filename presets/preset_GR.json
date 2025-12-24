@@ -1,6 +1,6 @@
 {
-  "name": "preset_US",
-  "description": "Preset für Land US",
+  "name": "preset_GR",
+  "description": "Preset für Land GR",
   "version": "1.0",
   "indicator_snapshot": {
     "FI_RES_TOTL": {
@@ -11,13 +11,11 @@
       "note": "invalid_indicator"
     },
     "NE_IMP_GNFS_CD": {
-      "value": 4103100000000,
+      "value": 122135634583.353,
       "year": "2024",
       "source": "WB",
       "indicator": "NE.IMP.GNFS.CD",
-      "country_currency": null,
-      "country_timezone": null,
-      "monthly_imports_usd": 341925000000.0
+      "monthly_imports_usd": 10177969548.61275
     },
     "DT_DOD_DECT_GN_ZS": {
       "value": null,
@@ -27,60 +25,50 @@
       "note": "no_values"
     },
     "NY_GDP_MKTP_CD": {
-      "value": 28750956130731.2,
+      "value": 256238371778.118,
       "year": "2024",
       "source": "WB",
       "indicator": "NY.GDP.MKTP.CD",
-      "country_currency": null,
-      "country_timezone": null,
-      "monthly_gdp_usd": 2395913010894.2666
+      "monthly_gdp_usd": 21353197648.176502
     },
     "FP_CPI_TOTL_ZG": {
-      "value": 2.94952520485207,
+      "value": 2.74149045788606,
       "year": "2024",
       "source": "WB",
       "indicator": "FP.CPI.TOTL.ZG",
-      "country_currency": null,
-      "country_timezone": null,
-      "latest_annual_change": 2.94952520485207
+      "latest_annual_change": 2.74149045788606
     },
     "NE_EXP_GNFS_CD": {
-      "value": 3193500000000,
+      "value": 107906278860.86,
       "year": "2024",
       "source": "WB",
       "indicator": "NE.EXP.GNFS.CD",
-      "country_currency": null,
-      "country_timezone": null,
-      "monthly_exports_usd": 266125000000.0
+      "monthly_exports_usd": 8992189905.071667
     },
     "BX_KLT_DINV_CD_WD": {
-      "value": 297058000000,
+      "value": 6742277267.34835,
       "year": "2024",
       "source": "WB",
       "indicator": "BX.KLT.DINV.CD.WD",
-      "country_currency": null,
-      "country_timezone": null,
-      "monthly_fdi_net_usd": 24754833333.333332
+      "monthly_fdi_net_usd": 561856438.9456958
     },
     "GC_XPN_TOTL_GD_ZS": {
-      "value": 24.8982825568771,
+      "value": 47.3019610078935,
       "year": "2023",
       "source": "WB",
       "indicator": "GC.XPN.TOTL.GD.ZS",
-      "country_currency": null,
-      "country_timezone": null,
-      "latest_annual_change": 24.8982825568771
+      "latest_annual_change": 47.3019610078935
     }
   },
   "metadata": {
     "created_by": "auto-generator",
-    "created_at": "2025-12-24T07:57:30.351989+00:00",
+    "created_at": "2025-12-24T07:57:34.255469+00:00",
     "country_info": {
-      "alpha2": "US",
-      "alpha3": "USA",
+      "alpha2": "GR",
+      "alpha3": null,
       "numeric": null,
-      "country_de": "Vereinigte Staaten",
-      "country_en": "United States",
+      "country_de": null,
+      "country_en": null,
       "timezone": null,
       "currency": null
     }

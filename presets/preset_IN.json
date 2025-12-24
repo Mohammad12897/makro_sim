@@ -4,28 +4,89 @@
   "version": "1.0",
   "indicator_snapshot": {
     "FI_RES_TOTL": {
-      "value": null,
-      "year": null,
-      "source": "missing",
+      "value": 60000000000.0,
+      "year": "2023",
+      "source": "central_bank",
       "indicator": "FI.RES.TOTL",
-      "note": "invalid_indicator"
+      "note": "from_fallback",
+      "country_currency": null,
+      "country_timezone": null,
+      "monthly_reserves_usd": 5000000000.0
     },
     "NE_IMP_GNFS_CD": {
       "value": 918333719557.771,
       "year": "2024",
       "source": "WB",
       "indicator": "NE.IMP.GNFS.CD",
+      "country_currency": null,
+      "country_timezone": null,
       "monthly_imports_usd": 76527809963.14758
     },
     "DT_DOD_DECT_GN_ZS": {
       "value": 18.5795533694083,
       "year": "2024",
       "source": "WB",
-      "indicator": "DT.DOD.DECT.GN.ZS"
+      "indicator": "DT.DOD.DECT.GN.ZS",
+      "country_currency": null,
+      "country_timezone": null
+    },
+    "NY_GDP_MKTP_CD": {
+      "value": 3909891533858.08,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "NY.GDP.MKTP.CD",
+      "country_currency": null,
+      "country_timezone": null,
+      "monthly_gdp_usd": 325824294488.17334
+    },
+    "FP_CPI_TOTL_ZG": {
+      "value": 4.95303550973656,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "FP.CPI.TOTL.ZG",
+      "country_currency": null,
+      "country_timezone": null,
+      "latest_annual_change": 4.95303550973656
+    },
+    "NE_EXP_GNFS_CD": {
+      "value": 827405227198.603,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "NE.EXP.GNFS.CD",
+      "country_currency": null,
+      "country_timezone": null,
+      "monthly_exports_usd": 68950435599.88359
+    },
+    "BX_KLT_DINV_CD_WD": {
+      "value": 27139853378.1402,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "BX.KLT.DINV.CD.WD",
+      "country_currency": null,
+      "country_timezone": null,
+      "monthly_fdi_net_usd": 2261654448.17835
+    },
+    "GC_XPN_TOTL_GD_ZS": {
+      "value": 13.3335178491336,
+      "year": "2022",
+      "source": "WB",
+      "indicator": "GC.XPN.TOTL.GD.ZS",
+      "country_currency": null,
+      "country_timezone": null,
+      "latest_annual_change": 13.3335178491336
     }
   },
   "metadata": {
     "created_by": "auto-generator",
-    "created_at": "2025-12-23T07:01:31.987238Z"
+    "created_at": "2025-12-24T07:57:33.314941+00:00",
+    "country_info": {
+      "alpha2": "IN",
+      "alpha3": "IND",
+      "numeric": null,
+      "country_de": "Indien",
+      "country_en": "India",
+      "timezone": null,
+      "currency": null
+    }
   }
 }

@@ -15,17 +15,75 @@
       "year": "2024",
       "source": "WB",
       "indicator": "NE.IMP.GNFS.CD",
+      "country_currency": null,
+      "country_timezone": null,
       "monthly_imports_usd": 11291458379.639666
     },
     "DT_DOD_DECT_GN_ZS": {
       "value": 2.21280566524888,
       "year": "2024",
       "source": "WB",
-      "indicator": "DT.DOD.DECT.GN.ZS"
+      "indicator": "DT.DOD.DECT.GN.ZS",
+      "country_currency": null,
+      "country_timezone": null
+    },
+    "NY_GDP_MKTP_CD": {
+      "value": 475252089215.416,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "NY.GDP.MKTP.CD",
+      "country_currency": null,
+      "country_timezone": null,
+      "monthly_gdp_usd": 39604340767.95133
+    },
+    "FP_CPI_TOTL_ZG": {
+      "value": 32.455871402917,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "FP.CPI.TOTL.ZG",
+      "country_currency": null,
+      "country_timezone": null,
+      "latest_annual_change": 32.455871402917
+    },
+    "NE_EXP_GNFS_CD": {
+      "value": 111928863188.398,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "NE.EXP.GNFS.CD",
+      "country_currency": null,
+      "country_timezone": null,
+      "monthly_exports_usd": 9327405265.699833
+    },
+    "BX_KLT_DINV_CD_WD": {
+      "value": 1449111110,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "BX.KLT.DINV.CD.WD",
+      "country_currency": null,
+      "country_timezone": null,
+      "monthly_fdi_net_usd": 120759259.16666667
+    },
+    "GC_XPN_TOTL_GD_ZS": {
+      "value": 19.6373860775885,
+      "year": "2009",
+      "source": "WB",
+      "indicator": "GC.XPN.TOTL.GD.ZS",
+      "country_currency": null,
+      "country_timezone": null,
+      "latest_annual_change": 19.6373860775885
     }
   },
   "metadata": {
     "created_by": "auto-generator",
-    "created_at": "2025-12-23T07:01:31.335036Z"
+    "created_at": "2025-12-24T07:57:31.560584+00:00",
+    "country_info": {
+      "alpha2": "IR",
+      "alpha3": "IRN",
+      "numeric": null,
+      "country_de": "Iran",
+      "country_en": "Iran",
+      "timezone": null,
+      "currency": null
+    }
   }
 }

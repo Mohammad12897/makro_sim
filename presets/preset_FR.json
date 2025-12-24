@@ -1,0 +1,88 @@
+{
+  "name": "preset_FR",
+  "description": "Preset für Land FR",
+  "version": "1.0",
+  "indicator_snapshot": {
+    "FI_RES_TOTL": {
+      "value": null,
+      "year": null,
+      "source": "missing",
+      "indicator": "FI.RES.TOTL",
+      "note": "invalid_indicator"
+    },
+    "NE_IMP_GNFS_CD": {
+      "value": 1081453951068.75,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "NE.IMP.GNFS.CD",
+      "country_currency": "EUR",
+      "country_timezone": "Europe/Paris",
+      "monthly_imports_usd": 90121162589.0625
+    },
+    "DT_DOD_DECT_GN_ZS": {
+      "value": null,
+      "year": null,
+      "source": "WB_empty",
+      "indicator": "DT.DOD.DECT.GN.ZS",
+      "note": "no_values"
+    },
+    "NY_GDP_MKTP_CD": {
+      "value": 3160442622465.08,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "NY.GDP.MKTP.CD",
+      "country_currency": "EUR",
+      "country_timezone": "Europe/Paris",
+      "monthly_gdp_usd": 263370218538.75668
+    },
+    "FP_CPI_TOTL_ZG": {
+      "value": 1.99904942291463,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "FP.CPI.TOTL.ZG",
+      "country_currency": "EUR",
+      "country_timezone": "Europe/Paris",
+      "latest_annual_change": 1.99904942291463
+    },
+    "NE_EXP_GNFS_CD": {
+      "value": 1071066237472.11,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "NE.EXP.GNFS.CD",
+      "country_currency": "EUR",
+      "country_timezone": "Europe/Paris",
+      "monthly_exports_usd": 89255519789.3425
+    },
+    "BX_KLT_DINV_CD_WD": {
+      "value": 52052548617.7634,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "BX.KLT.DINV.CD.WD",
+      "country_currency": "EUR",
+      "country_timezone": "Europe/Paris",
+      "monthly_fdi_net_usd": 4337712384.813617
+    },
+    "GC_XPN_TOTL_GD_ZS": {
+      "value": 47.2580360132692,
+      "year": "2023",
+      "source": "WB",
+      "indicator": "GC.XPN.TOTL.GD.ZS",
+      "country_currency": "EUR",
+      "country_timezone": "Europe/Paris",
+      "latest_annual_change": 47.2580360132692
+    }
+  },
+  "metadata": {
+    "created_by": "auto-generator",
+    "created_at": "2025-12-24T07:57:36.270884+00:00",
+    "country_info": {
+      "alpha2": "FR",
+      "alpha3": "FRA",
+      "numeric": "250",
+      "country_de": "Frankreich",
+      "country_en": "France",
+      "timezone": "Europe/Paris",
+      "currency": "EUR"
+    }
+  }
+}
