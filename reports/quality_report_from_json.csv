@@ -1,0 +1,10 @@
+preset_file,country,overall_score,status,indicator_count,failed_indicators
+presets/preset_BR.json,BR,100,ready_for_analysis,8,
+presets/preset_CN.json,CN,87,ready_for_analysis,8,GC_XPN_TOTL_GD_ZS
+presets/preset_DE.json,DE,87,ready_for_analysis,8,DT_DOD_DECT_GN_ZS
+presets/preset_FR.json,FR,87,ready_for_analysis,8,DT_DOD_DECT_GN_ZS
+presets/preset_GB.json,GB,75,needs_review,8,DT_DOD_DECT_GN_ZS;FI_RES_TOTL
+presets/preset_GR.json,GR,87,ready_for_analysis,8,DT_DOD_DECT_GN_ZS
+presets/preset_IN.json,IN,100,ready_for_analysis,8,
+presets/preset_IR.json,IR,92,ready_for_analysis,8,FI_RES_TOTL_MO;GC_XPN_TOTL_GD_ZS
+presets/preset_US.json,US,87,ready_for_analysis,8,DT_DOD_DECT_GN_ZS
