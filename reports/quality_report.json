@@ -1,0 +1,795 @@
+{
+  "generated_at": "2025-12-26T15:29:37.380783+00:00",
+  "summary": {
+    "total_presets": 9,
+    "by_status": {
+      "ready_for_analysis": 8,
+      "needs_review": 1
+    },
+    "avg_score": 89
+  },
+  "reports": [
+    {
+      "preset_file": "presets/preset_BR.json",
+      "country": "BR",
+      "created_at": "2025-12-26T14:49:51.751052+00:00",
+      "indicator_count": 8,
+      "per_indicator": {
+        "FI_RES_TOTL_MO": {
+          "indicator": "FI.RES.TOTL.MO",
+          "value": 7.95558614184571,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_IMP_GNFS_CD": {
+          "indicator": "NE.IMP.GNFS.CD",
+          "value": 385708875013.773,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "DT_DOD_DECT_GN_ZS": {
+          "indicator": "DT.DOD.DECT.GN.ZS",
+          "value": 28.6612661075538,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NY_GDP_MKTP_CD": {
+          "indicator": "NY.GDP.MKTP.CD",
+          "value": 2185821648943.86,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "FP_CPI_TOTL_ZG": {
+          "indicator": "FP.CPI.TOTL.ZG",
+          "value": 4.36746407652337,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_EXP_GNFS_CD": {
+          "indicator": "NE.EXP.GNFS.CD",
+          "value": 392105352908.42,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "BX_KLT_DINV_CD_WD": {
+          "indicator": "BX.KLT.DINV.CD.WD",
+          "value": 74090786050.19,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "GC_XPN_TOTL_GD_ZS": {
+          "indicator": "GC.XPN.TOTL.GD.ZS",
+          "value": 32.4311004876146,
+          "year": "2023",
+          "source": "WB",
+          "issues": []
+        }
+      },
+      "failed_rules": {},
+      "cross_issues": {},
+      "scores": {
+        "FI_RES_TOTL_MO": 100,
+        "NE_IMP_GNFS_CD": 100,
+        "DT_DOD_DECT_GN_ZS": 100,
+        "NY_GDP_MKTP_CD": 100,
+        "FP_CPI_TOTL_ZG": 100,
+        "NE_EXP_GNFS_CD": 100,
+        "BX_KLT_DINV_CD_WD": 100,
+        "GC_XPN_TOTL_GD_ZS": 100
+      },
+      "overall_score": 100,
+      "status": "ready_for_analysis"
+    },
+    {
+      "preset_file": "presets/preset_CN.json",
+      "country": "CN",
+      "created_at": "2025-12-26T14:49:48.280135+00:00",
+      "indicator_count": 8,
+      "per_indicator": {
+        "FI_RES_TOTL_MO": {
+          "indicator": "FI.RES.TOTL.MO",
+          "value": 11.2291372513816,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_IMP_GNFS_CD": {
+          "indicator": "NE.IMP.GNFS.CD",
+          "value": 3219342570126.17,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "DT_DOD_DECT_GN_ZS": {
+          "indicator": "DT.DOD.DECT.GN.ZS",
+          "value": 13.0007522555005,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NY_GDP_MKTP_CD": {
+          "indicator": "NY.GDP.MKTP.CD",
+          "value": 18743803170827.2,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "FP_CPI_TOTL_ZG": {
+          "indicator": "FP.CPI.TOTL.ZG",
+          "value": 0.218128938439177,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_EXP_GNFS_CD": {
+          "indicator": "NE.EXP.GNFS.CD",
+          "value": 3753056083349.04,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "BX_KLT_DINV_CD_WD": {
+          "indicator": "BX.KLT.DINV.CD.WD",
+          "value": 18556141172.84,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "GC_XPN_TOTL_GD_ZS": {
+          "indicator": "GC.XPN.TOTL.GD.ZS",
+          "value": null,
+          "year": null,
+          "source": "WB_empty",
+          "issues": [
+            "missing_value",
+            "missing_year",
+            "no_yearly_value"
+          ]
+        }
+      },
+      "failed_rules": {
+        "GC_XPN_TOTL_GD_ZS": [
+          "missing_value",
+          "missing_year",
+          "no_yearly_value"
+        ]
+      },
+      "cross_issues": {},
+      "scores": {
+        "FI_RES_TOTL_MO": 100,
+        "NE_IMP_GNFS_CD": 100,
+        "DT_DOD_DECT_GN_ZS": 100,
+        "NY_GDP_MKTP_CD": 100,
+        "FP_CPI_TOTL_ZG": 100,
+        "NE_EXP_GNFS_CD": 100,
+        "BX_KLT_DINV_CD_WD": 100,
+        "GC_XPN_TOTL_GD_ZS": 0
+      },
+      "overall_score": 87,
+      "status": "ready_for_analysis"
+    },
+    {
+      "preset_file": "presets/preset_DE.json",
+      "country": "DE",
+      "created_at": "2025-12-26T14:49:46.923551+00:00",
+      "indicator_count": 8,
+      "per_indicator": {
+        "FI_RES_TOTL_MO": {
+          "indicator": "FI.RES.TOTL.MO",
+          "value": 2.19888604346397,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_IMP_GNFS_CD": {
+          "indicator": "NE.IMP.GNFS.CD",
+          "value": 1764438191610.94,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "DT_DOD_DECT_GN_ZS": {
+          "indicator": "DT.DOD.DECT.GN.ZS",
+          "value": null,
+          "year": null,
+          "source": "WB_empty",
+          "issues": [
+            "missing_value",
+            "missing_year",
+            "no_yearly_value"
+          ]
+        },
+        "NY_GDP_MKTP_CD": {
+          "indicator": "NY.GDP.MKTP.CD",
+          "value": 4685592577804.69,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "FP_CPI_TOTL_ZG": {
+          "indicator": "FP.CPI.TOTL.ZG",
+          "value": 2.2564981433876,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_EXP_GNFS_CD": {
+          "indicator": "NE.EXP.GNFS.CD",
+          "value": 1941431210621.87,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "BX_KLT_DINV_CD_WD": {
+          "indicator": "BX.KLT.DINV.CD.WD",
+          "value": 47599143488.7827,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "GC_XPN_TOTL_GD_ZS": {
+          "indicator": "GC.XPN.TOTL.GD.ZS",
+          "value": 31.174891399437,
+          "year": "2022",
+          "source": "WB",
+          "issues": []
+        }
+      },
+      "failed_rules": {
+        "DT_DOD_DECT_GN_ZS": [
+          "missing_value",
+          "missing_year",
+          "no_yearly_value"
+        ]
+      },
+      "cross_issues": {},
+      "scores": {
+        "FI_RES_TOTL_MO": 100,
+        "NE_IMP_GNFS_CD": 100,
+        "DT_DOD_DECT_GN_ZS": 0,
+        "NY_GDP_MKTP_CD": 100,
+        "FP_CPI_TOTL_ZG": 100,
+        "NE_EXP_GNFS_CD": 100,
+        "BX_KLT_DINV_CD_WD": 100,
+        "GC_XPN_TOTL_GD_ZS": 100
+      },
+      "overall_score": 87,
+      "status": "ready_for_analysis"
+    },
+    {
+      "preset_file": "presets/preset_FR.json",
+      "country": "FR",
+      "created_at": "2025-12-26T14:49:55.240202+00:00",
+      "indicator_count": 8,
+      "per_indicator": {
+        "FI_RES_TOTL_MO": {
+          "indicator": "FI.RES.TOTL.MO",
+          "value": 2.38967602333511,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_IMP_GNFS_CD": {
+          "indicator": "NE.IMP.GNFS.CD",
+          "value": 1081453951068.75,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "DT_DOD_DECT_GN_ZS": {
+          "indicator": "DT.DOD.DECT.GN.ZS",
+          "value": null,
+          "year": null,
+          "source": "WB_empty",
+          "issues": [
+            "missing_value",
+            "missing_year",
+            "no_yearly_value"
+          ]
+        },
+        "NY_GDP_MKTP_CD": {
+          "indicator": "NY.GDP.MKTP.CD",
+          "value": 3160442622465.08,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "FP_CPI_TOTL_ZG": {
+          "indicator": "FP.CPI.TOTL.ZG",
+          "value": 1.99904942291463,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_EXP_GNFS_CD": {
+          "indicator": "NE.EXP.GNFS.CD",
+          "value": 1071066237472.11,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "BX_KLT_DINV_CD_WD": {
+          "indicator": "BX.KLT.DINV.CD.WD",
+          "value": 52052548617.7634,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "GC_XPN_TOTL_GD_ZS": {
+          "indicator": "GC.XPN.TOTL.GD.ZS",
+          "value": 47.2580360132692,
+          "year": "2023",
+          "source": "WB",
+          "issues": []
+        }
+      },
+      "failed_rules": {
+        "DT_DOD_DECT_GN_ZS": [
+          "missing_value",
+          "missing_year",
+          "no_yearly_value"
+        ]
+      },
+      "cross_issues": {},
+      "scores": {
+        "FI_RES_TOTL_MO": 100,
+        "NE_IMP_GNFS_CD": 100,
+        "DT_DOD_DECT_GN_ZS": 0,
+        "NY_GDP_MKTP_CD": 100,
+        "FP_CPI_TOTL_ZG": 100,
+        "NE_EXP_GNFS_CD": 100,
+        "BX_KLT_DINV_CD_WD": 100,
+        "GC_XPN_TOTL_GD_ZS": 100
+      },
+      "overall_score": 87,
+      "status": "ready_for_analysis"
+    },
+    {
+      "preset_file": "presets/preset_GB.json",
+      "country": "GB",
+      "created_at": "2025-12-24T07:37:11.124708+00:00",
+      "indicator_count": 8,
+      "per_indicator": {
+        "FI_RES_TOTL": {
+          "indicator": "FI.RES.TOTL",
+          "value": null,
+          "year": null,
+          "source": "missing",
+          "issues": [
+            "missing_value",
+            "missing_year",
+            "no_yearly_value"
+          ]
+        },
+        "NE_IMP_GNFS_CD": {
+          "indicator": "NE.IMP.GNFS.CD",
+          "value": 1174222748816.76,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "DT_DOD_DECT_GN_ZS": {
+          "indicator": "DT.DOD.DECT.GN.ZS",
+          "value": null,
+          "year": null,
+          "source": "WB_empty",
+          "issues": [
+            "missing_value",
+            "missing_year",
+            "no_yearly_value"
+          ]
+        },
+        "NY_GDP_MKTP_CD": {
+          "indicator": "NY.GDP.MKTP.CD",
+          "value": 3686033044482.13,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "FP_CPI_TOTL_ZG": {
+          "indicator": "FP.CPI.TOTL.ZG",
+          "value": 3.2715729463592,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_EXP_GNFS_CD": {
+          "indicator": "NE.EXP.GNFS.CD",
+          "value": 1142086333403.45,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "BX_KLT_DINV_CD_WD": {
+          "indicator": "BX.KLT.DINV.CD.WD",
+          "value": -60647281077.0004,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "GC_XPN_TOTL_GD_ZS": {
+          "indicator": "GC.XPN.TOTL.GD.ZS",
+          "value": 41.2292290721047,
+          "year": "2023",
+          "source": "WB",
+          "issues": []
+        }
+      },
+      "failed_rules": {
+        "FI_RES_TOTL": [
+          "missing_value",
+          "missing_year",
+          "no_yearly_value"
+        ],
+        "DT_DOD_DECT_GN_ZS": [
+          "missing_value",
+          "missing_year",
+          "no_yearly_value"
+        ]
+      },
+      "cross_issues": {},
+      "scores": {
+        "FI_RES_TOTL": 0,
+        "NE_IMP_GNFS_CD": 100,
+        "DT_DOD_DECT_GN_ZS": 0,
+        "NY_GDP_MKTP_CD": 100,
+        "FP_CPI_TOTL_ZG": 100,
+        "NE_EXP_GNFS_CD": 100,
+        "BX_KLT_DINV_CD_WD": 100,
+        "GC_XPN_TOTL_GD_ZS": 100
+      },
+      "overall_score": 75,
+      "status": "needs_review"
+    },
+    {
+      "preset_file": "presets/preset_GR.json",
+      "country": "GR",
+      "created_at": "2025-12-26T14:49:53.899858+00:00",
+      "indicator_count": 8,
+      "per_indicator": {
+        "FI_RES_TOTL_MO": {
+          "indicator": "FI.RES.TOTL.MO",
+          "value": 1.29465956102193,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_IMP_GNFS_CD": {
+          "indicator": "NE.IMP.GNFS.CD",
+          "value": 122135634583.353,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "DT_DOD_DECT_GN_ZS": {
+          "indicator": "DT.DOD.DECT.GN.ZS",
+          "value": null,
+          "year": null,
+          "source": "WB_empty",
+          "issues": [
+            "missing_value",
+            "missing_year",
+            "no_yearly_value"
+          ]
+        },
+        "NY_GDP_MKTP_CD": {
+          "indicator": "NY.GDP.MKTP.CD",
+          "value": 256238371778.118,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "FP_CPI_TOTL_ZG": {
+          "indicator": "FP.CPI.TOTL.ZG",
+          "value": 2.74149045788606,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_EXP_GNFS_CD": {
+          "indicator": "NE.EXP.GNFS.CD",
+          "value": 107906278860.86,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "BX_KLT_DINV_CD_WD": {
+          "indicator": "BX.KLT.DINV.CD.WD",
+          "value": 6742277267.34835,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "GC_XPN_TOTL_GD_ZS": {
+          "indicator": "GC.XPN.TOTL.GD.ZS",
+          "value": 47.3019610078935,
+          "year": "2023",
+          "source": "WB",
+          "issues": []
+        }
+      },
+      "failed_rules": {
+        "DT_DOD_DECT_GN_ZS": [
+          "missing_value",
+          "missing_year",
+          "no_yearly_value"
+        ]
+      },
+      "cross_issues": {},
+      "scores": {
+        "FI_RES_TOTL_MO": 100,
+        "NE_IMP_GNFS_CD": 100,
+        "DT_DOD_DECT_GN_ZS": 0,
+        "NY_GDP_MKTP_CD": 100,
+        "FP_CPI_TOTL_ZG": 100,
+        "NE_EXP_GNFS_CD": 100,
+        "BX_KLT_DINV_CD_WD": 100,
+        "GC_XPN_TOTL_GD_ZS": 100
+      },
+      "overall_score": 87,
+      "status": "ready_for_analysis"
+    },
+    {
+      "preset_file": "presets/preset_IN.json",
+      "country": "IN",
+      "created_at": "2025-12-26T14:49:52.848226+00:00",
+      "indicator_count": 8,
+      "per_indicator": {
+        "FI_RES_TOTL_MO": {
+          "indicator": "FI.RES.TOTL.MO",
+          "value": 7.52133810617043,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_IMP_GNFS_CD": {
+          "indicator": "NE.IMP.GNFS.CD",
+          "value": 918333719557.771,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "DT_DOD_DECT_GN_ZS": {
+          "indicator": "DT.DOD.DECT.GN.ZS",
+          "value": 18.5795533694083,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NY_GDP_MKTP_CD": {
+          "indicator": "NY.GDP.MKTP.CD",
+          "value": 3909891533858.08,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "FP_CPI_TOTL_ZG": {
+          "indicator": "FP.CPI.TOTL.ZG",
+          "value": 4.95303550973656,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_EXP_GNFS_CD": {
+          "indicator": "NE.EXP.GNFS.CD",
+          "value": 827405227198.603,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "BX_KLT_DINV_CD_WD": {
+          "indicator": "BX.KLT.DINV.CD.WD",
+          "value": 27139853378.1402,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "GC_XPN_TOTL_GD_ZS": {
+          "indicator": "GC.XPN.TOTL.GD.ZS",
+          "value": 13.3335178491336,
+          "year": "2022",
+          "source": "WB",
+          "issues": []
+        }
+      },
+      "failed_rules": {},
+      "cross_issues": {},
+      "scores": {
+        "FI_RES_TOTL_MO": 100,
+        "NE_IMP_GNFS_CD": 100,
+        "DT_DOD_DECT_GN_ZS": 100,
+        "NY_GDP_MKTP_CD": 100,
+        "FP_CPI_TOTL_ZG": 100,
+        "NE_EXP_GNFS_CD": 100,
+        "BX_KLT_DINV_CD_WD": 100,
+        "GC_XPN_TOTL_GD_ZS": 100
+      },
+      "overall_score": 100,
+      "status": "ready_for_analysis"
+    },
+    {
+      "preset_file": "presets/preset_IR.json",
+      "country": "IR",
+      "created_at": "2025-12-26T14:49:50.658270+00:00",
+      "indicator_count": 8,
+      "per_indicator": {
+        "FI_RES_TOTL_MO": {
+          "indicator": "FI.RES.TOTL.MO",
+          "value": 5.82231546015728,
+          "year": "1982",
+          "source": "WB",
+          "issues": [
+            "stale_stable"
+          ]
+        },
+        "NE_IMP_GNFS_CD": {
+          "indicator": "NE.IMP.GNFS.CD",
+          "value": 135497500555.676,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "DT_DOD_DECT_GN_ZS": {
+          "indicator": "DT.DOD.DECT.GN.ZS",
+          "value": 2.21280566524888,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NY_GDP_MKTP_CD": {
+          "indicator": "NY.GDP.MKTP.CD",
+          "value": 475252089215.416,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "FP_CPI_TOTL_ZG": {
+          "indicator": "FP.CPI.TOTL.ZG",
+          "value": 32.455871402917,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_EXP_GNFS_CD": {
+          "indicator": "NE.EXP.GNFS.CD",
+          "value": 111928863188.398,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "BX_KLT_DINV_CD_WD": {
+          "indicator": "BX.KLT.DINV.CD.WD",
+          "value": 1449111110,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "GC_XPN_TOTL_GD_ZS": {
+          "indicator": "GC.XPN.TOTL.GD.ZS",
+          "value": 19.6373860775885,
+          "year": "2009",
+          "source": "WB",
+          "issues": [
+            "stale_stable"
+          ]
+        }
+      },
+      "failed_rules": {
+        "FI_RES_TOTL_MO": [
+          "stale_stable"
+        ],
+        "GC_XPN_TOTL_GD_ZS": [
+          "stale_stable"
+        ]
+      },
+      "cross_issues": {},
+      "scores": {
+        "FI_RES_TOTL_MO": 70,
+        "NE_IMP_GNFS_CD": 100,
+        "DT_DOD_DECT_GN_ZS": 100,
+        "NY_GDP_MKTP_CD": 100,
+        "FP_CPI_TOTL_ZG": 100,
+        "NE_EXP_GNFS_CD": 100,
+        "BX_KLT_DINV_CD_WD": 100,
+        "GC_XPN_TOTL_GD_ZS": 70
+      },
+      "overall_score": 92,
+      "status": "ready_for_analysis"
+    },
+    {
+      "preset_file": "presets/preset_US.json",
+      "country": "US",
+      "created_at": "2025-12-26T14:49:49.472286+00:00",
+      "indicator_count": 8,
+      "per_indicator": {
+        "FI_RES_TOTL_MO": {
+          "indicator": "FI.RES.TOTL.MO",
+          "value": 1.94032058064747,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_IMP_GNFS_CD": {
+          "indicator": "NE.IMP.GNFS.CD",
+          "value": 4103100000000,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "DT_DOD_DECT_GN_ZS": {
+          "indicator": "DT.DOD.DECT.GN.ZS",
+          "value": null,
+          "year": null,
+          "source": "WB_empty",
+          "issues": [
+            "missing_value",
+            "missing_year",
+            "no_yearly_value"
+          ]
+        },
+        "NY_GDP_MKTP_CD": {
+          "indicator": "NY.GDP.MKTP.CD",
+          "value": 28750956130731.2,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "FP_CPI_TOTL_ZG": {
+          "indicator": "FP.CPI.TOTL.ZG",
+          "value": 2.94952520485207,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "NE_EXP_GNFS_CD": {
+          "indicator": "NE.EXP.GNFS.CD",
+          "value": 3193500000000,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "BX_KLT_DINV_CD_WD": {
+          "indicator": "BX.KLT.DINV.CD.WD",
+          "value": 297058000000,
+          "year": "2024",
+          "source": "WB",
+          "issues": []
+        },
+        "GC_XPN_TOTL_GD_ZS": {
+          "indicator": "GC.XPN.TOTL.GD.ZS",
+          "value": 24.8982825568771,
+          "year": "2023",
+          "source": "WB",
+          "issues": []
+        }
+      },
+      "failed_rules": {
+        "DT_DOD_DECT_GN_ZS": [
+          "missing_value",
+          "missing_year",
+          "no_yearly_value"
+        ]
+      },
+      "cross_issues": {},
+      "scores": {
+        "FI_RES_TOTL_MO": 100,
+        "NE_IMP_GNFS_CD": 100,
+        "DT_DOD_DECT_GN_ZS": 0,
+        "NY_GDP_MKTP_CD": 100,
+        "FP_CPI_TOTL_ZG": 100,
+        "NE_EXP_GNFS_CD": 100,
+        "BX_KLT_DINV_CD_WD": 100,
+        "GC_XPN_TOTL_GD_ZS": 100
+      },
+      "overall_score": 87,
+      "status": "ready_for_analysis"
+    }
+  ]
+}

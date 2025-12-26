@@ -3,15 +3,13 @@
   "description": "Preset für Land IN",
   "version": "1.0",
   "indicator_snapshot": {
-    "FI_RES_TOTL": {
-      "value": 60000000000.0,
-      "year": "2023",
-      "source": "central_bank",
-      "indicator": "FI.RES.TOTL",
-      "note": "from_fallback",
+    "FI_RES_TOTL_MO": {
+      "value": 7.52133810617043,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "FI.RES.TOTL.MO",
       "country_currency": null,
-      "country_timezone": null,
-      "monthly_reserves_usd": 5000000000.0
+      "country_timezone": null
     },
     "NE_IMP_GNFS_CD": {
       "value": 918333719557.771,
@@ -78,7 +76,7 @@
   },
   "metadata": {
     "created_by": "auto-generator",
-    "created_at": "2025-12-24T07:57:33.314941+00:00",
+    "created_at": "2025-12-26T14:49:52.848226+00:00",
     "country_info": {
       "alpha2": "IN",
       "alpha3": "IND",

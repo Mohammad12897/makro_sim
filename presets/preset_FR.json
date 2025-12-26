@@ -3,12 +3,13 @@
   "description": "Preset für Land FR",
   "version": "1.0",
   "indicator_snapshot": {
-    "FI_RES_TOTL": {
-      "value": null,
-      "year": null,
-      "source": "missing",
-      "indicator": "FI.RES.TOTL",
-      "note": "invalid_indicator"
+    "FI_RES_TOTL_MO": {
+      "value": 2.38967602333511,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "FI.RES.TOTL.MO",
+      "country_currency": "EUR",
+      "country_timezone": "Europe/Paris"
     },
     "NE_IMP_GNFS_CD": {
       "value": 1081453951068.75,
@@ -74,7 +75,7 @@
   },
   "metadata": {
     "created_by": "auto-generator",
-    "created_at": "2025-12-24T07:57:36.270884+00:00",
+    "created_at": "2025-12-26T14:49:55.240202+00:00",
     "country_info": {
       "alpha2": "FR",
       "alpha3": "FRA",

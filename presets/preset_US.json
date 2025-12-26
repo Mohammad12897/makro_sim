@@ -3,12 +3,13 @@
   "description": "Preset für Land US",
   "version": "1.0",
   "indicator_snapshot": {
-    "FI_RES_TOTL": {
-      "value": null,
-      "year": null,
-      "source": "missing",
-      "indicator": "FI.RES.TOTL",
-      "note": "invalid_indicator"
+    "FI_RES_TOTL_MO": {
+      "value": 1.94032058064747,
+      "year": "2024",
+      "source": "WB",
+      "indicator": "FI.RES.TOTL.MO",
+      "country_currency": null,
+      "country_timezone": null
     },
     "NE_IMP_GNFS_CD": {
       "value": 4103100000000,
@@ -74,7 +75,7 @@
   },
   "metadata": {
     "created_by": "auto-generator",
-    "created_at": "2025-12-24T07:57:30.351989+00:00",
+    "created_at": "2025-12-26T14:49:49.472286+00:00",
     "country_info": {
       "alpha2": "US",
       "alpha3": "USA",

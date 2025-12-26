@@ -3,12 +3,13 @@
   "description": "Preset für Land IR",
   "version": "1.0",
   "indicator_snapshot": {
-    "FI_RES_TOTL": {
-      "value": null,
-      "year": null,
-      "source": "missing",
-      "indicator": "FI.RES.TOTL",
-      "note": "invalid_indicator"
+    "FI_RES_TOTL_MO": {
+      "value": 5.82231546015728,
+      "year": "1982",
+      "source": "WB",
+      "indicator": "FI.RES.TOTL.MO",
+      "country_currency": null,
+      "country_timezone": null
     },
     "NE_IMP_GNFS_CD": {
       "value": 135497500555.676,
@@ -75,7 +76,7 @@
   },
   "metadata": {
     "created_by": "auto-generator",
-    "created_at": "2025-12-24T07:57:31.560584+00:00",
+    "created_at": "2025-12-26T14:49:50.658270+00:00",
     "country_info": {
       "alpha2": "IR",
       "alpha3": "IRN",
