@@ -12,6 +12,11 @@ generate_presets.py
 
 import os
 import json
+p = "scripts/invalid_indicators.json"
+if not os.path.exists(p):
+    with open(p, "w", encoding="utf-8") as f:
+        f.write("{}")
+import json
 import time
 import logging
 import requests
