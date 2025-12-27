@@ -2,34 +2,36 @@
 # coding: utf-8
 """
 generate_presets.py
-- Validiert Indikatoren (World Bank metadata)
-- Holt Indikatorwerte pro Land (World Bank)
-- Rechnet Monatswerte aus Jahreswerten (konfigurierbar)
-- Versucht Fallback-Quellen (lokale CSV oder custom fetcher)
-- Schreibt presets/preset_<COUNTRY>.json
-- Optional: Validiert erzeugte Presets gegen scripts/preset_schema.json
+- Erzeugt presets/preset_<COUNTRY>.json aus World Bank + Fallbacks
+- Wendet Monatsregeln an
+- Speichert Cache und Logs
+- Ruft run_validation aus scripts/validate_presets.py auf (wenn verfügbar)
+- Quarantänisiert nur bei kritischen Validierungsfehlern (Schema oder kritische cross_checks)
 """
-
+from __future__ import annotations
 import os
-import json
-p = "scripts/invalid_indicators.json"
-if not os.path.exists(p):
-    with open(p, "w", encoding="utf-8") as f:
-        f.write("{}")
 import json
 import time
 import logging
 import requests
 import glob
+import shutil
+import argparse
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-# jsonschema wird nur in der optionalen Validierungsfunktion benötigt
+# jsonschema wird nur in optionalen Validierungsfunktionen benötigt
 try:
     from jsonschema import validate as js_validate, ValidationError
 except Exception:
     js_validate = None
     ValidationError = Exception
+
+# Versuche, run_validation importierbar zu machen
+try:
+    from scripts.validate_presets import run_validation
+except Exception:
+    run_validation = None  # Fallback: CLI call möglich
 
 # ---------- Konfiguration ----------
 OUTPUT_DIR = "presets"
@@ -42,13 +44,10 @@ REQUEST_TIMEOUT = 10
 MAX_RETRIES = 3
 BACKOFF_FACTOR = 1.5
 VALIDATION_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 Tage
-COUNTRIES = ["DE", "CN", "US", "IR", "BR", "IN", "GR", "FR"]
+COUNTRIES = ["DE", "CN", "US", "IR", "BR", "IN", "GR", "FR", "GB"]
 USE_FALLBACK = True
 FALLBACK_CSV = "scripts/fallback_data.csv"
 COUNTRY_CODES_FILE = "scripts/country_codes.json"
-
-# Auto-skip configuration: after N failed validations mark indicator as invalid
-AUTO_SKIP_AFTER = 3
 INVALID_LOG = "scripts/invalid_indicators.json"
 # -----------------------------------
 
@@ -79,7 +78,6 @@ def load_indicators() -> List[str]:
             for line in f:
                 s = line.strip()
                 if s and not s.startswith("#"):
-                    # support CSV lines like "DE,FI.RES.TOTL,2023,..." -> indicator is second column
                     parts = [p.strip() for p in s.split(",")]
                     if len(parts) >= 2 and parts[1]:
                         inds.append(parts[1])
@@ -87,7 +85,16 @@ def load_indicators() -> List[str]:
                         inds.append(parts[0])
         return inds
     logger.info("Keine Indikator-Datei gefunden, verwende eingebaute Liste")
-    return ["FI.RES.TOTL", "NE.IMP.GNFS.CD", "DT.DOD.DECT.GN.ZS"]
+    return [
+        "FI.RES.TOTL.MO",
+        "NE.IMP.GNFS.CD",
+        "DT.DOD.DECT.CD",
+        "NY.GDP.MKTP.CD",
+        "FP.CPI.TOTL.ZG",
+        "NE.EXP.GNFS.CD",
+        "BX.KLT.DINV.CD.WD",
+        "GC.XPN.TOTL.GD.ZS",
+    ]
 
 def load_cache() -> Dict[str, Any]:
     if os.path.exists(INDICATOR_CACHE):
@@ -109,6 +116,14 @@ def save_json(path: str, data: Dict[str, Any]) -> None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+def save_preset_atomic(path: str, data: Dict[str, Any]) -> None:
+    tmp_dir = os.path.join(os.path.dirname(path), "tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+    tmp_path = os.path.join(tmp_dir, os.path.basename(path))
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    shutil.move(tmp_path, path)
 
 # ----------------- World Bank GET mit Retries -----------------
 def _wb_get(url: str, params: Dict[str, Any]) -> Optional[Any]:
@@ -155,16 +170,13 @@ def validate_indicator(indicator: str, cache: Dict[str, Any]) -> bool:
         else:
             valid = True
 
-    # update cache
     cache[cache_key] = {"valid": valid, "checked_at": now}
 
-    # handle fail counts and auto-skip logging
     if not valid:
         fails = cache.get("fail_counts", {})
         fails[indicator] = fails.get(indicator, 0) + 1
         cache["fail_counts"] = fails
-
-        if fails[indicator] >= AUTO_SKIP_AFTER:
+        if fails[indicator] >= 3:
             bad = {}
             if os.path.exists(INVALID_LOG):
                 try:
@@ -206,26 +218,19 @@ def latest_value_from_data(data: List[Dict[str, Any]]) -> Optional[Dict[str, Any
             return entry
     return None
 
-# ----------------- Fallback: lokale CSV loader (überarbeitet) -----------------
+# ----------------- Fallback CSV loader -----------------
 def load_fallback_csv(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
-    """
-    Lädt fallback_data.csv und sammelt alle Einträge pro country+indicator.
-    Reduziert anschließend auf den Eintrag mit dem neuesten Jahr (wenn Jahr numerisch).
-    Erwartetes CSV-Feldset: country,indicator,year,value,source
-    Rückgabe: { country: { indicator: { "year": ..., "value": ..., "source": ... } } }
-    """
     fallback = {}
     if not os.path.exists(path):
         return {}
-    import csv
+    import csv as _csv
     with open(path, "r", encoding="utf-8") as f:
-        # Support both header and headerless CSV: try DictReader, fallback to manual parse
         first = f.readline()
         f.seek(0)
-        has_header = "," in first and not first.strip().split(",")[0].isalpha()  # heuristic
+        has_header = "," in first and not first.strip().split(",")[0].isalpha()
         f.seek(0)
         if has_header:
-            reader = csv.DictReader(f)
+            reader = _csv.DictReader(f)
             for row in reader:
                 c = (row.get("country") or "").strip()
                 ind = (row.get("indicator") or "").strip()
@@ -240,7 +245,6 @@ def load_fallback_csv(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
                     continue
                 fallback.setdefault(c, {}).setdefault(ind, []).append({"year": year, "value": v, "source": src})
         else:
-            # headerless: each line like "DE,FI.RES.TOTL,2023,150000000000,central_bank"
             for line in f:
                 s = line.strip()
                 if not s or s.startswith("#"):
@@ -271,9 +275,8 @@ def load_fallback_csv(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
             reduced[c][ind] = latest
     return reduced
 
-# ----------------- Fallback: placeholder for IMF/COFER or other API -----------------
+# ----------------- Fallback placeholder for IMF/COFER -----------------
 def fetch_from_imf_cofer(country: str, indicator: str) -> Optional[Dict[str, Any]]:
-    # Platzhalter: implementiere echten Abruf hier, falls verfügbar.
     return None
 
 # ----------------- Country codes loader -----------------
@@ -288,35 +291,30 @@ def load_country_codes(path: str = COUNTRY_CODES_FILE) -> Dict[str, Any]:
         logger.warning("Fehler beim Laden von %s: %s", path, e)
         return {}
 
-# ----------------- Monatsregeln (neu) -----------------
+# ----------------- Monatsregeln -----------------
 def apply_monthly_rules(indicator: str, snapshot: Dict[str, Any]) -> None:
-    """
-    Ergänzt snapshot um monatliche Ableitungen oder zusätzliche Felder.
-    Modifiziert snapshot in-place.
-    """
     val = snapshot.get("value")
     if val is None:
         return
-
-    # lineare Monatsableitung für nominale Jahreswerte (USD)
     if indicator == "NE.IMP.GNFS.CD":
         snapshot["monthly_imports_usd"] = val / 12.0
-    elif indicator == "FI.RES.TOTL":
-        snapshot["monthly_reserves_usd"] = val / 12.0
+    elif indicator in ("FI.RES.TOTL", "FI.RES.TOTL.MO"):
+        # If FI.RES.TOTL.MO is provided, keep it; if FI.RES.TOTL (USD) provided, compute months elsewhere
+        if indicator == "FI.RES.TOTL":
+            snapshot["monthly_reserves_usd"] = val / 12.0
     elif indicator == "NY.GDP.MKTP.CD":
         snapshot["monthly_gdp_usd"] = val / 12.0
     elif indicator == "NE.EXP.GNFS.CD":
         snapshot["monthly_exports_usd"] = val / 12.0
     elif indicator == "BX.KLT.DINV.CD.WD":
         snapshot["monthly_fdi_net_usd"] = val / 12.0
-
-    # Für Wachstumsraten / Prozentangaben: dokumentiere latest_annual_change
     if indicator in ("FP.CPI.TOTL.ZG", "GC.XPN.TOTL.GD.ZS"):
         snapshot["latest_annual_change"] = val
 
-# ----------------- Preset-Building mit Monatswerten und Fallback -----------------
-def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any], fallback_data: Dict[str, Any], country_codes: Dict[str, Any]) -> Dict[str, Any]:
-    cc = country_codes.get(country_code, {})
+# ----------------- Preset-Building -----------------
+def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any],
+                 fallback_data: Dict[str, Any], country_codes: Dict[str, Any]) -> Dict[str, Any]:
+    cc = country_codes.get(country_code, {}) or {}
     preset = {
         "name": f"preset_{country_code}",
         "description": f"Preset für Land {country_code}",
@@ -338,7 +336,6 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
     }
 
     for ind in indicators:
-        # Laufzeit-Check: überspringe Indikatoren, die zuvor automatisch als invalid protokolliert wurden
         if os.path.exists(INVALID_LOG):
             try:
                 invalids = set(json.load(open(INVALID_LOG, "r", encoding="utf-8")).keys())
@@ -349,7 +346,6 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
                 continue
 
         key = ind.replace(".", "_")
-        # Validierung
         if not validate_indicator(ind, cache):
             logger.warning("Indikator %s ist ungültig oder nicht verfügbar. Versuche Fallback.", ind)
             snapshot = {"value": None, "year": None, "source": "missing", "indicator": ind, "note": "invalid_indicator"}
@@ -361,7 +357,6 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
                 snapshot["year"] = fb.get("year")
                 snapshot["source"] = fb.get("source", "fallback")
                 snapshot["note"] = "from_fallback"
-                # country metadata
                 if cc:
                     snapshot["country_currency"] = cc.get("currency")
                     snapshot["country_timezone"] = cc.get("timezone")
@@ -370,7 +365,6 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
             cache[f"{country_code}:{ind}"] = snapshot
             continue
 
-        # Normaler WB-Abruf
         res = fetch_worldbank_indicator(country_code, ind)
         snapshot = {"value": None, "year": None, "source": None, "indicator": ind}
         if res.get("status") == "ok":
@@ -435,32 +429,123 @@ def build_preset(country_code: str, indicators: List[str], cache: Dict[str, Any]
 
     return preset
 
-# ----------------- Validierung der erzeugten Presets (gewünscht) -----------------
-def validate_generated_presets(schema_path="scripts/preset_schema.json"):
-    import glob, json
+# ----------------- Validierung der erzeugten Presets (optional) -----------------
+def handle_validation_report(report_path: str = "reports/validation_report.json", quarantine_dir: str = "presets/quarantine"):
+    """
+    Read report_path and move only presets with critical validation errors to quarantine.
+    'stale' errors are treated as warnings and do not trigger quarantine.
+    """
+    if not os.path.exists(report_path):
+        logger.info("Validation report not found: %s", report_path)
+        return
     try:
-        from jsonschema import validate, ValidationError
-    except Exception:
-        raise RuntimeError("jsonschema ist nicht installiert; bitte 'pip install jsonschema'")
+        with open(report_path, "r", encoding="utf-8") as f:
+            rep = json.load(f)
+    except Exception as e:
+        logger.error("Could not read validation report %s: %s", report_path, e)
+        return
 
-    schema = json.load(open(schema_path, "r", encoding="utf-8"))
-    errs = 0
-    for p in glob.glob("presets/*.json"):
-        d = json.load(open(p, "r", encoding="utf-8"))
-        try:
-            validate(instance=d, schema=schema)
-            print("OK:", p)
-        except ValidationError as e:
-            errs += 1
-            print("INVALID:", p, e.message)
-    if errs:
-        raise SystemExit(f"{errs} invalid preset(s)")
+    os.makedirs(quarantine_dir, exist_ok=True)
+    critical_checks = {"trade_vs_gdp"}
+
+    for r in rep.get("reports", []):
+        status = r.get("status")
+        pfile = r.get("preset_file")
+        if not pfile or not os.path.exists(pfile):
+            continue
+        errors = r.get("errors", [])
+        is_critical = False
+        for e in errors:
+            if e.get("type") == "schema":
+                is_critical = True
+                break
+            if e.get("type") == "cross_check" and e.get("check") in critical_checks:
+                is_critical = True
+                break
+        if is_critical:
+            dest = os.path.join(quarantine_dir, os.path.basename(pfile))
+            try:
+                shutil.move(pfile, dest)
+                logger.warning("Moved %s to quarantine due to status=%s", pfile, status)
+                with open("reports/audit.jsonl", "a", encoding="utf-8") as af:
+                    af.write(json.dumps({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "action": "quarantine_preset",
+                        "file": pfile,
+                        "status": status
+                    }) + "\n")
+            except Exception as ex:
+                logger.error("Failed to move %s to quarantine: %s", pfile, ex)
+        else:
+            # write a warning audit entry for non-critical issues (including stale)
+            with open("reports/audit.jsonl", "a", encoding="utf-8") as af:
+                af.write(json.dumps({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "action": "validation_warning",
+                    "file": pfile,
+                    "status": status,
+                    "errors": errors
+                }) + "\n")
+
+def handle_validation_report_from_result(result: Dict[str, Any], quarantine_dir: str = "presets/quarantine"):
+    """
+    Process validation result dict returned by run_validation.
+    Move only presets with critical errors to quarantine.
+    Treat 'stale' as warning (do not quarantine).
+    Critical errors:
+      - any error with type == 'schema'
+      - cross_check errors for checks considered critical (e.g., 'trade_vs_gdp')
+    """
+    reports = result.get("reports", [])
+    os.makedirs(quarantine_dir, exist_ok=True)
+    critical_checks = {"trade_vs_gdp"}  # extend if needed
+
+    for r in reports:
+        pfile = r.get("preset_file")
+        if not pfile or not os.path.exists(pfile):
+            continue
+        errors = r.get("errors", [])
+        is_critical = False
+        for e in errors:
+            etype = e.get("type")
+            if etype == "schema":
+                is_critical = True
+                break
+            if etype == "cross_check":
+                check = e.get("check")
+                if check in critical_checks:
+                    is_critical = True
+                    break
+        if is_critical:
+            dest = os.path.join(quarantine_dir, os.path.basename(pfile))
+            try:
+                shutil.move(pfile, dest)
+                logger.warning("Moved %s to quarantine due to critical validation errors", pfile)
+                with open("reports/audit.jsonl", "a", encoding="utf-8") as af:
+                    af.write(json.dumps({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "action": "quarantine_preset",
+                        "file": pfile,
+                        "status": r.get("status"),
+                        "reason": "critical_validation"
+                    }) + "\n")
+            except Exception as ex:
+                logger.error("Failed to move %s to quarantine: %s", pfile, ex)
+        else:
+            # non-critical: keep file in place and write a warning audit entry
+            with open("reports/audit.jsonl", "a", encoding="utf-8") as af:
+                af.write(json.dumps({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "action": "validation_warning",
+                    "file": pfile,
+                    "status": r.get("status"),
+                    "errors": r.get("errors")
+                }) + "\n")
 
 # ----------------- CLI / Main -----------------
-def main(validate_only: bool = False):
+def main(validate_only: bool = False, no_validate: bool = False):
     indicators = load_indicators()
 
-    # filter out permanently invalid indicators
     invalids = set()
     if os.path.exists(INVALID_LOG):
         try:
@@ -490,7 +575,7 @@ def main(validate_only: bool = False):
             logger.info("Processing %s", c)
             preset = build_preset(c, indicators, cache, fallback_data, country_codes)
             out_path = os.path.join(OUTPUT_DIR, f"preset_{c}.json")
-            save_json(out_path, preset)
+            save_preset_atomic(out_path, preset)
             written.append(f"preset_{c}")
             logger.info("Wrote %s", out_path)
         except Exception as e:
@@ -500,9 +585,29 @@ def main(validate_only: bool = False):
     logger.info("Wrote presets: %s", written)
     print("Wrote presets:", written)
 
+    # optional: run validation (use run_validation result to avoid race conditions)
+    if not no_validate:
+        try:
+            if run_validation:
+                result = run_validation(presets_dir=OUTPUT_DIR, schema_path="scripts/preset_schema.json", out_dir="reports")
+                logger.info("Validation result: %s", result.get("summary", {}))
+                handle_validation_report_from_result(result, quarantine_dir=os.path.join(OUTPUT_DIR, "quarantine"))
+            else:
+                # fallback to CLI invocation (legacy)
+                import subprocess
+                subprocess.run(["python", "scripts/validate_presets.py", "--presets", OUTPUT_DIR, "--schema", "scripts/preset_schema.json", "--out", "reports"], check=False)
+                handle_validation_report("reports/validation_report.json", quarantine_dir=os.path.join(OUTPUT_DIR, "quarantine"))
+        except Exception as e:
+            logger.error("Validation failed: %s", e)
+
 if __name__ == "__main__":
-    validate_only = os.environ.get("VALIDATE_ONLY", "0") == "1"
-    main(validate_only=validate_only)
-    # Optional: nach erfolgreichem Run Presets validieren
-    # Entferne das Kommentar, wenn du immer validieren willst:
-    # validate_generated_presets("scripts/preset_schema.json")
+    parser = argparse.ArgumentParser(description="Generate presets and optionally validate them.")
+    parser.add_argument("--validate-only", action="store_true", help="Only validate configured indicators and exit")
+    parser.add_argument("--no-validate", action="store_true", help="Do not run validation after generation")
+    args = parser.parse_args()
+
+    # Backwards compatible env var
+    validate_only_env = os.environ.get("VALIDATE_ONLY", "0") == "1"
+    validate_only = args.validate_only or validate_only_env
+
+    main(validate_only=validate_only, no_validate=args.no_validate)
