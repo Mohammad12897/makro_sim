@@ -1,136 +1,643 @@
 {
-  "validate:FI.RES.TOTL": {
-    "valid": false,
-    "checked_at": 1766473289.8670626
+  "validate:FI.RES.TOTL.MO": {
+    "valid": true,
+    "checked_at": 1766899369.2325022
   },
-  "DE:FI.RES.TOTL": {
-    "value": null,
-    "year": null,
-    "source": "missing",
-    "indicator": "FI.RES.TOTL",
-    "note": "invalid_indicator"
+  "DE:FI.RES.TOTL.MO": {
+    "value": 2.19888604346397,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FI.RES.TOTL.MO",
+    "country_currency": null,
+    "country_timezone": null
   },
   "validate:NE.IMP.GNFS.CD": {
     "valid": true,
-    "checked_at": 1766473290.0453112
+    "checked_at": 1766899369.560399
   },
   "DE:NE.IMP.GNFS.CD": {
     "value": 1764438191610.94,
     "year": "2024",
     "source": "WB",
     "indicator": "NE.IMP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
     "monthly_imports_usd": 147036515967.57834
   },
-  "validate:DT.DOD.DECT.GN.ZS": {
+  "validate:DT.DOD.DECT.CD": {
     "valid": true,
-    "checked_at": 1766473290.3732424
+    "checked_at": 1766899370.086487
   },
-  "DE:DT.DOD.DECT.GN.ZS": {
+  "DE:DT.DOD.DECT.CD": {
     "value": null,
     "year": null,
     "source": "WB_empty",
-    "indicator": "DT.DOD.DECT.GN.ZS",
+    "indicator": "DT.DOD.DECT.CD",
     "note": "no_values"
   },
-  "CN:FI.RES.TOTL": {
-    "value": null,
-    "year": null,
-    "source": "missing",
-    "indicator": "FI.RES.TOTL",
-    "note": "invalid_indicator"
+  "validate:NY.GDP.MKTP.CD": {
+    "valid": true,
+    "checked_at": 1766899370.8566782
+  },
+  "DE:NY.GDP.MKTP.CD": {
+    "value": 4685592577804.69,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NY.GDP.MKTP.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_gdp_usd": 390466048150.39087
+  },
+  "validate:FP.CPI.TOTL.ZG": {
+    "valid": true,
+    "checked_at": 1766899371.1192026
+  },
+  "DE:FP.CPI.TOTL.ZG": {
+    "value": 2.2564981433876,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FP.CPI.TOTL.ZG",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 2.2564981433876
+  },
+  "validate:NE.EXP.GNFS.CD": {
+    "valid": true,
+    "checked_at": 1766899371.345192
+  },
+  "DE:NE.EXP.GNFS.CD": {
+    "value": 1941431210621.87,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.EXP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_exports_usd": 161785934218.48917
+  },
+  "validate:BX.KLT.DINV.CD.WD": {
+    "valid": true,
+    "checked_at": 1766899371.95975
+  },
+  "DE:BX.KLT.DINV.CD.WD": {
+    "value": 47599143488.7827,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "BX.KLT.DINV.CD.WD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_fdi_net_usd": 3966595290.7318916
+  },
+  "validate:GC.XPN.TOTL.GD.ZS": {
+    "valid": true,
+    "checked_at": 1766899372.3759484
+  },
+  "DE:GC.XPN.TOTL.GD.ZS": {
+    "value": 31.174891399437,
+    "year": "2022",
+    "source": "WB",
+    "indicator": "GC.XPN.TOTL.GD.ZS",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 31.174891399437
+  },
+  "CN:FI.RES.TOTL.MO": {
+    "value": 11.2291372513816,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FI.RES.TOTL.MO",
+    "country_currency": null,
+    "country_timezone": null
   },
   "CN:NE.IMP.GNFS.CD": {
     "value": 3219342570126.17,
     "year": "2024",
     "source": "WB",
     "indicator": "NE.IMP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
     "monthly_imports_usd": 268278547510.51416
   },
-  "CN:DT.DOD.DECT.GN.ZS": {
-    "value": 13.0007522555005,
+  "CN:DT.DOD.DECT.CD": {
+    "value": 2419835436491.8,
     "year": "2024",
     "source": "WB",
-    "indicator": "DT.DOD.DECT.GN.ZS"
+    "indicator": "DT.DOD.DECT.CD",
+    "country_currency": null,
+    "country_timezone": null
   },
-  "US:FI.RES.TOTL": {
+  "CN:NY.GDP.MKTP.CD": {
+    "value": 18743803170827.2,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NY.GDP.MKTP.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_gdp_usd": 1561983597568.9333
+  },
+  "CN:FP.CPI.TOTL.ZG": {
+    "value": 0.218128938439177,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FP.CPI.TOTL.ZG",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 0.218128938439177
+  },
+  "CN:NE.EXP.GNFS.CD": {
+    "value": 3753056083349.04,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.EXP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_exports_usd": 312754673612.42
+  },
+  "CN:BX.KLT.DINV.CD.WD": {
+    "value": 18556141172.84,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "BX.KLT.DINV.CD.WD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_fdi_net_usd": 1546345097.7366667
+  },
+  "CN:GC.XPN.TOTL.GD.ZS": {
     "value": null,
     "year": null,
-    "source": "missing",
-    "indicator": "FI.RES.TOTL",
-    "note": "invalid_indicator"
+    "source": "WB_empty",
+    "indicator": "GC.XPN.TOTL.GD.ZS",
+    "note": "no_values"
+  },
+  "US:FI.RES.TOTL.MO": {
+    "value": 1.94032058064747,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FI.RES.TOTL.MO",
+    "country_currency": null,
+    "country_timezone": null
   },
   "US:NE.IMP.GNFS.CD": {
     "value": 4103100000000,
     "year": "2024",
     "source": "WB",
     "indicator": "NE.IMP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
     "monthly_imports_usd": 341925000000.0
   },
-  "US:DT.DOD.DECT.GN.ZS": {
+  "US:DT.DOD.DECT.CD": {
     "value": null,
     "year": null,
     "source": "WB_empty",
-    "indicator": "DT.DOD.DECT.GN.ZS",
+    "indicator": "DT.DOD.DECT.CD",
     "note": "no_values"
   },
-  "IR:FI.RES.TOTL": {
-    "value": null,
-    "year": null,
-    "source": "missing",
-    "indicator": "FI.RES.TOTL",
-    "note": "invalid_indicator"
+  "US:NY.GDP.MKTP.CD": {
+    "value": 28750956130731.2,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NY.GDP.MKTP.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_gdp_usd": 2395913010894.2666
+  },
+  "US:FP.CPI.TOTL.ZG": {
+    "value": 2.94952520485207,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FP.CPI.TOTL.ZG",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 2.94952520485207
+  },
+  "US:NE.EXP.GNFS.CD": {
+    "value": 3193500000000,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.EXP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_exports_usd": 266125000000.0
+  },
+  "US:BX.KLT.DINV.CD.WD": {
+    "value": 297058000000,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "BX.KLT.DINV.CD.WD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_fdi_net_usd": 24754833333.333332
+  },
+  "US:GC.XPN.TOTL.GD.ZS": {
+    "value": 24.8982825568771,
+    "year": "2023",
+    "source": "WB",
+    "indicator": "GC.XPN.TOTL.GD.ZS",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 24.8982825568771
+  },
+  "IR:FI.RES.TOTL.MO": {
+    "value": 5.82231546015728,
+    "year": "1982",
+    "source": "WB",
+    "indicator": "FI.RES.TOTL.MO",
+    "country_currency": null,
+    "country_timezone": null
   },
   "IR:NE.IMP.GNFS.CD": {
     "value": 135497500555.676,
     "year": "2024",
     "source": "WB",
     "indicator": "NE.IMP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
     "monthly_imports_usd": 11291458379.639666
   },
-  "IR:DT.DOD.DECT.GN.ZS": {
-    "value": 2.21280566524888,
+  "IR:DT.DOD.DECT.CD": {
+    "value": 9654298895.5,
     "year": "2024",
     "source": "WB",
-    "indicator": "DT.DOD.DECT.GN.ZS"
+    "indicator": "DT.DOD.DECT.CD",
+    "country_currency": null,
+    "country_timezone": null
   },
-  "BR:FI.RES.TOTL": {
-    "value": null,
-    "year": null,
-    "source": "missing",
-    "indicator": "FI.RES.TOTL",
-    "note": "invalid_indicator"
+  "IR:NY.GDP.MKTP.CD": {
+    "value": 475252089215.416,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NY.GDP.MKTP.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_gdp_usd": 39604340767.95133
+  },
+  "IR:FP.CPI.TOTL.ZG": {
+    "value": 32.455871402917,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FP.CPI.TOTL.ZG",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 32.455871402917
+  },
+  "IR:NE.EXP.GNFS.CD": {
+    "value": 111928863188.398,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.EXP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_exports_usd": 9327405265.699833
+  },
+  "IR:BX.KLT.DINV.CD.WD": {
+    "value": 1449111110,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "BX.KLT.DINV.CD.WD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_fdi_net_usd": 120759259.16666667
+  },
+  "IR:GC.XPN.TOTL.GD.ZS": {
+    "value": 19.6373860775885,
+    "year": "2009",
+    "source": "WB",
+    "indicator": "GC.XPN.TOTL.GD.ZS",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 19.6373860775885
+  },
+  "BR:FI.RES.TOTL.MO": {
+    "value": 7.95558614184571,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FI.RES.TOTL.MO",
+    "country_currency": null,
+    "country_timezone": null
   },
   "BR:NE.IMP.GNFS.CD": {
     "value": 385708875013.773,
     "year": "2024",
     "source": "WB",
     "indicator": "NE.IMP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
     "monthly_imports_usd": 32142406251.14775
   },
-  "BR:DT.DOD.DECT.GN.ZS": {
-    "value": 28.6612661075538,
+  "BR:DT.DOD.DECT.CD": {
+    "value": 605463780812.8,
     "year": "2024",
     "source": "WB",
-    "indicator": "DT.DOD.DECT.GN.ZS"
+    "indicator": "DT.DOD.DECT.CD",
+    "country_currency": null,
+    "country_timezone": null
   },
-  "IN:FI.RES.TOTL": {
-    "value": null,
-    "year": null,
-    "source": "missing",
-    "indicator": "FI.RES.TOTL",
-    "note": "invalid_indicator"
+  "BR:NY.GDP.MKTP.CD": {
+    "value": 2185821648943.86,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NY.GDP.MKTP.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_gdp_usd": 182151804078.655
+  },
+  "BR:FP.CPI.TOTL.ZG": {
+    "value": 4.36746407652337,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FP.CPI.TOTL.ZG",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 4.36746407652337
+  },
+  "BR:NE.EXP.GNFS.CD": {
+    "value": 392105352908.42,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.EXP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_exports_usd": 32675446075.701664
+  },
+  "BR:BX.KLT.DINV.CD.WD": {
+    "value": 74090786050.19,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "BX.KLT.DINV.CD.WD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_fdi_net_usd": 6174232170.849167
+  },
+  "BR:GC.XPN.TOTL.GD.ZS": {
+    "value": 32.4311004876146,
+    "year": "2023",
+    "source": "WB",
+    "indicator": "GC.XPN.TOTL.GD.ZS",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 32.4311004876146
+  },
+  "IN:FI.RES.TOTL.MO": {
+    "value": 7.52133810617043,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FI.RES.TOTL.MO",
+    "country_currency": null,
+    "country_timezone": null
   },
   "IN:NE.IMP.GNFS.CD": {
     "value": 918333719557.771,
     "year": "2024",
     "source": "WB",
     "indicator": "NE.IMP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
     "monthly_imports_usd": 76527809963.14758
   },
-  "IN:DT.DOD.DECT.GN.ZS": {
-    "value": 18.5795533694083,
+  "IN:DT.DOD.DECT.CD": {
+    "value": 716456023890.4,
     "year": "2024",
     "source": "WB",
-    "indicator": "DT.DOD.DECT.GN.ZS"
+    "indicator": "DT.DOD.DECT.CD",
+    "country_currency": null,
+    "country_timezone": null
+  },
+  "IN:NY.GDP.MKTP.CD": {
+    "value": 3909891533858.08,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NY.GDP.MKTP.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_gdp_usd": 325824294488.17334
+  },
+  "IN:FP.CPI.TOTL.ZG": {
+    "value": 4.95303550973656,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FP.CPI.TOTL.ZG",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 4.95303550973656
+  },
+  "IN:NE.EXP.GNFS.CD": {
+    "value": 827405227198.603,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.EXP.GNFS.CD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_exports_usd": 68950435599.88359
+  },
+  "IN:BX.KLT.DINV.CD.WD": {
+    "value": 27139853378.1402,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "BX.KLT.DINV.CD.WD",
+    "country_currency": null,
+    "country_timezone": null,
+    "monthly_fdi_net_usd": 2261654448.17835
+  },
+  "IN:GC.XPN.TOTL.GD.ZS": {
+    "value": 13.3335178491336,
+    "year": "2022",
+    "source": "WB",
+    "indicator": "GC.XPN.TOTL.GD.ZS",
+    "country_currency": null,
+    "country_timezone": null,
+    "latest_annual_change": 13.3335178491336
+  },
+  "GR:FI.RES.TOTL.MO": {
+    "value": 1.29465956102193,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FI.RES.TOTL.MO"
+  },
+  "GR:NE.IMP.GNFS.CD": {
+    "value": 122135634583.353,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.IMP.GNFS.CD",
+    "monthly_imports_usd": 10177969548.61275
+  },
+  "GR:DT.DOD.DECT.CD": {
+    "value": null,
+    "year": null,
+    "source": "WB_empty",
+    "indicator": "DT.DOD.DECT.CD",
+    "note": "no_values"
+  },
+  "GR:NY.GDP.MKTP.CD": {
+    "value": 256238371778.118,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NY.GDP.MKTP.CD",
+    "monthly_gdp_usd": 21353197648.176502
+  },
+  "GR:FP.CPI.TOTL.ZG": {
+    "value": 2.74149045788606,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FP.CPI.TOTL.ZG",
+    "latest_annual_change": 2.74149045788606
+  },
+  "GR:NE.EXP.GNFS.CD": {
+    "value": 107906278860.86,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.EXP.GNFS.CD",
+    "monthly_exports_usd": 8992189905.071667
+  },
+  "GR:BX.KLT.DINV.CD.WD": {
+    "value": 6742277267.34835,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "BX.KLT.DINV.CD.WD",
+    "monthly_fdi_net_usd": 561856438.9456958
+  },
+  "GR:GC.XPN.TOTL.GD.ZS": {
+    "value": 47.3019610078935,
+    "year": "2023",
+    "source": "WB",
+    "indicator": "GC.XPN.TOTL.GD.ZS",
+    "latest_annual_change": 47.3019610078935
+  },
+  "FR:FI.RES.TOTL.MO": {
+    "value": 2.38967602333511,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FI.RES.TOTL.MO",
+    "country_currency": "EUR",
+    "country_timezone": "Europe/Paris"
+  },
+  "FR:NE.IMP.GNFS.CD": {
+    "value": 1081453951068.75,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.IMP.GNFS.CD",
+    "country_currency": "EUR",
+    "country_timezone": "Europe/Paris",
+    "monthly_imports_usd": 90121162589.0625
+  },
+  "FR:DT.DOD.DECT.CD": {
+    "value": null,
+    "year": null,
+    "source": "WB_empty",
+    "indicator": "DT.DOD.DECT.CD",
+    "note": "no_values"
+  },
+  "FR:NY.GDP.MKTP.CD": {
+    "value": 3160442622465.08,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NY.GDP.MKTP.CD",
+    "country_currency": "EUR",
+    "country_timezone": "Europe/Paris",
+    "monthly_gdp_usd": 263370218538.75668
+  },
+  "FR:FP.CPI.TOTL.ZG": {
+    "value": 1.99904942291463,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FP.CPI.TOTL.ZG",
+    "country_currency": "EUR",
+    "country_timezone": "Europe/Paris",
+    "latest_annual_change": 1.99904942291463
+  },
+  "FR:NE.EXP.GNFS.CD": {
+    "value": 1071066237472.11,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.EXP.GNFS.CD",
+    "country_currency": "EUR",
+    "country_timezone": "Europe/Paris",
+    "monthly_exports_usd": 89255519789.3425
+  },
+  "FR:BX.KLT.DINV.CD.WD": {
+    "value": 52052548617.7634,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "BX.KLT.DINV.CD.WD",
+    "country_currency": "EUR",
+    "country_timezone": "Europe/Paris",
+    "monthly_fdi_net_usd": 4337712384.813617
+  },
+  "FR:GC.XPN.TOTL.GD.ZS": {
+    "value": 47.2580360132692,
+    "year": "2023",
+    "source": "WB",
+    "indicator": "GC.XPN.TOTL.GD.ZS",
+    "country_currency": "EUR",
+    "country_timezone": "Europe/Paris",
+    "latest_annual_change": 47.2580360132692
+  },
+  "GB:FI.RES.TOTL.MO": {
+    "value": 1.22309285940089,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FI.RES.TOTL.MO",
+    "country_currency": "GBP",
+    "country_timezone": "Europe/London"
+  },
+  "GB:NE.IMP.GNFS.CD": {
+    "value": 1174222748816.76,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.IMP.GNFS.CD",
+    "country_currency": "GBP",
+    "country_timezone": "Europe/London",
+    "monthly_imports_usd": 97851895734.73
+  },
+  "GB:DT.DOD.DECT.CD": {
+    "value": null,
+    "year": null,
+    "source": "WB_empty",
+    "indicator": "DT.DOD.DECT.CD",
+    "note": "no_values"
+  },
+  "GB:NY.GDP.MKTP.CD": {
+    "value": 3686033044482.13,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NY.GDP.MKTP.CD",
+    "country_currency": "GBP",
+    "country_timezone": "Europe/London",
+    "monthly_gdp_usd": 307169420373.5108
+  },
+  "GB:FP.CPI.TOTL.ZG": {
+    "value": 3.2715729463592,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "FP.CPI.TOTL.ZG",
+    "country_currency": "GBP",
+    "country_timezone": "Europe/London",
+    "latest_annual_change": 3.2715729463592
+  },
+  "GB:NE.EXP.GNFS.CD": {
+    "value": 1142086333403.45,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "NE.EXP.GNFS.CD",
+    "country_currency": "GBP",
+    "country_timezone": "Europe/London",
+    "monthly_exports_usd": 95173861116.95416
+  },
+  "GB:BX.KLT.DINV.CD.WD": {
+    "value": -60647281077.0004,
+    "year": "2024",
+    "source": "WB",
+    "indicator": "BX.KLT.DINV.CD.WD",
+    "country_currency": "GBP",
+    "country_timezone": "Europe/London",
+    "monthly_fdi_net_usd": -5053940089.750033
+  },
+  "GB:GC.XPN.TOTL.GD.ZS": {
+    "value": 41.2292290721047,
+    "year": "2023",
+    "source": "WB",
+    "indicator": "GC.XPN.TOTL.GD.ZS",
+    "country_currency": "GBP",
+    "country_timezone": "Europe/London",
+    "latest_annual_change": 41.2292290721047
   }
 }

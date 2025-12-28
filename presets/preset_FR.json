@@ -20,11 +20,11 @@
       "country_timezone": "Europe/Paris",
       "monthly_imports_usd": 90121162589.0625
     },
-    "DT_DOD_DECT_GN_ZS": {
+    "DT_DOD_DECT_CD": {
       "value": null,
       "year": null,
       "source": "WB_empty",
-      "indicator": "DT.DOD.DECT.GN.ZS",
+      "indicator": "DT.DOD.DECT.CD",
       "note": "no_values"
     },
     "NY_GDP_MKTP_CD": {
@@ -75,7 +75,7 @@
   },
   "metadata": {
     "created_by": "auto-generator",
-    "created_at": "2025-12-26T14:49:55.240202+00:00",
+    "created_at": "2025-12-28T05:23:06.900259+00:00",
     "country_info": {
       "alpha2": "FR",
       "alpha3": "FRA",

@@ -1,0 +1,83 @@
+{
+  "generated_at": "2025-12-28T05:23:13.657610+00:00",
+  "summary": {
+    "total_presets": 9,
+    "by_status": {
+      "ready_for_analysis": 9
+    },
+    "validated_at": "2025-12-28T05:23:13.652947+00:00"
+  },
+  "reports": [
+    {
+      "preset_file": "presets/preset_BR.json",
+      "country": "BR",
+      "errors": [],
+      "status": "ready_for_analysis",
+      "indicator_count": 8
+    },
+    {
+      "preset_file": "presets/preset_CN.json",
+      "country": "CN",
+      "errors": [],
+      "status": "ready_for_analysis",
+      "indicator_count": 8
+    },
+    {
+      "preset_file": "presets/preset_DE.json",
+      "country": "DE",
+      "errors": [],
+      "status": "ready_for_analysis",
+      "indicator_count": 8
+    },
+    {
+      "preset_file": "presets/preset_FR.json",
+      "country": "FR",
+      "errors": [],
+      "status": "ready_for_analysis",
+      "indicator_count": 8
+    },
+    {
+      "preset_file": "presets/preset_GB.json",
+      "country": "GB",
+      "errors": [],
+      "status": "ready_for_analysis",
+      "indicator_count": 8
+    },
+    {
+      "preset_file": "presets/preset_GR.json",
+      "country": "GR",
+      "errors": [],
+      "status": "ready_for_analysis",
+      "indicator_count": 8
+    },
+    {
+      "preset_file": "presets/preset_IN.json",
+      "country": "IN",
+      "errors": [],
+      "status": "ready_for_analysis",
+      "indicator_count": 8
+    },
+    {
+      "preset_file": "presets/preset_IR.json",
+      "country": "IR",
+      "errors": [
+        {
+          "type": "stale",
+          "indicators": [
+            "FI_RES_TOTL_MO",
+            "GC_XPN_TOTL_GD_ZS"
+          ]
+        }
+      ],
+      "status": "ready_for_analysis",
+      "indicator_count": 8
+    },
+    {
+      "preset_file": "presets/preset_US.json",
+      "country": "US",
+      "errors": [],
+      "status": "ready_for_analysis",
+      "indicator_count": 8
+    }
+  ]
+}

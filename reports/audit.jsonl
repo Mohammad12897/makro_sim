@@ -1,0 +1,1 @@
+{"timestamp": "2025-12-28T05:23:11.468436+00:00", "action": "patch_preset", "file": "presets/preset_IR.json", "changed_indicators": ["FI_RES_TOTL_MO", "GC_XPN_TOTL_GD_ZS"], "reason": "mark_stale_and_add_notes"}
