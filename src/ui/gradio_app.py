@@ -27,6 +27,8 @@ COUNTRY_PRESETS_FILENAME = PRESETS_DIR / "country_presets.json"
 # Slider-Definitionen
 # ---------------------------------------------------------------------
 
+SCENARIOS = ["Baseline", "Optimistisch", "Pessimistisch", "Stress"]
+
 default_params: Dict[str, float] = {
     "USD_Dominanz": 0.7,
     "RMB_Akzeptanz": 0.2,
@@ -160,10 +162,17 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
 
     total = 0.5 * macro + 0.3 * geo + 0.2 * gov
 
+
+    finanz = (p.get("verschuldung", 0.8) / 2.0 + p.get("FX_Schockempfindlichkeit", 0.8) / 2.0)
+    sozial = (1 - p.get("fachkraefte", 0.7)) * 0.5 + (1 - p.get("demokratie", 0.8)) * 0.5
+
+
     return {
         "macro": clamp01(macro),
         "geo": clamp01(geo),
         "governance": clamp01(gov),
+        "finanz": clamp01(finanz),
+        "sozial": clamp01(sozial),
         "total": clamp01(total),
     }
 
@@ -213,26 +222,27 @@ def build_risk_radar(preset: dict, title: str = "Risiko-Radar"):
     fig.tight_layout()
     return fig
 
-def build_risk_radar_5d(scores: dict, title: str = "Risiko-Radar 5D"):
+def build_risk_radar_5d(scores: dict, title: str):
     labels = ["Macro", "Geo", "Governance", "Finanz", "Sozial"]
     values = [
         scores["macro"],
         scores["geo"],
         scores["governance"],
-        scores.get("finanz", scores["macro"]),     # Platzhalter
-        scores.get("sozial", scores["governance"]) # Platzhalter
+        scores["finanz"],
+        scores["sozial"],
     ]
     values += values[:1]
-    angles = np.linspace(0, 2 * np.pi, len(labels) + 1)
+    angles = np.linspace(0, 2*np.pi, len(labels)+1)
 
-    fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(5, 5))
+    fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(5,5))
     ax.plot(angles, values, "o-", linewidth=2)
     ax.fill(angles, values, alpha=0.25)
-    ax.set_thetagrids(angles[:-1] * 180 / np.pi, labels)
+    ax.set_thetagrids(angles[:-1] * 180/np.pi, labels)
     ax.set_ylim(0, 1)
     ax.set_title(title)
-    fig.tight_layout()
+    plt.tight_layout()
     return fig
+
 
 def build_early_warning(params: dict) -> dict:
     scores = compute_risk_scores(params)
@@ -887,6 +897,44 @@ with gr.Blocks(title="Makro-Simulation") as demo:
 
         btn_forecast = gr.Button("Prognose starten")
 
+        shock_list = gr.Dataframe(
+            headers=["Jahr", "Typ", "Intensität"],
+            datatype=["number", "str", "number"],
+            row_count=3,
+            column_count=3,
+            label="Schock-Events",
+        )
+
+        def parse_shocks(df, years):
+            events = {}
+            if df is None:
+                return events
+
+            for row in df:
+                try:
+                    year = int(row[0])
+                    typ = row[1]
+                    intensity = float(row[2])
+                except:
+                    continue
+
+                if not (0 <= year < years):
+                    continue
+
+                if year not in events:
+                    events[year] = {}
+
+                if typ == "Makro-Schock":
+                    events[year]["macro_risk_add"] = intensity
+                elif typ == "Geo-Schock":
+                    events[year]["geo_risk_add"] = intensity
+                elif typ == "Resilienz-Schock":
+                    events[year]["resilienz_add"] = -intensity
+                elif typ == "Volatilitäts-Schock":
+                    events[year]["shock_add"] = intensity
+
+            return events
+
         with gr.Tab("A – Klassisch-ökonomisch"):
             a_plot1 = gr.Plot(label="BIP-Wachstum (deterministisch vs. stochastisch)")
             a_plot2 = gr.Plot(label="Inflation (deterministisch vs. stochastisch)")
@@ -932,17 +980,18 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             shock_year = int(vals[NUM_SLIDERS + 3])
             shock_intensity = float(vals[NUM_SLIDERS + 4])
 
+            shock_df = vals[NUM_SLIDERS + 5]
+
             events = {}
             if shock_intensity > 0 and 0 <= shock_year < years:
                 events[shock_year] = {"shock_add": shock_intensity, "geo_risk_add": 0.1}
 
-            #det, stoch, mc = simulate_paths(params, years, mc_runs, events=events)
-
+            events = parse_shocks(shock_df, years)
+            
             base_params = _collect_params_from_values(list(slider_vals))
             params = _collect_params_from_values(list(slider_vals))
             scores = compute_risk_scores(params)
             cat, _ = risk_category(scores["total"])
-
 
             macro = scores["macro"]
             geo = scores["geo"]
@@ -954,7 +1003,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             params_scenario = apply_scenario(params, scenario_name)
             det, stoch, mc = simulate_paths(params_scenario, years, mc_runs, events=events)
 
-            #det, stoch, mc = simulate_paths(params, years, mc_runs)
             t = np.arange(years)
 
             # A – Klassisch-ökonomisch
@@ -1229,9 +1277,80 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 fig_d1, fig_d2, fig_d3, fig_d4, summary_d, comment_d,
             )
 
+
+            def run_scenario_dashboard(*vals):
+                slider_vals = vals[:NUM_SLIDERS]
+                years = int(vals[NUM_SLIDERS])
+                mc_runs = int(vals[NUM_SLIDERS + 1])
+
+                base_params = _collect_params_from_values(list(slider_vals))
+
+                scenario_results = {}
+
+                for scen in SCENARIOS:
+                    p = apply_scenario(base_params, scen)
+                    det, stoch, mc = simulate_paths(p, years, mc_runs)
+
+                    scenario_results[scen] = {
+                        "gdp": det["gdp_growth"],
+                        "inf": det["inflation"],
+                        "res": det["resilienz"],
+                        "risk": det["risk_drift"],
+                    }
+
+                t = np.arange(years)
+
+                # GDP plot
+                fig_gdp, ax = plt.subplots(figsize=(6, 4))
+                for scen in SCENARIOS:
+                    ax.plot(t, scenario_results[scen]["gdp"], label=scen)
+                ax.set_title("BIP-Wachstum – Szenarien")
+                ax.legend()
+                plt.tight_layout()
+
+                # Inflation
+                fig_inf, ax2 = plt.subplots(figsize=(6, 4))
+                for scen in SCENARIOS:
+                    ax2.plot(t, scenario_results[scen]["inf"], label=scen)
+                ax2.set_title("Inflation – Szenarien")
+                ax2.legend()
+                plt.tight_layout()
+
+                # Resilienz
+                fig_res, ax3 = plt.subplots(figsize=(6, 4))
+                for scen in SCENARIOS:
+                    ax3.plot(t, scenario_results[scen]["res"], label=scen)
+                ax3.set_title("Resilienz – Szenarien")
+                ax3.legend()
+                plt.tight_layout()
+
+                # Risiko
+                fig_risk, ax4 = plt.subplots(figsize=(6, 4))
+                for scen in SCENARIOS:
+                    ax4.plot(t, scenario_results[scen]["risk"], label=scen)
+                ax4.set_title("Risiko-Drift – Szenarien")
+                ax4.legend()
+                plt.tight_layout()
+
+                # Kommentar
+                comment = (
+                    "### Interpretation\n"
+                    "- **Optimistisch**: bessere Governance, höhere Resilienz, geringere Risiken.\n"
+                    "- **Pessimistisch**: höhere Risiken, geringere Resilienz, schwächeres Wachstum.\n"
+                    "- **Stress**: starke Volatilität, Risikoanstieg, deutliche Wachstumsdämpfung.\n"
+                )
+
+                return fig_gdp, fig_inf, fig_res, fig_risk, comment
+
+            btn_sd.click(
+                fn=run_scenario_dashboard,
+                inputs=slider_components + [years_sd, mc_sd],
+                outputs=[sd_plot_gdp, sd_plot_inf, sd_plot_res, sd_plot_risk, sd_comment],
+            )
+
         btn_forecast.click(
             fn=run_forecast,
-            inputs=slider_components + [years_slider, mc_runs_slider, scenario_dropdown, shock_year, shock_intensity],
+            inputs=slider_components + [years_slider, mc_runs_slider, scenario_dropdown, shock_year, shock_intensity, shock_list],
             outputs=[
                 a_plot1, a_plot2, a_plot3, a_plot4, a_summary, a_comment,
                 b_plot1, b_plot2, b_plot3, b_plot4, b_summary, b_comment,
@@ -1239,7 +1358,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 d_plot1, d_plot2, d_plot3, d_plot4, d_summary, d_comment,
             ],
         )
-
 
         with gr.Tab("Vergleich"):
             gr.Markdown("### Länder-Vergleich")
@@ -1262,11 +1380,13 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 pa = presets.get(a)
                 pb = presets.get(b)
 
-                fig_a = build_risk_radar(pa, f"Risiko-Radar: {a}")
-                fig_b = build_risk_radar(pb, f"Risiko-Radar: {b}")
-
+                # Risiko-Scores berechnen
                 sa = compute_risk_scores(pa)
                 sb = compute_risk_scores(pb)
+
+                # 5D-Radar direkt aus Scores
+                fig_a = build_risk_radar_5d(sa, f"Risiko-Radar 5D: {a}")
+                fig_b = build_risk_radar_5d(sb, f"Risiko-Radar 5D: {b}")
 
                 table = {
                     "Land A": sa,
@@ -1296,20 +1416,27 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 return fig_a, fig_b, table, comment
 
 
-
-
-
-            btn_compare.click(
-                fn=compare_countries,
-                inputs=[land_a, land_b],
-                outputs=[radar_a, radar_b, compare_table],
-            )
-
             btn_compare.click(
                 fn=compare_countries,
                 inputs=[land_a, land_b],
                 outputs=[radar_a, radar_b, compare_table, compare_comment],
             )
+
+
+    with gr.Tab("Szenario-Dashboard"):
+        gr.Markdown("### Vergleich der Szenarien (Baseline, Optimistisch, Pessimistisch, Stress)")
+
+        years_sd = gr.Slider(5, 50, value=20, step=1, label="Jahre")
+        mc_sd = gr.Slider(1, 200, value=50, step=1, label="Monte-Carlo Durchläufe")
+
+        btn_sd = gr.Button("Szenarien simulieren")
+
+        sd_plot_gdp = gr.Plot(label="BIP-Wachstum – Szenarien")
+        sd_plot_inf = gr.Plot(label="Inflation – Szenarien")
+        sd_plot_res = gr.Plot(label="Resilienz – Szenarien")
+        sd_plot_risk = gr.Plot(label="Risiko-Drift – Szenarien")
+
+        sd_comment = gr.Markdown(label="Kommentar")
 
 if __name__ == "__main__":
     demo.launch()    

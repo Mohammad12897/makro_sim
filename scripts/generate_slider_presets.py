@@ -3,10 +3,9 @@
 """
 Konvertiert country_presets.json (Indicator-Snapshots) in slider_presets.json (UI-Presets).
 
-- echte Normalisierung der relevanten Indikatoren
-- vollständige 16 UI-Slider-Parameter
+- Aggressive Normalisierung der relevanten Indikatoren
+- Vollständige 16 UI-Slider-Parameter
 - Risiko-Scores (macro, geo, governance, total)
-- robust gegen fehlende Indikatoren
 """
 
 from __future__ import annotations
@@ -91,14 +90,20 @@ def clamp01(x: float) -> float:
     return max(0.0, min(1.0, x))
 
 
-def normalize_ratio(value, min_val=0.0, max_val=3.0) -> float:
+def normalize_ratio(value, min_val=0.0, max_val=2.0) -> float:
+    """
+    Aggressive Normalisierung: enger Bereich, damit Unterschiede stärker wirken.
+    """
     if value is None:
         return 0.5
     x = max(min_val, min(max_val, float(value)))
     return (x - min_val) / (max_val - min_val)
 
 
-def normalize_log(value, min_log=8.0, max_log=14.0) -> float:
+def normalize_log(value, min_log=9.0, max_log=13.0) -> float:
+    """
+    Aggressiver als 8–14: mittlere Länder rücken stärker auseinander.
+    """
     if value is None or value <= 0:
         return 0.5
     x = math.log10(float(value))
@@ -106,12 +111,14 @@ def normalize_log(value, min_log=8.0, max_log=14.0) -> float:
     return (x - min_log) / (max_log - min_log)
 
 
-def normalize_inflation(value, low=0.0, high=15.0) -> float:
+def normalize_inflation(value, low=0.0, high=10.0) -> float:
+    """
+    Aggressiv: schon moderate Inflation erhöht Risiko deutlich.
+    """
     if value is None:
         return 0.5
     x = max(low, min(high, float(value)))
     return (x - low) / (high - low)
-
 
 # ---------------------------------------------------------------------
 # Risiko-Scores
@@ -119,15 +126,15 @@ def normalize_inflation(value, low=0.0, high=15.0) -> float:
 
 def compute_risk_scores(p: dict) -> Dict[str, float]:
     macro = (
-        clamp01(p["verschuldung"] / 2.0) * 0.4 +
-        clamp01(p["FX_Schockempfindlichkeit"] / 2.0) * 0.3 +
-        (1 - clamp01(p["Reserven_Monate"] / 24.0)) * 0.3
+        clamp01(p["verschuldung"] / 1.5) * 0.45 +  # stärkeres Gewicht
+        clamp01(p["FX_Schockempfindlichkeit"] / 1.5) * 0.35 +
+        (1 - clamp01(p["Reserven_Monate"] / 18.0)) * 0.20  # Reserven wirken stärker
     )
 
     geo = (
-        clamp01(p["USD_Dominanz"]) * 0.4 +
-        clamp01(p["Sanktions_Exposure"]) * 0.4 +
-        (1 - clamp01(p["Alternativnetz_Abdeckung"])) * 0.2
+        clamp01(p["USD_Dominanz"]) * 0.45 +
+        clamp01(p["Sanktions_Exposure"]) * 0.35 +
+        (1 - clamp01(p["Alternativnetz_Abdeckung"])) * 0.20
     )
 
     gov = (
@@ -147,9 +154,9 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
 
 
 def risk_category(score: float) -> Tuple[str, str]:
-    if score < 0.34:
+    if score < 0.33:
         return "stabil", "green"
-    elif score < 0.67:
+    elif score < 0.66:
         return "warnung", "yellow"
     else:
         return "kritisch", "red"
@@ -162,26 +169,28 @@ def risk_category(score: float) -> Tuple[str, str]:
 def country_to_slider_preset(code: str, country_preset: dict) -> dict:
     """
     Vollständiges Mapping von Indicator-Snapshot → 16 UI-Slider-Parameter.
+    Aggressive Normalisierung für makrorelevante Größen.
     """
     slider = {k: default for (k, _lo, _hi, default) in PARAM_SLIDERS}
     snap = country_preset.get("indicator_snapshot", {}) or {}
 
-    # Verschuldung
+    # Verschuldung: Debt/GDP
     try:
         debt = snap.get("DT_DOD_DECT_CD", {}).get("value")
         gdp = snap.get("NY_GDP_MKTP_CD", {}).get("value")
         if debt and gdp:
             ratio = float(debt) / float(gdp)
-            slider["verschuldung"] = normalize_ratio(ratio, 0.0, 3.0) * 2.0
-    except:
+            # 0–200% → 0–1, dann auf Skala 0–2 strecken
+            slider["verschuldung"] = normalize_ratio(ratio, 0.0, 2.0) * 2.0
+    except Exception:
         pass
 
-    # Reserven
+    # Reserven in Monaten
     try:
         res = snap.get("FI_RES_TOTL_MO", {}).get("value")
         if res is not None:
             slider["Reserven_Monate"] = max(0.0, min(24.0, float(res)))
-    except:
+    except Exception:
         pass
 
     # Offenheit → Zugangsresilienz
@@ -189,30 +198,32 @@ def country_to_slider_preset(code: str, country_preset: dict) -> dict:
         exports = snap.get("NE_EXP_GNFS_CD", {}).get("value")
         imports = snap.get("NE_IMP_GNFS_CD", {}).get("value")
         if exports and imports:
-            openness = normalize_log(exports + imports)
+            openness = normalize_log(exports + imports, 9.0, 13.0)
             slider["Zugangsresilienz"] = clamp01(openness)
-    except:
+    except Exception:
         pass
 
     # Inflation → FX-Schockempfindlichkeit
     try:
         infl = snap.get("FP_CPI_TOTL_ZG", {}).get("value")
         if infl is not None:
-            inf_norm = normalize_inflation(infl)
-            slider["FX_Schockempfindlichkeit"] = 0.5 + 0.5 * inf_norm
-    except:
+            inf_norm = normalize_inflation(infl, 0.0, 10.0)
+            # 0.5–1.5 auf UI-Skala 0–2
+            slider["FX_Schockempfindlichkeit"] = 0.5 + 1.0 * inf_norm
+    except Exception:
         pass
 
-    # Staatsausgabenquote → stabilitaet
+    # Staatsausgabenquote → stabilitaet (aggressiv: hohe Ausgaben drücken stärker)
     try:
         spend = snap.get("GC_XPN_TOTL_GD_ZS", {}).get("value")
         if spend is not None:
             spend_norm = normalize_ratio(spend / 100.0, 0.0, 0.6)
-            slider["stabilitaet"] = clamp01(1.0 - 0.5 * spend_norm)
-    except:
+            slider["stabilitaet"] = clamp01(1.0 - 0.7 * spend_norm)
+    except Exception:
         pass
 
-    # Rest bleibt default (du kannst später erweitern)
+    # Der Rest (USD_Dominanz, RMB_Akzeptanz, etc.) bleibt erstmal Default
+    # und kann später mit weiteren Indikatoren gemappt werden.
 
     return slider
 
@@ -229,12 +240,12 @@ def main():
 
     slider_presets = {}
 
-    print("Generiere Slider-Presets…")
+    print("Generiere Slider-Presets (mit Risiko-Scores)…")
     for code, cp in countries.items():
         sp = country_to_slider_preset(code, cp)
         scores = compute_risk_scores(sp)
         cat, _ = risk_category(scores["total"])
-        print(f"{code}: Risiko={scores['total']:.2f} ({cat})")
+        print(f"{code}: total={scores['total']:.2f} ({cat})")
         slider_presets[code] = sp
 
     save_json(SLIDER_PRESETS_FILENAME, slider_presets)
