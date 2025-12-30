@@ -13,6 +13,45 @@ import gradio as gr
 import matplotlib.pyplot as plt
 import numpy as np
 
+
+
+def build_comment_a(summary):
+    g = summary["final_gdp_growth_det"]
+    inf = summary["final_inflation_det"]
+    risk = summary["final_risk_det"]
+
+    parts = []
+    parts.append("Wachstum: robust." if g > 0.03 else "Wachstum: moderat." if g > 0 else "Wachstum: rezessiv.")
+    parts.append("Inflation: hoch." if inf > 0.06 else "erhöht." if inf > 0.03 else "unter Kontrolle.")
+    parts.append("Risiko: kritisch." if risk > 0.66 else "angespannt." if risk > 0.33 else "stabil.")
+    return " ".join(parts)
+
+
+def build_comment_b(summary):
+    return (
+        f"Importkosten: {summary['final_importkosten_mult_det']:.2f}. "
+        f"Alternativnetz: {summary['alternativnetz_abdeckung']:.2f}. "
+        f"Währungsdiversifikation: {summary['waehrungsdiversifikation']:.2f}."
+    )
+
+
+def build_comment_c(summary):
+    return (
+        f"Systemvolatilität: {summary['system_vol_det']:.2f}. "
+        f"Schock-Propagation: {summary['schock_propagation_proxy']:.2f}. "
+        f"Governance-Stabilität: {summary['governance_stability_proxy']:.2f}. "
+        f"Stressindex: {summary['final_stress_det']:.2f}."
+    )
+
+
+def build_comment_d(summary):
+    return (
+        f"MC-Wachstum: {summary['gdp_growth_mean_final']:.2f}. "
+        f"MC-Inflation: {summary['inflation_mean_final']:.2f}. "
+        f"MC-Risiko: {summary['risk_drift_mean_final']:.2f}."
+    )
+
+
 # ---------------------------------------------------------------------
 # Pfade & Basis-Setup
 # ---------------------------------------------------------------------
@@ -622,13 +661,6 @@ def apply_scenario(params: dict, scenario: str) -> dict:
 # ---------------------------------------------------------------------
 
 def simulate_paths(params: dict, years: int, runs: int, events: dict | None = None):
-    """
-    Liefert:
-      - det: deterministische Serien
-      - stoch: stochastische Serien
-      - mc: Monte-Carlo (runs x years)
-      - events: {jahr: {"shock_add": x, "geo_risk_add": y, ...}}
-    """
     events = events or {}
 
     # Risiko-Basiswerte
@@ -649,9 +681,9 @@ def simulate_paths(params: dict, years: int, runs: int, events: dict | None = No
     import_mult_base = 1.0 + 0.4 * geo + 0.2 * macro
     stress_base = 0.4 * macro + 0.3 * geo + 0.3 * gov
 
-    # -------------------------
-    # Deterministisch
-    # -------------------------
+    # ---------------------------------------------------------
+    # DETERMINISTISCH
+    # ---------------------------------------------------------
     det = {k: [] for k in [
         "gdp_growth", "inflation", "resilienz", "risk_drift",
         "importkosten_mult", "system_vol", "stress_index"
@@ -663,9 +695,6 @@ def simulate_paths(params: dict, years: int, runs: int, events: dict | None = No
     stress = stress_base
 
     for t in range(years):
-        # -------------------------
-        # SCHOCK-MODUL
-        # -------------------------
         event = events.get(t, {})
 
         shock_add = event.get("shock_add", 0.0)
@@ -673,16 +702,11 @@ def simulate_paths(params: dict, years: int, runs: int, events: dict | None = No
         macro_add = event.get("macro_risk_add", 0.0)
         resil_add = event.get("resilienz_add", 0.0)
 
-        # Risiken anpassen
         geo_eff = min(1.0, geo + geo_add)
         macro_eff = min(1.0, macro + macro_add)
 
-        # Schock wirkt auf Volatilität
         shock_effect = shock_add
 
-        # -------------------------
-        # Deterministische Dynamik
-        # -------------------------
         growth = base_growth * (1 - 0.8 * risk_level) - 0.02 * shock_effect
         infl = base_inflation + 0.5 * system_vol + shock_effect
 
@@ -705,13 +729,78 @@ def simulate_paths(params: dict, years: int, runs: int, events: dict | None = No
         det["system_vol"].append(system_vol)
         det["stress_index"].append(stress)
 
-    # -------------------------
-    # Stochastisch + Monte-Carlo
-    # -------------------------
-    # (bleibt wie in deiner Version – du musst nichts ändern)
-    # -------------------------
+    # ---------------------------------------------------------
+    # STOCHASTISCH
+    # ---------------------------------------------------------
+    stoch = {k: [] for k in [
+        "gdp_growth", "inflation", "resilienz", "risk_drift",
+        "importkosten_mult", "system_vol", "stress_index"
+    ]}
 
-    # ... hier bleibt dein bestehender stochastischer und MC-Code unverändert ...
+    resil_s = base_resilienz
+    risk_level_s = total
+    import_mult_s = import_mult_base
+    stress_s = stress_base
+
+    for t in range(years):
+        shock = random.gauss(0, system_vol)
+
+        growth_s = base_growth * (1 - total) + 0.02 * shock
+        infl_s = base_inflation + shock
+
+        resil_s = max(0.0, min(1.0,
+            resil_s * (1 - 0.4 * schock_durchl) +
+            0.15 * (1 - stress_s) -
+            0.1 * abs(shock)
+        ))
+
+        import_mult_s = import_mult_s * (1 + 0.1 * (geo - resil_s) + 0.05 * shock)
+        stress_s = max(0.0, min(1.0, stress_s + 0.1 * (macro - gov) + 0.05 * abs(shock)))
+        risk_level_s = max(0.0, min(1.0, risk_level_s + 0.05 * (macro - gov) + 0.02 * shock))
+
+        stoch["gdp_growth"].append(growth_s)
+        stoch["inflation"].append(infl_s)
+        stoch["resilienz"].append(resil_s)
+        stoch["risk_drift"].append(risk_level_s)
+        stoch["importkosten_mult"].append(import_mult_s)
+        stoch["system_vol"].append(system_vol)
+        stoch["stress_index"].append(stress_s)
+
+    # ---------------------------------------------------------
+    # MONTE-CARLO
+    # ---------------------------------------------------------
+    mc = {k: [] for k in ["gdp_growth", "inflation", "resilienz", "risk_drift"]}
+
+    for _ in range(runs):
+        resil_m = base_resilienz
+        risk_level_m = total
+        stress_m = stress_base
+
+        g_list, i_list, r_list, rd_list = [], [], [], []
+
+        for t in range(years):
+            shock = random.gauss(0, system_vol)
+
+            g = base_growth * (1 - total) + 0.02 * shock
+            inf = base_inflation + shock
+
+            resil_m = max(0.0, min(1.0,
+                resil_m * (1 - 0.4 * schock_durchl) +
+                0.15 * (1 - stress_m) -
+                0.1 * abs(shock)
+            ))
+
+            risk_level_m = max(0.0, min(1.0, risk_level_m + 0.05 * (macro - gov) + 0.02 * shock))
+
+            g_list.append(g)
+            i_list.append(inf)
+            r_list.append(resil_m)
+            rd_list.append(risk_level_m)
+
+        mc["gdp_growth"].append(g_list)
+        mc["inflation"].append(i_list)
+        mc["resilienz"].append(r_list)
+        mc["risk_drift"].append(rd_list)
 
     return det, stoch, mc
 
@@ -1148,124 +1237,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             comment_c = build_comment_c(summary_c)
             comment_d = build_comment_d(summary_d)
 
-            def build_comment_a(summary_a: dict) -> str:
-                g = summary_a["final_gdp_growth_det"]
-                inf = summary_a["final_inflation_det"]
-                risk = summary_a["final_risk_det"]
-
-                parts = []
-                if g > 0.03:
-                    parts.append("Wachstumsperspektive: **robust**.")
-                elif g > 0.0:
-                    parts.append("Wachstumsperspektive: **moderat**.")
-                else:
-                    parts.append("Wachstumsperspektive: **rezessiv**.")
-
-                if inf > 0.06:
-                    parts.append("Inflationsdruck: **hoch**.")
-                elif inf > 0.03:
-                    parts.append("Inflationsdruck: **erhöht**.")
-                else:
-                    parts.append("Inflationsdruck: **unter Kontrolle**.")
-
-                if risk > 0.66:
-                    parts.append("Gesamtrisiko: **kritisch** – erhöhte Anfälligkeit in der Langfristprognose.")
-                elif risk > 0.33:
-                    parts.append("Gesamtrisiko: **angespannt** – erhöhte Wachsamkeit erforderlich.")
-                else:
-                    parts.append("Gesamtrisiko: **stabil**.")
-
-                return " ".join(parts)
-
-
-            def build_comment_b(summary_b: dict) -> str:
-                g = summary_b["final_gdp_growth_det"]
-                inf = summary_b["final_inflation_det"]
-                risk = summary_b["final_risk_det"]
-
-                parts = []
-                if g > 0.03:
-                    parts.append("Wachstumsperspektive: **robust**.")
-                elif g > 0.0:
-                    parts.append("Wachstumsperspektive: **moderat**.")
-                else:
-                    parts.append("Wachstumsperspektive: **rezessiv**.")
-
-                if inf > 0.06:
-                    parts.append("Inflationsdruck: **hoch**.")
-                elif inf > 0.03:
-                    parts.append("Inflationsdruck: **erhöht**.")
-                else:
-                    parts.append("Inflationsdruck: **unter Kontrolle**.")
-
-                if risk > 0.66:
-                    parts.append("Gesamtrisiko: **kritisch** – erhöhte Anfälligkeit in der Langfristprognose.")
-                elif risk > 0.33:
-                    parts.append("Gesamtrisiko: **angespannt** – erhöhte Wachsamkeit erforderlich.")
-                else:
-                    parts.append("Gesamtrisiko: **stabil**.")
-
-                return " ".join(parts)
-
-            def build_comment_c(summary_c: dict) -> str:
-                g = summary_c["final_gdp_growth_det"]
-                inf = summary_c["final_inflation_det"]
-                risk = summary_c["final_risk_det"]
-
-                parts = []
-                if g > 0.03:
-                    parts.append("Wachstumsperspektive: **robust**.")
-                elif g > 0.0:
-                    parts.append("Wachstumsperspektive: **moderat**.")
-                else:
-                    parts.append("Wachstumsperspektive: **rezessiv**.")
-
-                if inf > 0.06:
-                    parts.append("Inflationsdruck: **hoch**.")
-                elif inf > 0.03:
-                    parts.append("Inflationsdruck: **erhöht**.")
-                else:
-                    parts.append("Inflationsdruck: **unter Kontrolle**.")
-
-                if risk > 0.66:
-                    parts.append("Gesamtrisiko: **kritisch** – erhöhte Anfälligkeit in der Langfristprognose.")
-                elif risk > 0.33:
-                    parts.append("Gesamtrisiko: **angespannt** – erhöhte Wachsamkeit erforderlich.")
-                else:
-                    parts.append("Gesamtrisiko: **stabil**.")
-
-                return " ".join(parts)
-
-            def build_comment_d(summary_d: dict) -> str:
-                g = summary_d["final_gdp_growth_det"]
-                inf = summary_d["final_inflation_det"]
-                risk = summary_d["final_risk_det"]
-
-                parts = []
-                if g > 0.03:
-                    parts.append("Wachstumsperspektive: **robust**.")
-                elif g > 0.0:
-                    parts.append("Wachstumsperspektive: **moderat**.")
-                else:
-                    parts.append("Wachstumsperspektive: **rezessiv**.")
-
-                if inf > 0.06:
-                    parts.append("Inflationsdruck: **hoch**.")
-                elif inf > 0.03:
-                    parts.append("Inflationsdruck: **erhöht**.")
-                else:
-                    parts.append("Inflationsdruck: **unter Kontrolle**.")
-
-                if risk > 0.66:
-                    parts.append("Gesamtrisiko: **kritisch** – erhöhte Anfälligkeit in der Langfristprognose.")
-                elif risk > 0.33:
-                    parts.append("Gesamtrisiko: **angespannt** – erhöhte Wachsamkeit erforderlich.")
-                else:
-                    parts.append("Gesamtrisiko: **stabil**.")
-
-                return " ".join(parts)
-
-
             return (
                 # A
                 fig_a1, fig_a2, fig_a3, fig_a4, summary_a, comment_a,
@@ -1278,76 +1249,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             )
 
 
-            def run_scenario_dashboard(*vals):
-                slider_vals = vals[:NUM_SLIDERS]
-                years = int(vals[NUM_SLIDERS])
-                mc_runs = int(vals[NUM_SLIDERS + 1])
-
-                base_params = _collect_params_from_values(list(slider_vals))
-
-                scenario_results = {}
-
-                for scen in SCENARIOS:
-                    p = apply_scenario(base_params, scen)
-                    det, stoch, mc = simulate_paths(p, years, mc_runs)
-
-                    scenario_results[scen] = {
-                        "gdp": det["gdp_growth"],
-                        "inf": det["inflation"],
-                        "res": det["resilienz"],
-                        "risk": det["risk_drift"],
-                    }
-
-                t = np.arange(years)
-
-                # GDP plot
-                fig_gdp, ax = plt.subplots(figsize=(6, 4))
-                for scen in SCENARIOS:
-                    ax.plot(t, scenario_results[scen]["gdp"], label=scen)
-                ax.set_title("BIP-Wachstum – Szenarien")
-                ax.legend()
-                plt.tight_layout()
-
-                # Inflation
-                fig_inf, ax2 = plt.subplots(figsize=(6, 4))
-                for scen in SCENARIOS:
-                    ax2.plot(t, scenario_results[scen]["inf"], label=scen)
-                ax2.set_title("Inflation – Szenarien")
-                ax2.legend()
-                plt.tight_layout()
-
-                # Resilienz
-                fig_res, ax3 = plt.subplots(figsize=(6, 4))
-                for scen in SCENARIOS:
-                    ax3.plot(t, scenario_results[scen]["res"], label=scen)
-                ax3.set_title("Resilienz – Szenarien")
-                ax3.legend()
-                plt.tight_layout()
-
-                # Risiko
-                fig_risk, ax4 = plt.subplots(figsize=(6, 4))
-                for scen in SCENARIOS:
-                    ax4.plot(t, scenario_results[scen]["risk"], label=scen)
-                ax4.set_title("Risiko-Drift – Szenarien")
-                ax4.legend()
-                plt.tight_layout()
-
-                # Kommentar
-                comment = (
-                    "### Interpretation\n"
-                    "- **Optimistisch**: bessere Governance, höhere Resilienz, geringere Risiken.\n"
-                    "- **Pessimistisch**: höhere Risiken, geringere Resilienz, schwächeres Wachstum.\n"
-                    "- **Stress**: starke Volatilität, Risikoanstieg, deutliche Wachstumsdämpfung.\n"
-                )
-
-                return fig_gdp, fig_inf, fig_res, fig_risk, comment
-
-            btn_sd.click(
-                fn=run_scenario_dashboard,
-                inputs=slider_components + [years_sd, mc_sd],
-                outputs=[sd_plot_gdp, sd_plot_inf, sd_plot_res, sd_plot_risk, sd_comment],
-            )
-
         btn_forecast.click(
             fn=run_forecast,
             inputs=slider_components + [years_slider, mc_runs_slider, scenario_dropdown, shock_year, shock_intensity, shock_list],
@@ -1358,6 +1259,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 d_plot1, d_plot2, d_plot3, d_plot4, d_summary, d_comment,
             ],
         )
+
 
         with gr.Tab("Vergleich"):
             gr.Markdown("### Länder-Vergleich")
@@ -1423,6 +1325,70 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             )
 
 
+
+    def run_scenario_dashboard(*vals):
+        slider_vals = vals[:NUM_SLIDERS]
+        years = int(vals[NUM_SLIDERS])
+        mc_runs = int(vals[NUM_SLIDERS + 1])
+
+        base_params = _collect_params_from_values(list(slider_vals))
+
+        scenario_results = {}
+
+        for scen in SCENARIOS:
+            p = apply_scenario(base_params, scen)
+            det, stoch, mc = simulate_paths(p, years, mc_runs)
+
+            scenario_results[scen] = {
+                "gdp": det["gdp_growth"],
+                "inf": det["inflation"],
+                "res": det["resilienz"],
+                "risk": det["risk_drift"],
+            }
+
+        t = np.arange(years)
+        # GDP plot
+        fig_gdp, ax = plt.subplots(figsize=(6, 4))
+        for scen in SCENARIOS:
+            ax.plot(t, scenario_results[scen]["gdp"], label=scen)
+        ax.set_title("BIP-Wachstum – Szenarien")
+        ax.legend()
+        plt.tight_layout()
+
+        # Inflation
+        fig_inf, ax2 = plt.subplots(figsize=(6, 4))
+        for scen in SCENARIOS:
+            ax2.plot(t, scenario_results[scen]["inf"], label=scen)
+        ax2.set_title("Inflation – Szenarien")
+        ax2.legend()
+        plt.tight_layout()
+
+        # Resilienz
+        fig_res, ax3 = plt.subplots(figsize=(6, 4))
+        for scen in SCENARIOS:
+            ax3.plot(t, scenario_results[scen]["res"], label=scen)
+        ax3.set_title("Resilienz – Szenarien")
+        ax3.legend()
+        plt.tight_layout()
+
+        # Risiko
+        fig_risk, ax4 = plt.subplots(figsize=(6, 4))
+        for scen in SCENARIOS:
+            ax4.plot(t, scenario_results[scen]["risk"], label=scen)
+        ax4.set_title("Risiko-Drift – Szenarien")
+        ax4.legend()
+        plt.tight_layout()
+
+        # Kommentar
+        comment = (
+            "### Interpretation\n"
+            "- **Optimistisch**: bessere Governance, höhere Resilienz, geringere Risiken.\n"
+            "- **Pessimistisch**: höhere Risiken, geringere Resilienz, schwächeres Wachstum.\n"
+            "- **Stress**: starke Volatilität, Risikoanstieg, deutliche Wachstumsdämpfung.\n"
+        )
+
+        return fig_gdp, fig_inf, fig_res, fig_risk, comment
+
     with gr.Tab("Szenario-Dashboard"):
         gr.Markdown("### Vergleich der Szenarien (Baseline, Optimistisch, Pessimistisch, Stress)")
 
@@ -1437,6 +1403,13 @@ with gr.Blocks(title="Makro-Simulation") as demo:
         sd_plot_risk = gr.Plot(label="Risiko-Drift – Szenarien")
 
         sd_comment = gr.Markdown(label="Kommentar")
+
+        # WICHTIG: Button-Handler MUSS HIER stehen
+        btn_sd.click(
+            fn=run_scenario_dashboard,
+            inputs=slider_components + [years_sd, mc_sd],
+            outputs=[sd_plot_gdp, sd_plot_inf, sd_plot_res, sd_plot_risk, sd_comment],
+        )
 
 if __name__ == "__main__":
     demo.launch()    
