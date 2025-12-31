@@ -261,8 +261,12 @@ def build_risk_radar(preset: dict, title: str = "Risiko-Radar"):
     fig.tight_layout()
     return fig
 
+
 def build_risk_radar_5d(scores: dict, title: str):
-    labels = ["Macro", "Geo", "Governance", "Finanz", "Sozial"]
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
     values = [
         scores["macro"],
         scores["geo"],
@@ -270,18 +274,35 @@ def build_risk_radar_5d(scores: dict, title: str):
         scores["finanz"],
         scores["sozial"],
     ]
+
+    # Radar schließen
     values += values[:1]
-    angles = np.linspace(0, 2*np.pi, len(labels)+1)
+    angles = np.linspace(0, 2 * np.pi, len(values))
 
-    fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(5,5))
-    ax.plot(angles, values, "o-", linewidth=2)
-    ax.fill(angles, values, alpha=0.25)
-    ax.set_thetagrids(angles[:-1] * 180/np.pi, labels)
+    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+
+    # Hintergrund
+    ax.set_facecolor("#f7f7f7")
+
+    # Gitterlinien
+    ax.set_rlabel_position(0)
+    ax.set_yticks([0.2, 0.4, 0.6, 0.8])
+    ax.set_yticklabels(["0.2", "0.4", "0.6", "0.8"], fontsize=9)
     ax.set_ylim(0, 1)
-    ax.set_title(title)
-    plt.tight_layout()
-    return fig
 
+    # Linien + Fläche
+    ax.plot(angles, values, linewidth=2, color="#0077cc")
+    ax.fill(angles, values, color="#0077cc", alpha=0.25)
+
+    # Achsenbeschriftung
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels, fontsize=11)
+
+    # Titel
+    ax.set_title(title, fontsize=14, pad=20)
+
+    fig.tight_layout()
+    return fig
 
 def build_early_warning(params: dict) -> dict:
     scores = compute_risk_scores(params)
@@ -834,6 +855,80 @@ _log_preset_validation()
 # UI bauen
 # ---------------------------------------------------------------------
 
+
+def risk_thermometer(total_risk: float) -> str:
+    if total_risk < 0.33:
+        return "🟢 **Stabil** – geringes Gesamtrisiko"
+    elif total_risk < 0.66:
+        return "🟡 **Angespannt** – mittleres Gesamtrisiko"
+    else:
+        return "🔴 **Kritisch** – hohes Gesamtrisiko"
+
+def update_live_risk_and_radar(*vals):
+    params = _collect_params_from_values(list(vals))
+    scores_live = compute_risk_scores(params)
+
+    # Baseline = Startwerte der Slider
+    params_base = _collect_params_from_values([s.value for s in slider_components])
+    scores_base = compute_risk_scores(params_base)
+
+    radar_live = build_risk_radar_5d(scores_live, "Live-Risiko-Radar")
+    radar_delta = build_delta_radar(scores_base, scores_live)
+
+    thermometer = risk_thermometer(scores_live["total"])
+
+    return scores_live, radar_live, radar_delta, thermometer
+
+def build_delta_radar(scores_base, scores_live, title="Delta-Radar"):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
+
+    base_vals = [
+        scores_base["macro"],
+        scores_base["geo"],
+        scores_base["governance"],
+        scores_base["finanz"],
+        scores_base["sozial"],
+    ]
+    live_vals = [
+        scores_live["macro"],
+        scores_live["geo"],
+        scores_live["governance"],
+        scores_live["finanz"],
+        scores_live["sozial"],
+    ]
+
+    base_vals += base_vals[:1]
+    live_vals += live_vals[:1]
+
+    angles = np.linspace(0, 2 * np.pi, len(base_vals))
+
+    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+    ax.set_facecolor("#f7f7f7")
+
+    # Gitter
+    ax.set_ylim(0, 1)
+    ax.set_yticks([0.2, 0.4, 0.6, 0.8])
+
+    # Baseline
+    ax.plot(angles, base_vals, color="#999999", linewidth=2, label="Baseline")
+    ax.fill(angles, base_vals, color="#999999", alpha=0.15)
+
+    # Live
+    ax.plot(angles, live_vals, color="#0077cc", linewidth=2, label="Aktuell")
+    ax.fill(angles, live_vals, color="#0077cc", alpha=0.25)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+
+    ax.set_title(title, fontsize=14, pad=20)
+    ax.legend(loc="upper right")
+
+    fig.tight_layout()
+    return fig
+
 with gr.Blocks(title="Makro-Simulation") as demo:
     gr.Markdown("# Makro-Simulation")
 
@@ -856,6 +951,20 @@ with gr.Blocks(title="Makro-Simulation") as demo:
         summary_text = gr.Textbox(label="Ergebnis-Summary", lines=14)
 
         early_warning_box = gr.JSON(label="Frühwarnsystem")
+
+        live_risk_box = gr.JSON(label="Live-Risiko (sofort)")
+        live_radar_plot = gr.Plot(label="Live-Radar (5D)")
+
+        delta_radar_plot = gr.Plot(label="Delta-Radar")
+        risk_thermo = gr.Markdown(label="Risiko-Thermometer")
+
+
+        for slider in slider_components:
+            slider.change(
+                fn=update_live_risk_and_radar,
+                inputs=slider_components,
+                outputs=[live_risk_box, live_radar_plot, delta_radar_plot, risk_thermo],
+            )
 
         def run_simulation_with_warning(*vals):
             params = _collect_params_from_values(list(vals))
@@ -1076,7 +1185,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 events[shock_year] = {"shock_add": shock_intensity, "geo_risk_add": 0.1}
 
             events = parse_shocks(shock_df, years)
-            
+
             base_params = _collect_params_from_values(list(slider_vals))
             params = _collect_params_from_values(list(slider_vals))
             scores = compute_risk_scores(params)
@@ -1325,7 +1434,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             )
 
 
-
     def run_scenario_dashboard(*vals):
         slider_vals = vals[:NUM_SLIDERS]
         years = int(vals[NUM_SLIDERS])
@@ -1412,4 +1520,4 @@ with gr.Blocks(title="Makro-Simulation") as demo:
         )
 
 if __name__ == "__main__":
-    demo.launch()    
+    demo.launch()
