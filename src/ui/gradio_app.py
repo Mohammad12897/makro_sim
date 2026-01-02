@@ -85,6 +85,7 @@ default_params: Dict[str, float] = {
     "demokratie": 0.8,
     "FX_Schockempfindlichkeit": 0.8,
     "Reserven_Monate": 6,
+    "korruption": 0.3,
 }
 
 PARAM_SLIDERS: List[Tuple[str, float, float, float]] = [
@@ -104,6 +105,7 @@ PARAM_SLIDERS: List[Tuple[str, float, float, float]] = [
     ("demokratie", 0.0, 1.0, default_params["demokratie"]),
     ("FX_Schockempfindlichkeit", 0.0, 2.0, default_params["FX_Schockempfindlichkeit"]),
     ("Reserven_Monate", 0, 24, default_params["Reserven_Monate"]),
+    ("korruption", 0.0, 1.0, default_params["korruption"]),
 ]
 
 NUM_SLIDERS = len(PARAM_SLIDERS)
@@ -176,6 +178,29 @@ def ensure_slider_presets_up_to_date() -> str:
 # Risiko-Scores
 # ---------------------------------------------------------------------
 
+def collapse_alarm(det):
+    warnings = []
+
+    if det["gdp_growth"][-1] < -0.03:
+        warnings.append("🔴 BIP kollabiert (< -3%)")
+
+    if det["inflation"][-1] > 0.08:
+        warnings.append("🔴 Hyperinflation (> 8%)")
+
+    if det["resilienz"][-1] < 0.2:
+        warnings.append("🔴 Resilienz kritisch (< 0.2)")
+
+    if det["risk_drift"][-1] > 0.8:
+        warnings.append("🔴 Systemrisiko extrem (> 0.8)")
+
+    if det["stress_index"][-1] > 0.7:
+        warnings.append("🔴 Stressindex kritisch (> 0.7)")
+
+    if not warnings:
+        return "🟢 Keine Kollaps‑Warnungen"
+
+    return "\n".join(warnings)
+
 def clamp01(x: float) -> float:
     return max(0.0, min(1.0, x))
 
@@ -193,10 +218,13 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         (1 - clamp01(p.get("Alternativnetz_Abdeckung", 0.5))) * 0.20
     )
 
+    korruption = p.get("korruption", 0.3)
+
     gov = (
         (1 - clamp01(p.get("demokratie", 0.8))) * 0.5 +
         (1 - clamp01(p.get("innovation", 0.6))) * 0.3 +
-        (1 - clamp01(p.get("fachkraefte", 0.7))) * 0.2
+        (1 - clamp01(p.get("fachkraefte", 0.7))) * 0.2 +
+        korruption * 0.15
     )
 
     total = 0.5 * macro + 0.3 * geo + 0.2 * gov
@@ -259,6 +287,7 @@ def build_risk_radar(preset: dict, title: str = "Risiko-Radar"):
     ax.set_ylim(0, 1)
     ax.set_title(title)
     fig.tight_layout()
+    plt.close(fig)
     return fig
 
 
@@ -302,6 +331,7 @@ def build_risk_radar_5d(scores: dict, title: str):
     ax.set_title(title, fontsize=14, pad=20)
 
     fig.tight_layout()
+    plt.close(fig)
     return fig
 
 def build_early_warning(params: dict) -> dict:
@@ -570,7 +600,7 @@ def _delete_preset_and_refresh_dropdown(name: str):
     )
 
 
-def _load_preset_with_warning(preset_name: str, *current_vals):
+def _load_preset_with_warning_old(preset_name: str, *current_vals):
     try:
         if not preset_name:
             none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
@@ -608,6 +638,80 @@ def _load_preset_with_warning(preset_name: str, *current_vals):
         print(traceback.format_exc())
         none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
         return (*none_updates, f"Fehler beim Laden des Presets: {e}")
+
+def _load_preset_with_warning(preset_name: str, *current_vals):
+    try:
+        if not preset_name:
+            none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
+
+            # NEUE OUTPUTS HINZUFÜGEN
+            return (
+                *none_updates,
+                "Kein Preset ausgewählt.",
+                gr.update(value=None),   # live_risk_box
+                gr.update(value=None),   # live_radar_plot
+                gr.update(value=None),   # delta_radar_plot
+                gr.update(value=None),   # risk_thermo
+            )
+
+        presets = load_presets()
+        preset = presets.get(preset_name)
+        if not preset:
+            none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
+
+            return (
+                *none_updates,
+                f"Preset '{preset_name}' nicht gefunden.",
+                gr.update(value=None),
+                gr.update(value=None),
+                gr.update(value=None),
+                gr.update(value=None),
+            )
+
+        try:
+            from .sanitize import validate_preset
+            clean, warnings = validate_preset(preset, clamp=False)
+        except Exception:
+            clean = preset
+            warnings = []
+
+        updates = []
+        for key, lo, hi, default in PARAM_SLIDERS:
+            val = clean.get(key, default)
+            updates.append(gr.update(value=val))
+
+        if any(w[0] == "critical" for w in warnings):
+            status = "Achtung: Preset enthält kritische Werte."
+        elif warnings:
+            status = "Warnungen im Preset vorhanden."
+        else:
+            status = "Preset geladen."
+
+        # HIER KOMMEN DIE 4 NEUEN OUTPUTS DAZU
+        return (
+            *updates,
+            status,
+            gr.update(value=None),   # live_risk_box
+            gr.update(value=None),   # live_radar_plot
+            gr.update(value=None),   # delta_radar_plot
+            gr.update(value=None),   # risk_thermo
+        )
+
+    except Exception as e:
+        import traceback
+        print("Fehler in _load_preset_with_warning:", e)
+        print(traceback.format_exc())
+
+        none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
+
+        return (
+            *none_updates,
+            f"Fehler beim Laden des Presets: {e}",
+            gr.update(value=None),
+            gr.update(value=None),
+            gr.update(value=None),
+            gr.update(value=None),
+        )
 
 def normalize_inflation(value: float, mean: float = 4.0, std: float = 3.0) -> float:
     if value is None:
@@ -840,6 +944,7 @@ def build_fan_plot(mc_series, years: int, title: str):
     ax.set_xlabel("Jahre")
     ax.legend()
     plt.tight_layout()
+    plt.close(fig)
     return fig
 
 
@@ -854,7 +959,6 @@ _log_preset_validation()
 # ---------------------------------------------------------------------
 # UI bauen
 # ---------------------------------------------------------------------
-
 
 def risk_thermometer(total_risk: float) -> str:
     if total_risk < 0.33:
@@ -927,6 +1031,7 @@ def build_delta_radar(scores_base, scores_live, title="Delta-Radar"):
     ax.legend(loc="upper right")
 
     fig.tight_layout()
+    plt.close(fig)
     return fig
 
 with gr.Blocks(title="Makro-Simulation") as demo:
@@ -952,11 +1057,14 @@ with gr.Blocks(title="Makro-Simulation") as demo:
 
         early_warning_box = gr.JSON(label="Frühwarnsystem")
 
-        live_risk_box = gr.JSON(label="Live-Risiko (sofort)")
+        live_risk_box = gr.JSON(label="Live-Risiko + Eingangsparameter")
         live_radar_plot = gr.Plot(label="Live-Radar (5D)")
 
         delta_radar_plot = gr.Plot(label="Delta-Radar")
         risk_thermo = gr.Markdown(label="Risiko-Thermometer")
+
+        #slider_korruption = gr.Slider(0, 1, value=0.3, label="Korruption (0=sauber, 1=korrupt)")
+        #slider_components.append(slider_korruption)
 
 
         for slider in slider_components:
@@ -1004,7 +1112,14 @@ with gr.Blocks(title="Makro-Simulation") as demo:
         btn_load_preset.click(
             fn=_load_preset_with_warning,
             inputs=[preset_dropdown] + slider_components,
-            outputs=[*slider_components, preset_status],
+            outputs=[
+                *slider_components,   # alle Slider
+                preset_status,        # Status-Text
+                live_risk_box,        # JSON
+                live_radar_plot,      # Plot
+                delta_radar_plot,     # Plot
+                risk_thermo,          # Markdown
+            ],
         )
 
         btn_save_preset.click(
@@ -1073,25 +1188,13 @@ with gr.Blocks(title="Makro-Simulation") as demo:
         shock_year = gr.Slider(
             minimum=0, maximum=50, value=5, step=1, label="Schockjahr (0 = kein Schock)"
         )
+    
         shock_intensity = gr.Slider(
             minimum=0.0, maximum=0.5, value=0.0, step=0.05, label="Schock-Intensität"
         )
 
-        years_slider = gr.Slider(
-            minimum=5,
-            maximum=50,
-            value=20,
-            step=1,
-            label="Prognose-Horizont (Jahre)",
-        )
-
-        mc_runs_slider = gr.Slider(
-            minimum=1,
-            maximum=200,
-            value=100,
-            step=1,
-            label="Monte-Carlo Durchläufe",
-        )
+        years_slider = gr.Slider(5, 50, value=20, step=1, label="Prognose-Horizont (Jahre)")
+        mc_runs_slider = gr.Slider(1, 200, value=100, step=1, label="Monte-Carlo Durchläufe")
 
         btn_forecast = gr.Button("Prognose starten")
 
@@ -1102,6 +1205,46 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             column_count=3,
             label="Schock-Events",
         )
+
+        # --- TAB A ---
+        with gr.Tab("A – Klassisch-ökonomisch"):
+            a_plot1 = gr.Plot(label="BIP-Wachstum (deterministisch vs. stochastisch)")
+            a_plot2 = gr.Plot(label="Inflation (deterministisch vs. stochastisch)")
+            a_plot3 = gr.Plot(label="Risiko-Drift")
+            a_plot4 = gr.Plot(label="Resilienz")
+            a_summary = gr.JSON(label="Summary A")
+            a_comment = gr.Markdown(label="Kommentar A")   # NEU
+
+        # --- TAB B ---
+        with gr.Tab("B – Geopolitisch-ökonomisch"):
+            b_plot1 = gr.Plot(label="Importkosten-Multiplikator")
+            b_plot2 = gr.Plot(label="Sanktions-Risiko-Proxy")
+            b_plot3 = gr.Plot(label="Alternativnetz-Abdeckung")
+            b_plot4 = gr.Plot(label="Währungsdiversifikation (heuristisch)")
+            b_summary = gr.JSON(label="Summary B")
+            b_comment = gr.Markdown(label="Kommentar B")   # NEU
+
+        # --- TAB C ---
+        with gr.Tab("C – Systemisch-komplex"):
+            c_plot1 = gr.Plot(label="System-Volatilität")
+            c_plot2 = gr.Plot(label="Schock-Propagation")
+            c_plot3 = gr.Plot(label="Governance-Stabilität (invertiertes Risiko)")
+            c_plot4 = gr.Plot(label="Stress-Index")
+            c_summary = gr.JSON(label="Summary C")
+            c_comment = gr.Markdown(label="Kommentar C")   # NEU
+
+        # --- TAB D ---
+        with gr.Tab("D – Vollmodell (Monte-Carlo)"):
+            d_plot1 = gr.Plot(label="BIP-Wachstum – Monte-Carlo-Fächer")
+            d_plot2 = gr.Plot(label="Inflation – Monte-Carlo-Fächer")
+            d_plot3 = gr.Plot(label="Resilienz – Monte-Carlo-Fächer")
+            d_plot4 = gr.Plot(label="Risiko-Drift – Monte-Carlo-Fächer")
+            d_summary = gr.JSON(label="Summary D")
+            d_comment = gr.Markdown(label="Kommentar D")   # NEU
+
+        # --- Kollaps-Alarm (NEU, SAUBER) ---
+        alarm_box = gr.Markdown(label="Kollaps‑Alarm")
+
 
         def parse_shocks(df, years):
             events = {}
@@ -1133,242 +1276,168 @@ with gr.Blocks(title="Makro-Simulation") as demo:
 
             return events
 
-        with gr.Tab("A – Klassisch-ökonomisch"):
-            a_plot1 = gr.Plot(label="BIP-Wachstum (deterministisch vs. stochastisch)")
-            a_plot2 = gr.Plot(label="Inflation (deterministisch vs. stochastisch)")
-            a_plot3 = gr.Plot(label="Risiko-Drift")
-            a_plot4 = gr.Plot(label="Resilienz")
-            a_summary = gr.JSON(label="Summary A")
-            a_comment = gr.Markdown(label="Kommentar A")   # NEU
 
 
-        with gr.Tab("B – Geopolitisch-ökonomisch"):
-            b_plot1 = gr.Plot(label="Importkosten-Multiplikator")
-            b_plot2 = gr.Plot(label="Sanktions-Risiko-Proxy")
-            b_plot3 = gr.Plot(label="Alternativnetz-Abdeckung")
-            b_plot4 = gr.Plot(label="Währungsdiversifikation (heuristisch)")
-            b_summary = gr.JSON(label="Summary B")
-            b_comment = gr.Markdown(label="Kommentar B")   # NEU
-
-
-        with gr.Tab("C – Systemisch-komplex"):
-            c_plot1 = gr.Plot(label="System-Volatilität")
-            c_plot2 = gr.Plot(label="Schock-Propagation")
-            c_plot3 = gr.Plot(label="Governance-Stabilität (invertiertes Risiko)")
-            c_plot4 = gr.Plot(label="Stress-Index")
-            c_summary = gr.JSON(label="Summary C")
-            c_comment = gr.Markdown(label="Kommentar C")   # NEU
-
-
-        with gr.Tab("D – Vollmodell (Monte-Carlo)"):
-            d_plot1 = gr.Plot(label="BIP-Wachstum – Monte-Carlo-Fächer")
-            d_plot2 = gr.Plot(label="Inflation – Monte-Carlo-Fächer")
-            d_plot3 = gr.Plot(label="Resilienz – Monte-Carlo-Fächer")
-            d_plot4 = gr.Plot(label="Risiko-Drift – Monte-Carlo-Fächer")
-            d_summary = gr.JSON(label="Summary D")
-            d_comment = gr.Markdown(label="Kommentar D")   # NEU
-
-
+        # ---------------------------------------------------------
+        # Forecast-Funktion
+        # ---------------------------------------------------------
         def run_forecast(*vals):
             slider_vals = vals[:NUM_SLIDERS]
             years = int(vals[NUM_SLIDERS])
             mc_runs = int(vals[NUM_SLIDERS + 1])
             scenario = vals[NUM_SLIDERS + 2]
-
             shock_year = int(vals[NUM_SLIDERS + 3])
             shock_intensity = float(vals[NUM_SLIDERS + 4])
-
             shock_df = vals[NUM_SLIDERS + 5]
 
-            events = {}
-            if shock_intensity > 0 and 0 <= shock_year < years:
-                events[shock_year] = {"shock_add": shock_intensity, "geo_risk_add": 0.1}
-
+            # Events parsen
             events = parse_shocks(shock_df, years)
+            if shock_intensity > 0 and 0 <= shock_year < years:
+                events[shock_year] = {"shock_add": shock_intensity}
 
-            base_params = _collect_params_from_values(list(slider_vals))
             params = _collect_params_from_values(list(slider_vals))
+            params_scenario = apply_scenario(params, scenario)
+
+            det, stoch, mc = simulate_paths(params_scenario, years, mc_runs, events=events)
             scores = compute_risk_scores(params)
             cat, _ = risk_category(scores["total"])
-
-            macro = scores["macro"]
-            geo = scores["geo"]
-            gov = scores["governance"]
-            total = scores["total"]
-            schock_durchl = geo * 0.7 + macro * 0.3
-
-            scenario_name = vals[NUM_SLIDERS + 2]  # z.B. nach mc_runs_slider
-            params_scenario = apply_scenario(params, scenario_name)
-            det, stoch, mc = simulate_paths(params_scenario, years, mc_runs, events=events)
-
             t = np.arange(years)
 
-            # A – Klassisch-ökonomisch
-            fig_a1, ax_a1 = plt.subplots(figsize=(5, 3))
-            ax_a1.plot(t, det["gdp_growth"], label="deterministisch")
-            ax_a1.plot(t, stoch["gdp_growth"], label="stochastisch", alpha=0.7)
-            ax_a1.set_title("BIP-Wachstum")
-            ax_a1.set_xlabel("Jahre")
-            ax_a1.legend()
+            # --- A ---
+            fig_a1, ax = plt.subplots(figsize=(5, 3))
+            ax.plot(t, det["gdp_growth"])
+            ax.plot(t, stoch["gdp_growth"], alpha=0.7)
             plt.tight_layout()
+            plt.close(fig_a1)
 
-            fig_a2, ax_a2 = plt.subplots(figsize=(5, 3))
-            ax_a2.plot(t, det["inflation"], label="deterministisch")
-            ax_a2.plot(t, stoch["inflation"], label="stochastisch", alpha=0.7)
-            ax_a2.set_title("Inflation")
-            ax_a2.set_xlabel("Jahre")
-            ax_a2.legend()
+            fig_a2, ax = plt.subplots(figsize=(5, 3))
+            ax.plot(t, det["inflation"])
+            ax.plot(t, stoch["inflation"], alpha=0.7)
             plt.tight_layout()
+            plt.close(fig_a2)
 
-            fig_a3, ax_a3 = plt.subplots(figsize=(5, 3))
-            ax_a3.plot(t, det["risk_drift"], label="deterministisch")
-            ax_a3.plot(t, stoch["risk_drift"], label="stochastisch", alpha=0.7)
-            ax_a3.set_title("Risiko-Drift")
-            ax_a3.set_xlabel("Jahre")
-            ax_a3.legend()
+            fig_a3, ax = plt.subplots(figsize=(5, 3))
+            ax.plot(t, det["risk_drift"])
+            ax.plot(t, stoch["risk_drift"], alpha=0.7)
             plt.tight_layout()
+            plt.close(fig_a3)
 
-            fig_a4, ax_a4 = plt.subplots(figsize=(5, 3))
-            ax_a4.plot(t, det["resilienz"], label="deterministisch")
-            ax_a4.plot(t, stoch["resilienz"], label="stochastisch", alpha=0.7)
-            ax_a4.set_title("Resilienz")
-            ax_a4.set_xlabel("Jahre")
-            ax_a4.legend()
+            fig_a4, ax = plt.subplots(figsize=(5, 3))
+            ax.plot(t, det["resilienz"])
+            ax.plot(t, stoch["resilienz"], alpha=0.7)
             plt.tight_layout()
+            plt.close(fig_a4)
 
             summary_a = {
-                "risk_scores": scores,
-                "category": cat,
                 "final_gdp_growth_det": det["gdp_growth"][-1],
                 "final_inflation_det": det["inflation"][-1],
                 "final_resilienz_det": det["resilienz"][-1],
                 "final_risk_det": det["risk_drift"][-1],
             }
+            comment_a = build_comment_a(summary_a)
 
-            # B – Geopolitisch-ökonomisch
-            fig_b1, ax_b1 = plt.subplots(figsize=(5, 3))
-            ax_b1.plot(t, det["importkosten_mult"], label="deterministisch")
-            ax_b1.plot(t, stoch["importkosten_mult"], label="stochastisch", alpha=0.7)
-            ax_b1.set_title("Importkosten-Multiplikator")
-            ax_b1.set_xlabel("Jahre")
-            ax_b1.legend()
+            # --- B ---
+            fig_b1, ax = plt.subplots(figsize=(5, 3))
+            ax.plot(t, det["importkosten_mult"])
             plt.tight_layout()
+            plt.close(fig_b1)
 
-            fig_b2, ax_b2 = plt.subplots(figsize=(5, 3))
-            ax_b2.plot(t, [scores["geo"]] * years, label="Geo-Risiko")
-            ax_b2.set_title("Sanktions-Risiko (Proxy)")
-            ax_b2.set_xlabel("Jahre")
-            ax_b2.legend()
+            fig_b2, ax = plt.subplots(figsize=(5, 3))
+            ax.plot(t, [scores["geo"]] * years)
             plt.tight_layout()
+            plt.close(fig_b2)
 
-            fig_b3, ax_b3 = plt.subplots(figsize=(5, 3))
-            alt = params.get("Alternativnetz_Abdeckung", 0.5)
-            ax_b3.plot(t, [alt] * years, label="Alternativnetz-Abdeckung")
-            ax_b3.set_title("Alternativnetz-Abdeckung")
-            ax_b3.set_xlabel("Jahre")
-            ax_b3.legend()
+            fig_b3, ax = plt.subplots(figsize=(5, 3))
+            ax.plot(t, [params["Alternativnetz_Abdeckung"]] * years)
             plt.tight_layout()
+            plt.close(fig_b3)
 
-            fig_b4, ax_b4 = plt.subplots(figsize=(5, 3))
-            usd = params.get("USD_Dominanz", 0.7)
-            rmb = params.get("RMB_Akzeptanz", 0.2)
-            divers = 1.0 - abs(usd - rmb)
-            ax_b4.plot(t, [divers] * years, label="Währungsdiversifikation")
-            ax_b4.set_title("Währungsdiversifikation (Heuristik)")
-            ax_b4.set_xlabel("Jahre")
-            ax_b4.legend()
+            fig_b4, ax = plt.subplots(figsize=(5, 3))
+            divers = 1.0 - abs(params["USD_Dominanz"] - params["RMB_Akzeptanz"])
+            ax.plot(t, [divers] * years)
             plt.tight_layout()
+            plt.close(fig_b4)
 
             summary_b = {
                 "geo_risk": scores["geo"],
-                "sanktions_risiko_proxy": scores["geo"],
-                "alternativnetz_abdeckung": alt,
+                "alternativnetz_abdeckung": params["Alternativnetz_Abdeckung"],
                 "waehrungsdiversifikation": divers,
                 "final_importkosten_mult_det": det["importkosten_mult"][-1],
             }
+            comment_b = build_comment_b(summary_b)
 
-            # C – Systemisch-komplex
-            fig_c1, ax_c1 = plt.subplots(figsize=(5, 3))
-            ax_c1.plot(t, det["system_vol"], label="System-Volatilität (det)")
-            ax_c1.set_title("System-Volatilität")
-            ax_c1.set_xlabel("Jahre")
-            ax_c1.legend()
+            # --- C ---
+            fig_c1, ax = plt.subplots(figsize=(5, 3))
+            ax.plot(t, det["system_vol"])
             plt.tight_layout()
+            plt.close(fig_c1)
 
-            fig_c2, ax_c2 = plt.subplots(figsize=(5, 3))
-            ax_c2.plot(t, [schock_durchl] * years, label="Schock-Propagation")
-            ax_c2.set_title("Schock-Propagation (Proxy)")
-            ax_c2.set_xlabel("Jahre")
-            ax_c2.legend()
+            fig_c2, ax = plt.subplots(figsize=(5, 3))
+            schock_durchl = scores["geo"] * 0.7 + scores["macro"] * 0.3
+            ax.plot(t, [schock_durchl] * years)
             plt.tight_layout()
+            plt.close(fig_c2)
 
-            fig_c3, ax_c3 = plt.subplots(figsize=(5, 3))
-            gov_stab = [1.0 - scores["governance"]] * years
-            ax_c3.plot(t, gov_stab, label="Governance-Stabilität (invertiert)")
-            ax_c3.set_title("Governance-Stabilität (Proxy)")
-            ax_c3.set_xlabel("Jahre")
-            ax_c3.legend()
+            fig_c3, ax = plt.subplots(figsize=(5, 3))
+            gov_stab = 1.0 - scores["governance"]
+            ax.plot(t, [gov_stab] * years)
             plt.tight_layout()
+            plt.close(fig_c3)
 
-            fig_c4, ax_c4 = plt.subplots(figsize=(5, 3))
-            ax_c4.plot(t, det["stress_index"], label="Stress-Index (det)")
-            ax_c4.plot(t, stoch["stress_index"], label="Stress-Index (stoch)", alpha=0.7)
-            ax_c4.set_title("Stress-Index")
-            ax_c4.set_xlabel("Jahre")
-            ax_c4.legend()
+            fig_c4, ax = plt.subplots(figsize=(5, 3))
+            ax.plot(t, det["stress_index"])
+            ax.plot(t, stoch["stress_index"], alpha=0.7)
             plt.tight_layout()
+            plt.close(fig_c4)
 
             summary_c = {
                 "system_vol_det": det["system_vol"][0],
                 "schock_propagation_proxy": schock_durchl,
-                "governance_stability_proxy": 1.0 - scores["governance"],
+                "governance_stability_proxy": gov_stab,
                 "final_stress_det": det["stress_index"][-1],
-                "final_stress_stoch": stoch["stress_index"][-1],
             }
+            comment_c = build_comment_c(summary_c)
 
-            # D – Vollmodell (Monte-Carlo-Fächer)
-            fig_d1 = build_fan_plot(mc["gdp_growth"], years, "BIP-Wachstum – Monte-Carlo")
-            fig_d2 = build_fan_plot(mc["inflation"], years, "Inflation – Monte-Carlo")
-            fig_d3 = build_fan_plot(mc["resilienz"], years, "Resilienz – Monte-Carlo")
-            fig_d4 = build_fan_plot(mc["risk_drift"], years, "Risiko-Drift – Monte-Carlo")
+            # --- D ---
+            fig_d1 = build_fan_plot(mc["gdp_growth"], years, "BIP-Wachstum – MC")
+            fig_d2 = build_fan_plot(mc["inflation"], years, "Inflation – MC")
+            fig_d3 = build_fan_plot(mc["resilienz"], years, "Resilienz – MC")
+            fig_d4 = build_fan_plot(mc["risk_drift"], years, "Risiko-Drift – MC")
 
             summary_d = {
-                "mc_runs": mc_runs,
-                "years": years,
                 "gdp_growth_mean_final": float(np.mean([run[-1] for run in mc["gdp_growth"]])),
                 "inflation_mean_final": float(np.mean([run[-1] for run in mc["inflation"]])),
                 "resilienz_mean_final": float(np.mean([run[-1] for run in mc["resilienz"]])),
                 "risk_drift_mean_final": float(np.mean([run[-1] for run in mc["risk_drift"]])),
             }
-
-            comment_a = build_comment_a(summary_a)
-            comment_b = build_comment_b(summary_b)
-            comment_c = build_comment_c(summary_c)
             comment_d = build_comment_d(summary_d)
 
+            # --- Kollaps-Alarm ---
+            alarm_text = collapse_alarm(det)
+
             return (
-                # A
                 fig_a1, fig_a2, fig_a3, fig_a4, summary_a, comment_a,
-                # B
                 fig_b1, fig_b2, fig_b3, fig_b4, summary_b, comment_b,
-                # C
                 fig_c1, fig_c2, fig_c3, fig_c4, summary_c, comment_c,
-                # D
                 fig_d1, fig_d2, fig_d3, fig_d4, summary_d, comment_d,
+                alarm_text,
             )
 
-
+        # Button-Handler
         btn_forecast.click(
             fn=run_forecast,
-            inputs=slider_components + [years_slider, mc_runs_slider, scenario_dropdown, shock_year, shock_intensity, shock_list],
+            inputs=slider_components + [
+                years_slider, mc_runs_slider, scenario_dropdown,
+                shock_year, shock_intensity, shock_list
+            ],
             outputs=[
                 a_plot1, a_plot2, a_plot3, a_plot4, a_summary, a_comment,
                 b_plot1, b_plot2, b_plot3, b_plot4, b_summary, b_comment,
                 c_plot1, c_plot2, c_plot3, c_plot4, c_summary, c_comment,
                 d_plot1, d_plot2, d_plot3, d_plot4, d_summary, d_comment,
+                alarm_box,
             ],
         )
-
 
         with gr.Tab("Vergleich"):
             gr.Markdown("### Länder-Vergleich")

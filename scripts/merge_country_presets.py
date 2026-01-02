@@ -6,8 +6,9 @@ Merge presets/preset_*.json into presets/country_presets.json
 - Jede Datei preset_*.json enthält ein Länder-Preset mit Indicator-Snapshot + Metadaten.
 - Der Output ist ein Dict: { "BR": {...}, "DE": {...}, ... } in country_presets.json.
 
-Usage:
-  python scripts/merge_country_presets.py [--strategy overwrite|skip|rename]
+NEU:
+- Fehlende Keys (z.B. 'korruption') werden automatisch ergänzt.
+- Alle Werte werden auf gültige Bereiche gemäß PARAM_SLIDERS geclamped.
 """
 
 from __future__ import annotations
@@ -19,83 +20,106 @@ from tempfile import NamedTemporaryFile
 PRESETS_DIR = Path("presets")
 OUT_FILE = PRESETS_DIR / "country_presets.json"
 
+# --- NEU: Default-Werte für fehlende Keys ---
+DEFAULTS = {
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6,
+    "korruption": 0.3,   # NEU
+}
 
-def atomic_write(path: Path, data: dict):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = NamedTemporaryFile(delete=False, dir=str(path.parent), suffix=".tmp")
-    tmp.write(json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
-    tmp.close()
-    Path(tmp.name).replace(path)
+# --- NEU: Gültige Bereiche (Clamping) ---
+RANGES = {
+    "USD_Dominanz": (0, 1),
+    "RMB_Akzeptanz": (0, 1),
+    "Zugangsresilienz": (0, 1),
+    "Sanktions_Exposure": (0, 1),
+    "Alternativnetz_Abdeckung": (0, 1),
+    "Liquiditaetsaufschlag": (0, 1),
+    "CBDC_Nutzung": (0, 1),
+    "Golddeckung": (0, 1),
+    "innovation": (0, 1),
+    "fachkraefte": (0, 1),
+    "energie": (0, 1),
+    "stabilitaet": (0, 1),
+    "verschuldung": (0, 2),
+    "demokratie": (0, 1),
+    "FX_Schockempfindlichkeit": (0, 2),
+    "Reserven_Monate": (0, 24),
+    "korruption": (0, 1),
+}
 
-
-def load_json_safe(p: Path):
+def clamp(value, lo, hi):
     try:
-        with p.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Warning: failed to parse {p}: {e}")
-        return None
+        v = float(value)
+    except:
+        return lo
+    return max(lo, min(hi, v))
 
+def sanitize_preset(preset: dict) -> dict:
+    """Ergänzt fehlende Keys und clamp’t Werte in gültige Bereiche."""
+    clean = {}
 
-def merge_country_presets(strategy: str = "overwrite") -> dict:
-    merged: dict[str, dict] = {}
-    files = sorted(PRESETS_DIR.glob("preset_*.json"))
+    for key, default in DEFAULTS.items():
+        val = preset.get(key, default)
+        lo, hi = RANGES[key]
+        clean[key] = clamp(val, lo, hi)
 
-    for p in files:
-        data = load_json_safe(p)
-        if data is None:
+    return clean
+
+def main(strategy="overwrite"):
+    PRESETS_DIR.mkdir(exist_ok=True)
+
+    merged = {}
+
+    for file in PRESETS_DIR.glob("preset_*.json"):
+        try:
+            data = json.loads(file.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"Fehler beim Lesen von {file}: {e}")
             continue
 
-        # Name ableiten:
-        # - Wenn Datei {"BR": {...}} etc. → Key verwenden
-        # - Sonst: Dateiname ohne prefix
-        if isinstance(data, dict) and len(data) == 1:
-            only_key = next(iter(data.keys()))
-            only_val = data[only_key]
-            if isinstance(only_val, dict) and len(only_key) <= 5 and only_key.isalpha():
-                name = only_key
-                content = only_val
-            else:
-                name = p.stem.replace("preset_", "")
-                content = data
-        else:
-            name = p.stem.replace("preset_", "")
-            content = data
+        # Länder-Code aus Dateiname extrahieren
+        code = file.stem.replace("preset_", "").upper()
 
-        # Konflikte behandeln
-        if name in merged:
-            if strategy == "skip":
-                print(f"Skipping duplicate {name} from {p}")
-                continue
-            if strategy == "rename":
-                i = 1
-                candidate = f"{name}_{i}"
-                while candidate in merged:
-                    i += 1
-                    candidate = f"{name}_{i}"
-                name = candidate
+        # Sanitize
+        clean = sanitize_preset(data)
 
-        merged[name] = content
+        if strategy == "skip" and code in merged:
+            continue
+        elif strategy == "rename" and code in merged:
+            i = 2
+            new_code = f"{code}_{i}"
+            while new_code in merged:
+                i += 1
+                new_code = f"{code}_{i}"
+            code = new_code
 
-    return merged
+        merged[code] = clean
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--strategy",
-        choices=["overwrite", "skip", "rename"],
-        default="overwrite",
-        help="How to handle duplicate preset names (default: overwrite)",
+    # Schreiben
+    OUT_FILE.write_text(
+        json.dumps(merged, indent=2, ensure_ascii=False),
+        encoding="utf-8"
     )
-    args = parser.parse_args()
-    merged = merge_country_presets(strategy=args.strategy)
-    try:
-        atomic_write(OUT_FILE, merged)
-        print(f"Wrote {OUT_FILE} with {len(merged)} country presets")
-    except Exception as e:
-        print("Failed to write country_presets.json:", e)
 
+    print(f"country_presets.json aktualisiert ({len(merged)} Länder).")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--strategy", choices=["overwrite", "skip", "rename"], default="overwrite")
+    args = parser.parse_args()
+    main(args.strategy)

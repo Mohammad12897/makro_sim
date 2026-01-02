@@ -1,795 +1,173 @@
 {
-  "BR": {
-    "name": "preset_BR",
-    "description": "Preset für Land BR",
-    "version": "1.0",
-    "indicator_snapshot": {
-      "FI_RES_TOTL_MO": {
-        "value": 7.95558614184571,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FI.RES.TOTL.MO",
-        "country_currency": null,
-        "country_timezone": null
-      },
-      "NE_IMP_GNFS_CD": {
-        "value": 385708875013.773,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.IMP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_imports_usd": 32142406251.14775
-      },
-      "DT_DOD_DECT_CD": {
-        "value": 605463780812.8,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "DT.DOD.DECT.CD",
-        "country_currency": null,
-        "country_timezone": null
-      },
-      "NY_GDP_MKTP_CD": {
-        "value": 2185821648943.86,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NY.GDP.MKTP.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_gdp_usd": 182151804078.655
-      },
-      "FP_CPI_TOTL_ZG": {
-        "value": 4.36746407652337,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FP.CPI.TOTL.ZG",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 4.36746407652337
-      },
-      "NE_EXP_GNFS_CD": {
-        "value": 392105352908.42,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.EXP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_exports_usd": 32675446075.701664
-      },
-      "BX_KLT_DINV_CD_WD": {
-        "value": 74090786050.19,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "BX.KLT.DINV.CD.WD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_fdi_net_usd": 6174232170.849167
-      },
-      "GC_XPN_TOTL_GD_ZS": {
-        "value": 32.4311004876146,
-        "year": "2023",
-        "source": "WB",
-        "indicator": "GC.XPN.TOTL.GD.ZS",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 32.4311004876146
-      }
-    },
-    "metadata": {
-      "created_by": "auto-generator",
-      "created_at": "2025-12-28T05:22:59.790278+00:00",
-      "country_info": {
-        "alpha2": "BR",
-        "alpha3": "BRA",
-        "numeric": null,
-        "country_de": "Brasilien",
-        "country_en": "Brazil",
-        "timezone": null,
-        "currency": null
-      }
-    }
-  },
-  "CN": {
-    "name": "preset_CN",
-    "description": "Preset für Land CN",
-    "version": "1.0",
-    "indicator_snapshot": {
-      "FI_RES_TOTL_MO": {
-        "value": 11.2291372513816,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FI.RES.TOTL.MO",
-        "country_currency": null,
-        "country_timezone": null
-      },
-      "NE_IMP_GNFS_CD": {
-        "value": 3219342570126.17,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.IMP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_imports_usd": 268278547510.51416
-      },
-      "DT_DOD_DECT_CD": {
-        "value": 2419835436491.8,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "DT.DOD.DECT.CD",
-        "country_currency": null,
-        "country_timezone": null
-      },
-      "NY_GDP_MKTP_CD": {
-        "value": 18743803170827.2,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NY.GDP.MKTP.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_gdp_usd": 1561983597568.9333
-      },
-      "FP_CPI_TOTL_ZG": {
-        "value": 0.218128938439177,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FP.CPI.TOTL.ZG",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 0.218128938439177
-      },
-      "NE_EXP_GNFS_CD": {
-        "value": 3753056083349.04,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.EXP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_exports_usd": 312754673612.42
-      },
-      "BX_KLT_DINV_CD_WD": {
-        "value": 18556141172.84,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "BX.KLT.DINV.CD.WD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_fdi_net_usd": 1546345097.7366667
-      },
-      "GC_XPN_TOTL_GD_ZS": {
-        "value": null,
-        "year": null,
-        "source": "WB_empty",
-        "indicator": "GC.XPN.TOTL.GD.ZS",
-        "note": "no_values"
-      }
-    },
-    "metadata": {
-      "created_by": "auto-generator",
-      "created_at": "2025-12-28T05:22:53.148199+00:00",
-      "country_info": {
-        "alpha2": "CN",
-        "alpha3": "CHN",
-        "numeric": null,
-        "country_de": "China",
-        "country_en": "China",
-        "timezone": null,
-        "currency": null
-      }
-    }
-  },
-  "DE": {
-    "name": "preset_DE",
-    "description": "Preset für Land DE",
-    "version": "1.0",
-    "indicator_snapshot": {
-      "FI_RES_TOTL_MO": {
-        "value": 2.19888604346397,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FI.RES.TOTL.MO",
-        "country_currency": null,
-        "country_timezone": null
-      },
-      "NE_IMP_GNFS_CD": {
-        "value": 1764438191610.94,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.IMP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_imports_usd": 147036515967.57834
-      },
-      "DT_DOD_DECT_CD": {
-        "value": null,
-        "year": null,
-        "source": "WB_empty",
-        "indicator": "DT.DOD.DECT.CD",
-        "note": "no_values"
-      },
-      "NY_GDP_MKTP_CD": {
-        "value": 4685592577804.69,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NY.GDP.MKTP.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_gdp_usd": 390466048150.39087
-      },
-      "FP_CPI_TOTL_ZG": {
-        "value": 2.2564981433876,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FP.CPI.TOTL.ZG",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 2.2564981433876
-      },
-      "NE_EXP_GNFS_CD": {
-        "value": 1941431210621.87,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.EXP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_exports_usd": 161785934218.48917
-      },
-      "BX_KLT_DINV_CD_WD": {
-        "value": 47599143488.7827,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "BX.KLT.DINV.CD.WD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_fdi_net_usd": 3966595290.7318916
-      },
-      "GC_XPN_TOTL_GD_ZS": {
-        "value": 31.174891399437,
-        "year": "2022",
-        "source": "WB",
-        "indicator": "GC.XPN.TOTL.GD.ZS",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 31.174891399437
-      }
-    },
-    "metadata": {
-      "created_by": "auto-generator",
-      "created_at": "2025-12-28T05:22:49.232461+00:00",
-      "country_info": {
-        "alpha2": "DE",
-        "alpha3": "DEU",
-        "numeric": null,
-        "country_de": "Deutschland",
-        "country_en": "Germany",
-        "timezone": null,
-        "currency": null
-      }
-    }
-  },
-  "FR": {
-    "name": "preset_FR",
-    "description": "Preset für Land FR",
-    "version": "1.0",
-    "indicator_snapshot": {
-      "FI_RES_TOTL_MO": {
-        "value": 2.38967602333511,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FI.RES.TOTL.MO",
-        "country_currency": "EUR",
-        "country_timezone": "Europe/Paris"
-      },
-      "NE_IMP_GNFS_CD": {
-        "value": 1081453951068.75,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.IMP.GNFS.CD",
-        "country_currency": "EUR",
-        "country_timezone": "Europe/Paris",
-        "monthly_imports_usd": 90121162589.0625
-      },
-      "DT_DOD_DECT_CD": {
-        "value": null,
-        "year": null,
-        "source": "WB_empty",
-        "indicator": "DT.DOD.DECT.CD",
-        "note": "no_values"
-      },
-      "NY_GDP_MKTP_CD": {
-        "value": 3160442622465.08,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NY.GDP.MKTP.CD",
-        "country_currency": "EUR",
-        "country_timezone": "Europe/Paris",
-        "monthly_gdp_usd": 263370218538.75668
-      },
-      "FP_CPI_TOTL_ZG": {
-        "value": 1.99904942291463,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FP.CPI.TOTL.ZG",
-        "country_currency": "EUR",
-        "country_timezone": "Europe/Paris",
-        "latest_annual_change": 1.99904942291463
-      },
-      "NE_EXP_GNFS_CD": {
-        "value": 1071066237472.11,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.EXP.GNFS.CD",
-        "country_currency": "EUR",
-        "country_timezone": "Europe/Paris",
-        "monthly_exports_usd": 89255519789.3425
-      },
-      "BX_KLT_DINV_CD_WD": {
-        "value": 52052548617.7634,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "BX.KLT.DINV.CD.WD",
-        "country_currency": "EUR",
-        "country_timezone": "Europe/Paris",
-        "monthly_fdi_net_usd": 4337712384.813617
-      },
-      "GC_XPN_TOTL_GD_ZS": {
-        "value": 47.2580360132692,
-        "year": "2023",
-        "source": "WB",
-        "indicator": "GC.XPN.TOTL.GD.ZS",
-        "country_currency": "EUR",
-        "country_timezone": "Europe/Paris",
-        "latest_annual_change": 47.2580360132692
-      }
-    },
-    "metadata": {
-      "created_by": "auto-generator",
-      "created_at": "2025-12-28T05:23:06.900259+00:00",
-      "country_info": {
-        "alpha2": "FR",
-        "alpha3": "FRA",
-        "numeric": "250",
-        "country_de": "Frankreich",
-        "country_en": "France",
-        "timezone": "Europe/Paris",
-        "currency": "EUR"
-      }
-    }
-  },
-  "GB": {
-    "name": "preset_GB",
-    "description": "Preset für Land GB",
-    "version": "1.0",
-    "indicator_snapshot": {
-      "FI_RES_TOTL_MO": {
-        "value": 1.22309285940089,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FI.RES.TOTL.MO",
-        "country_currency": "GBP",
-        "country_timezone": "Europe/London"
-      },
-      "NE_IMP_GNFS_CD": {
-        "value": 1174222748816.76,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.IMP.GNFS.CD",
-        "country_currency": "GBP",
-        "country_timezone": "Europe/London",
-        "monthly_imports_usd": 97851895734.73
-      },
-      "DT_DOD_DECT_CD": {
-        "value": null,
-        "year": null,
-        "source": "WB_empty",
-        "indicator": "DT.DOD.DECT.CD",
-        "note": "no_values"
-      },
-      "NY_GDP_MKTP_CD": {
-        "value": 3686033044482.13,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NY.GDP.MKTP.CD",
-        "country_currency": "GBP",
-        "country_timezone": "Europe/London",
-        "monthly_gdp_usd": 307169420373.5108
-      },
-      "FP_CPI_TOTL_ZG": {
-        "value": 3.2715729463592,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FP.CPI.TOTL.ZG",
-        "country_currency": "GBP",
-        "country_timezone": "Europe/London",
-        "latest_annual_change": 3.2715729463592
-      },
-      "NE_EXP_GNFS_CD": {
-        "value": 1142086333403.45,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.EXP.GNFS.CD",
-        "country_currency": "GBP",
-        "country_timezone": "Europe/London",
-        "monthly_exports_usd": 95173861116.95416
-      },
-      "BX_KLT_DINV_CD_WD": {
-        "value": -60647281077.0004,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "BX.KLT.DINV.CD.WD",
-        "country_currency": "GBP",
-        "country_timezone": "Europe/London",
-        "monthly_fdi_net_usd": -5053940089.750033
-      },
-      "GC_XPN_TOTL_GD_ZS": {
-        "value": 41.2292290721047,
-        "year": "2023",
-        "source": "WB",
-        "indicator": "GC.XPN.TOTL.GD.ZS",
-        "country_currency": "GBP",
-        "country_timezone": "Europe/London",
-        "latest_annual_change": 41.2292290721047
-      }
-    },
-    "metadata": {
-      "created_by": "auto-generator",
-      "created_at": "2025-12-28T05:23:09.030067+00:00",
-      "country_info": {
-        "alpha2": "GB",
-        "alpha3": "GBR",
-        "numeric": "826",
-        "country_de": "Vereinigtes Königreich",
-        "country_en": "United Kingdom",
-        "timezone": "Europe/London",
-        "currency": "GBP"
-      }
-    }
-  },
   "GR": {
-    "name": "preset_GR",
-    "description": "Preset für Land GR",
-    "version": "1.0",
-    "indicator_snapshot": {
-      "FI_RES_TOTL_MO": {
-        "value": 1.29465956102193,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FI.RES.TOTL.MO"
-      },
-      "NE_IMP_GNFS_CD": {
-        "value": 122135634583.353,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.IMP.GNFS.CD",
-        "monthly_imports_usd": 10177969548.61275
-      },
-      "DT_DOD_DECT_CD": {
-        "value": null,
-        "year": null,
-        "source": "WB_empty",
-        "indicator": "DT.DOD.DECT.CD",
-        "note": "no_values"
-      },
-      "NY_GDP_MKTP_CD": {
-        "value": 256238371778.118,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NY.GDP.MKTP.CD",
-        "monthly_gdp_usd": 21353197648.176502
-      },
-      "FP_CPI_TOTL_ZG": {
-        "value": 2.74149045788606,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FP.CPI.TOTL.ZG",
-        "latest_annual_change": 2.74149045788606
-      },
-      "NE_EXP_GNFS_CD": {
-        "value": 107906278860.86,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.EXP.GNFS.CD",
-        "monthly_exports_usd": 8992189905.071667
-      },
-      "BX_KLT_DINV_CD_WD": {
-        "value": 6742277267.34835,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "BX.KLT.DINV.CD.WD",
-        "monthly_fdi_net_usd": 561856438.9456958
-      },
-      "GC_XPN_TOTL_GD_ZS": {
-        "value": 47.3019610078935,
-        "year": "2023",
-        "source": "WB",
-        "indicator": "GC.XPN.TOTL.GD.ZS",
-        "latest_annual_change": 47.3019610078935
-      }
-    },
-    "metadata": {
-      "created_by": "auto-generator",
-      "created_at": "2025-12-28T05:23:05.202834+00:00",
-      "country_info": {
-        "alpha2": "GR",
-        "alpha3": null,
-        "numeric": null,
-        "country_de": null,
-        "country_en": null,
-        "timezone": null,
-        "currency": null
-      }
-    }
-  },
-  "IN": {
-    "name": "preset_IN",
-    "description": "Preset für Land IN",
-    "version": "1.0",
-    "indicator_snapshot": {
-      "FI_RES_TOTL_MO": {
-        "value": 7.52133810617043,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FI.RES.TOTL.MO",
-        "country_currency": null,
-        "country_timezone": null
-      },
-      "NE_IMP_GNFS_CD": {
-        "value": 918333719557.771,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.IMP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_imports_usd": 76527809963.14758
-      },
-      "DT_DOD_DECT_CD": {
-        "value": 716456023890.4,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "DT.DOD.DECT.CD",
-        "country_currency": null,
-        "country_timezone": null
-      },
-      "NY_GDP_MKTP_CD": {
-        "value": 3909891533858.08,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NY.GDP.MKTP.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_gdp_usd": 325824294488.17334
-      },
-      "FP_CPI_TOTL_ZG": {
-        "value": 4.95303550973656,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FP.CPI.TOTL.ZG",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 4.95303550973656
-      },
-      "NE_EXP_GNFS_CD": {
-        "value": 827405227198.603,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.EXP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_exports_usd": 68950435599.88359
-      },
-      "BX_KLT_DINV_CD_WD": {
-        "value": 27139853378.1402,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "BX.KLT.DINV.CD.WD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_fdi_net_usd": 2261654448.17835
-      },
-      "GC_XPN_TOTL_GD_ZS": {
-        "value": 13.3335178491336,
-        "year": "2022",
-        "source": "WB",
-        "indicator": "GC.XPN.TOTL.GD.ZS",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 13.3335178491336
-      }
-    },
-    "metadata": {
-      "created_by": "auto-generator",
-      "created_at": "2025-12-28T05:23:02.680252+00:00",
-      "country_info": {
-        "alpha2": "IN",
-        "alpha3": "IND",
-        "numeric": null,
-        "country_de": "Indien",
-        "country_en": "India",
-        "timezone": null,
-        "currency": null
-      }
-    }
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6.0,
+    "korruption": 0.3
   },
   "IR": {
-    "name": "preset_IR",
-    "description": "Preset für Land IR",
-    "version": "1.0",
-    "indicator_snapshot": {
-      "FI_RES_TOTL_MO": {
-        "value": 5.82231546015728,
-        "year": "1982",
-        "source": "WB",
-        "indicator": "FI.RES.TOTL.MO",
-        "country_currency": null,
-        "country_timezone": null,
-        "notes": "Marked stale by automated patch: value/year appear outdated; please review source.",
-        "stale": true
-      },
-      "NE_IMP_GNFS_CD": {
-        "value": 135497500555.676,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.IMP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_imports_usd": 11291458379.639666
-      },
-      "DT_DOD_DECT_CD": {
-        "value": 9654298895.5,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "DT.DOD.DECT.CD",
-        "country_currency": null,
-        "country_timezone": null
-      },
-      "NY_GDP_MKTP_CD": {
-        "value": 475252089215.416,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NY.GDP.MKTP.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_gdp_usd": 39604340767.95133
-      },
-      "FP_CPI_TOTL_ZG": {
-        "value": 32.455871402917,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FP.CPI.TOTL.ZG",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 32.455871402917
-      },
-      "NE_EXP_GNFS_CD": {
-        "value": 111928863188.398,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.EXP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_exports_usd": 9327405265.699833
-      },
-      "BX_KLT_DINV_CD_WD": {
-        "value": 1449111110,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "BX.KLT.DINV.CD.WD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_fdi_net_usd": 120759259.16666667
-      },
-      "GC_XPN_TOTL_GD_ZS": {
-        "value": 19.6373860775885,
-        "year": "2009",
-        "source": "WB",
-        "indicator": "GC.XPN.TOTL.GD.ZS",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 19.6373860775885,
-        "notes": "Marked stale by automated patch: value/year appear outdated; please review source.",
-        "stale": true
-      }
-    },
-    "metadata": {
-      "created_by": "auto-generator",
-      "created_at": "2025-12-28T05:22:57.467119+00:00",
-      "country_info": {
-        "alpha2": "IR",
-        "alpha3": "IRN",
-        "numeric": null,
-        "country_de": "Iran",
-        "country_en": "Iran",
-        "timezone": null,
-        "currency": null
-      }
-    }
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6.0,
+    "korruption": 0.3
+  },
+  "CN": {
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6.0,
+    "korruption": 0.3
+  },
+  "IN": {
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6.0,
+    "korruption": 0.3
+  },
+  "FR": {
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6.0,
+    "korruption": 0.3
+  },
+  "DE": {
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6.0,
+    "korruption": 0.3
   },
   "US": {
-    "name": "preset_US",
-    "description": "Preset für Land US",
-    "version": "1.0",
-    "indicator_snapshot": {
-      "FI_RES_TOTL_MO": {
-        "value": 1.94032058064747,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FI.RES.TOTL.MO",
-        "country_currency": null,
-        "country_timezone": null
-      },
-      "NE_IMP_GNFS_CD": {
-        "value": 4103100000000,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.IMP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_imports_usd": 341925000000.0
-      },
-      "DT_DOD_DECT_CD": {
-        "value": null,
-        "year": null,
-        "source": "WB_empty",
-        "indicator": "DT.DOD.DECT.CD",
-        "note": "no_values"
-      },
-      "NY_GDP_MKTP_CD": {
-        "value": 28750956130731.2,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NY.GDP.MKTP.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_gdp_usd": 2395913010894.2666
-      },
-      "FP_CPI_TOTL_ZG": {
-        "value": 2.94952520485207,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "FP.CPI.TOTL.ZG",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 2.94952520485207
-      },
-      "NE_EXP_GNFS_CD": {
-        "value": 3193500000000,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "NE.EXP.GNFS.CD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_exports_usd": 266125000000.0
-      },
-      "BX_KLT_DINV_CD_WD": {
-        "value": 297058000000,
-        "year": "2024",
-        "source": "WB",
-        "indicator": "BX.KLT.DINV.CD.WD",
-        "country_currency": null,
-        "country_timezone": null,
-        "monthly_fdi_net_usd": 24754833333.333332
-      },
-      "GC_XPN_TOTL_GD_ZS": {
-        "value": 24.8982825568771,
-        "year": "2023",
-        "source": "WB",
-        "indicator": "GC.XPN.TOTL.GD.ZS",
-        "country_currency": null,
-        "country_timezone": null,
-        "latest_annual_change": 24.8982825568771
-      }
-    },
-    "metadata": {
-      "created_by": "auto-generator",
-      "created_at": "2025-12-28T05:22:55.559498+00:00",
-      "country_info": {
-        "alpha2": "US",
-        "alpha3": "USA",
-        "numeric": null,
-        "country_de": "Vereinigte Staaten",
-        "country_en": "United States",
-        "timezone": null,
-        "currency": null
-      }
-    }
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6.0,
+    "korruption": 0.3
+  },
+  "BR": {
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6.0,
+    "korruption": 0.3
+  },
+  "GB": {
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6.0,
+    "korruption": 0.3
   }
 }
