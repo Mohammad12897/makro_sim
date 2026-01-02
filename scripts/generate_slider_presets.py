@@ -9,6 +9,14 @@ Konvertiert country_presets.json (Indicator-Snapshots) in slider_presets.json (U
 """
 
 from __future__ import annotations
+import sys
+from pathlib import Path
+
+# Projektwurzel zum Python-Pfad hinzufügen
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT))
+
+from core.risk_model import compute_risk_scores, risk_category
 
 import json
 import math
@@ -83,8 +91,6 @@ def save_json(path: Path, data: dict):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
-def clamp01(x: float) -> float:
-    return max(0.0, min(1.0, x))
 
 def normalize_ratio(value, min_val=0.0, max_val=2.0) -> float:
     if value is None:
@@ -109,63 +115,22 @@ def normalize_inflation(value, low=0.0, high=10.0) -> float:
 # Risiko-Scores (identisch zu gradio_app.py)
 # ---------------------------------------------------------------------
 
-def compute_risk_scores(p: dict) -> Dict[str, float]:
-    macro = (
-        clamp01(p.get("verschuldung", 0.8) / 1.5) * 0.45 +
-        clamp01(p.get("FX_Schockempfindlichkeit", 0.8) / 1.5) * 0.35 +
-        (1 - clamp01(p.get("Reserven_Monate", 6) / 18.0)) * 0.20
-    )
-
-    geo = (
-        clamp01(p.get("USD_Dominanz", 0.7)) * 0.45 +
-        clamp01(p.get("Sanktions_Exposure", 0.05)) * 0.35 +
-        (1 - clamp01(p.get("Alternativnetz_Abdeckung", 0.5))) * 0.20
-    )
-
-    korruption = p.get("korruption", 0.3)
-
-    gov = (
-        (1 - clamp01(p.get("demokratie", 0.8))) * 0.5 +
-        (1 - clamp01(p.get("innovation", 0.6))) * 0.3 +
-        (1 - clamp01(p.get("fachkraefte", 0.7))) * 0.2 +
-        korruption * 0.15
-    )
-
-    total = 0.5 * macro + 0.3 * geo + 0.2 * gov
-
-    finanz = (
-        p.get("verschuldung", 0.8) / 2.0 +
-        p.get("FX_Schockempfindlichkeit", 0.8) / 2.0
-    )
-
-    sozial = (
-        (1 - p.get("fachkraefte", 0.7)) * 0.5 +
-        (1 - p.get("demokratie", 0.8)) * 0.5
-    )
-
-    return {
-        "macro": clamp01(macro),
-        "geo": clamp01(geo),
-        "governance": clamp01(gov),
-        "finanz": clamp01(finanz),
-        "sozial": clamp01(sozial),
-        "total": clamp01(total),
-    }
-    
-def risk_category(score: float):
-    if score < 0.33:
-        return "stabil", "green"
-    elif score < 0.66:
-        return "warnung", "yellow"
-    else:
-        return "kritisch", "red"
 
 # ---------------------------------------------------------------------
 # Mapping: country_presets.json → Slider-Preset
 # ---------------------------------------------------------------------
 
 def country_to_slider_preset(code: str, country_preset: dict) -> dict:
+    # Start mit Defaults
     slider = {k: default for (k, _lo, _hi, default) in PARAM_SLIDERS}
+
+    # 1) Direktes Mapping aus flachen Keys (so wie in deiner neuen country_presets.json)
+    #    Falls du später wieder indicator_snapshot nutzt, bleibt das unten als Fallback.
+    for key in slider.keys():
+        if key in country_preset:
+            slider[key] = country_preset[key]
+
+    # 2) OPTIONAL: Fallback auf alte indicator_snapshot-Logik, falls vorhanden
     snap = country_preset.get("indicator_snapshot", {}) or {}
 
     # Verschuldung
@@ -175,7 +140,7 @@ def country_to_slider_preset(code: str, country_preset: dict) -> dict:
         if debt and gdp:
             ratio = float(debt) / float(gdp)
             slider["verschuldung"] = normalize_ratio(ratio, 0.0, 2.0) * 2.0
-    except:
+    except Exception:
         pass
 
     # Reserven
@@ -183,42 +148,44 @@ def country_to_slider_preset(code: str, country_preset: dict) -> dict:
         res = snap.get("FI_RES_TOTL_MO", {}).get("value")
         if res is not None:
             slider["Reserven_Monate"] = max(0.0, min(24.0, float(res)))
-    except:
+    except Exception:
         pass
 
-    # Offenheit
+    # Offenheit → Zugangsresilienz
     try:
         exports = snap.get("NE_EXP_GNFS_CD", {}).get("value")
         imports = snap.get("NE_IMP_GNFS_CD", {}).get("value")
         if exports and imports:
             openness = normalize_log(exports + imports, 9.0, 13.0)
-            slider["Zugangsresilienz"] = clamp01(openness)
-    except:
+            # clamp01 kommt aus risk_model; hier entweder selbst definieren oder importieren
+            from core.risk_model import clamp01 as _clamp01
+            slider["Zugangsresilienz"] = _clamp01(openness)
+    except Exception:
         pass
 
-    # Inflation
+    # Inflation → FX_Schockempfindlichkeit
     try:
         infl = snap.get("FP_CPI_TOTL_ZG", {}).get("value")
         if infl is not None:
             inf_norm = normalize_inflation(infl, 0.0, 10.0)
             slider["FX_Schockempfindlichkeit"] = 0.5 + 1.0 * inf_norm
-    except:
+    except Exception:
         pass
 
-    # Staatsausgabenquote
+    # Staatsausgabenquote → stabilitaet
     try:
         spend = snap.get("GC_XPN_TOTL_GD_ZS", {}).get("value")
         if spend is not None:
             spend_norm = normalize_ratio(spend / 100.0, 0.0, 0.6)
-            slider["stabilitaet"] = clamp01(1.0 - 0.7 * spend_norm)
-    except:
+            from core.risk_model import clamp01 as _clamp01
+            slider["stabilitaet"] = _clamp01(1.0 - 0.7 * spend_norm)
+    except Exception:
         pass
 
-    # korruption → Default 0.3 (falls kein Indikator existiert)
+    # korruption: wenn weder flacher Wert noch Snapshot: Default 0.3
     slider["korruption"] = slider.get("korruption", 0.3)
 
     return slider
-
 # ---------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------

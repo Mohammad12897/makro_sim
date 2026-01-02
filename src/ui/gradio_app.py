@@ -3,6 +3,15 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Projektwurzel zum Python-Pfad hinzufügen
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT))
+
+from core.risk_model import compute_risk_scores, risk_category
+
 import json
 import math
 import random
@@ -201,57 +210,6 @@ def collapse_alarm(det):
 
     return "\n".join(warnings)
 
-def clamp01(x: float) -> float:
-    return max(0.0, min(1.0, x))
-
-
-def compute_risk_scores(p: dict) -> Dict[str, float]:
-    macro = (
-        clamp01(p.get("verschuldung", 0.8) / 1.5) * 0.45 +
-        clamp01(p.get("FX_Schockempfindlichkeit", 0.8) / 1.5) * 0.35 +
-        (1 - clamp01(p.get("Reserven_Monate", 6) / 18.0)) * 0.20
-    )
-
-    geo = (
-        clamp01(p.get("USD_Dominanz", 0.7)) * 0.45 +
-        clamp01(p.get("Sanktions_Exposure", 0.05)) * 0.35 +
-        (1 - clamp01(p.get("Alternativnetz_Abdeckung", 0.5))) * 0.20
-    )
-
-    korruption = p.get("korruption", 0.3)
-
-    gov = (
-        (1 - clamp01(p.get("demokratie", 0.8))) * 0.5 +
-        (1 - clamp01(p.get("innovation", 0.6))) * 0.3 +
-        (1 - clamp01(p.get("fachkraefte", 0.7))) * 0.2 +
-        korruption * 0.15
-    )
-
-    total = 0.5 * macro + 0.3 * geo + 0.2 * gov
-
-
-    finanz = (p.get("verschuldung", 0.8) / 2.0 + p.get("FX_Schockempfindlichkeit", 0.8) / 2.0)
-    sozial = (1 - p.get("fachkraefte", 0.7)) * 0.5 + (1 - p.get("demokratie", 0.8)) * 0.5
-
-
-    return {
-        "macro": clamp01(macro),
-        "geo": clamp01(geo),
-        "governance": clamp01(gov),
-        "finanz": clamp01(finanz),
-        "sozial": clamp01(sozial),
-        "total": clamp01(total),
-    }
-
-
-def risk_category(score: float) -> Tuple[str, str]:
-    if score < 0.33:
-        return "stabil", "green"
-    elif score < 0.66:
-        return "warnung", "yellow"
-    else:
-        return "kritisch", "red"
-
 
 def get_scored_preset_choices():
     presets = load_presets()
@@ -285,7 +243,15 @@ def build_risk_radar(preset: dict, title: str = "Risiko-Radar"):
     ax.fill(angles, values, alpha=0.25)
     ax.set_thetagrids(angles[:-1] * 180 / np.pi, labels)
     ax.set_ylim(0, 1)
-    ax.set_title(title)
+    ax.set_title(title, fontsize=14, pad=20)
+    ax.text(
+        0.5, 1.10,
+        "Δ = Live – Baseline (5D Risiko-Komponenten)",
+        transform=ax.transAxes,
+        ha="center",
+        va="center",
+        fontsize=9,
+    )
     fig.tight_layout()
     plt.close(fig)
     return fig
@@ -329,6 +295,16 @@ def build_risk_radar_5d(scores: dict, title: str):
 
     # Titel
     ax.set_title(title, fontsize=14, pad=20)
+
+    # Formel-Erklärung oben drüber
+    ax.text(
+        0.5, 1.08,
+        "Total = 0.5·Makro + 0.3·Geo + 0.2·Governance",
+        transform=ax.transAxes,
+        ha="center",
+        va="center",
+        fontsize=9,
+    )
 
     fig.tight_layout()
     plt.close(fig)
@@ -599,45 +575,6 @@ def _delete_preset_and_refresh_dropdown(name: str):
         gr.update(choices=get_scored_preset_choices(), value=None),
     )
 
-
-def _load_preset_with_warning_old(preset_name: str, *current_vals):
-    try:
-        if not preset_name:
-            none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
-            return (*none_updates, "Kein Preset ausgewählt.")
-
-        presets = load_presets()
-        preset = presets.get(preset_name)
-        if not preset:
-            none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
-            return (*none_updates, f"Preset '{preset_name}' nicht gefunden.")
-
-        try:
-            from .sanitize import validate_preset
-            clean, warnings = validate_preset(preset, clamp=False)
-        except Exception:
-            clean = preset
-            warnings = []
-
-        updates = []
-        for key, lo, hi, default in PARAM_SLIDERS:
-            val = clean.get(key, default)
-            updates.append(gr.update(value=val))
-
-        if any(w[0] == "critical" for w in warnings):
-            status = "Achtung: Preset enthält kritische Werte."
-        elif warnings:
-            status = "Warnungen im Preset vorhanden."
-        else:
-            status = "Preset geladen."
-
-        return (*updates, status)
-    except Exception as e:
-        import traceback
-        print("Fehler in _load_preset_with_warning:", e)
-        print(traceback.format_exc())
-        none_updates = [gr.update(value=None) for _ in PARAM_SLIDERS]
-        return (*none_updates, f"Fehler beim Laden des Presets: {e}")
 
 def _load_preset_with_warning(preset_name: str, *current_vals):
     try:
@@ -983,6 +920,7 @@ def update_live_risk_and_radar(*vals):
 
     return scores_live, radar_live, radar_delta, thermometer
 
+
 def build_delta_radar(scores_base, scores_live, title="Delta-Radar"):
     import matplotlib.pyplot as plt
     import numpy as np
@@ -1028,6 +966,15 @@ def build_delta_radar(scores_base, scores_live, title="Delta-Radar"):
     ax.set_xticklabels(labels)
 
     ax.set_title(title, fontsize=14, pad=20)
+    ax.text(
+        0.5, 1.10,
+        "Δ = Live – Baseline (5D Risiko-Komponenten)",
+        transform=ax.transAxes,
+        ha="center",
+        va="center",
+        fontsize=9,
+    )
+    
     ax.legend(loc="upper right")
 
     fig.tight_layout()
@@ -1042,30 +989,54 @@ with gr.Blocks(title="Makro-Simulation") as demo:
     # -------------------------------------------------------------
     with gr.Tab("Simulation"):
         slider_components = []
-        for key, lo, hi, default in PARAM_SLIDERS:
-            slider = gr.Slider(
-                minimum=lo,
-                maximum=hi,
-                value=default,
-                step=0.01,
-                label=key,
-            )
-            slider_components.append(slider)
+        half = len(PARAM_SLIDERS) // 2
+        with gr.Row():
+          # -----------------------------
+          # Linke Spalte – erste Hälfte
+          # -----------------------------
+            with gr.Column(scale=2):
+                for key, lo, hi, default in PARAM_SLIDERS[:half]:
+                    s = gr.Slider(
+                        minimum=lo,
+                        maximum=hi,
+                        value=default,
+                        step=0.01,
+                        label=key,
+                    )
+
+                    slider_components.append(s)
+            # -----------------------------
+            # Rechte Spalte – zweite Hälfte
+            # -----------------------------
+            with gr.Column(scale=2):
+                for key, lo, hi, default in PARAM_SLIDERS[half:]:
+                    s = gr.Slider(
+                        minimum=lo,
+                        maximum=hi,
+                        value=default,
+                        step=0.01,
+                        label=key,
+                    )
+
+                    slider_components.append(s)
+
+            # -----------------------------
+            # Rechte Seitenleiste – Risiko
+            # -----------------------------
+            with gr.Column(scale=1):
+                live_risk_box = gr.JSON(label="Live-Risiko + Parameter")
+                risk_thermo = gr.Markdown(label="Risiko-Thermometer")
+                live_radar_plot = gr.Plot(label="Live-Radar (5D)")
+                delta_radar_plot = gr.Plot(label="Delta-Radar")
+
+        # -----------------------------
+        # Buttons + Ergebnisse
+        # -----------------------------
 
         btn_run = gr.Button("Simulation starten")
         summary_text = gr.Textbox(label="Ergebnis-Summary", lines=14)
 
         early_warning_box = gr.JSON(label="Frühwarnsystem")
-
-        live_risk_box = gr.JSON(label="Live-Risiko + Eingangsparameter")
-        live_radar_plot = gr.Plot(label="Live-Radar (5D)")
-
-        delta_radar_plot = gr.Plot(label="Delta-Radar")
-        risk_thermo = gr.Markdown(label="Risiko-Thermometer")
-
-        #slider_korruption = gr.Slider(0, 1, value=0.3, label="Korruption (0=sauber, 1=korrupt)")
-        #slider_components.append(slider_korruption)
-
 
         for slider in slider_components:
             slider.change(
@@ -1188,7 +1159,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
         shock_year = gr.Slider(
             minimum=0, maximum=50, value=5, step=1, label="Schockjahr (0 = kein Schock)"
         )
-    
+
         shock_intensity = gr.Slider(
             minimum=0.0, maximum=0.5, value=0.0, step=0.05, label="Schock-Intensität"
         )
@@ -1316,15 +1287,38 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             plt.tight_layout()
             plt.close(fig_a2)
 
-            fig_a3, ax = plt.subplots(figsize=(5, 3))
-            ax.plot(t, det["risk_drift"])
-            ax.plot(t, stoch["risk_drift"], alpha=0.7)
-            plt.tight_layout()
+ 
+            fig_a3, ax_a3 = plt.subplots(figsize=(5, 3))
+            ax_a3.plot(t, det["risk_drift"], label="deterministisch")
+            ax_a3.plot(t, stoch["risk_drift"], label="stochastisch", alpha=0.7)
+            ax_a3.set_title("Risiko-Drift")
+            ax_a3.set_xlabel("Jahre")
+            ax_a3.text(
+                0.5, 1.12,
+                "Formel: Risk Drift = f(Makro, Geo, Governance, Schocks)",
+                transform=ax_a3.transAxes,
+                ha="center",
+                va="center",
+                fontsize=8,
+            )
+            ax_a3.legend()
+            plt.tight_layout()   
             plt.close(fig_a3)
 
-            fig_a4, ax = plt.subplots(figsize=(5, 3))
-            ax.plot(t, det["resilienz"])
-            ax.plot(t, stoch["resilienz"], alpha=0.7)
+            fig_a4, ax_a4 = plt.subplots(figsize=(5, 3))
+            ax_a4.plot(t, det["resilienz"])
+            ax_a4.plot(t, stoch["resilienz"], alpha=0.7)
+            ax_a4.set_title("Risiko-Drift – Szenarien")
+            alarm_text = collapse_alarm(det)
+            ax_a4.text(
+                0.5, -0.25,
+                f"Kollaps-Alarm: {alarm_text}",
+                transform=ax_a4.transAxes,
+                ha="center",
+                va="center",
+                fontsize=10,
+                color="red",
+            )
             plt.tight_layout()
             plt.close(fig_a4)
 
@@ -1411,9 +1405,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 "risk_drift_mean_final": float(np.mean([run[-1] for run in mc["risk_drift"]])),
             }
             comment_d = build_comment_d(summary_d)
-
-            # --- Kollaps-Alarm ---
-            alarm_text = collapse_alarm(det)
 
             return (
                 fig_a1, fig_a2, fig_a3, fig_a4, summary_a, comment_a,
@@ -1553,6 +1544,14 @@ with gr.Blocks(title="Makro-Simulation") as demo:
         for scen in SCENARIOS:
             ax4.plot(t, scenario_results[scen]["risk"], label=scen)
         ax4.set_title("Risiko-Drift – Szenarien")
+        ax4.text(
+            0.5, 1.12,
+            "Formel: Risk Drift = f(Makro, Geo, Governance, Schocks)",
+            transform=ax4.transAxes,
+            ha="center",
+            va="center",
+            fontsize=8,
+        )
         ax4.legend()
         plt.tight_layout()
 
