@@ -11,6 +11,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT))
 
 from core.risk_model import compute_risk_scores, risk_category
+from core.sensitivity import sensitivity_analysis
+from core.heatmap import risk_heatmap
+from core.scenario_engine import apply_shock
 
 import json
 import math
@@ -23,6 +26,53 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+
+def ui_scenario(country_code, shock_json, slider_presets):
+    params = slider_presets[country_code]
+    shock = json.loads(shock_json)
+    new_params, new_score, report = apply_shock(params, shock)
+
+    table = []
+    for r in report:
+        table.append([
+            r["parameter"],
+            r["änderung"],
+            r["bedeutung"],
+            r["farbe"]
+        ])
+
+    return new_score["total"], table
+
+def ui_heatmap(slider_presets):
+    table = risk_heatmap(slider_presets)
+    rows = []
+
+    for row in table:
+        rows.append([
+            row["land"],
+            row["macro"], row["macro_color"],
+            row["geo"], row["geo_color"],
+            row["gov"], row["gov_color"],
+            row["total"], row["total_color"]
+        ])
+
+    return rows
+
+
+def ui_sensitivity(country_code, slider_presets):
+    params = slider_presets[country_code]
+    results = sensitivity_analysis(params)
+
+    table = []
+    for r in results:
+        table.append([
+            r["parameter"],
+            r["delta"],
+            r["bedeutung"],
+            r["farbe"]
+        ])
+
+    return table
 
 def build_comment_a(summary):
     g = summary["final_gdp_growth_det"]
@@ -473,16 +523,30 @@ def lexikon_erweitert_markdown() -> str:
 - **Inflation**
 - **FX‑Schockempfindlichkeit**
 - **Reserven**
+- **macro =**
+- **0.5 * (verschuldung_norm_exp) +**
+- **0.3 * (fx_norm) +**
+- **0.2 * (reserven_norm_log)**
 
 ### B) Geopolitisches Risiko
 - **USD‑Dominanz**
 - **Sanktions‑Exposure**
 - **Alternativnetz‑Abdeckung (invertiert)**
+- **geo =**
+- **0.4 * usd_dom_norm +**
+- **0.4 * sanktions_norm +**
+- **0.2 * (1 - alternativnetz_norm)^1.5**
 
 ### C) Governance‑Risiko
-- **Demokratie (invertiert)**
-- **Innovation (invertiert)**
-- **Fachkräfte (invertiert)**
+- **Demokratie (invertiert und stärker gewichtet)**
+- **Korruption (stark gewichtet)**
+- **Innovation (linear)**
+- **Fachkräfte (linear)**
+- **gov =**
+- **0.45 * (1 - demokratie) +**
+- **0.30 * korruption +**
+- **0.15 * (1 - innovation) +**
+- **0.10 * (1 - fachkraefte)**
 
 ### Gesamt‑Risiko: 0.5 * risk_macro(p) + 0.3 * risk_geo(p) + 0.2 * risk_governance(p)
 
@@ -988,6 +1052,44 @@ with gr.Blocks(title="Makro-Simulation") as demo:
     # Simulation (inkl. Risiko-Output)
     # -------------------------------------------------------------
     with gr.Tab("Simulation"):
+
+        with gr.Tab("Heatmap"):
+            gr.Markdown("### Heatmap der Risikotreiber")
+            heat_button = gr.Button("Heatmap erzeugen")
+            heat_output = gr.Dataframe(
+                headers=["Land", "Makro", "Makro-Farbe", "Geo", "Geo-Farbe", "Gov", "Gov-Farbe", "Total", "Total-Farbe"]
+            )
+
+            heat_button.click(
+                fn=lambda: ui_heatmap(slider_presets),
+                inputs=[],
+                outputs=[heat_output]
+            )
+       
+        with gr.Tab("Szenarien"):
+            gr.Markdown("### Szenario-Engine (Governance-, Makro-, Geo-Schocks)")
+
+            scen_country = gr.Dropdown(choices=list(slider_presets.keys()), label="Land")
+            scen_input = gr.Textbox(label="Schock (JSON)", value='{"demokratie": -0.2}')
+            scen_button = gr.Button("Szenario anwenden")
+
+            scen_score = gr.Number(label="Neuer Risiko-Score")
+            scen_report = gr.Dataframe(headers=["Parameter", "Änderung", "Bedeutung", "Farbe"])
+
+            scen_button.click(
+                fn=lambda c, s: ui_scenario(c, s, slider_presets),
+                inputs=[scen_country, scen_input],
+                outputs=[scen_score, scen_report]
+            )
+        
+        
+        with gr.Tab("Methodik"):
+            gr.Markdown("### Dokumentation der Risiko-Methodik")
+            with open("docs/risk_methodology.md", "r", encoding="utf-8") as f:
+                doc_text = f.read()
+            gr.Markdown(doc_text)
+
+
         slider_components = []
         half = len(PARAM_SLIDERS) // 2
         with gr.Row():
