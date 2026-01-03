@@ -15,6 +15,7 @@ from core.sensitivity import sensitivity_analysis
 from core.heatmap import risk_heatmap
 from core.scenario_engine import apply_shock
 
+
 import json
 import math
 import random
@@ -25,6 +26,104 @@ import gradio as gr
 import matplotlib.pyplot as plt
 import numpy as np
 
+
+
+
+
+# ---------------------------------------------------------------------
+# Pfade & Basis-Setup
+# ---------------------------------------------------------------------
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+PRESETS_DIR = BASE_DIR / "presets"
+
+PRESETS_FILENAME = PRESETS_DIR / "slider_presets.json"
+COUNTRY_PRESETS_FILENAME = PRESETS_DIR / "country_presets.json"
+
+# ---------------------------------------------------------------------
+# Slider-Definitionen
+# ---------------------------------------------------------------------
+
+SCENARIOS = ["Baseline", "Optimistisch", "Pessimistisch", "Stress"]
+
+default_params: Dict[str, float] = {
+    "USD_Dominanz": 0.7,
+    "RMB_Akzeptanz": 0.2,
+    "Zugangsresilienz": 0.8,
+    "Sanktions_Exposure": 0.05,
+    "Alternativnetz_Abdeckung": 0.5,
+    "Liquiditaetsaufschlag": 0.03,
+    "CBDC_Nutzung": 0.5,
+    "Golddeckung": 0.4,
+    "innovation": 0.6,
+    "fachkraefte": 0.7,
+    "energie": 0.5,
+    "stabilitaet": 0.9,
+    "verschuldung": 0.8,
+    "demokratie": 0.8,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 6,
+    "korruption": 0.3,
+}
+
+PARAM_SLIDERS: List[Tuple[str, float, float, float]] = [
+    ("USD_Dominanz", 0.0, 1.0, default_params["USD_Dominanz"]),
+    ("RMB_Akzeptanz", 0.0, 1.0, default_params["RMB_Akzeptanz"]),
+    ("Zugangsresilienz", 0.0, 1.0, default_params["Zugangsresilienz"]),
+    ("Sanktions_Exposure", 0.0, 1.0, default_params["Sanktions_Exposure"]),
+    ("Alternativnetz_Abdeckung", 0.0, 1.0, default_params["Alternativnetz_Abdeckung"]),
+    ("Liquiditaetsaufschlag", 0.0, 1.0, default_params["Liquiditaetsaufschlag"]),
+    ("CBDC_Nutzung", 0.0, 1.0, default_params["CBDC_Nutzung"]),
+    ("Golddeckung", 0.0, 1.0, default_params["Golddeckung"]),
+    ("innovation", 0.0, 1.0, default_params["innovation"]),
+    ("fachkraefte", 0.0, 1.0, default_params["fachkraefte"]),
+    ("energie", 0.0, 1.0, default_params["energie"]),
+    ("stabilitaet", 0.0, 1.0, default_params["stabilitaet"]),
+    ("verschuldung", 0.0, 2.0, default_params["verschuldung"]),
+    ("demokratie", 0.0, 1.0, default_params["demokratie"]),
+    ("FX_Schockempfindlichkeit", 0.0, 2.0, default_params["FX_Schockempfindlichkeit"]),
+    ("Reserven_Monate", 0, 24, default_params["Reserven_Monate"]),
+    ("korruption", 0.0, 1.0, default_params["korruption"]),
+]
+
+NUM_SLIDERS = len(PARAM_SLIDERS)
+
+# ---------------------------------------------------------------------
+# Preset-IO + Auto-Pipeline
+# ---------------------------------------------------------------------
+
+def _ensure_presets_file():
+    PRESETS_FILENAME.parent.mkdir(parents=True, exist_ok=True)
+    if not PRESETS_FILENAME.exists():
+        PRESETS_FILENAME.write_text("{}", encoding="utf-8")
+
+
+def load_presets() -> dict:
+    _ensure_presets_file()
+    try:
+        text = PRESETS_FILENAME.read_text(encoding="utf-8")
+        data = json.loads(text)
+        if not isinstance(data, dict):
+            print("Warning: slider_presets.json ist nicht vom Typ dict, setze auf {}.")
+            return {}
+        return data
+    except Exception as e:
+        print("Error reading slider_presets.json:", e)
+        return {}
+
+presets = load_presets()
+
+def save_presets(presets: dict) -> bool:
+    _ensure_presets_file()
+    try:
+        PRESETS_FILENAME.write_text(
+            json.dumps(presets, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return True
+    except Exception as e:
+        print("Error writing slider_presets.json:", e)
+        return False
 
 
 def ui_scenario(country_code, shock_json, slider_presets):
@@ -110,100 +209,6 @@ def build_comment_d(summary):
         f"MC-Risiko: {summary['risk_drift_mean_final']:.2f}."
     )
 
-
-# ---------------------------------------------------------------------
-# Pfade & Basis-Setup
-# ---------------------------------------------------------------------
-
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-PRESETS_DIR = BASE_DIR / "presets"
-
-PRESETS_FILENAME = PRESETS_DIR / "slider_presets.json"
-COUNTRY_PRESETS_FILENAME = PRESETS_DIR / "country_presets.json"
-
-# ---------------------------------------------------------------------
-# Slider-Definitionen
-# ---------------------------------------------------------------------
-
-SCENARIOS = ["Baseline", "Optimistisch", "Pessimistisch", "Stress"]
-
-default_params: Dict[str, float] = {
-    "USD_Dominanz": 0.7,
-    "RMB_Akzeptanz": 0.2,
-    "Zugangsresilienz": 0.8,
-    "Sanktions_Exposure": 0.05,
-    "Alternativnetz_Abdeckung": 0.5,
-    "Liquiditaetsaufschlag": 0.03,
-    "CBDC_Nutzung": 0.5,
-    "Golddeckung": 0.4,
-    "innovation": 0.6,
-    "fachkraefte": 0.7,
-    "energie": 0.5,
-    "stabilitaet": 0.9,
-    "verschuldung": 0.8,
-    "demokratie": 0.8,
-    "FX_Schockempfindlichkeit": 0.8,
-    "Reserven_Monate": 6,
-    "korruption": 0.3,
-}
-
-PARAM_SLIDERS: List[Tuple[str, float, float, float]] = [
-    ("USD_Dominanz", 0.0, 1.0, default_params["USD_Dominanz"]),
-    ("RMB_Akzeptanz", 0.0, 1.0, default_params["RMB_Akzeptanz"]),
-    ("Zugangsresilienz", 0.0, 1.0, default_params["Zugangsresilienz"]),
-    ("Sanktions_Exposure", 0.0, 1.0, default_params["Sanktions_Exposure"]),
-    ("Alternativnetz_Abdeckung", 0.0, 1.0, default_params["Alternativnetz_Abdeckung"]),
-    ("Liquiditaetsaufschlag", 0.0, 1.0, default_params["Liquiditaetsaufschlag"]),
-    ("CBDC_Nutzung", 0.0, 1.0, default_params["CBDC_Nutzung"]),
-    ("Golddeckung", 0.0, 1.0, default_params["Golddeckung"]),
-    ("innovation", 0.0, 1.0, default_params["innovation"]),
-    ("fachkraefte", 0.0, 1.0, default_params["fachkraefte"]),
-    ("energie", 0.0, 1.0, default_params["energie"]),
-    ("stabilitaet", 0.0, 1.0, default_params["stabilitaet"]),
-    ("verschuldung", 0.0, 2.0, default_params["verschuldung"]),
-    ("demokratie", 0.0, 1.0, default_params["demokratie"]),
-    ("FX_Schockempfindlichkeit", 0.0, 2.0, default_params["FX_Schockempfindlichkeit"]),
-    ("Reserven_Monate", 0, 24, default_params["Reserven_Monate"]),
-    ("korruption", 0.0, 1.0, default_params["korruption"]),
-]
-
-NUM_SLIDERS = len(PARAM_SLIDERS)
-
-# ---------------------------------------------------------------------
-# Preset-IO + Auto-Pipeline
-# ---------------------------------------------------------------------
-
-def _ensure_presets_file():
-    PRESETS_FILENAME.parent.mkdir(parents=True, exist_ok=True)
-    if not PRESETS_FILENAME.exists():
-        PRESETS_FILENAME.write_text("{}", encoding="utf-8")
-
-
-def load_presets() -> dict:
-    _ensure_presets_file()
-    try:
-        text = PRESETS_FILENAME.read_text(encoding="utf-8")
-        data = json.loads(text)
-        if not isinstance(data, dict):
-            print("Warning: slider_presets.json ist nicht vom Typ dict, setze auf {}.")
-            return {}
-        return data
-    except Exception as e:
-        print("Error reading slider_presets.json:", e)
-        return {}
-
-
-def save_presets(presets: dict) -> bool:
-    _ensure_presets_file()
-    try:
-        PRESETS_FILENAME.write_text(
-            json.dumps(presets, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        return True
-    except Exception as e:
-        print("Error writing slider_presets.json:", e)
-        return False
 
 
 def ensure_slider_presets_up_to_date() -> str:
@@ -1052,44 +1057,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
     # Simulation (inkl. Risiko-Output)
     # -------------------------------------------------------------
     with gr.Tab("Simulation"):
-
-        with gr.Tab("Heatmap"):
-            gr.Markdown("### Heatmap der Risikotreiber")
-            heat_button = gr.Button("Heatmap erzeugen")
-            heat_output = gr.Dataframe(
-                headers=["Land", "Makro", "Makro-Farbe", "Geo", "Geo-Farbe", "Gov", "Gov-Farbe", "Total", "Total-Farbe"]
-            )
-
-            heat_button.click(
-                fn=lambda: ui_heatmap(slider_presets),
-                inputs=[],
-                outputs=[heat_output]
-            )
-       
-        with gr.Tab("Szenarien"):
-            gr.Markdown("### Szenario-Engine (Governance-, Makro-, Geo-Schocks)")
-
-            scen_country = gr.Dropdown(choices=list(slider_presets.keys()), label="Land")
-            scen_input = gr.Textbox(label="Schock (JSON)", value='{"demokratie": -0.2}')
-            scen_button = gr.Button("Szenario anwenden")
-
-            scen_score = gr.Number(label="Neuer Risiko-Score")
-            scen_report = gr.Dataframe(headers=["Parameter", "Änderung", "Bedeutung", "Farbe"])
-
-            scen_button.click(
-                fn=lambda c, s: ui_scenario(c, s, slider_presets),
-                inputs=[scen_country, scen_input],
-                outputs=[scen_score, scen_report]
-            )
-        
-        
-        with gr.Tab("Methodik"):
-            gr.Markdown("### Dokumentation der Risiko-Methodik")
-            with open("docs/risk_methodology.md", "r", encoding="utf-8") as f:
-                doc_text = f.read()
-            gr.Markdown(doc_text)
-
-
         slider_components = []
         half = len(PARAM_SLIDERS) // 2
         with gr.Row():
@@ -1158,6 +1125,56 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             inputs=slider_components,
             outputs=[summary_text, early_warning_box],
         )
+
+
+    with gr.Tab("Heatmap"):
+        gr.Markdown("### Heatmap der Risikotreiber")
+        heat_button = gr.Button("Heatmap erzeugen")
+        heat_output = gr.Dataframe(
+            headers=["Land", "Makro", "Makro-Farbe", "Geo", "Geo-Farbe", "Gov", "Gov-Farbe", "Total", "Total-Farbe"]
+        )
+
+        heat_button.click(
+            fn=lambda: ui_heatmap(presets),
+            inputs=[],
+            outputs=[heat_output]
+        )
+       
+    with gr.Tab("Szenarien"):
+        gr.Markdown("### Szenario-Engine (Governance-, Makro-, Geo-Schocks)")
+
+        scen_country = gr.Dropdown(choices=list(presets.keys()), label="Land")
+        scen_input = gr.Textbox(label="Schock (JSON)", value='{"demokratie": -0.2}')
+        scen_button = gr.Button("Szenario anwenden")
+
+        scen_score = gr.Number(label="Neuer Risiko-Score")
+        scen_report = gr.Dataframe(headers=["Parameter", "Änderung", "Bedeutung", "Farbe"])
+
+        scen_button.click(
+            fn=lambda c, s: ui_scenario(c, s, presets),
+            inputs=[scen_country, scen_input],
+            outputs=[scen_score, scen_report]
+        )
+
+
+    with gr.Tab("Sensitivität"):
+        gr.Markdown("### Sensitivitätsanalyse pro Land")
+        sens_country = gr.Dropdown(choices=list(presets.keys()), label="Land")
+        sens_button = gr.Button("Analyse starten")
+        sens_output = gr.Dataframe(headers=["Parameter", "Δ Risiko", "Bedeutung", "Farbe"])
+
+        sens_button.click(
+            fn=lambda c: ui_sensitivity(c, presets),
+            inputs=[sens_country],
+            outputs=[sens_output]
+        )  
+        
+    with gr.Tab("Methodik"):
+        gr.Markdown("### Dokumentation der Risiko-Methodik")
+        with open("docs/risk_methodology.md", "r", encoding="utf-8") as f:
+            doc_text = f.read()
+        gr.Markdown(doc_text)
+
 
     # -------------------------------------------------------------
     # Preset-Manager
