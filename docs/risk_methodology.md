@@ -219,6 +219,32 @@ Das Dashboard ermöglicht eine schnelle, umfassende und intuitive Einschätzung 
 
 
 
+Interpretation: Länder-Benchmarking
+
+Das Benchmarking-Modul ermöglicht den strukturierten Vergleich eines Landes mit mehreren anderen Ländern. 
+Es kombiniert Radar-Diagramme, Heatmaps, Rankings und automatische Textinterpretationen, um Unterschiede und Gemeinsamkeiten sichtbar zu machen.
+
+Elemente des Benchmarkings:
+
+1. Multi-Radar:
+   - Vergleicht die Risikostruktur über fünf Dimensionen.
+   - Zeigt, welche Länder ähnliche Muster aufweisen.
+   - Identifiziert Ausreißer und strukturelle Schwächen.
+
+2. Mini-Heatmap:
+   - Farblich codierter Vergleich der Risiko-Dimensionen.
+   - Zeigt relative Stärken und Schwächen der Länder.
+
+3. Ranking-Tabelle:
+   - Sortiert Länder nach Gesamt-Risiko oder einzelnen Dimensionen.
+   - Erlaubt eine schnelle Einordnung im internationalen Vergleich.
+
+4. Automatische Benchmark-Interpretation:
+   - Liefert eine textbasierte Analyse der wichtigsten Unterschiede.
+   - Hebt Stärken, Schwächen und Besonderheiten hervor.
+   - Unterstützt datenbasierte Entscheidungen.
+
+Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht auf die Risikolage mehrerer Länder.
 
 
 
@@ -271,6 +297,32 @@ Das Dashboard ermöglicht eine schnelle, umfassende und intuitive Einschätzung 
 - **0.10 * (1 - fachkraefte)**
 
 ### Gesamt‑Risiko: 0.5 * risk_macro(p) + 0.3 * risk_geo(p) + 0.2 * risk_governance(p)
+
+### finanz = gewicht1 * verschuldung
+       + gewicht2 * FX_Schockempfindlichkeit
+       + gewicht3 * Liquiditaetsaufschlag
+       - gewicht4 * Reserven
+       - gewicht5 * Golddeckung
+
+### Finanz‑Risiko als normierter Wert zwischen 0 und 1 liegt.
+- **0.0 – 0.3 → stabil**
+- **0.3 – 0.5 → moderat**
+- **0.5 – 0.7 → erhöht**
+- **> 0.7 → kritisch**
+
+### sozial = gewicht1 * korruption
+       + gewicht2 * instabilitaet
+       - gewicht3 * demokratie
+       - gewicht4 * fachkraefte
+       - gewicht5 * energie
+
+### Sozial-Risiko als normierter Wert zwischen 0 und 1 liegt
+- **0.0 – 0.3 → hohe soziale Stabilität**
+- **0.3 – 0.5 → moderat**
+- **0.5 – 0.7 → erhöhte Risiken**
+- **> 0.7 → kritische Lage**
+
+### Ranking: Makro‑Risiko + Geopolitisches Risiko + Governance‑Risiko + finanz + sozial
 
 ### Farbliche Markierung (kritisch / warnend / stabil)
 | **Score** | **Kategorie** | **Farbe** |

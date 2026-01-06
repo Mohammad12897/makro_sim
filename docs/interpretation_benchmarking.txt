@@ -1,0 +1,26 @@
+# Interpretation: Länder-Benchmarking
+
+Das Benchmarking-Modul ermöglicht den strukturierten Vergleich eines Landes mit mehreren anderen Ländern. 
+Es kombiniert Radar-Diagramme, Heatmaps, Rankings und automatische Textinterpretationen, um Unterschiede und Gemeinsamkeiten sichtbar zu machen.
+
+Elemente des Benchmarkings:
+
+1. Multi-Radar:
+   - Vergleicht die Risikostruktur über fünf Dimensionen.
+   - Zeigt, welche Länder ähnliche Muster aufweisen.
+   - Identifiziert Ausreißer und strukturelle Schwächen.
+
+2. Mini-Heatmap:
+   - Farblich codierter Vergleich der Risiko-Dimensionen.
+   - Zeigt relative Stärken und Schwächen der Länder.
+
+3. Ranking-Tabelle:
+   - Sortiert Länder nach Gesamt-Risiko oder einzelnen Dimensionen.
+   - Erlaubt eine schnelle Einordnung im internationalen Vergleich.
+
+4. Automatische Benchmark-Interpretation:
+   - Liefert eine textbasierte Analyse der wichtigsten Unterschiede.
+   - Hebt Stärken, Schwächen und Besonderheiten hervor.
+   - Unterstützt datenbasierte Entscheidungen.
+   
+Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht auf die Risikolage mehrerer Länder.

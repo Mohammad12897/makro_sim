@@ -109,6 +109,7 @@ szenario_text = load_textfile(ROOT.parent / "docs" / "interpretation_szenario.tx
 sensitivitaet_text = load_textfile(ROOT.parent / "docs" / "interpretation_sensitivitaet.txt")
 prognose_text = load_textfile(ROOT.parent / "docs" / "interpretation_prognose.txt")
 dashboard_text = load_textfile(ROOT.parent / "docs" / "interpretation_dashboard.txt")
+benchmarking_text = load_textfile(ROOT.parent / "docs" / "interpretation_benchmarking.txt")
 
 # ============================================================
 # HILFSFUNKTIONEN FÜR DIE SIMULATION
@@ -254,6 +255,39 @@ def plot_resilience_radar(scores: Dict[str, float]):
 
     return fig
 
+def plot_multi_radar(score_dict: dict):
+    """
+    score_dict = {
+        "DE": {"macro":..., "geo":..., ...},
+        "US": {...},
+        ...
+    }
+    """
+    labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+
+    for country, scores in score_dict.items():
+        values = [
+            scores["macro"],
+            scores["geo"],
+            scores["governance"],
+            scores["finanz"],
+            scores["sozial"],
+        ]
+        values = np.concatenate((values, [values[0]]))
+        ax.plot(angles, values, linewidth=2, label=country)
+        ax.fill(angles, values, alpha=0.15)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
+    ax.set_title("Multi-Radar Vergleich")
+
+    return fig
 
 # ============================================================
 # PROGNOSE-FUNKTIONEN
@@ -419,6 +453,38 @@ def run_simulation_with_radar_and_delta(*vals):
 
     return summary, warning, fig_radar, fig_delta, fig_res
 
+
+def generate_benchmark_interpretation(scores: dict):
+    """
+    scores = {
+        "DE": {"total":..., "macro":..., ...},
+        "US": {...},
+        ...
+    }
+    """
+    text = "Benchmark-Analyse:\n\n"
+
+    # Ranking
+    ranking = sorted(scores.items(), key=lambda x: x[1]["total"])
+    text += "Risikoranking (niedrig → hoch):\n"
+    for i, (land, sc) in enumerate(ranking, 1):
+        text += f"{i}. {land}: {sc['total']:.3f}\n"
+
+    # Unterschiede hervorheben
+    best = ranking[0][0]
+    worst = ranking[-1][0]
+
+    text += f"\nNiedrigstes Risiko: {best}\n"
+    text += f"Höchstes Risiko: {worst}\n"
+
+    # Dimensionale Analyse
+    text += "\nDimensionale Unterschiede:\n"
+    dims = ["macro", "geo", "governance", "finanz", "sozial"]
+    for d in dims:
+        sorted_dim = sorted(scores.items(), key=lambda x: x[1][d])
+        text += f"- {d.capitalize()}: Bestes Land = {sorted_dim[0][0]}, Schwächstes Land = {sorted_dim[-1][0]}\n"
+
+    return text
 
 # ============================================================
 # UI – HAUPTANWENDUNG
@@ -650,7 +716,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
 
         
         # ----------------------------------------------------
-        # TAB — DASHBOARD
+        # TAB 6 — DASHBOARD
         # ----------------------------------------------------
         with gr.Tab("Dashboard"):
 
@@ -739,8 +805,94 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 gr.Markdown(f"```\n{dashboard_text}\n```")
    
         
+
         # ----------------------------------------------------
-        # TAB 6 — METHODIK
+        # TAB 7 — BENCHMARKING
+        # ----------------------------------------------------
+        with gr.Tab("Benchmarking"):
+
+            gr.Markdown("### Länder-Benchmarking: Vergleich mehrerer Länder")
+
+            # Auswahl
+            bench_main = gr.Dropdown(
+                choices=list(presets.keys()),
+                label="Hauptland",
+                value=list(presets.keys())[0],
+            )
+
+            bench_compare = gr.Dropdown(
+                choices=list(presets.keys()),
+                label="Vergleichsländer",
+                multiselect=True,
+                value=["US", "CN"],
+            )
+
+            bench_button = gr.Button("Benchmark starten")
+
+            # Outputs
+            bench_multi_radar = gr.Plot()
+            bench_heatmap = gr.Dataframe(
+                headers=["Land", "Makro", "Geo", "Governance", "Finanz", "Sozial", "Total"],
+                wrap=True,
+            )
+            bench_ranking = gr.Dataframe(   
+                headers=["Rang", "Land", "Risiko"],
+                wrap=True,
+            )
+            bench_interpret = gr.Textbox(label="Automatische Benchmark-Interpretation", lines=12)
+
+            # Benchmark-Funktion
+            def ui_benchmark(main, compare):
+                if main not in presets:
+                    return None, None, None, "Ungültiges Hauptland."
+
+                countries = [main] + compare
+
+                # Risiko-Scores berechnen
+                score_dict = {}
+                for c in countries:
+                    params = presets[c]
+                    score_dict[c] = compute_risk_scores(params)
+
+                # Multi-Radar
+                fig = plot_multi_radar(score_dict)
+
+                # Mini-Heatmap
+                heat_rows = []
+                for c, sc in score_dict.items():
+                    heat_rows.append([
+                        c,
+                        sc["macro"],
+                        sc["geo"],
+                        sc["governance"],
+                        sc["finanz"],
+                        sc["sozial"],
+                        sc["total"],
+                    ])
+
+                # Ranking
+                ranking = sorted(score_dict.items(), key=lambda x: x[1]["total"])
+                rank_rows = []
+                for i, (land, sc) in enumerate(ranking, 1):
+                    rank_rows.append([i, land, sc["total"]])
+
+                # Automatische Interpretation
+                interpretation = generate_benchmark_interpretation(score_dict)
+
+                return fig, heat_rows, rank_rows, interpretation
+
+            bench_button.click(
+                fn=ui_benchmark,
+                inputs=[bench_main, bench_compare],
+                outputs=[bench_multi_radar, bench_heatmap, bench_ranking, bench_interpret],
+            )
+
+            # Externe Interpretation
+            with gr.Accordion("Interpretation des Benchmarkings", open=False):
+                gr.Markdown(f"```\n{benchmarking_text}\n```")
+
+        # ----------------------------------------------------
+        # TAB 8 — METHODIK
         # ----------------------------------------------------
         with gr.Tab("Methodik"):
             gr.Markdown("### Dokumentation der Risiko-Methodik")
