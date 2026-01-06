@@ -1,0 +1,21 @@
+# Interpretation: Sensitivitätsanalyse
+
+Die Sensitivitätsanalyse zeigt, welche Parameter das Gesamtrisiko eines Landes am stärksten beeinflussen. 
+Jeder Parameter wird einzeln leicht verändert, um seine Wirkung auf den Risiko-Score zu messen.
+
+Bedeutung:
+- Δ Risiko → Veränderung des Gesamt-Risikos bei kleiner Parameteränderung
+- Hohe Bedeutung → starker Einfluss auf das Risiko
+- Mittlere Bedeutung → relevanter Einfluss
+- Geringe Bedeutung → kaum Einfluss
+
+Interpretation:
+- Hohe Δ-Werte → zentrale Risikotreiber
+- Niedrige Δ-Werte → Parameter mit geringer Relevanz
+- Rote Farbe → Risiko steigt bei Parametererhöhung
+- Grüne Farbe → Risiko sinkt bei Parametererhöhung
+
+Nutzung:
+- Priorisierung politischer Maßnahmen
+- Identifikation der wichtigsten Stellhebel
+- Unterstützung bei Reformstrategien

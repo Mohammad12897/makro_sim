@@ -1,0 +1,25 @@
+# Interpretation: Prognose (Deterministisch & Monte-Carlo)
+
+Die Prognose zeigt, wie sich das Risiko eines Landes langfristig entwickeln könnte. 
+Es werden zwei Methoden verwendet:
+
+1. Deterministische Prognose:
+   - Parameter entwickeln sich nach festen Annahmen (z. B. Innovation steigt leicht, Verschuldung steigt moderat).
+   - Ergebnis: eine einzelne Risiko-Kurve.
+
+2. Monte-Carlo-Prognose:
+   - Parameter entwickeln sich zufällig innerhalb realistischer Schwankungsbreiten.
+   - Ergebnis: viele mögliche Risiko-Pfade.
+   - Der Median zeigt den typischen Verlauf.
+   - Das 5–95%-Band zeigt die Unsicherheit.
+
+Interpretation:
+- Steigende Kurve → Risiko nimmt langfristig zu
+- Fallende Kurve → Risiko sinkt
+- Breites Unsicherheitsband → hohe Unsicherheit über die Zukunft
+- Enges Band → stabile Entwicklung
+
+Nutzung:
+- Bewertung langfristiger Stabilität
+- Analyse von Reformbedarf
+- Risikoabschätzung unter Unsicherheit

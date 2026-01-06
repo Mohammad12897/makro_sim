@@ -1,0 +1,20 @@
+# Interpretation: Delta‑Radar (Veränderungen gegenüber Default)
+Das Delta‑Radar zeigt wie sich das Risikoprofil verändert, wenn Parameter angepasst oder Szenarien angewendet werden.
+
+Bedeutung:
+- Positive Werte (nach außen) → Risiko steigt
+- Negative Werte (nach innen) → Risiko sinkt
+- Null-Linie → keine Veränderung
+
+Interpretation:
+- Große Ausschläge → starke Veränderung
+- Breite Ausdehnung → systemische Risikoänderung
+- Einzelne Spitzen → gezielte Effekte (z. B. Governance‑Schock)
+- Symmetrisch → breit gestreute Veränderungen
+
+Grenzwerte:
+- < ±0.05 → vernachlässigbar
+- ±0.05–0.15 → spürbare Veränderung
+- ±0.15–0.30 → deutliche Veränderung
+- > ±0.30 → struktureller Risiko‑Shift
+

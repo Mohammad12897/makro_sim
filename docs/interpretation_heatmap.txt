@@ -1,0 +1,25 @@
+# Interpretation: Risiko-Heatmap nach Ländern
+
+Die Risiko-Heatmap zeigt die relative Risikolage verschiedener Länder über mehrere Dimensionen. 
+Jede Zelle ist farblich codiert und ermöglicht einen schnellen visuellen Vergleich.
+
+Achsen / Spalten:
+- Makro: Wachstum, Inflation, fiskalische Stabilität
+- Geo: geopolitische Risiken, Abhängigkeiten, Sanktionsrisiken
+- Governance: Institutionenqualität, Rechtsstaatlichkeit, Korruption
+- Total: Gesamt-Risiko-Score
+
+Interpretation:
+- Grün: niedriges Risiko
+- Gelb: moderates Risiko
+- Orange: erhöhtes Risiko
+- Rot: kritisches Risiko
+
+Nutzung:
+- Länder mit vielen roten/orangen Feldern weisen strukturelle Schwächen auf.
+- Länder mit überwiegend grünen Feldern gelten als stabil.
+- Unterschiede zwischen Makro, Geo und Governance zeigen, welche Faktoren das Risiko dominieren.
+- Der Total-Score fasst alle Dimensionen zusammen und dient als Gesamtindikator.
+
+Hinweis:
+Die Heatmap dient der schnellen Orientierung. Für detaillierte Analysen sollten Radar-Diagramme, Szenarien und Sensitivitätsanalysen hinzugezogen werden.

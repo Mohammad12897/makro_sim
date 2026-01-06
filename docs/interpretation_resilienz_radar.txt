@@ -1,0 +1,23 @@
+# Interpretation: Risiko‑vs‑Resilienz‑Radar
+Dieses Radar zeigt die Balance zwischen Risiko und Widerstandsfähigkeit eines Landes.
+
+Achsen:
+- Risiko → Gesamt‑Risiko‑Score
+- Resilienz → 1 − Risiko
+- Governance → institutionelle Stabilität
+- Finanz → finanzielle Puffer
+- Sozial → gesellschaftliche Kohäsion
+
+Interpretation:
+- Große Resilienz‑Fläche → hohe Schockrobustheit
+- Große Risiko‑Fläche → erhöhte Verwundbarkeit
+- Governance/Finanz/Sozial erklären die Resilienz
+- Ausgewogene Form → stabile Struktur
+- Asymmetrische Form → einzelne Schwachstellen
+
+Grenzwerte:
+- Risiko < 0.30 → sehr hohe Resilienz
+- 0.30–0.50 → ausgewogene Lage
+- 0.50–0.70 → erhöhte Verwundbarkeit
+- > 0.70 → kritische Lage
+

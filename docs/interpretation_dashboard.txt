@@ -1,0 +1,36 @@
+# Interpretation: Risiko-Dashboard
+
+Das Risiko-Dashboard bietet eine kompakte Gesamtübersicht über die Risikolage eines Landes. 
+Es kombiniert mehrere Analyseinstrumente, um sowohl den aktuellen Zustand als auch Trends, Veränderungen und strukturelle Schwachstellen sichtbar zu machen.
+
+Elemente des Dashboards:
+
+1. Gesamt-Risiko-Ampel:
+   - Zeigt den aktuellen Risiko-Score in einer Farbstufe (grün, gelb, orange, rot).
+   - Dient als schnelle Einschätzung der Gesamtlage.
+
+2. Status-Radar:
+   - Visualisiert die Risikostruktur über fünf Dimensionen: Makro, Geo, Governance, Finanz, Sozial.
+   - Zeigt, welche Bereiche stabil oder kritisch sind.
+
+3. Risiko-vs.-Resilienz-Radar:
+   - Stellt Risiko und Widerstandsfähigkeit gegenüber.
+   - Zeigt, ob ein Land Schocks gut absorbieren kann.
+
+4. Delta-Radar:
+   - Zeigt Veränderungen gegenüber dem Ausgangszustand.
+   - Macht sichtbar, welche Faktoren sich verschlechtert oder verbessert haben.
+
+5. Frühwarnindikatoren:
+   - Textbasierte Hinweise auf kritische Entwicklungen.
+   - Identifiziert Risikobereiche, die besondere Aufmerksamkeit erfordern.
+
+6. Mini-Prognose:
+   - Zeigt den erwarteten Risiko-Trend der nächsten Jahre.
+   - Unterstützt langfristige Einschätzungen.
+
+7. Mini-Heatmap:
+   - Vergleich mit anderen Ländern.
+   - Zeigt relative Stärken und Schwächen.
+
+Das Dashboard ermöglicht eine schnelle, umfassende und intuitive Einschätzung der Risikolage und unterstützt datenbasierte Entscheidungen.

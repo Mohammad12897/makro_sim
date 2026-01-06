@@ -1,0 +1,23 @@
+# Interpretation: Status‑Radar (Makro, Geo, Governance, Finanz, Sozial)
+Das Status‑Radar zeigt das aktuelle Risikoprofil eines Landes über fünf Dimensionen.
+Jede Achse liegt zwischen 0 = niedriges Risiko und 1 = hohes Risiko.
+
+Achsen:
+- Makro → Wachstum, Inflation, Haushaltslage
+- Geo → geopolitische Spannungen, Abhängigkeiten
+- Governance → Institutionen, Rechtsstaatlichkeit, Korruption
+- Finanz → Schulden, Liquidität, Bankenstabilität
+- Sozial → gesellschaftliche Stabilität
+
+Interpretation:
+- Kleine kompakte Fläche → geringes Risiko
+- Große ausgefranste Fläche → mehrere Risikotreiber erhöht
+- Einzelne Spitzen → spezifische Schwachstellen
+- Symmetrisch → breit verteilte Risiken
+- Asymmetrisch → einzelne dominante Faktoren
+
+Grenzwerte:
+- 0.00–0.30 → niedrig (grün)
+- 0.30–0.50 → moderat (gelb)
+- 0.50–0.70 → erhöht (orange)
+- > 0.70 → kritisch (rot)

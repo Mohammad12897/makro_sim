@@ -1,0 +1,21 @@
+# Interpretation: Szenario-Analyse
+
+Die Szenario-Engine zeigt, wie sich das Risikoprofil eines Landes verändert, wenn bestimmte Parameter gezielt verändert werden. 
+Ein Szenario kann makroökonomische, geopolitische oder Governance-bezogene Schocks simulieren.
+
+Bedeutung:
+- Positive Änderungen → Risiko steigt
+- Negative Änderungen → Risiko sinkt
+- Die Bedeutung (hoch/mittel/gering) zeigt, wie stark der Parameter das Gesamtrisiko beeinflusst.
+
+Interpretation:
+- Hohe Bedeutung + starke Änderung → struktureller Risikotreiber
+- Mittlere Bedeutung → relevante, aber nicht dominante Wirkung
+- Geringe Bedeutung → Parameter hat nur begrenzten Einfluss
+- Rote Farbe → Risiko steigt
+- Grüne Farbe → Risiko sinkt
+
+Nutzung:
+- Identifikation der wichtigsten Risikotreiber
+- Bewertung politischer oder wirtschaftlicher Maßnahmen
+- Simulation von Stressszenarien (z. B. Governance-Schock, Energiekrise, Finanzstress)

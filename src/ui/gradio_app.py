@@ -27,11 +27,8 @@ import numpy as np
 # PRESETS LADEN
 # ============================================================
 
-# ROOT = /content/makro_sim/src
-# presets liegen unter /content/makro_sim/presets/slider_presets.json
 PRESETS_FILENAME = ROOT.parent / "presets" / "slider_presets.json"
 
-# Default-Parameter (Fallback und Basis für Delta-Radar)
 default_params: Dict[str, float] = {
     "USD_Dominanz": 0.7,
     "RMB_Akzeptanz": 0.2,
@@ -94,11 +91,29 @@ presets = load_presets()
 EXPECTED_COUNTRIES = ["DE", "US", "IR", "CN", "FR", "IN", "BR", "GR", "GB"]
 
 # ============================================================
+# TEXTDATEIEN (Interpretationen) LADEN
+# ============================================================
+
+def load_textfile(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return "Textdatei konnte nicht geladen werden."
+
+
+status_radar_text = load_textfile(ROOT.parent / "docs" / "interpretation_status_radar.txt")
+delta_radar_text = load_textfile(ROOT.parent / "docs" / "interpretation_delta_radar.txt")
+resilienz_radar_text = load_textfile(ROOT.parent / "docs" / "interpretation_resilienz_radar.txt")
+heatmap_text = load_textfile(ROOT.parent / "docs" / "interpretation_heatmap.txt")
+szenario_text = load_textfile(ROOT.parent / "docs" / "interpretation_szenario.txt")
+sensitivitaet_text = load_textfile(ROOT.parent / "docs" / "interpretation_sensitivitaet.txt")
+prognose_text = load_textfile(ROOT.parent / "docs" / "interpretation_prognose.txt")
+
+# ============================================================
 # HILFSFUNKTIONEN FÜR DIE SIMULATION
 # ============================================================
 
 def _collect_params_from_values(vals: List[float]) -> Dict[str, float]:
-    """Mappt die Sliderwerte in ein Parameter-Dict."""
     params = {}
     for (key, _lo, _hi, _default), v in zip(PARAM_SLIDERS, vals):
         params[key] = float(v)
@@ -106,7 +121,6 @@ def _collect_params_from_values(vals: List[float]) -> Dict[str, float]:
 
 
 def build_early_warning(params: Dict[str, float], scores: Dict[str, float]) -> str:
-    """Einfache Frühwarnlogik basierend auf Parametern und Scores."""
     warnings = []
 
     total = scores.get("total", 0.0)
@@ -152,7 +166,6 @@ def build_early_warning(params: Dict[str, float], scores: Dict[str, float]) -> s
 # ============================================================
 
 def plot_radar(scores: Dict[str, float]):
-    """Status-Radar für: Makro, Geo, Governance, Finanz, Sozial."""
     labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
     values = [
         scores["macro"],
@@ -178,7 +191,6 @@ def plot_radar(scores: Dict[str, float]):
 
 
 def plot_delta_radar(scores_old: Dict[str, float], scores_new: Dict[str, float]):
-    """Delta-Radar zwischen Default und neuer Konstellation."""
     labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
 
     old_vals = [
@@ -215,7 +227,6 @@ def plot_delta_radar(scores_old: Dict[str, float], scores_new: Dict[str, float])
 
 
 def plot_resilience_radar(scores: Dict[str, float]):
-    """Radar für Risiko vs. Resilienz plus Governance/Finanz/Sozial."""
     labels = ["Risiko", "Resilienz", "Governance", "Finanz", "Sozial"]
     risk = scores["total"]
     resilience = max(0.0, min(1.0, 1.0 - risk))
@@ -248,7 +259,6 @@ def plot_resilience_radar(scores: Dict[str, float]):
 # ============================================================
 
 def forecast(params: Dict[str, float], years: int = 20) -> List[float]:
-    """Einfache deterministische Langfrist-Prognose des Risiko-Scores."""
     results = []
     current = params.copy()
 
@@ -269,7 +279,6 @@ def monte_carlo_forecast(
     years: int = 20,
     runs: int = 500,
 ) -> np.ndarray:
-    """Monte-Carlo-Prognose des Risiko-Scores über mehrere Pfade."""
     all_runs = []
     for _ in range(runs):
         current = params.copy()
@@ -296,7 +305,6 @@ def plot_forecast(values: List[float]):
 
 
 def plot_monte_carlo(mc_values: np.ndarray):
-    """Plot mit Median und Konfidenzband."""
     if mc_values.size == 0:
         fig, ax = plt.subplots()
         ax.text(0.5, 0.5, "Keine Daten", ha="center", va="center")
@@ -375,7 +383,6 @@ def ui_sensitivity(country_code):
 # ============================================================
 
 def load_country_preset(country_code: str) -> List[float]:
-    """Lädt die Preset-Werte eines Landes in Slider-Reihenfolge."""
     if country_code in presets:
         params = presets[country_code]
     else:
@@ -388,7 +395,6 @@ def load_country_preset(country_code: str) -> List[float]:
 
 
 def run_simulation_with_radar_and_delta(*vals):
-    """Simulation + Frühwarnung + Radar + Delta-Radar + Resilienz-Radar."""
     params = _collect_params_from_values(list(vals))
 
     scores_new = compute_risk_scores(params)
@@ -434,7 +440,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
 
             gr.Markdown("### Risiko-Simulation mit Frühwarnsystem und Radar-Ansichten")
 
-            # Länder-Auswahl für Presets
             country_dropdown = gr.Dropdown(
                 choices=[c for c in EXPECTED_COUNTRIES if c in presets.keys()],
                 label="Land (für Presets)",
@@ -468,24 +473,26 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                         )
                         slider_components.append(s)
 
-            # Outputs
             summary_text = gr.Textbox(label="Risiko-Zusammenfassung", lines=6)
             early_warning_box = gr.Textbox(label="Frühwarnindikatoren", lines=8)
+
             radar_plot = gr.Plot(label="Status-Radar")
             delta_radar_plot = gr.Plot(label="Delta-Radar")
             resilience_radar_plot = gr.Plot(label="Risiko vs. Resilienz")
 
-            # Button
+            with gr.Accordion("Interpretation der Radar-Diagramme", open=False):
+                gr.Markdown(f"```\n{status_radar_text}\n```")
+                gr.Markdown(f"```\n{delta_radar_text}\n```")
+                gr.Markdown(f"```\n{resilienz_radar_text}\n```")
+
             run_button = gr.Button("Simulation starten")
 
-            # Länderauswahl: lädt Preset-Werte in Slider
             country_dropdown.change(
                 fn=load_country_preset,
                 inputs=[country_dropdown],
                 outputs=slider_components,
             )
 
-            # Simulation mit Radar-Outputs
             run_button.click(
                 fn=run_simulation_with_radar_and_delta,
                 inputs=slider_components,
@@ -515,6 +522,10 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 wrap=True,
             )
 
+            with gr.Accordion("Interpretation der Radar-Diagramme", open=False):
+                gr.Markdown(f"```\n{heatmap_text}\n```")
+
+
             heat_button.click(
                 fn=ui_heatmap,
                 inputs=[],
@@ -531,7 +542,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 choices=list(presets.keys()),
                 label="Land",
             )
-
+               
             scen_input = gr.Textbox(
                 label="Schock (JSON)",
                 value='{"demokratie": -0.2}',
@@ -546,6 +557,9 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 wrap=True,
             )
 
+            with gr.Accordion("Interpretation der Szenario-Analyse", open=False):
+                gr.Markdown(f"```\n{szenario_text}\n```")
+ 
             scen_button.click(
                 fn=ui_scenario,
                 inputs=[scen_country, scen_input],
@@ -569,6 +583,9 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 headers=["Parameter", "Δ Risiko", "Bedeutung", "Farbe"],
                 wrap=True,
             )
+
+            with gr.Accordion("Interpretation der Sensitivitätsanalyse", open=False):
+                gr.Markdown(f"```\n{sensitivitaet_text}\n```")
 
             sens_button.click(
                 fn=ui_sensitivity,
@@ -621,6 +638,9 @@ with gr.Blocks(title="Makro-Simulation") as demo:
 
                 return fig_det, fig_mc
 
+            with gr.Accordion("Interpretation der Prognose", open=False):
+                gr.Markdown(f"```\n{prognose_text}\n```")
+
             prog_button.click(
                 fn=ui_forecast,
                 inputs=[prog_country, prog_years, prog_runs],
@@ -659,19 +679,10 @@ except Exception:
     lexikon_erweitert_markdown = "Lexikon konnte nicht geladen werden."
 
 
-# ============================================================
-# EXPORTIERTE VARIABLEN
-# ============================================================
-
 __all__ = [
     "demo",
     "lexikon_erweitert_markdown",
 ]
-
-
-# ============================================================
-# HAUPTPROGRAMM
-# ============================================================
 
 if __name__ == "__main__":
     demo.launch()
