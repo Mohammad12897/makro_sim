@@ -108,6 +108,7 @@ heatmap_text = load_textfile(ROOT.parent / "docs" / "interpretation_heatmap.txt"
 szenario_text = load_textfile(ROOT.parent / "docs" / "interpretation_szenario.txt")
 sensitivitaet_text = load_textfile(ROOT.parent / "docs" / "interpretation_sensitivitaet.txt")
 prognose_text = load_textfile(ROOT.parent / "docs" / "interpretation_prognose.txt")
+dashboard_text = load_textfile(ROOT.parent / "docs" / "interpretation_dashboard.txt")
 
 # ============================================================
 # HILFSFUNKTIONEN FÜR DIE SIMULATION
@@ -647,6 +648,97 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 outputs=[prog_plot_det, prog_plot_mc],
             )
 
+        
+        # ----------------------------------------------------
+        # TAB — DASHBOARD
+        # ----------------------------------------------------
+        with gr.Tab("Dashboard"):
+
+            gr.Markdown("### Gesamtüberblick: Risiko-Dashboard")
+
+            # Land auswählen
+            dash_country = gr.Dropdown(
+                choices=list(presets.keys()),
+                label="Land",
+                value=list(presets.keys())[0],
+            )
+
+            # Outputs
+            dash_risk_ampel = gr.Markdown()
+            dash_radar = gr.Plot()
+            dash_resilience = gr.Plot()
+            dash_delta = gr.Plot()
+            dash_warning = gr.Markdown()
+            dash_forecast = gr.Plot()
+            dash_heatmap = gr.Dataframe(
+                headers=["Land", "Makro", "Makro-Farbe", "Geo", "Geo-Farbe", "Gov", "Gov-Farbe", "Total", "Total-Farbe"],
+                wrap=True,
+            )
+
+            # Dashboard-Funktion
+            def ui_dashboard(country):
+                params = presets[country]
+                scores = compute_risk_scores(params)
+                default_scores = compute_risk_scores(default_params)
+
+                # Ampel
+                cat = risk_category(scores["total"])
+                ampel = f"### Risiko-Ampel: **{scores['total']:.3f} ({cat})**"
+
+                # Plots
+                fig_radar = plot_radar(scores)
+                fig_res = plot_resilience_radar(scores)
+                fig_delta = plot_delta_radar(default_scores, scores)
+
+                # Frühwarnsystem
+                warn = build_early_warning(params, scores)
+                warn_md = "### Frühwarnindikatoren\n" + warn.replace("-", "•")
+
+                # Mini-Prognose
+                values = forecast(params, years=10)
+                fig_forecast = plot_forecast(values)
+
+                # Mini-Heatmap
+                table = risk_heatmap(presets)
+                rows = []
+                for row in table:
+                    rows.append([
+                    row["land"],
+                    row["macro"], row["macro_color"],
+                    row["geo"], row["geo_color"],
+                    row["gov"], row["gov_color"],
+                    row["total"], row["total_color"],
+                ])
+
+                return (
+                    ampel,
+                    fig_radar,
+                    fig_res,
+                    fig_delta,
+                    warn_md,
+                    fig_forecast,
+                    rows,
+                )
+
+            dash_country.change(
+                fn=ui_dashboard,
+                inputs=[dash_country],
+                outputs=[
+                    dash_risk_ampel,
+                    dash_radar,
+                    dash_resilience,
+                    dash_delta,
+                    dash_warning,
+                    dash_forecast,
+                    dash_heatmap,
+                ],
+            )
+
+            # Interpretation
+            with gr.Accordion("Interpretation des Dashboards", open=False):
+                gr.Markdown(f"```\n{dashboard_text}\n```")
+   
+        
         # ----------------------------------------------------
         # TAB 6 — METHODIK
         # ----------------------------------------------------
