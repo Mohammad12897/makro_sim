@@ -289,6 +289,54 @@ def plot_multi_radar(score_dict: dict):
 
     return fig
 
+
+def plot_handel_radar(params: dict):
+    labels = ["Export-Konzentration", "Import kritische Güter", "Partner-Konzentration"]
+    values = [
+        params.get("export_konzentration", 0.5),
+        params.get("import_kritische_gueter", 0.5),
+        params.get("partner_konzentration", 0.5),
+    ]
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+    values = np.concatenate((values, [values[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(angles, values, linewidth=2)
+    ax.fill(angles, values, alpha=0.25)
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.set_title("Handelsabhängigkeit")
+
+    return fig
+
+
+def handels_heatmap(presets: dict):
+    rows = []
+    for land, params in presets.items():
+        scores = compute_risk_scores(params)
+        rows.append([
+            land,
+            scores["handel"],
+        ])
+    return rows
+
+def compute_supply_chain_risk(p: dict) -> float:
+    chokepoint = p.get("chokepoint_abhaengigkeit", 0.5)
+    jit = p.get("just_in_time_anteil", 0.5)
+    konz = p.get("produktions_konzentration", 0.5)
+    puffer = p.get("lager_puffer", 0.5)
+
+    risk = (
+        0.35 * clamp01(chokepoint) +
+        0.30 * clamp01(jit) +
+        0.25 * clamp01(konz) +
+        0.10 * (1 - clamp01(puffer))
+    )
+    return clamp01(risk)
+
 # ============================================================
 # PROGNOSE-FUNKTIONEN
 # ============================================================
@@ -486,6 +534,7 @@ def generate_benchmark_interpretation(scores: dict):
 
     return text
 
+
 # ============================================================
 # UI – HAUPTANWENDUNG
 # ============================================================
@@ -609,7 +658,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 choices=list(presets.keys()),
                 label="Land",
             )
-               
+
             scen_input = gr.Textbox(
                 label="Schock (JSON)",
                 value='{"demokratie": -0.2}',
@@ -626,7 +675,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
 
             with gr.Accordion("Interpretation der Szenario-Analyse", open=False):
                 gr.Markdown(f"```\n{szenario_text}\n```")
- 
+
             scen_button.click(
                 fn=ui_scenario,
                 inputs=[scen_country, scen_input],
@@ -714,7 +763,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 outputs=[prog_plot_det, prog_plot_mc],
             )
 
-        
+
         # ----------------------------------------------------
         # TAB 6 — DASHBOARD
         # ----------------------------------------------------
@@ -739,6 +788,14 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             dash_heatmap = gr.Dataframe(
                 headers=["Land", "Makro", "Makro-Farbe", "Geo", "Geo-Farbe", "Gov", "Gov-Farbe", "Total", "Total-Farbe"],
                 wrap=True,
+                label="Risiko-Heatmap",
+            )
+
+            dash_handel_radar = gr.Plot(label="Handels-Radar")
+            dash_handel_heatmap = gr.Dataframe(
+                headers=["Land", "Handels-Risiko"],
+                wrap=True,
+                label="Handels-Heatmap",
             )
 
             # Dashboard-Funktion
@@ -748,7 +805,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 default_scores = compute_risk_scores(default_params)
 
                 # Ampel
-                cat = risk_category(scores["total"])
+                cat, color = risk_category(scores["total"])
                 ampel = f"### Risiko-Ampel: **{scores['total']:.3f} ({cat})**"
 
                 # Plots
@@ -764,17 +821,23 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 values = forecast(params, years=10)
                 fig_forecast = plot_forecast(values)
 
-                # Mini-Heatmap
+                # Risiko-Heatmap (bestehende Logik)
                 table = risk_heatmap(presets)
                 rows = []
                 for row in table:
                     rows.append([
-                    row["land"],
-                    row["macro"], row["macro_color"],
-                    row["geo"], row["geo_color"],
-                    row["gov"], row["gov_color"],
-                    row["total"], row["total_color"],
-                ])
+                        row["land"],
+                        row["macro"], row["macro_color"],
+                        row["geo"], row["geo_color"],
+                        row["gov"], row["gov_color"],
+                        row["total"], row["total_color"],
+                    ])
+
+                # Handels-Radar
+                fig_handel = plot_handel_radar(params)
+
+                # Handels-Heatmap
+                handel_rows = handels_heatmap(presets)
 
                 return (
                     ampel,
@@ -784,6 +847,8 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                     warn_md,
                     fig_forecast,
                     rows,
+                    fig_handel,
+                    handel_rows,
                 )
 
             dash_country.change(
@@ -797,14 +862,17 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                     dash_warning,
                     dash_forecast,
                     dash_heatmap,
+                    dash_handel_radar,
+                    dash_handel_heatmap,
                 ],
             )
 
             # Interpretation
             with gr.Accordion("Interpretation des Dashboards", open=False):
                 gr.Markdown(f"```\n{dashboard_text}\n```")
-   
-        
+
+
+
 
         # ----------------------------------------------------
         # TAB 7 — BENCHMARKING
@@ -835,7 +903,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 headers=["Land", "Makro", "Geo", "Governance", "Finanz", "Sozial", "Total"],
                 wrap=True,
             )
-            bench_ranking = gr.Dataframe(   
+            bench_ranking = gr.Dataframe(
                 headers=["Rang", "Land", "Risiko"],
                 wrap=True,
             )

@@ -60,9 +60,9 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
     )
 
     # 4) HANDELS-RISIKO (neu)
-    export_konz = p.get("export_konzentration", 0.5)      # 0–1
-    import_krit = p.get("import_kritische_gueter", 0.5)   # 0–1
-    partner_konz = p.get("partner_konzentration", 0.5)    # 0–1
+    export_konz = p.get("export_konzentration", 0.5)
+    import_krit = p.get("import_kritische_gueter", 0.5)
+    partner_konz = p.get("partner_konzentration", 0.5)
 
     handel = (
         0.4 * clamp01(export_konz) +
