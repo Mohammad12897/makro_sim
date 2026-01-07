@@ -78,7 +78,7 @@ Grenzwerte:
 
 Interpretation: Risiko-Heatmap nach Ländern
 
-Die Risiko-Heatmap zeigt die relative Risikolage verschiedener Länder über mehrere Dimensionen. 
+Die Risiko-Heatmap zeigt die relative Risikolage verschiedener Länder über mehrere Dimensionen.
 Jede Zelle ist farblich codiert und ermöglicht einen schnellen visuellen Vergleich.
 
 Achsen / Spalten:
@@ -106,7 +106,7 @@ Die Heatmap dient der schnellen Orientierung. Für detaillierte Analysen sollten
 
 Interpretation: Szenario-Analyse
 
-Die Szenario-Engine zeigt, wie sich das Risikoprofil eines Landes verändert, wenn bestimmte Parameter gezielt verändert werden. 
+Die Szenario-Engine zeigt, wie sich das Risikoprofil eines Landes verändert, wenn bestimmte Parameter gezielt verändert werden.
 Ein Szenario kann makroökonomische, geopolitische oder Governance-bezogene Schocks simulieren.
 
 Bedeutung:
@@ -130,7 +130,7 @@ Nutzung:
 
 Interpretation: Sensitivitätsanalyse
 
-Die Sensitivitätsanalyse zeigt, welche Parameter das Gesamtrisiko eines Landes am stärksten beeinflussen. 
+Die Sensitivitätsanalyse zeigt, welche Parameter das Gesamtrisiko eines Landes am stärksten beeinflussen.
 Jeder Parameter wird einzeln leicht verändert, um seine Wirkung auf den Risiko-Score zu messen.
 
 Bedeutung:
@@ -154,7 +154,7 @@ Nutzung:
 
 Interpretation: Prognose (Deterministisch & Monte-Carlo)
 
-Die Prognose zeigt, wie sich das Risiko eines Landes langfristig entwickeln könnte. 
+Die Prognose zeigt, wie sich das Risiko eines Landes langfristig entwickeln könnte.
 Es werden zwei Methoden verwendet:
 
 1. Deterministische Prognose:
@@ -182,7 +182,7 @@ Nutzung:
 
 Interpretation: Risiko-Dashboard
 
-Das Risiko-Dashboard bietet eine kompakte Gesamtübersicht über die Risikolage eines Landes. 
+Das Risiko-Dashboard bietet eine kompakte Gesamtübersicht über die Risikolage eines Landes.
 Es kombiniert mehrere Analyseinstrumente, um sowohl den aktuellen Zustand als auch Trends, Veränderungen und strukturelle Schwachstellen sichtbar zu machen.
 
 Elemente des Dashboards:
@@ -221,7 +221,7 @@ Das Dashboard ermöglicht eine schnelle, umfassende und intuitive Einschätzung 
 
 Interpretation: Länder-Benchmarking
 
-Das Benchmarking-Modul ermöglicht den strukturierten Vergleich eines Landes mit mehreren anderen Ländern. 
+Das Benchmarking-Modul ermöglicht den strukturierten Vergleich eines Landes mit mehreren anderen Ländern.
 Es kombiniert Radar-Diagramme, Heatmaps, Rankings und automatische Textinterpretationen, um Unterschiede und Gemeinsamkeiten sichtbar zu machen.
 
 Elemente des Benchmarkings:
@@ -266,7 +266,7 @@ Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht
 | **verschuldung** | **> 1.0 (UI Skala)** | Sehr hohe Verschuldung erhöht fiskalische Verwundbarkeit | Konsolidierung, externe Finanzierung prüfen |
 | **demokratie** | **< 0.3** | Geringe Rechenschaft → erhöhtes politisches Risiko | Governance Maßnahmen und Transparenz stärken |
 
-### A) Makro‑Risiko
+### A) Makro‑Risiko (40%)
 - **Verschuldung**
 - **Inflation**
 - **FX‑Schockempfindlichkeit**
@@ -276,7 +276,8 @@ Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht
 - **0.3 * (fx_norm) +**
 - **0.2 * (reserven_norm_log)**
 
-### B) Geopolitisches Risiko
+
+### B) Geopolitisches Risiko (35%)
 - **USD‑Dominanz**
 - **Sanktions‑Exposure**
 - **Alternativnetz‑Abdeckung (invertiert)**
@@ -285,7 +286,7 @@ Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht
 - **0.4 * sanktions_norm +**
 - **0.2 * (1 - alternativnetz_norm)^1.5**
 
-### C) Governance‑Risiko
+### C) Governance‑Risiko (25%)
 - **Demokratie (invertiert und stärker gewichtet)**
 - **Korruption (stark gewichtet)**
 - **Innovation (linear)**
@@ -296,7 +297,7 @@ Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht
 - **0.15 * (1 - innovation) +**
 - **0.10 * (1 - fachkraefte)**
 
-### Gesamt‑Risiko: 0.5 * risk_macro(p) + 0.3 * risk_geo(p) + 0.2 * risk_governance(p)
+### Gesamt‑Risiko: 0.4 * risk_macro(p) + 0.3 * risk_geo(p) + 0.2 * risk_governance(p)
 
 ### finanz = gewicht1 * verschuldung
        + gewicht2 * FX_Schockempfindlichkeit
@@ -310,6 +311,14 @@ Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht
 - **0.5 – 0.7 → erhöht**
 - **> 0.7 → kritisch**
 
+### Finanz
+- **Verwendet nur:**
+- **verschuldung**
+- **FX_Schockempfindlichkeit**
+- **\mathrm{finanz}=\min \left( 1,\  rac{\mathrm{verschuldung}}{2}+rac{\mathrm{FX\_ Schockempfindlichkeit}}{2}ight)** 
+- **Alles andere in den Presets (RMB, Zugangsresilienz, CBDC, Gold, etc.) hat keinen Einfluss auf finanz**
+
+
 ### sozial = gewicht1 * korruption
        + gewicht2 * instabilitaet
        - gewicht3 * demokratie
@@ -322,7 +331,25 @@ Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht
 - **0.5 – 0.7 → erhöhte Risiken**
 - **> 0.7 → kritische Lage**
 
+### Sozial
+- **Verwendet nur:**
+- **fachkraefte**
+- **demokratie**
+- **\mathrm{sozial}=\min \left( 1,\  0.5\cdot (1-\mathrm{fachkraefte})+0.5\cdot (1-\mathrm{demokratie})ight)** 
+- **Auch hier: Energie, Stabilität, Korruption etc. gehen nicht in sozial ein.**
+
 ### Ranking: Makro‑Risiko + Geopolitisches Risiko + Governance‑Risiko + finanz + sozial
+
+### Ranking
+- **Für jedes Land:**
+- **es werden die Preset‑Parameter geladen (presets["DE"], presets["US"], …)**
+- **daraus wird scores = compute_risk_scores(params) berechnet**
+- **das Ranking sortiert dann nach scores["total"]:**
+- **\mathrm{total}=0.40\cdot \mathrm{macro}+0.35\cdot \mathrm{geo}+0.25\cdot \mathrm{gov}**
+- **Länder mit niedrigerem total → besserer Rang.**
+
+
+
 
 ### Farbliche Markierung (kritisch / warnend / stabil)
 | **Score** | **Kategorie** | **Farbe** |
