@@ -283,6 +283,13 @@ geopolitische Stabilität beeinflusst. Sie ermöglicht eine präzisere Bewertung
 in Risikoanalyse, Szenarioplanung und strategischer Politikgestaltung.
 
 
+### Finanzielle Abhängigkeit beschreibt die strukturelle Verwundbarkeit eines Landes gegenüber externen Kapitalquellen, 
+internationalen Finanzmärkten und Fremdwährungsrisiken.
+
+Hohe Auslandsverschuldung, starke Kapitalmarktintegration, ein hoher Anteil ausländischer Investoren oder Refinanzierung in Fremdwährung 
+erhöhen das Risiko von Kapitalabflüssen, Zinsanstiegen und Währungsschocks. Länder mit hoher finanzieller Abhängigkeit sind besonders anfällig 
+für globale Finanzkrisen, Vertrauensverluste und externe Schocks.
+
 
 ### Kritische Werte und Hinweise
 

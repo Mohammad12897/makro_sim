@@ -111,6 +111,7 @@ prognose_text = load_textfile(ROOT.parent / "docs" / "interpretation_prognose.tx
 dashboard_text = load_textfile(ROOT.parent / "docs" / "interpretation_dashboard.txt")
 benchmarking_text = load_textfile(ROOT.parent / "docs" / "interpretation_benchmarking.txt")
 handel_lieferketten_text = load_textfile(ROOT.parent / "docs" / "interpretation_handel_lieferketten.txt")
+finanzielle_abhaengigkeit_text = load_textfile(ROOT.parent / "docs" / "interpretation_finanzielle_abhaengigkeit.txt") 
 
 # ============================================================
 # HILFSFUNKTIONEN FÜR DIE SIMULATION
@@ -121,7 +122,6 @@ def _collect_params_from_values(vals: List[float]) -> Dict[str, float]:
     for (key, _lo, _hi, _default), v in zip(PARAM_SLIDERS, vals):
         params[key] = float(v)
     return params
-
 
 def build_early_warning(params: Dict[str, float], scores: Dict[str, float]) -> str:
     warnings = []
@@ -192,6 +192,79 @@ def build_trade_supply_early_warning(params: dict, scores: dict) -> str:
         return "### Frühwarnsystem Handel & Lieferketten\n\n- Aktuell keine akuten Frühwarnsignale erkannt."
 
     return "### Frühwarnsystem Handel & Lieferketten\n\n" + "\n".join(f"- {l}" for l in lines)
+
+def build_financial_early_warning(params: dict, scores: dict) -> str:
+    lines = []
+
+    if scores["financial"] > 0.7:
+        lines.append("Kritische finanzielle Abhängigkeit: hohe Auslandsverschuldung oder starke Kapitalmarktbindung.")
+    elif scores["financial"] > 0.5:
+        lines.append("Erhöhte finanzielle Abhängigkeit: Kapitalabflüsse oder Zinsanstiege könnten Risiken auslösen.")
+
+    if params.get("auslandsverschuldung", 0.5) > 0.7:
+        lines.append("Warnsignal: sehr hohe Auslandsverschuldung.")
+    if params.get("kapitalmarkt_abhaengigkeit", 0.5) > 0.7:
+        lines.append("Warnsignal: starke Abhängigkeit von internationalen Kapitalmärkten.")
+    if params.get("investoren_anteil", 0.5) > 0.7:
+        lines.append("Warnsignal: hoher Anteil ausländischer Investoren.")
+    if params.get("fremdwaehrungs_refinanzierung", 0.5) > 0.7:
+        lines.append("Warnsignal: hohe Refinanzierung in Fremdwährung – anfällig für FX-Schocks.")
+
+    if not lines:
+        return "### Frühwarnsystem Finanzielle Abhängigkeit\n\n- Keine akuten Warnsignale."
+
+    return "### Frühwarnsystem Finanzielle Abhängigkeit\n\n" + "\n".join(f"- {l}" for l in lines)
+
+
+def score_to_traffic_light(score: float) -> str:
+    if score < 0.33:
+        return "🟢"
+    elif score < 0.66:
+        return "🟡"
+    return "🔴"
+
+
+def build_early_warning_dashboard(params: Dict[str, float], scores: Dict[str, float]) -> str:
+    lines = []
+    lines.append("## Frühwarn-Dashboard\n")
+
+    lines.append(f"{score_to_traffic_light(scores['macro'])} Makro-Risiko: {scores['macro']:.2f}")
+    lines.append(f"{score_to_traffic_light(scores['geo'])} Geo-Risiko: {scores['geo']:.2f}")
+    lines.append(f"{score_to_traffic_light(scores['governance'])} Governance-Risiko: {scores['governance']:.2f}")
+    lines.append(f"{score_to_traffic_light(scores['handel'])} Handels-Risiko: {scores['handel']:.2f}")
+    lines.append(f"{score_to_traffic_light(scores['supply_chain'])} Lieferketten-Risiko: {scores['supply_chain']:.2f}")
+    lines.append(f"{score_to_traffic_light(scores['financial'])} Finanzielle Abhängigkeit: {scores['financial']:.2f}")
+    lines.append("")
+
+    if scores["macro"] > 0.66:
+        lines.append("- Makro: Kritische Verwundbarkeit – Verschuldung/FX/Reserven prüfen.")
+    elif scores["macro"] > 0.5:
+        lines.append("- Makro: Erhöhte Risiken – Puffer und Refinanzierung beobachten.")
+
+    if scores["geo"] > 0.66:
+        lines.append("- Geo: Hohe geopolitische Spannungen oder Sanktionsrisiken.")
+    elif scores["geo"] > 0.5:
+        lines.append("- Geo: Relevante Abhängigkeiten von USD oder kritischen Partnern.")
+
+    if scores["governance"] > 0.66:
+        lines.append("- Governance: Schwache Institutionen, Korruption oder Fachkräftemangel.")
+    elif scores["governance"] > 0.5:
+        lines.append("- Governance: Gemischtes Bild – Reformbedarf prüfen.")
+
+    if scores["handel"] > 0.66 or scores["supply_chain"] > 0.66:
+        lines.append("- Handel/Lieferketten: Kritische Abhängigkeiten oder fragile Strukturen.")
+    elif scores["handel"] > 0.5 or scores["supply_chain"] > 0.5:
+        lines.append("- Handel/Lieferketten: Diversifizierung und Puffer ausbauen.")
+
+    if scores["financial"] > 0.66:
+        lines.append("- Finanzen: Hohe externe Abhängigkeit – Kapitalabflüsse/Zinsanstiege kritisch.")
+    elif scores["financial"] > 0.5:
+        lines.append("- Finanzen: Erhöhte externe Verwundbarkeit – Monitoring verstärken.")
+
+    if len(lines) == 2:
+        lines.append("- Aktuell keine markanten Frühwarnsignale.")
+
+    return "\n".join(lines)
 
 # ============================================================
 # RADAR-FUNKTIONEN
@@ -397,6 +470,71 @@ def plot_abhaengigkeiten_radar(params: dict):
     ax.set_title("Abhängigkeiten-Radar")
     return fig
 
+def plot_finanz_radar(params: dict):
+    labels = [
+        "Auslandsverschuldung",
+        "Kapitalmarkt-Abhängigkeit",
+        "Investorenanteil",
+        "Fremdwährungs-Refinanzierung"
+    ]
+
+    values = [
+        params.get("auslandsverschuldung", 0.5),
+        params.get("kapitalmarkt_abhaengigkeit", 0.5),
+        params.get("investoren_anteil", 0.5),
+        params.get("fremdwaehrungs_refinanzierung", 0.5),
+    ]
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+    values = np.concatenate((values, [values[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(angles, values, linewidth=2, color="blue")
+    ax.fill(angles, values, alpha=0.25, color="blue")
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.set_title("Finanzielle Abhängigkeit")
+    return fig
+
+def compute_abhaengigkeiten_block_score(scores: dict) -> float:
+    # Einfacher Block: Mittelwert der drei Abhängigkeitsdimensionen
+    return (
+        scores["handel"] +
+        scores["supply_chain"] +
+        scores["financial"]
+    ) / 3.0
+
+
+def plot_systemrisiko_radar(params: dict):
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    scores = compute_risk_scores(params)
+
+    macro = scores["macro"]
+    geo = scores["geo"]
+    gov = scores["governance"]
+    abhaeng = compute_abhaengigkeiten_block_score(scores)
+
+    labels = ["Makro", "Geo", "Governance", "Abhängigkeiten"]
+    values = [macro, geo, gov, abhaeng]
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+    values = np.concatenate((values, [values[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(angles, values, linewidth=2, color="darkred")
+    ax.fill(angles, values, alpha=0.25, color="darkred")
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.set_title("Systemrisiko-Radar")
+    return fig
+
+
 def build_trade_supply_feature_matrix(presets: dict):
     countries = []
     X = []
@@ -414,6 +552,54 @@ def build_trade_supply_feature_matrix(presets: dict):
         X.append(vec)
     return countries, X
 
+def build_trade_supply_financial_matrix(presets: dict):
+    countries = []
+    X = []
+    for land, p in presets.items():
+        vec = [
+            p.get("export_konzentration", 0.5),
+            p.get("import_kritische_gueter", 0.5),
+            p.get("partner_konzentration", 0.5),
+
+            p.get("chokepoint_abhaengigkeit", 0.5),
+            p.get("just_in_time_anteil", 0.5),
+            p.get("produktions_konzentration", 0.5),
+            1 - p.get("lager_puffer", 0.5),
+
+            p.get("auslandsverschuldung", 0.5),
+            p.get("kapitalmarkt_abhaengigkeit", 0.5),
+            p.get("investoren_anteil", 0.5),
+            p.get("fremdwaehrungs_refinanzierung", 0.5),
+        ]
+        countries.append(land)
+        X.append(vec)
+    return countries, X
+
+def cluster_trade_supply_financial(presets: dict):
+    import numpy as np
+
+    countries, X = build_trade_supply_financial_matrix(presets)
+    X = np.array(X)
+
+    # Initiale Clusterzentren (heuristisch)
+    centers = np.array([
+        X.mean(axis=0) - 0.15,
+        X.mean(axis=0),
+        X.mean(axis=0) + 0.15,
+    ])
+
+    # 5 Iterationen
+    for _ in range(5):
+        dists = np.linalg.norm(X[:, None, :] - centers[None, :, :], axis=2)
+        labels = np.argmin(dists, axis=1)
+
+        for k in range(3):
+            if np.any(labels == k):
+                centers[k] = X[labels == k].mean(axis=0)
+
+    return countries, labels
+
+
 def handels_heatmap(presets: dict):
     rows = []
     for land, params in presets.items():
@@ -427,6 +613,18 @@ def supply_chain_heatmap(presets: dict):
     for land, params in presets.items():
         scores = compute_risk_scores(params)
         rows.append([land, scores["supply_chain"]])
+    return rows
+
+def abhaengigkeiten_heatmap(presets: dict):
+    rows = []
+    for land, params in presets.items():
+        scores = compute_risk_scores(params)
+        rows.append([
+            land,
+            scores["handel"],
+            scores["supply_chain"],
+            scores["financial"],
+        ])
     return rows
 
 # ============================================================
@@ -658,6 +856,7 @@ def interpret_country_full(name: str, params: dict, scores: dict) -> str:
     lines.append(f"- Governance-Risiko: **{scores['governance']:.3f}**")
     lines.append(f"- Handels-Risiko: **{scores['handel']:.3f}**")
     lines.append(f"- Lieferketten-Risiko: **{scores['supply_chain']:.3f}**")
+    lines.append(f"- Finanzielle Abhängigkeit: **{scores['financial']:.3f}**\n")
     lines.append("")
 
     # Makro
@@ -684,7 +883,7 @@ def interpret_country_full(name: str, params: dict, scores: dict) -> str:
     else:
         lines.append("• Governance: **stark** – gute Institutionen, Innovationskraft und Fachkräftebasis.")
 
-    # Handel & Lieferketten
+    # Handel 
     if scores["handel"] > 0.66:
         lines.append("• Handel: **hohe Abhängigkeit** – starke Konzentration bei Exporten, Importen oder Partnern.")
     elif scores["handel"] > 0.33:
@@ -692,6 +891,7 @@ def interpret_country_full(name: str, params: dict, scores: dict) -> str:
     else:
         lines.append("• Handel: **gut diversifiziert** – begrenzte strukturelle Abhängigkeiten.")
 
+    # Lieferketten
     if scores["supply_chain"] > 0.66:
         lines.append("• Lieferketten: **fragil** – hohe Abhängigkeit von Chokepoints, Just-in-Time und konzentrierter Produktion.")
     elif scores["supply_chain"] > 0.33:
@@ -699,7 +899,24 @@ def interpret_country_full(name: str, params: dict, scores: dict) -> str:
     else:
         lines.append("• Lieferketten: **robust** – Puffer, Diversifizierung und resiliente Logistikstrukturen.")
 
+    # Finanzen
+    if scores["financial"] > 0.66:
+        lines.append("• Finanzielle Abhängigkeit: **hoch** – starke Kapitalmarktbindung oder FX-Refinanzierung.")
+    elif scores["financial"] > 0.33:
+        lines.append("• Finanzielle Abhängigkeit: **moderat**.")
+    else:
+        lines.append("• Finanzielle Abhängigkeit: **gering** – stabile Finanzierungsbasis.")
+    
     return "\n".join(lines)
+
+
+def interpret_cluster(label: int) -> str:
+    if label == 0:
+        return "Cluster 0: Hohe Abhängigkeiten – fragil, konzentriert, störungsanfällig."
+    elif label == 1:
+        return "Cluster 1: Mittlere Abhängigkeiten – teilweise diversifiziert, moderat robust."
+    else:
+        return "Cluster 2: Niedrige Abhängigkeiten – diversifiziert, resilient, stabile Strukturen."
 
 # ============================================================
 # UI – HAUPTANWENDUNG
@@ -964,6 +1181,24 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 label="Handels-Heatmap",
             )
 
+            # Systemrisiko-Radar (optional separat)
+            sys_country = gr.Dropdown(
+                choices=list(presets.keys()),
+                label="Land (Systemrisiko-Radar)",
+                value=list(presets.keys())[0],
+            )
+            sys_radar = gr.Plot(label="Systemrisiko-Radar")
+
+            def ui_system_radar(country):
+                params = presets[country]
+                return plot_systemrisiko_radar(params)
+
+            sys_country.change(
+                fn=ui_system_radar,
+                inputs=[sys_country],
+                outputs=[sys_radar],
+            )
+
             # Dashboard-Funktion
             def ui_dashboard(country):
                 params = presets[country]
@@ -980,7 +1215,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 fig_delta = plot_delta_radar(default_scores, scores)
 
                 # Frühwarnsystem
-                warn = build_early_warning(params, scores)
+                warn = build_early_warning_dashboard(params, scores)
                 warn_md = "### Frühwarnindikatoren\n" + warn.replace("-", "•")
 
                 # Mini-Prognose
@@ -1036,9 +1271,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             # Interpretation
             with gr.Accordion("Interpretation des Dashboards", open=False):
                 gr.Markdown(f"```\n{dashboard_text}\n```")
-
-
-
 
         # ----------------------------------------------------
         # TAB 7 — BENCHMARKING
@@ -1149,6 +1381,12 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 label="Handels-Heatmap",
             )
 
+            hls_abhaengigkeiten_heatmap = gr.Dataframe(
+                headers=["Land", "Handel", "Lieferkette", "Finanzen"],
+                wrap=True,
+                label="Abhängigkeiten-Heatmap",
+            )
+
             hls_supply_heatmap = gr.Dataframe(
                 headers=["Land", "Lieferketten-Risiko"],
                 wrap=True,
@@ -1167,6 +1405,8 @@ with gr.Blocks(title="Makro-Simulation") as demo:
 
                 heat_handel = handels_heatmap(presets)
                 heat_supply = supply_chain_heatmap(presets)
+                heat_abhaeng = abhaengigkeiten_heatmap(presets)
+
 
                 interpretation = interpret_handel_supply(params, scores)
                 warnings = build_trade_supply_early_warning(params, scores)
@@ -1177,6 +1417,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                     fig_abhaeng,
                     heat_handel,
                     heat_supply,
+                    heat_abhaeng,
                     interpretation + "\n\n" + warnings,
                 )
 
@@ -1190,6 +1431,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                     hls_abhaengigkeiten_radar,
                     hls_handel_heatmap,
                     hls_supply_heatmap,
+                    hls_abhaengigkeiten_heatmap,   # <-- NEU
                     hls_interpret,
                 ],
               
@@ -1203,53 +1445,53 @@ with gr.Blocks(title="Makro-Simulation") as demo:
         # TAB 9 — CLUSTERANALYSE
         # ----------------------------------------------------
         with gr.Tab("Clusteranalyse"):
-            gr.Markdown("### Clusteranalyse: Handels- & Lieferkettenprofile")
+            gr.Markdown("### Clusteranalyse: Handel + Lieferketten + Finanzen")
+
 
             cluster_button = gr.Button("Cluster berechnen")
             cluster_output = gr.Dataframe(
                 headers=["Land", "Cluster"],
-                label="Cluster-Ergebnisse"
+                label="Cluster-Ergebnisse",
+                wrap=True,
             )
 
             def ui_cluster():
-                countries, X = build_trade_supply_feature_matrix(presets)
+                countries, labels = cluster_trade_supply_financial(presets)
 
-                # Einfacher 3-Cluster-K-Means (ohne sklearn)
-                # Wir nehmen die Mittelwerte als Clusterzentren
-                import numpy as np
-                X = np.array(X)
-
-                # Initiale Clusterzentren (heuristisch)
-                centers = np.array([
-                    X.mean(axis=0) - 0.15,
-                    X.mean(axis=0),
-                    X.mean(axis=0) + 0.15,
-                ])
-
-                # 5 Iterationen
-                for _ in range(5):
-                    # Clusterzuweisung
-                    dists = np.linalg.norm(X[:, None, :] - centers[None, :, :], axis=2)
-                    labels = np.argmin(dists, axis=1)
-
-                    # Zentren aktualisieren
-                    for k in range(3):
-                        if np.any(labels == k):
-                            centers[k] = X[labels == k].mean(axis=0)
-
-                # Ergebnisliste
                 rows = []
                 for land, label in zip(countries, labels):
-                    rows.append([land, int(label)])
-
+                    rows.append([land, int(label), interpret_cluster(int(label))])
                 return rows
 
             cluster_button.click(
                 fn=ui_cluster,
                 inputs=[],
-                outputs=[cluster_output]
+                outputs=[cluster_output],
             )
 
+        # ----------------------------------------------------
+        # TAB Optional
+        # ----------------------------------------------------
+        with gr.Tab("Länderprofil"):
+
+            lp_country = gr.Dropdown(
+                choices=list(presets.keys()),
+                label="Land",
+                value=list(presets.keys())[0],
+            )
+
+            lp_output = gr.Markdown()
+
+            def ui_country_profile(country):
+                params = presets[country]
+                scores = compute_risk_scores(params)
+                return interpret_country_full(country, params, scores)
+
+            lp_country.change(
+                fn=ui_country_profile,
+                inputs=[lp_country],
+                outputs=[lp_output],
+            )
 
         # ----------------------------------------------------
         # TAB 10 — METHODIK

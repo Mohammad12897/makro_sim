@@ -23,7 +23,11 @@
     "chokepoint_abhaengigkeit": 0.6,
     "just_in_time_anteil": 0.7,
     "produktions_konzentration": 0.5,
-    "lager_puffer": 0.4
+    "lager_puffer": 0.4,
+    "auslandsverschuldung": 0.6,
+    "kapitalmarkt_abhaengigkeit": 0.5,
+    "investoren_anteil": 0.5,
+    "fremdwaehrungs_refinanzierung": 0.6
   },
   "US": {
     "USD_Dominanz": 0.95,
@@ -49,7 +53,11 @@
     "chokepoint_abhaengigkeit": 0.4,
     "just_in_time_anteil": 0.6,
     "produktions_konzentration": 0.4,
-    "lager_puffer": 0.6
+    "lager_puffer": 0.6,
+    "auslandsverschuldung": 0.7,
+    "kapitalmarkt_abhaengigkeit": 0.8,
+    "investoren_anteil": 0.7,
+    "fremdwaehrungs_refinanzierung": 0.4
   },
   "CN": {
     "USD_Dominanz": 0.4,
@@ -75,7 +83,11 @@
     "chokepoint_abhaengigkeit": 0.8,
     "just_in_time_anteil": 0.5,
     "produktions_konzentration": 0.8,
-    "lager_puffer": 0.3
+    "lager_puffer": 0.3,
+    "auslandsverschuldung": 0.5,
+    "kapitalmarkt_abhaengigkeit": 0.6,
+    "investoren_anteil": 0.4,
+    "fremdwaehrungs_refinanzierung": 0.7
   },
   "IN": {
     "USD_Dominanz": 0.6,
@@ -101,7 +113,11 @@
     "chokepoint_abhaengigkeit": 0.7,
     "just_in_time_anteil": 0.4,
     "produktions_konzentration": 0.6,
-    "lager_puffer": 0.5
+    "lager_puffer": 0.5,
+    "auslandsverschuldung": 0.65,
+    "kapitalmarkt_abhaengigkeit": 0.55,
+    "investoren_anteil": 0.45,
+    "fremdwaehrungs_refinanzierung": 0.6
   },
   "IR": {
     "USD_Dominanz": 0.2,
@@ -127,7 +143,11 @@
     "chokepoint_abhaengigkeit": 0.9,
     "just_in_time_anteil": 0.3,
     "produktions_konzentration": 0.7,
-    "lager_puffer": 0.2
+    "lager_puffer": 0.2,
+    "auslandsverschuldung": 0.8,
+    "kapitalmarkt_abhaengigkeit": 0.3,
+    "investoren_anteil": 0.2,
+    "fremdwaehrungs_refinanzierung": 0.9
   },
   "BR": {
     "USD_Dominanz": 0.65,
@@ -153,7 +173,11 @@
     "chokepoint_abhaengigkeit": 0.6,
     "just_in_time_anteil": 0.5,
     "produktions_konzentration": 0.5,
-    "lager_puffer": 0.4
+    "lager_puffer": 0.4,
+    "auslandsverschuldung": 0.7,
+    "kapitalmarkt_abhaengigkeit": 0.6,
+    "investoren_anteil": 0.55,
+    "fremdwaehrungs_refinanzierung": 0.5
   },
   "FR": {
     "USD_Dominanz": 0.65,
@@ -179,7 +203,11 @@
     "chokepoint_abhaengigkeit": 0.5,
     "just_in_time_anteil": 0.6,
     "produktions_konzentration": 0.5,
-    "lager_puffer": 0.5
+    "lager_puffer": 0.5,
+    "auslandsverschuldung": 0.65,
+    "kapitalmarkt_abhaengigkeit": 0.6,
+    "investoren_anteil": 0.55,
+    "fremdwaehrungs_refinanzierung": 0.5
   },
   "GB": {
     "USD_Dominanz": 0.7,
@@ -205,7 +233,11 @@
     "chokepoint_abhaengigkeit": 0.6,
     "just_in_time_anteil": 0.7,
     "produktions_konzentration": 0.5,
-    "lager_puffer": 0.4 
+    "lager_puffer": 0.4,
+    "auslandsverschuldung": 0.7,
+    "kapitalmarkt_abhaengigkeit": 0.7,
+    "investoren_anteil": 0.6,
+    "fremdwaehrungs_refinanzierung": 0.5
   },
   "GR": {
     "USD_Dominanz": 0.65,
@@ -231,6 +263,10 @@
     "chokepoint_abhaengigkeit": 0.8,
     "just_in_time_anteil": 0.5,
     "produktions_konzentration": 0.6,
-    "lager_puffer": 0.3
+    "lager_puffer": 0.3,
+    "auslandsverschuldung": 0.8,
+    "kapitalmarkt_abhaengigkeit": 0.7,
+    "investoren_anteil": 0.6,
+    "fremdwaehrungs_refinanzierung": 0.7
   }
 }

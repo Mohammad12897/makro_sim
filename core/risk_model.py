@@ -30,8 +30,23 @@ def compute_supply_chain_risk(p: dict) -> float:
     return clamp01(risk)
 
 
+def compute_financial_dependency(p: dict) -> float:
+    ausland = p.get("auslandsverschuldung", 0.5)
+    kapital = p.get("kapitalmarkt_abhaengigkeit", 0.5)
+    invest = p.get("investoren_anteil", 0.5)
+    fx_refi = p.get("fremdwaehrungs_refinanzierung", 0.5)
+
+    risk = (
+        0.35 * clamp01(ausland) +
+        0.25 * clamp01(kapital) +
+        0.20 * clamp01(invest) +
+        0.20 * clamp01(fx_refi)
+    )
+    return clamp01(risk)
+
+
 def compute_risk_scores(p: dict) -> Dict[str, float]:
-    # 1) MAKRO-RISIKO (40 %)
+    # 1) MAKRO-RISIKO
     versch = p.get("verschuldung", 0.8)
     fx = p.get("FX_Schockempfindlichkeit", 0.8)
     res = p.get("Reserven_Monate", 6)
@@ -45,7 +60,7 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         0.2 * res_norm
     )
 
-    # 2) GEO-RISIKO (35 %)
+    # 2) GEO-RISIKO
     usd = p.get("USD_Dominanz", 0.7)
     sank = p.get("Sanktions_Exposure", 0.05)
     alt = p.get("Alternativnetz_Abdeckung", 0.5)
@@ -60,7 +75,7 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         0.2 * ((1 - alt_norm) ** 1.5)
     )
 
-    # 3) GOVERNANCE-RISIKO (25 %)
+    # 3) GOVERNANCE-RISIKO
     demo = p.get("demokratie", 0.8)
     innov = p.get("innovation", 0.6)
     fach = p.get("fachkraefte", 0.7)
@@ -73,7 +88,7 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         0.10 * (1 - clamp01(fach))
     )
 
-    # 4) HANDELS-RISIKO (neu)
+    # 4) HANDELS-RISIKO
     export_konz = p.get("export_konzentration", 0.5)
     import_krit = p.get("import_kritische_gueter", 0.5)
     partner_konz = p.get("partner_konzentration", 0.5)
@@ -84,32 +99,39 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         0.3 * clamp01(partner_konz)
     )
 
-    # 5) GESAMTRISIKO (Handel integriert)
+    # 5) Lieferketten-Risiko
+    supply_chain = compute_supply_chain_risk(p)
+
+    # 6) Finanzielle Abhängigkeit (neue Dimension)
+    financial = compute_financial_dependency(p)
+
+    # 7) GESAMTRISIKO
     total = (
-        0.35 * macro +
-        0.30 * geo +
+        0.30 * macro +
+        0.25 * geo +
         0.20 * gov +
-        0.15 * handel
+        0.15 * handel +
+        0.05 * supply_chain +
+        0.05 * financial
     )
 
-    # 6) Zusatzdimensionen (für Radar)
+    # 8) Zusatzdimensionen (für Radar)
     finanz = clamp01((versch / 2.0 + fx / 2.0))
     sozial = clamp01((1 - fach) * 0.5 + (1 - demo) * 0.5)
-
-    # 7) Handel & Lieferketten (für Radar)
-    supply_chain = compute_supply_chain_risk(p)
 
     return {
         "macro": clamp01(macro),
         "geo": clamp01(geo),
         "governance": clamp01(gov),
         "handel": clamp01(handel),
+        "supply_chain": clamp01(supply_chain),
+        "financial": clamp01(financial),
         "finanz": finanz,
         "sozial": sozial,
-        "supply_chain": supply_chain,
         "total": clamp01(total),
     }
 
+    
 def risk_category(score: float) -> Tuple[str, str]:
     if score < 0.33:
         return "stabil", "green"
