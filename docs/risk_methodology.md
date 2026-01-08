@@ -1,6 +1,6 @@
 # Risiko-Modell – Methodikdokumentation
 
-# Interpretation
+### Interpretation
 Interpretation: Status‑Radar (Makro, Geo, Governance, Finanz, Sozial)
 Das Status‑Radar zeigt das aktuelle Risikoprofil eines Landes über fünf Dimensionen.
 Jede Achse liegt zwischen 0 = niedriges Risiko und 1 = hohes Risiko.
@@ -12,7 +12,7 @@ Achsen:
 - Finanz → Schulden, Liquidität, Bankenstabilität
 - Sozial → gesellschaftliche Stabilität
 
-Interpretation:
+### Interpretation:
 - Kleine kompakte Fläche → geringes Risiko
 - Große ausgefranste Fläche → mehrere Risikotreiber erhöht
 - Einzelne Spitzen → spezifische Schwachstellen
@@ -28,7 +28,7 @@ Grenzwerte:
 | **> 0.70** | **kritisch (rot)** |
 
 
-Interpretation: Delta‑Radar (Veränderungen gegenüber Default)
+### Interpretation: Delta‑Radar (Veränderungen gegenüber Default)
 Das Delta‑Radar zeigt wie sich das Risikoprofil verändert, wenn Parameter angepasst oder Szenarien angewendet werden.
 
 Bedeutung:
@@ -36,7 +36,7 @@ Bedeutung:
 - Negative Werte (nach innen) → Risiko sinkt
 - Null-Linie → keine Veränderung
 
-Interpretation:
+### Interpretation:
 - Große Ausschläge → starke Veränderung
 - Breite Ausdehnung → systemische Risikoänderung
 - Einzelne Spitzen → gezielte Effekte (z. B. Governance‑Schock)
@@ -60,7 +60,7 @@ Achsen:
 - Finanz → finanzielle Puffer
 - Sozial → gesellschaftliche Kohäsion
 
-Interpretation:
+### Interpretation:
 - Große Resilienz‑Fläche → hohe Schockrobustheit
 - Große Risiko‑Fläche → erhöhte Verwundbarkeit
 - Governance/Finanz/Sozial erklären die Resilienz
@@ -76,7 +76,7 @@ Grenzwerte:
 | **> 0.70** | **< 0.30** | **skritische Lage** |
 
 
-Interpretation: Risiko-Heatmap nach Ländern
+### Interpretation: Risiko-Heatmap nach Ländern
 
 Die Risiko-Heatmap zeigt die relative Risikolage verschiedener Länder über mehrere Dimensionen.
 Jede Zelle ist farblich codiert und ermöglicht einen schnellen visuellen Vergleich.
@@ -104,7 +104,7 @@ Die Heatmap dient der schnellen Orientierung. Für detaillierte Analysen sollten
 
 
 
-Interpretation: Szenario-Analyse
+### Interpretation: Szenario-Analyse
 
 Die Szenario-Engine zeigt, wie sich das Risikoprofil eines Landes verändert, wenn bestimmte Parameter gezielt verändert werden.
 Ein Szenario kann makroökonomische, geopolitische oder Governance-bezogene Schocks simulieren.
@@ -180,7 +180,7 @@ Nutzung:
 
 
 
-Interpretation: Risiko-Dashboard
+### Interpretation: Risiko-Dashboard
 
 Das Risiko-Dashboard bietet eine kompakte Gesamtübersicht über die Risikolage eines Landes.
 Es kombiniert mehrere Analyseinstrumente, um sowohl den aktuellen Zustand als auch Trends, Veränderungen und strukturelle Schwachstellen sichtbar zu machen.
@@ -219,7 +219,7 @@ Das Dashboard ermöglicht eine schnelle, umfassende und intuitive Einschätzung 
 
 
 
-Interpretation: Länder-Benchmarking
+### Interpretation: Länder-Benchmarking
 
 Das Benchmarking-Modul ermöglicht den strukturierten Vergleich eines Landes mit mehreren anderen Ländern.
 Es kombiniert Radar-Diagramme, Heatmaps, Rankings und automatische Textinterpretationen, um Unterschiede und Gemeinsamkeiten sichtbar zu machen.
@@ -246,6 +246,41 @@ Elemente des Benchmarkings:
 
 Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht auf die Risikolage mehrerer Länder.
 
+
+
+### Interpretation: Handel & Lieferketten
+
+Die Dimension „Handel & Lieferketten“ beschreibt die strukturellen Abhängigkeiten eines Landes von internationalen Warenströmen, kritischen Importen, 
+Exportmärkten und globalen Produktionsnetzwerken. Sie ist ein zentraler Treiber für wirtschaftliche Stabilität, geopolitische Verwundbarkeit und makroökonomische Resilienz.
+
+1. Export-Konzentration
+Eine hohe Export-Konzentration bedeutet, dass ein Land stark von wenigen Produkten oder Branchen abhängig ist. Beispiele sind Öl-Exporte, 
+Automobilindustrie oder Halbleiterproduktion. Je stärker die Konzentration, desto größer das Risiko bei Nachfrageschocks, technologischen Umbrüchen oder 
+geopolitischen Konflikten. Länder mit diversifizierten Exportstrukturen sind widerstandsfähiger gegenüber globalen Krisen.
+
+2. Import kritischer Güter
+Importabhängigkeit bei kritischen Gütern wie Energie, Medikamenten, Maschinen, Halbleitern oder Nahrungsmitteln erhöht die Verwundbarkeit. 
+Lieferstopps, Sanktionen oder Transportstörungen können direkte Auswirkungen auf Produktion, Versorgungssicherheit und Preisstabilität haben. 
+Eine hohe Importabhängigkeit in sicherheitsrelevanten Bereichen gilt als strategisches Risiko.
+
+3. Partner-Konzentration
+Wenn ein Land stark von wenigen Handelspartnern abhängig ist, entsteht ein geopolitisches Risiko. Politische Spannungen, 
+Sanktionen oder wirtschaftliche Schocks in diesen Partnerländern können die eigene Wirtschaft unmittelbar treffen. Eine breite Diversifizierung der 
+Handelspartner reduziert diese Abhängigkeit und erhöht die strategische Autonomie.
+
+4. Lieferkettenrisiko
+Globale Lieferketten sind komplex und anfällig für Störungen. Hohe Abhängigkeit von einzelnen Produktionsstandorten, Just-in-Time-Logistik, 
+geringe Lagerpuffer oder die Nutzung kritischer Seewege (z. B. Suezkanal, Taiwanstraße) erhöhen das Risiko. Naturkatastrophen, geopolitische Konflikte oder 
+Transportengpässe können zu Produktionsausfällen und Preisschocks führen.
+
+5. Gesamtinterpretation
+Ein hohes Handels- und Lieferkettenrisiko weist auf strukturelle Verwundbarkeiten hin, die sich in Krisenzeiten schnell materialisieren können. 
+Länder mit hoher Export- oder Importkonzentration, wenigen Handelspartnern oder fragilen Lieferketten sind besonders anfällig für externe Schocks. 
+Eine diversifizierte Handelsstruktur, robuste Logistik und strategische Lagerhaltung erhöhen die Resilienz.
+
+Die Dimension „Handel & Lieferketten“ ergänzt das bestehende Risiko-Modell um eine zentrale Perspektive, die sowohl wirtschaftliche als auch 
+geopolitische Stabilität beeinflusst. Sie ermöglicht eine präzisere Bewertung der strukturellen Abhängigkeiten eines Landes und unterstützt datenbasierte Entscheidungen 
+in Risikoanalyse, Szenarioplanung und strategischer Politikgestaltung.
 
 
 

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT))
 
 # --- Core-Module ---
-from core.risk_model import compute_risk_scores, risk_category
+from core.risk_model import compute_risk_scores, risk_category, clamp01
 from core.sensitivity import sensitivity_analysis
 from core.heatmap import risk_heatmap
 from core.scenario_engine import apply_shock
@@ -110,6 +110,7 @@ sensitivitaet_text = load_textfile(ROOT.parent / "docs" / "interpretation_sensit
 prognose_text = load_textfile(ROOT.parent / "docs" / "interpretation_prognose.txt")
 dashboard_text = load_textfile(ROOT.parent / "docs" / "interpretation_dashboard.txt")
 benchmarking_text = load_textfile(ROOT.parent / "docs" / "interpretation_benchmarking.txt")
+handel_lieferketten_text = load_textfile(ROOT.parent / "docs" / "interpretation_handel_lieferketten.txt")
 
 # ============================================================
 # HILFSFUNKTIONEN FÜR DIE SIMULATION
@@ -162,6 +163,35 @@ def build_early_warning(params: Dict[str, float], scores: Dict[str, float]) -> s
 
     return "\n".join(f"- {w}" for w in warnings)
 
+
+def build_trade_supply_early_warning(params: dict, scores: dict) -> str:
+    lines = []
+
+    # Schwellen auf Score-Ebene
+    if scores["handel"] > 0.7:
+        lines.append("Kritische Handelsabhängigkeit: hohe Konzentration bei Exporten, Importen oder Handelspartnern.")
+    elif scores["handel"] > 0.5:
+        lines.append("Erhöhte Handelsabhängigkeit: Diversifizierung sollte geprüft und ausgebaut werden.")
+
+    if scores["supply_chain"] > 0.7:
+        lines.append("Kritische Lieferkettenrisiken: hohe Anfälligkeit für Störungen in Produktion und Transport.")
+    elif scores["supply_chain"] > 0.5:
+        lines.append("Erhöhte Lieferkettenrisiken: Puffer, Alternativrouten und Redundanzen prüfen.")
+
+    # Parameter-spezifische Trigger
+    if params.get("chokepoint_abhaengigkeit", 0.5) > 0.7:
+        lines.append("Warnsignal: starke Abhängigkeit von wenigen Transportkorridoren oder Seewegen (Chokepoints).")
+    if params.get("just_in_time_anteil", 0.5) > 0.7:
+        lines.append("Warnsignal: hoher Just-in-Time-Anteil – geringe Lagerpuffer erhöhen Störungsanfälligkeit.")
+    if params.get("produktions_konzentration", 0.5) > 0.7:
+        lines.append("Warnsignal: Produktion stark in wenigen Ländern/Regionen konzentriert.")
+    if params.get("lager_puffer", 0.5) < 0.3:
+        lines.append("Warnsignal: sehr geringe Lagerpuffer – Versorgungssicherheit im Krisenfall gefährdet.")
+
+    if not lines:
+        return "### Frühwarnsystem Handel & Lieferketten\n\n- Aktuell keine akuten Frühwarnsignale erkannt."
+
+    return "### Frühwarnsystem Handel & Lieferketten\n\n" + "\n".join(f"- {l}" for l in lines)
 
 # ============================================================
 # RADAR-FUNKTIONEN
@@ -289,7 +319,6 @@ def plot_multi_radar(score_dict: dict):
 
     return fig
 
-
 def plot_handel_radar(params: dict):
     labels = ["Export-Konzentration", "Import kritische Güter", "Partner-Konzentration"]
     values = [
@@ -309,33 +338,96 @@ def plot_handel_radar(params: dict):
     ax.set_xticklabels(labels)
     ax.set_ylim(0, 1)
     ax.set_title("Handelsabhängigkeit")
-
     return fig
 
+
+def plot_supply_chain_radar(params: dict):
+    labels = ["Chokepoints", "Just-in-Time", "Konzentration", "Lagerpuffer"]
+    values = [
+        params.get("chokepoint_abhaengigkeit", 0.5),
+        params.get("just_in_time_anteil", 0.5),
+        params.get("produktions_konzentration", 0.5),
+        1 - params.get("lager_puffer", 0.5),
+    ]
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+    values = np.concatenate((values, [values[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(angles, values, linewidth=2, color="red")
+    ax.fill(angles, values, alpha=0.25, color="red")
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.set_title("Lieferkettenrisiko")
+    return fig
+
+def plot_abhaengigkeiten_radar(params: dict):
+    labels = [
+        "Handel",
+        "Lieferketten",
+        "Währung/Zahlung",
+    ]
+
+    # Aggregierte Scores
+    scores = compute_risk_scores(params)
+    handel = scores["handel"]
+    supply = scores["supply_chain"]
+
+    waehrung = (
+        0.5 * clamp01(params.get("USD_Dominanz", 0.7)) +
+        0.3 * clamp01(params.get("Sanktions_Exposure", 0.05) * 2.0) +
+        0.2 * (1 - clamp01(params.get("Alternativnetz_Abdeckung", 0.5)))
+    )
+    waehrung = clamp01(waehrung)
+
+    values = [handel, supply, waehrung]
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+    values = np.concatenate((values, [values[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(angles, values, linewidth=2, color="purple")
+    ax.fill(angles, values, alpha=0.25, color="purple")
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.set_title("Abhängigkeiten-Radar")
+    return fig
+
+def build_trade_supply_feature_matrix(presets: dict):
+    countries = []
+    X = []
+    for land, p in presets.items():
+        vec = [
+            p.get("export_konzentration", 0.5),
+            p.get("import_kritische_gueter", 0.5),
+            p.get("partner_konzentration", 0.5),
+            p.get("chokepoint_abhaengigkeit", 0.5),
+            p.get("just_in_time_anteil", 0.5),
+            p.get("produktions_konzentration", 0.5),
+            1 - p.get("lager_puffer", 0.5),
+        ]
+        countries.append(land)
+        X.append(vec)
+    return countries, X
 
 def handels_heatmap(presets: dict):
     rows = []
     for land, params in presets.items():
         scores = compute_risk_scores(params)
-        rows.append([
-            land,
-            scores["handel"],
-        ])
+        rows.append([land, scores["handel"]])
     return rows
 
-def compute_supply_chain_risk(p: dict) -> float:
-    chokepoint = p.get("chokepoint_abhaengigkeit", 0.5)
-    jit = p.get("just_in_time_anteil", 0.5)
-    konz = p.get("produktions_konzentration", 0.5)
-    puffer = p.get("lager_puffer", 0.5)
 
-    risk = (
-        0.35 * clamp01(chokepoint) +
-        0.30 * clamp01(jit) +
-        0.25 * clamp01(konz) +
-        0.10 * (1 - clamp01(puffer))
-    )
-    return clamp01(risk)
+def supply_chain_heatmap(presets: dict):
+    rows = []
+    for land, params in presets.items():
+        scores = compute_risk_scores(params)
+        rows.append([land, scores["supply_chain"]])
+    return rows
 
 # ============================================================
 # PROGNOSE-FUNKTIONEN
@@ -460,7 +552,6 @@ def ui_sensitivity(country_code):
         ])
     return table
 
-
 # ============================================================
 # UI-FUNKTIONEN – Simulation mit LÄNDER-DROPDOWN
 # ============================================================
@@ -534,6 +625,81 @@ def generate_benchmark_interpretation(scores: dict):
 
     return text
 
+def interpret_handel_supply(params, scores):
+    text = "### Handel & Lieferketten – Automatische Interpretation\n\n"
+
+    text += f"- Handelsrisiko: **{scores['handel']:.3f}**\n"
+    text += f"- Lieferkettenrisiko: **{scores['supply_chain']:.3f}**\n\n"
+
+    if scores["handel"] > 0.66:
+        text += "• Das Land weist eine **kritische Handelsabhängigkeit** auf.\n"
+    elif scores["handel"] > 0.33:
+        text += "• Die Handelsabhängigkeit ist **moderat**, aber verwundbar.\n"
+    else:
+        text += "• Die Handelsabhängigkeit ist **gering** und gut diversifiziert.\n"
+
+    if scores["supply_chain"] > 0.66:
+        text += "• Die Lieferketten sind **hochgradig fragil**.\n"
+    elif scores["supply_chain"] > 0.33:
+        text += "• Die Lieferketten sind **teilweise anfällig**.\n"
+    else:
+        text += "• Die Lieferketten sind **robust**.\n"
+
+    return text
+
+def interpret_country_full(name: str, params: dict, scores: dict) -> str:
+    lines = []
+    lines.append(f"## Länderprofil: {name}\n")
+
+    # Gesamtbild
+    lines.append(f"- Gesamtrisiko: **{scores['total']:.3f}**")
+    lines.append(f"- Makro-Risiko: **{scores['macro']:.3f}**")
+    lines.append(f"- Geo-Risiko: **{scores['geo']:.3f}**")
+    lines.append(f"- Governance-Risiko: **{scores['governance']:.3f}**")
+    lines.append(f"- Handels-Risiko: **{scores['handel']:.3f}**")
+    lines.append(f"- Lieferketten-Risiko: **{scores['supply_chain']:.3f}**")
+    lines.append("")
+
+    # Makro
+    if scores["macro"] > 0.66:
+        lines.append("• Makroökonomische Lage: **kritisch** – hohe Verschuldung, FX-Risiken oder geringe Reserven.")
+    elif scores["macro"] > 0.33:
+        lines.append("• Makroökonomische Lage: **angespannt** – Verwundbarkeiten vorhanden, aber noch beherrschbar.")
+    else:
+        lines.append("• Makroökonomische Lage: **stabil** – solide Puffer und begrenzte Schockanfälligkeit.")
+
+    # Geo
+    if scores["geo"] > 0.66:
+        lines.append("• Geopolitische Lage: **hohes Risiko** – starke Abhängigkeit von USD, Sanktionen oder fehlenden Alternativen.")
+    elif scores["geo"] > 0.33:
+        lines.append("• Geopolitische Lage: **mittleres Risiko** – gewisse Abhängigkeiten, aber mit Ausweichoptionen.")
+    else:
+        lines.append("• Geopolitische Lage: **relativ robust** – Diversifizierung und Alternativnetzwerke vorhanden.")
+
+    # Governance
+    if scores["governance"] > 0.66:
+        lines.append("• Governance: **schwach** – Defizite bei Demokratie, Korruptionskontrolle oder Fachkräften.")
+    elif scores["governance"] > 0.33:
+        lines.append("• Governance: **durchwachsen** – gemischtes Bild mit Stärken und Schwächen.")
+    else:
+        lines.append("• Governance: **stark** – gute Institutionen, Innovationskraft und Fachkräftebasis.")
+
+    # Handel & Lieferketten
+    if scores["handel"] > 0.66:
+        lines.append("• Handel: **hohe Abhängigkeit** – starke Konzentration bei Exporten, Importen oder Partnern.")
+    elif scores["handel"] > 0.33:
+        lines.append("• Handel: **moderate Abhängigkeit** – Diversifizierung ausbaufähig.")
+    else:
+        lines.append("• Handel: **gut diversifiziert** – begrenzte strukturelle Abhängigkeiten.")
+
+    if scores["supply_chain"] > 0.66:
+        lines.append("• Lieferketten: **fragil** – hohe Abhängigkeit von Chokepoints, Just-in-Time und konzentrierter Produktion.")
+    elif scores["supply_chain"] > 0.33:
+        lines.append("• Lieferketten: **teilweise anfällig** – gewisse Risiken, aber mit Puffer- und Ausweichmöglichkeiten.")
+    else:
+        lines.append("• Lieferketten: **robust** – Puffer, Diversifizierung und resiliente Logistikstrukturen.")
+
+    return "\n".join(lines)
 
 # ============================================================
 # UI – HAUPTANWENDUNG
@@ -959,8 +1125,134 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             with gr.Accordion("Interpretation des Benchmarkings", open=False):
                 gr.Markdown(f"```\n{benchmarking_text}\n```")
 
+        
+        
         # ----------------------------------------------------
-        # TAB 8 — METHODIK
+        # TAB 8 — HANDEL & LIEFERKETTEN
+        # ----------------------------------------------------
+        with gr.Tab("Handel & Lieferketten"):
+            gr.Markdown("### Analyse: Handelsabhängigkeit & Lieferkettenrisiko")
+
+            hls_country = gr.Dropdown(
+                choices=list(presets.keys()),
+                label="Land",
+                value=list(presets.keys())[0],
+            )
+
+            hls_handel_radar = gr.Plot(label="Handels-Radar")
+            hls_supply_radar = gr.Plot(label="Lieferketten-Radar")
+            hls_abhaengigkeiten_radar = gr.Plot(label="Abhängigkeiten-Radar")
+
+            hls_handel_heatmap = gr.Dataframe(
+                headers=["Land", "Handels-Risiko"],
+                wrap=True,
+                label="Handels-Heatmap",
+            )
+
+            hls_supply_heatmap = gr.Dataframe(
+                headers=["Land", "Lieferketten-Risiko"],
+                wrap=True,
+                label="Lieferketten-Heatmap",
+            )
+
+            hls_interpret = gr.Markdown()
+
+            def ui_handel_supply(country):
+                params = presets[country]
+                scores = compute_risk_scores(params)
+
+                fig_handel = plot_handel_radar(params)
+                fig_supply = plot_supply_chain_radar(params)
+                fig_abhaeng = plot_abhaengigkeiten_radar(params)
+
+                heat_handel = handels_heatmap(presets)
+                heat_supply = supply_chain_heatmap(presets)
+
+                interpretation = interpret_handel_supply(params, scores)
+                warnings = build_trade_supply_early_warning(params, scores)
+
+                return (
+                    fig_handel,
+                    fig_supply,
+                    fig_abhaeng,
+                    heat_handel,
+                    heat_supply,
+                    interpretation + "\n\n" + warnings,
+                )
+
+
+            hls_country.change(
+                fn=ui_handel_supply,
+                inputs=[hls_country],
+                outputs=[
+                    hls_handel_radar,
+                    hls_supply_radar,
+                    hls_abhaengigkeiten_radar,
+                    hls_handel_heatmap,
+                    hls_supply_heatmap,
+                    hls_interpret,
+                ],
+              
+            ) 
+
+            with gr.Accordion("Interpretation Handel & Lieferketten", open=False):
+                gr.Markdown(f"```\n{handel_lieferketten_text}\n```")
+        
+
+        # ----------------------------------------------------
+        # TAB 9 — CLUSTERANALYSE
+        # ----------------------------------------------------
+        with gr.Tab("Clusteranalyse"):
+            gr.Markdown("### Clusteranalyse: Handels- & Lieferkettenprofile")
+
+            cluster_button = gr.Button("Cluster berechnen")
+            cluster_output = gr.Dataframe(
+                headers=["Land", "Cluster"],
+                label="Cluster-Ergebnisse"
+            )
+
+            def ui_cluster():
+                countries, X = build_trade_supply_feature_matrix(presets)
+
+                # Einfacher 3-Cluster-K-Means (ohne sklearn)
+                # Wir nehmen die Mittelwerte als Clusterzentren
+                import numpy as np
+                X = np.array(X)
+
+                # Initiale Clusterzentren (heuristisch)
+                centers = np.array([
+                    X.mean(axis=0) - 0.15,
+                    X.mean(axis=0),
+                    X.mean(axis=0) + 0.15,
+                ])
+
+                # 5 Iterationen
+                for _ in range(5):
+                    # Clusterzuweisung
+                    dists = np.linalg.norm(X[:, None, :] - centers[None, :, :], axis=2)
+                    labels = np.argmin(dists, axis=1)
+
+                    # Zentren aktualisieren
+                    for k in range(3):
+                        if np.any(labels == k):
+                            centers[k] = X[labels == k].mean(axis=0)
+
+                # Ergebnisliste
+                rows = []
+                for land, label in zip(countries, labels):
+                    rows.append([land, int(label)])
+
+                return rows
+
+            cluster_button.click(
+                fn=ui_cluster,
+                inputs=[],
+                outputs=[cluster_output]
+            )
+
+
+        # ----------------------------------------------------
+        # TAB 10 — METHODIK
         # ----------------------------------------------------
         with gr.Tab("Methodik"):
             gr.Markdown("### Dokumentation der Risiko-Methodik")

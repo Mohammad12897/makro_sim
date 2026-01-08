@@ -15,12 +15,26 @@ def normalize_log(x, max_val=20.0):
     """Logarithmische Normalisierung: Reserven wirken stark risikomindernd."""
     return clamp01(1 - (math.log1p(x) / math.log1p(max_val)))
 
+def compute_supply_chain_risk(p: dict) -> float:
+    chokepoint = p.get("chokepoint_abhaengigkeit", 0.5)
+    jit = p.get("just_in_time_anteil", 0.5)
+    konz = p.get("produktions_konzentration", 0.5)
+    puffer = p.get("lager_puffer", 0.5)
+
+    risk = (
+        0.35 * clamp01(chokepoint) +
+        0.30 * clamp01(jit) +
+        0.25 * clamp01(konz) +
+        0.10 * (1 - clamp01(puffer))
+    )
+    return clamp01(risk)
+
+
 def compute_risk_scores(p: dict) -> Dict[str, float]:
     # 1) MAKRO-RISIKO (40 %)
     versch = p.get("verschuldung", 0.8)
     fx = p.get("FX_Schockempfindlichkeit", 0.8)
     res = p.get("Reserven_Monate", 6)
-
     versch_norm = normalize_exp(versch, scale=1.0)
     fx_norm = clamp01(fx / 2.0)
     res_norm = normalize_log(res, max_val=20.0)
@@ -82,6 +96,9 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
     finanz = clamp01((versch / 2.0 + fx / 2.0))
     sozial = clamp01((1 - fach) * 0.5 + (1 - demo) * 0.5)
 
+    # 7) Handel & Lieferketten (für Radar)
+    supply_chain = compute_supply_chain_risk(p)
+
     return {
         "macro": clamp01(macro),
         "geo": clamp01(geo),
@@ -89,9 +106,10 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         "handel": clamp01(handel),
         "finanz": finanz,
         "sozial": sozial,
+        "supply_chain": supply_chain,
         "total": clamp01(total),
     }
-    
+
 def risk_category(score: float) -> Tuple[str, str]:
     if score < 0.33:
         return "stabil", "green"

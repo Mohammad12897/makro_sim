@@ -1,0 +1,33 @@
+# Interpretation: Handel & Lieferketten
+
+Die Dimension „Handel & Lieferketten“ beschreibt die strukturellen Abhängigkeiten eines Landes von internationalen Warenströmen, kritischen Importen, 
+Exportmärkten und globalen Produktionsnetzwerken. Sie ist ein zentraler Treiber für wirtschaftliche Stabilität, geopolitische Verwundbarkeit und makroökonomische Resilienz.
+
+1. Export-Konzentration
+Eine hohe Export-Konzentration bedeutet, dass ein Land stark von wenigen Produkten oder Branchen abhängig ist. Beispiele sind Öl-Exporte, 
+Automobilindustrie oder Halbleiterproduktion. Je stärker die Konzentration, desto größer das Risiko bei Nachfrageschocks, technologischen Umbrüchen oder 
+geopolitischen Konflikten. Länder mit diversifizierten Exportstrukturen sind widerstandsfähiger gegenüber globalen Krisen.
+
+2. Import kritischer Güter
+Importabhängigkeit bei kritischen Gütern wie Energie, Medikamenten, Maschinen, Halbleitern oder Nahrungsmitteln erhöht die Verwundbarkeit. 
+Lieferstopps, Sanktionen oder Transportstörungen können direkte Auswirkungen auf Produktion, Versorgungssicherheit und Preisstabilität haben. 
+Eine hohe Importabhängigkeit in sicherheitsrelevanten Bereichen gilt als strategisches Risiko.
+
+3. Partner-Konzentration
+Wenn ein Land stark von wenigen Handelspartnern abhängig ist, entsteht ein geopolitisches Risiko. Politische Spannungen, 
+Sanktionen oder wirtschaftliche Schocks in diesen Partnerländern können die eigene Wirtschaft unmittelbar treffen. Eine breite Diversifizierung der 
+Handelspartner reduziert diese Abhängigkeit und erhöht die strategische Autonomie.
+
+4. Lieferkettenrisiko
+Globale Lieferketten sind komplex und anfällig für Störungen. Hohe Abhängigkeit von einzelnen Produktionsstandorten, Just-in-Time-Logistik, 
+geringe Lagerpuffer oder die Nutzung kritischer Seewege (z. B. Suezkanal, Taiwanstraße) erhöhen das Risiko. Naturkatastrophen, geopolitische Konflikte oder 
+Transportengpässe können zu Produktionsausfällen und Preisschocks führen.
+
+5. Gesamtinterpretation
+Ein hohes Handels- und Lieferkettenrisiko weist auf strukturelle Verwundbarkeiten hin, die sich in Krisenzeiten schnell materialisieren können. 
+Länder mit hoher Export- oder Importkonzentration, wenigen Handelspartnern oder fragilen Lieferketten sind besonders anfällig für externe Schocks. 
+Eine diversifizierte Handelsstruktur, robuste Logistik und strategische Lagerhaltung erhöhen die Resilienz.
+
+Die Dimension „Handel & Lieferketten“ ergänzt das bestehende Risiko-Modell um eine zentrale Perspektive, die sowohl wirtschaftliche als auch 
+geopolitische Stabilität beeinflusst. Sie ermöglicht eine präzisere Bewertung der strukturellen Abhängigkeiten eines Landes und unterstützt datenbasierte Entscheidungen 
+in Risikoanalyse, Szenarioplanung und strategischer Politikgestaltung.
