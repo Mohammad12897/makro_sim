@@ -1426,8 +1426,8 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 summary, warnings, r1, r2, r3 = run_simulation_with_radar_and_delta(*slider_values)
 
                 # Tech-Radar zusätzlich erzeugen
-                params = {k: v for (k, _, _, _), v in zip(PARAM_SLIDERS, slider_values)}
-                tech_fig = tech_radar(params)
+                country = country_dropdown.value
+                tech_fig = tech_radar(presets[country])
 
                 return summary, warnings, r1, r2, r3, tech_fig
 
@@ -1456,38 +1456,36 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             gr.Markdown("### Tech-Frühwarnsystem")
 
             tech_warn_output = gr.Textbox(
-             label="Tech-Warnungen",
-        lines=6
-    )
+                label="Tech-Warnungen",
+                lines=6
+            )
 
-    def ui_tech_warning(*slider_values):
-        params = {k: v for (k, _, _, _), v in zip(PARAM_SLIDERS, slider_values)}
-        return tech_early_warning(params)
+            def ui_tech_warning(country):
+                return tech_early_warning(presets[country])
 
-    tech_warn_button = gr.Button("Tech-Risiken analysieren")
+            tech_warn_button = gr.Button("Tech-Risiken analysieren")
 
-    tech_warn_button.click(
-        fn=ui_tech_warning,
-        inputs=slider_components,
-        outputs=tech_warn_output
-    )
+            tech_warn_button.click(
+                fn=ui_tech_warning,
+                inputs=[country_dropdown],
+                outputs=tech_warn_output
+            )
 
-    # --- Tech-Storyline ---
-    gr.Markdown("### Tech-Storyline")
+            # --- Tech-Storyline ---
+            gr.Markdown("### Tech-Storyline")
 
-    tech_story_output = gr.Markdown()
+            tech_story_output = gr.Markdown()
 
-    def ui_tech_story(*slider_values):
-        params = {k: v for (k, _, _, _), v in zip(PARAM_SLIDERS, slider_values)}
-        return tech_storyline(country_dropdown.value, params)
+            def ui_tech_story(country):
+                return tech_storyline(country, presets[country])
 
-    tech_story_button = gr.Button("Tech-Storyline erzeugen")
+            tech_story_button = gr.Button("Tech-Storyline erzeugen")
 
-    tech_story_button.click(
-        fn=ui_tech_story,
-        inputs=slider_components,
-        outputs=tech_story_output
-    )
+            tech_story_button.click(
+                fn=ui_tech_story,
+                inputs=[country_dropdown],
+                outputs=tech_story_output
+            )
 
         # ----------------------------------------------------
         # TAB 2 — HEATMAP
