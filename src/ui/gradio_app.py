@@ -272,9 +272,106 @@ def build_early_warning_dashboard(params: Dict[str, float], scores: Dict[str, fl
 
     return "\n".join(lines)
 
+def tech_early_warning(params: dict) -> str:
+    warnings = []
+
+    if params["halbleiter_abhaengigkeit"] > 0.75:
+        warnings.append("⚠️ Hohe Halbleiter-Abhängigkeit – Risiko bei globalen Chip-Schocks.")
+
+    if params["software_cloud_abhaengigkeit"] > 0.75:
+        warnings.append("⚠️ Starke Cloud-Abhängigkeit – Risiko bei US/EU-Regulierungen.")
+
+    if params["ip_lizenzen_abhaengigkeit"] > 0.75:
+        warnings.append("⚠️ Hohe IP-Lizenzabhängigkeit – Gefahr durch Lizenzentzug.")
+
+    if params["schluesseltechnologie_importe"] > 0.75:
+        warnings.append("⚠️ Kritische Abhängigkeit von Schlüsseltechnologien – Lieferstopps möglich.")
+
+    if not warnings:
+        return "Keine kritischen Tech-Risiken erkannt."
+
+    return "\n".join(warnings)
+
+def tech_storyline(name: str, params: dict) -> str:
+    h = params["halbleiter_abhaengigkeit"]
+    s = params["software_cloud_abhaengigkeit"]
+    ip = params["ip_lizenzen_abhaengigkeit"]
+    k = params["schluesseltechnologie_importe"]
+
+    lines = [f"## Tech-Storyline: {name}\n"]
+
+    if h > 0.75:
+        lines.append("• Das Land ist stark von globalen Halbleitern abhängig – ein externer Schock hätte große Auswirkungen.")
+    elif h > 0.5:
+        lines.append("• Moderate Halbleiter-Abhängigkeit – Risiken bestehen, aber sind kontrollierbar.")
+    else:
+        lines.append("• Geringe Halbleiter-Abhängigkeit – robuste lokale Alternativen.")
+
+    if s > 0.75:
+        lines.append("• Hohe Cloud-Abhängigkeit – mögliche Verwundbarkeit gegenüber geopolitischen Spannungen.")
+    elif s > 0.5:
+        lines.append("• Moderate Cloud-Abhängigkeit – Diversifizierung wäre sinnvoll.")
+    else:
+        lines.append("• Geringe Cloud-Abhängigkeit – gute digitale Souveränität.")
+
+    if ip > 0.75:
+        lines.append("• Kritische Abhängigkeit von IP-Lizenzen – Gefahr durch Lizenzentzug.")
+    elif ip > 0.5:
+        lines.append("• Moderate IP-Abhängigkeit – Risiken bestehen, aber sind beherrschbar.")
+    else:
+        lines.append("• Geringe IP-Abhängigkeit – stabile Innovationsbasis.")
+
+    if k > 0.75:
+        lines.append("• Hohe Abhängigkeit von Schlüsseltechnologie-Importen – Lieferstopps wären problematisch.")
+    elif k > 0.5:
+        lines.append("• Moderate Abhängigkeit von Schlüsseltechnologien – Diversifizierung empfehlenswert.")
+    else:
+        lines.append("• Geringe Abhängigkeit von Schlüsseltechnologien – gute technologische Resilienz.")
+
+    return "\n".join(lines)
 # ============================================================
 # RADAR-FUNKTIONEN
 # ============================================================
+
+def tech_delta_radar(old_params: dict, new_params: dict):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    labels = ["Halbleiter", "Software/Cloud", "IP/Lizenzen", "Schlüsseltechnologien"]
+
+    old_vals = [
+        old_params["halbleiter_abhaengigkeit"],
+        old_params["software_cloud_abhaengigkeit"],
+        old_params["ip_lizenzen_abhaengigkeit"],
+        old_params["schluesseltechnologie_importe"],
+    ]
+
+    new_vals = [
+        new_params["halbleiter_abhaengigkeit"],
+        new_params["software_cloud_abhaengigkeit"],
+        new_params["ip_lizenzen_abhaengigkeit"],
+        new_params["schluesseltechnologie_importe"],
+    ]
+
+    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+
+    old_vals = np.concatenate((old_vals, [old_vals[0]]))
+    new_vals = np.concatenate((new_vals, [new_vals[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+
+    ax.plot(angles, old_vals, "o--", label="Vorher", linewidth=1.5)
+    ax.plot(angles, new_vals, "o-", label="Nachher", linewidth=2)
+
+    ax.fill(angles, new_vals, alpha=0.2)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.legend(loc="upper right")
+
+    return fig
 
 def plot_radar(scores: Dict[str, float]):
     labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
@@ -1257,9 +1354,9 @@ with gr.Blocks(title="Makro-Simulation") as demo:
         # ----------------------------------------------------
         # TAB 1 — SIMULATION
         # ----------------------------------------------------
-        with gr.Tab("Simulation"):
+        with gr.Tab("Simulation & Radar-Analysen"):
 
-            gr.Markdown("### Risiko-Simulation mit Frühwarnsystem und Radar-Ansichten & Tech-Radar")
+            gr.Markdown("### Risiko-Simulation mit Frühwarnsystem und Radar-Ansichten  & Multi-Radar-Vergleich")
 
             country_dropdown = gr.Dropdown(
                 choices=[c for c in EXPECTED_COUNTRIES if c in presets.keys()],
@@ -1300,17 +1397,22 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             radar_plot = gr.Plot(label="Status-Radar")
             delta_radar_plot = gr.Plot(label="Delta-Radar")
             resilience_radar_plot = gr.Plot(label="Risiko vs. Resilienz")
+            tech_radar_plot = gr.Plot(label="Tech-Radar")
 
             # --- Tech-Radar (NEU integriert) ---
-            tech_radar_plot = gr.Plot(label="Tech-Radar")
+            multi_radar_plot = gr.Plot(label="Multi-Radar (alle Länder)")
             # --- Interpretation ---
             with gr.Accordion("Interpretation der Radar-Diagramme", open=False):
                 gr.Markdown(f"```\n{status_radar_text}\n```")
                 gr.Markdown(f"```\n{delta_radar_text}\n```")
                 gr.Markdown(f"```\n{resilienz_radar_text}\n```")
+                gr.Markdown("**Tech-Radar:** zeigt die vier technologischen Abhängigkeiten eines Landes.")
+                gr.Markdown("**Multi-Radar:** vergleicht alle Länder gleichzeitig.")
 
             # --- Buttons ---
             run_button = gr.Button("Simulation starten")
+            multi_button = gr.Button("Multi-Radar erzeugen")
+
 
             # --- Preset laden ---
             country_dropdown.change(
@@ -1341,6 +1443,51 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                     tech_radar_plot
                 ],
             )
+
+            # --- Multi-Radar ---
+            multi_button.click(
+                lambda: multi_radar(presets),
+                None,
+                multi_radar_plot
+            )
+
+
+            # --- Tech-Frühwarnsystem ---
+            gr.Markdown("### Tech-Frühwarnsystem")
+
+            tech_warn_output = gr.Textbox(
+             label="Tech-Warnungen",
+        lines=6
+    )
+
+    def ui_tech_warning(*slider_values):
+        params = {k: v for (k, _, _, _), v in zip(PARAM_SLIDERS, slider_values)}
+        return tech_early_warning(params)
+
+    tech_warn_button = gr.Button("Tech-Risiken analysieren")
+
+    tech_warn_button.click(
+        fn=ui_tech_warning,
+        inputs=slider_components,
+        outputs=tech_warn_output
+    )
+
+    # --- Tech-Storyline ---
+    gr.Markdown("### Tech-Storyline")
+
+    tech_story_output = gr.Markdown()
+
+    def ui_tech_story(*slider_values):
+        params = {k: v for (k, _, _, _), v in zip(PARAM_SLIDERS, slider_values)}
+        return tech_storyline(country_dropdown.value, params)
+
+    tech_story_button = gr.Button("Tech-Storyline erzeugen")
+
+    tech_story_button.click(
+        fn=ui_tech_story,
+        inputs=slider_components,
+        outputs=tech_story_output
+    )
 
         # ----------------------------------------------------
         # TAB 2 — HEATMAP
