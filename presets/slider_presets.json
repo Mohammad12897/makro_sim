@@ -27,7 +27,11 @@
     "auslandsverschuldung": 0.6,
     "kapitalmarkt_abhaengigkeit": 0.5,
     "investoren_anteil": 0.5,
-    "fremdwaehrungs_refinanzierung": 0.6
+    "fremdwaehrungs_refinanzierung": 0.6,
+    "halbleiter_abhaengigkeit": 0.7,
+    "software_cloud_abhaengigkeit": 0.8,
+    "ip_lizenzen_abhaengigkeit": 0.6,
+    "schluesseltechnologie_importe": 0.7
   },
   "US": {
     "USD_Dominanz": 0.95,
@@ -57,7 +61,11 @@
     "auslandsverschuldung": 0.7,
     "kapitalmarkt_abhaengigkeit": 0.8,
     "investoren_anteil": 0.7,
-    "fremdwaehrungs_refinanzierung": 0.4
+    "fremdwaehrungs_refinanzierung": 0.4,
+    "halbleiter_abhaengigkeit": 0.3,
+    "software_cloud_abhaengigkeit": 0.2,
+    "ip_lizenzen_abhaengigkeit": 0.3,
+    "schluesseltechnologie_importe": 0.3
   },
   "CN": {
     "USD_Dominanz": 0.4,
@@ -87,7 +95,11 @@
     "auslandsverschuldung": 0.5,
     "kapitalmarkt_abhaengigkeit": 0.6,
     "investoren_anteil": 0.4,
-    "fremdwaehrungs_refinanzierung": 0.7
+    "fremdwaehrungs_refinanzierung": 0.7,
+    "halbleiter_abhaengigkeit": 0.9,
+    "software_cloud_abhaengigkeit": 0.9,
+    "ip_lizenzen_abhaengigkeit": 0.8,
+    "schluesseltechnologie_importe": 0.9
   },
   "IN": {
     "USD_Dominanz": 0.6,
@@ -117,7 +129,11 @@
     "auslandsverschuldung": 0.65,
     "kapitalmarkt_abhaengigkeit": 0.55,
     "investoren_anteil": 0.45,
-    "fremdwaehrungs_refinanzierung": 0.6
+    "fremdwaehrungs_refinanzierung": 0.6,
+    "halbleiter_abhaengigkeit": 0.8,
+    "software_cloud_abhaengigkeit": 0.9,
+    "ip_lizenzen_abhaengigkeit": 0.8,
+    "schluesseltechnologie_importe": 0.8
   },
   "IR": {
     "USD_Dominanz": 0.2,
@@ -147,7 +163,11 @@
     "auslandsverschuldung": 0.8,
     "kapitalmarkt_abhaengigkeit": 0.3,
     "investoren_anteil": 0.2,
-    "fremdwaehrungs_refinanzierung": 0.9
+    "fremdwaehrungs_refinanzierung": 0.9,
+    "halbleiter_abhaengigkeit": 0.9,
+    "software_cloud_abhaengigkeit": 0.9,
+    "ip_lizenzen_abhaengigkeit": 0.8,
+    "schluesseltechnologie_importe": 0.9
   },
   "BR": {
     "USD_Dominanz": 0.65,
@@ -177,7 +197,11 @@
     "auslandsverschuldung": 0.7,
     "kapitalmarkt_abhaengigkeit": 0.6,
     "investoren_anteil": 0.55,
-    "fremdwaehrungs_refinanzierung": 0.5
+    "fremdwaehrungs_refinanzierung": 0.5,
+    "halbleiter_abhaengigkeit": 0.8,
+    "software_cloud_abhaengigkeit": 0.8,
+    "ip_lizenzen_abhaengigkeit": 0.7,
+    "schluesseltechnologie_importe": 0.8
   },
   "FR": {
     "USD_Dominanz": 0.65,
@@ -207,7 +231,11 @@
     "auslandsverschuldung": 0.65,
     "kapitalmarkt_abhaengigkeit": 0.6,
     "investoren_anteil": 0.55,
-    "fremdwaehrungs_refinanzierung": 0.5
+    "fremdwaehrungs_refinanzierung": 0.5,
+    "halbleiter_abhaengigkeit": 0.6,
+    "software_cloud_abhaengigkeit": 0.7,
+    "ip_lizenzen_abhaengigkeit": 0.6,
+    "schluesseltechnologie_importe": 0.6
   },
   "GB": {
     "USD_Dominanz": 0.7,
@@ -237,7 +265,11 @@
     "auslandsverschuldung": 0.7,
     "kapitalmarkt_abhaengigkeit": 0.7,
     "investoren_anteil": 0.6,
-    "fremdwaehrungs_refinanzierung": 0.5
+    "fremdwaehrungs_refinanzierung": 0.5,
+    "halbleiter_abhaengigkeit": 0.6,
+    "software_cloud_abhaengigkeit": 0.7,
+    "ip_lizenzen_abhaengigkeit": 0.6,
+    "schluesseltechnologie_importe": 0.6
   },
   "GR": {
     "USD_Dominanz": 0.65,
@@ -267,6 +299,10 @@
     "auslandsverschuldung": 0.8,
     "kapitalmarkt_abhaengigkeit": 0.7,
     "investoren_anteil": 0.6,
-    "fremdwaehrungs_refinanzierung": 0.7
+    "fremdwaehrungs_refinanzierung": 0.7,
+    "halbleiter_abhaengigkeit": 0.8,
+    "software_cloud_abhaengigkeit": 0.8,
+    "ip_lizenzen_abhaengigkeit": 0.7,
+    "schluesseltechnologie_importe": 0.8
   }
 }

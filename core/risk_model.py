@@ -15,6 +15,32 @@ def normalize_log(x, max_val=20.0):
     """Logarithmische Normalisierung: Reserven wirken stark risikomindernd."""
     return clamp01(1 - (math.log1p(x) / math.log1p(max_val)))
 
+def tech_profile(scores: dict) -> str:
+    t = scores["tech"]
+
+    if t > 0.75:
+        return "Sehr hohe technologische Abhängigkeit – kritische Verwundbarkeit."
+    elif t > 0.55:
+        return "Hohe technologische Abhängigkeit – Monitoring erforderlich."
+    elif t > 0.35:
+        return "Moderate technologische Abhängigkeit."
+    else:
+        return "Geringe technologische Abhängigkeit – robuste technologische Basis."
+
+def compute_tech_dependency(p: dict) -> float:
+    chips = p.get("halbleiter_abhaengigkeit", 0.5)
+    software = p.get("software_cloud_abhaengigkeit", 0.5)
+    ip = p.get("ip_lizenzen_abhaengigkeit", 0.5)
+    keytech = p.get("schluesseltechnologie_importe", 0.5)
+
+    risk = (
+        0.35 * clamp01(chips) +
+        0.30 * clamp01(software) +
+        0.20 * clamp01(ip) +
+        0.15 * clamp01(keytech)
+    )
+    return clamp01(risk)
+
 def compute_supply_chain_risk(p: dict) -> float:
     chokepoint = p.get("chokepoint_abhaengigkeit", 0.5)
     jit = p.get("just_in_time_anteil", 0.5)
@@ -105,14 +131,18 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
     # 6) Finanzielle Abhängigkeit (neue Dimension)
     financial = compute_financial_dependency(p)
 
-    # 7) GESAMTRISIKO
+    # 7) Tech-Abhängigkeit (NEU)
+    tech = compute_tech_dependency(p)
+
+    # 8) GESAMTRISIKO
     total = (
-        0.30 * macro +
-        0.25 * geo +
-        0.20 * gov +
-        0.15 * handel +
-        0.05 * supply_chain +
-        0.05 * financial
+        0.28 * macro +
+        0.23 * geo +
+        0.18 * gov +
+        0.13 * handel +
+        0.06 * supply_chain +
+        0.06 * financial +
+        0.06 * tech
     )
 
     # 8) Zusatzdimensionen (für Radar)
@@ -126,6 +156,7 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         "handel": clamp01(handel),
         "supply_chain": clamp01(supply_chain),
         "financial": clamp01(financial),
+        "tech": clamp01(tech),
         "finanz": finanz,
         "sozial": sozial,
         "total": clamp01(total),
