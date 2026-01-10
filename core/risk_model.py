@@ -136,13 +136,14 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
 
     # 8) GESAMTRISIKO
     total = (
-        0.28 * macro +
-        0.23 * geo +
-        0.18 * gov +
-        0.13 * handel +
+        0.26 * macro +
+        0.21 * geo +
+        0.17 * governance +
+        0.12 * handel +
         0.06 * supply_chain +
         0.06 * financial +
-        0.06 * tech
+        0.06 * tech +
+        0.06 * energie
     )
 
     # 8) Zusatzdimensionen (für Radar)
