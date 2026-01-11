@@ -107,7 +107,7 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
     fach = p.get("fachkraefte", 0.7)
     korr = p.get("korruption", 0.3)
 
-    gov = (
+    governance = (
         0.45 * (1 - clamp01(demo)) +
         0.30 * clamp01(korr) +
         0.15 * (1 - clamp01(innov)) +
@@ -128,13 +128,16 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
     # 5) Lieferketten-Risiko
     supply_chain = compute_supply_chain_risk(p)
 
-    # 6) Finanzielle Abhängigkeit (neue Dimension)
+    # 6) Finanzielle Abhängigkeit
     financial = compute_financial_dependency(p)
 
-    # 7) Tech-Abhängigkeit (NEU)
+    # 7) Tech-Abhängigkeit
     tech = compute_tech_dependency(p)
 
-    # 8) GESAMTRISIKO
+    # 8) Energieabhängigkeit (NEU)
+    energie = p.get("energie", 0.5)
+
+    # 9) GESAMTRISIKO
     total = (
         0.26 * macro +
         0.21 * geo +
@@ -146,23 +149,17 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         0.06 * energie
     )
 
-    # 8) Zusatzdimensionen (für Radar)
-    finanz = clamp01((versch / 2.0 + fx / 2.0))
-    sozial = clamp01((1 - fach) * 0.5 + (1 - demo) * 0.5)
-
     return {
-        "macro": clamp01(macro),
-        "geo": clamp01(geo),
-        "governance": clamp01(gov),
-        "handel": clamp01(handel),
-        "supply_chain": clamp01(supply_chain),
-        "financial": clamp01(financial),
-        "tech": clamp01(tech),
-        "finanz": finanz,
-        "sozial": sozial,
-        "total": clamp01(total),
+        "macro": macro,
+        "geo": geo,
+        "governance": governance,
+        "handel": handel,
+        "supply_chain": supply_chain,
+        "financial": financial,
+        "tech": tech,
+        "energie": energie,
+        "total": total,
     }
-
     
 def risk_category(score: float) -> Tuple[str, str]:
     if score < 0.33:

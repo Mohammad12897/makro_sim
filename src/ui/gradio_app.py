@@ -25,6 +25,20 @@ import numpy as np
 import seaborn as sns
 
 
+# ------------------------------------------------------------
+# 1. Datenbasis laden
+# ------------------------------------------------------------
+
+#with open("slider_presets.json", "r", encoding="utf-8") as f:
+#    presets = json.load(f)
+
+# ------------------------------------------------------------
+# 2. Risiko- und Statusfunktionen (werden bei dir schon existieren)
+# ------------------------------------------------------------
+
+# Annahme: existiert in deinem Projekt
+# def compute_risk_scores(params: dict) -> dict: ...
+
 # ============================================================
 # PRESETS LADEN
 # ============================================================
@@ -102,6 +116,17 @@ def load_textfile(path: Path) -> str:
     except Exception:
         return "Textdatei konnte nicht geladen werden."
 
+def load_lexikon():
+    lexikon_path = ROOT / "docs" / "lexikon_erweitert.md"
+    if lexikon_path.exists():
+        return lexikon_path.read_text(encoding="utf-8")
+    return "Lexikon nicht gefunden."
+
+try:
+    lexikon_erweitert_markdown = load_lexikon()
+except Exception:
+    lexikon_erweitert_markdown = "Lexikon konnte nicht geladen werden."
+
 
 status_radar_text = load_textfile(ROOT.parent / "docs" / "interpretation_status_radar.txt")
 delta_radar_text = load_textfile(ROOT.parent / "docs" / "interpretation_delta_radar.txt")
@@ -132,39 +157,54 @@ def build_early_warning(params: Dict[str, float], scores: Dict[str, float]) -> s
     macro = scores.get("macro", 0.0)
     geo = scores.get("geo", 0.0)
     gov = scores.get("governance", 0.0)
-    finanz = scores.get("finanz", 0.0)
-    sozial = scores.get("sozial", 0.0)
+    handel = scores.get("handel", 0.0)
+    supply = scores.get("supply_chain", 0.0)
+    financial = scores.get("financial", 0.0)
+    tech = scores.get("tech", 0.0)
+    energie = scores.get("energie", 0.0)
 
-    if total > 0.7:
-        warnings.append("Gesamtrisiko im roten Bereich (> 0.7).")
-    elif total > 0.5:
-        warnings.append("Gesamtrisiko erhöht (> 0.5).")
+    # --- Gesamtwarnung ---
+    if total > 0.75:
+        warnings.append("⚠️ **Gesamtrisiko kritisch hoch** – sofortige Maßnahmen erforderlich.")
+    elif total > 0.55:
+        warnings.append("⚠️ **Gesamtrisiko erhöht** – erhöhte Wachsamkeit empfohlen.")
 
-    if macro > 0.6:
-        warnings.append("Makro-Risiko erhöht: Wachstum, Inflation oder Defizite kritisch.")
-    if geo > 0.6:
-        warnings.append("Geo-Risiko erhöht: geopolitische Spannungen oder Sanktionen möglich.")
-    if gov > 0.6:
-        warnings.append("Governance-Risiko erhöht: Institutionen, Rechtsstaatlichkeit, Transparenz fragil.")
-    if finanz > 0.6:
-        warnings.append("Finanz-Risiko erhöht: Finanzsystem oder Schuldenpuffer kritisch.")
-    if sozial > 0.6:
-        warnings.append("Soziales Risiko erhöht: gesellschaftliche Spannungen möglich.")
+    # --- Makro ---
+    if macro > 0.7:
+        warnings.append("• Makroökonomische Instabilität (Inflation, Wachstum, Arbeitsmarkt).")
 
-    if params.get("verschuldung", 0.0) > 1.2:
-        warnings.append("Hohe Verschuldung: Risiko von Refinanzierungsstress.")
-    if params.get("FX_Schockempfindlichkeit", 0.0) > 1.2:
-        warnings.append("Hohe FX-Schockempfindlichkeit: Währungsrisiko erhöht.")
-    if params.get("demokratie", 1.0) < 0.4:
-        warnings.append("Niedrige demokratische Qualität: Governance-Risikotreiber.")
-    if params.get("korruption", 0.0) > 0.6:
-        warnings.append("Hohe Korruption: Governance- und Investitionsrisiko.")
+    # --- Geo ---
+    if geo > 0.7:
+        warnings.append("• Hohe geopolitische Risiken (Konflikte, Sanktionen, Rivalitäten).")
+
+    # --- Governance ---
+    if gov > 0.7:
+        warnings.append("• Schwache Governance-Strukturen und politische Unsicherheit.")
+
+    # --- Handel ---
+    if handel > 0.7:
+        warnings.append("• Kritische Handelsabhängigkeit von wenigen Partnern.")
+
+    # --- Lieferkette ---
+    if supply > 0.7:
+        warnings.append("• Hohe Verwundbarkeit der Lieferketten (Single-Sourcing, geringe Diversifikation).")
+
+    # --- Finanzen ---
+    if financial > 0.7:
+        warnings.append("• Finanzielle Instabilität (Kapitalflüsse, Verschuldung, Zinsrisiken).")
+
+    # --- Tech ---
+    if tech > 0.7:
+        warnings.append("• Kritische technologische Abhängigkeit (Halbleiter, Cloud, IP).")
+
+    # --- Energie ---
+    if energie > 0.7:
+        warnings.append("• Kritische Energieabhängigkeit – hohe Importabhängigkeit und Schockrisiken.")
 
     if not warnings:
-        warnings.append("Keine akuten Frühwarnsignale. Situation insgesamt stabil.")
+        return "Keine akuten Frühwarnsignale – Risiko derzeit stabil."
 
-    return "\n".join(f"- {w}" for w in warnings)
-
+    return "\n".join(warnings)
 
 def build_trade_supply_early_warning(params: dict, scores: dict) -> str:
     lines = []
@@ -332,26 +372,6 @@ def tech_storyline(name: str, params: dict) -> str:
 
     return "\n".join(lines)
 
-def cluster_storyline(cluster_id: int) -> str:
-    if cluster_id == 0:
-        return (
-            "Cluster 0 umfasst Länder mit niedrigen Risiken: "
-            "gut diversifizierter Handel, stabile Lieferketten, "
-            "solide Finanzen und geringe Tech- und Energieabhängigkeit."
-        )
-    elif cluster_id == 1:
-        return (
-            "Cluster 1 umfasst Länder mit mittleren Risiken: "
-            "einige Abhängigkeiten in Handel, Lieferketten oder Tech "
-            "sowie moderate Energieverwundbarkeit."
-        )
-    elif cluster_id == 2:
-        return (
-            "Cluster 2 umfasst Länder mit hohen Risiken: "
-            "starke Abhängigkeiten in Handel, Lieferketten, Tech oder Energie "
-            "und hohe Anfälligkeit für externe Schocks."
-        )
-    return "Unbekannt" 
 
 # ============================================================
 # RADAR-FUNKTIONEN
@@ -422,42 +442,50 @@ def plot_radar(scores: Dict[str, float]):
     return fig
 
 
-def plot_delta_radar(scores_old: Dict[str, float], scores_new: Dict[str, float]):
-    labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
+def plot_delta_radar(country):
+    p = presets[country]
 
-    old_vals = [
-        scores_old["macro"],
-        scores_old["geo"],
-        scores_old["governance"],
-        scores_old["finanz"],
-        scores_old["sozial"],
+    # Prüfen, ob t0/t1 existieren
+    if "t0" not in p or "t1" not in p:
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, "Keine t0/t1 Daten vorhanden", ha="center", fontsize=14)
+        ax.axis("off")
+        return fig
+
+    p0 = p["t0"]
+    p1 = p["t1"]
+
+    s0 = compute_risk_scores(p0)
+    s1 = compute_risk_scores(p1)
+
+    labels = [
+        "Makro", "Geo", "Governance", "Handel",
+        "Lieferkette", "Finanzen", "Tech", "Energie"
     ]
 
-    new_vals = [
-        scores_new["macro"],
-        scores_new["geo"],
-        scores_new["governance"],
-        scores_new["finanz"],
-        scores_new["sozial"],
+    dims = ["macro","geo","governance","handel",
+            "supply_chain","financial","tech","energie"]
 
-    ]
+    v0 = [s0[d] for d in dims]
+    v1 = [s1[d] for d in dims]
 
-    delta = [n - o for n, o in zip(new_vals, old_vals)]
-
-    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
-    delta = np.concatenate((delta, [delta[0]]))
+    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
     angles = np.concatenate((angles, [angles[0]]))
 
     fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
-    ax.plot(angles, delta, "o-", linewidth=2, color="red")
-    ax.fill(angles, delta, alpha=0.25, color="red")
+
+    ax.plot(angles, v0 + [v0[0]], label="t0", linewidth=2)
+    ax.plot(angles, v1 + [v1[0]], label="t1", linewidth=2)
+
+    ax.fill(angles, v0 + [v0[0]], alpha=0.15)
+    ax.fill(angles, v1 + [v1[0]], alpha=0.15)
+
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels)
-    ax.set_ylim(-1, 1)
-    ax.set_title("Delta-Radar (Veränderungen)")
+    ax.set_ylim(0, 1)
+    ax.legend()
 
     return fig
-
 
 def plot_resilience_radar(scores: Dict[str, float]):
     labels = ["Risiko", "Resilienz", "Governance", "Finanz", "Sozial"]
@@ -624,132 +652,6 @@ def plot_finanz_radar(params: dict):
     ax.set_xticklabels(labels)
     ax.set_ylim(0, 1)
     ax.set_title("Finanzielle Abhängigkeit")
-    return fig
-
-def plot_status_radar(scores: dict):
-    labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
-    values = [
-        scores["macro"],
-        scores["geo"],
-        scores["governance"],
-        scores["finanz"],
-        scores["sozial"],
-    ]
-
-    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
-    angles = np.concatenate((angles, [angles[0]]))
-    values = np.concatenate((values, [values[0]]))
-
-    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
-    ax.plot(angles, values, "o-", linewidth=2)
-    ax.fill(angles, values, alpha=0.25)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels)
-    ax.set_ylim(0, 1)
-
-    return fig
-
-def plot_risk_radar(scores: dict):
-    labels = [
-        "Makro", "Geo", "Governance", "Handel",
-        "Lieferkette", "Finanzen", "Tech", "Energie"
-    ]
-
-    values = [
-        scores["macro"],
-        scores["geo"],
-        scores["governance"],
-        scores["handel"],
-        scores["supply_chain"],
-        scores["financial"],
-        scores["tech"],
-        scores["energie"],
-    ]
-
-    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
-    angles = np.concatenate((angles, [angles[0]]))
-    values = np.concatenate((values, [values[0]]))
-
-    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
-    ax.plot(angles, values, "o-", linewidth=2)
-    ax.fill(angles, values, alpha=0.25)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels)
-    ax.set_ylim(0, 1)
-
-    return fig
-
-def plot_multi_risk_radar(presets: dict):
-    labels = [
-        "Makro", "Geo", "Governance", "Handel",
-        "Lieferkette", "Finanzen", "Tech", "Energie"
-    ]
-
-    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
-    angles = np.concatenate((angles, [angles[0]]))
-
-    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
-
-    for land, params in presets.items():
-        scores = compute_risk_scores(params)
-
-        values = [
-            scores["macro"],
-            scores["geo"],
-            scores["governance"],
-            scores["handel"],
-            scores["supply_chain"],
-            scores["financial"],
-            scores["tech"],
-            scores["energie"],
-        ]
-        values = np.concatenate((values, [values[0]]))
-
-        ax.plot(angles, values, linewidth=1.5, label=land)
-        ax.fill(angles, values, alpha=0.1)
-
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels)
-    ax.set_ylim(0, 1)
-    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
-
-    return fig
-
-def plot_cluster_radar(presets: dict):
-    countries, labels = cluster_risk_dimensions(presets)
-
-    # Risiko-Dimensionen
-    dims = ["handel", "supply_chain", "financial", "tech", "energie"]
-    labels_radar = ["Handel", "Lieferkette", "Finanzen", "Tech", "Energie"]
-
-    # Cluster-Mittelwerte berechnen
-    cluster_means = {0: [], 1: [], 2: []}
-    for c in [0, 1, 2]:
-        cluster_means[c] = np.mean(
-            [
-                [compute_risk_scores(presets[land])[d] for d in dims]
-                for land, lab in zip(countries, labels)
-                if lab == c
-            ],
-            axis=0
-        )
-
-    # Radar zeichnen
-    angles = np.linspace(0, 2*np.pi, len(labels_radar), endpoint=False)
-    angles = np.concatenate((angles, [angles[0]]))
-
-    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
-
-    for c in [0, 1, 2]:
-        vals = np.concatenate((cluster_means[c], [cluster_means[c][0]]))
-        ax.plot(angles, vals, label=f"Cluster {c}", linewidth=2)
-        ax.fill(angles, vals, alpha=0.15)
-
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels_radar)
-    ax.set_ylim(0, 1)
-    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
-
     return fig
 
 def risk_radar(scores: Dict[str, float]):
@@ -957,36 +859,6 @@ def cluster_tech(presets):
 
     return countries, labels
 
-def cluster_risk_dimensions(presets: dict):
-    countries = list(presets.keys())
-
-    X = np.array([
-        [
-            compute_risk_scores(presets[land])["handel"],
-            compute_risk_scores(presets[land])["supply_chain"],
-            compute_risk_scores(presets[land])["financial"],
-            compute_risk_scores(presets[land])["tech"],
-            compute_risk_scores(presets[land])["energie"],   # NEU
-        ]
-        for land in countries
-    ])
-
-    centers = np.array([
-        X.mean(axis=0) - 0.15,
-        X.mean(axis=0),
-        X.mean(axis=0) + 0.15,
-    ])
-
-    for _ in range(5):
-        dists = np.linalg.norm(X[:, None, :] - centers[None, :, :], axis=2)
-        labels = np.argmin(dists, axis=1)
-
-        for k in range(3):
-            if np.any(labels == k):
-                centers[k] = X[labels == k].mean(axis=0)
-
-    return countries, labels
-
 def handels_heatmap(presets: dict):
     rows = []
     for land, params in presets.items():
@@ -1031,31 +903,6 @@ def tech_heatmap(presets):
 
     return rows
 
-def plot_cluster_heatmap(presets: dict):
-    countries = list(presets.keys())
-
-    data = [
-        [
-            compute_risk_scores(presets[land])["handel"],
-            compute_risk_scores(presets[land])["supply_chain"],
-            compute_risk_scores(presets[land])["financial"],
-            compute_risk_scores(presets[land])["tech"],
-            compute_risk_scores(presets[land])["energie"],
-        ]
-        for land in countries
-    ]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.heatmap(
-        data,
-        annot=True,
-        cmap="Reds",
-        xticklabels=["Handel", "Lieferkette", "Finanzen", "Tech", "Energie"],
-        yticklabels=countries,
-        ax=ax
-    )
-    ax.set_title("Cluster-Heatmap: Risiko-Dimensionen")
-    return fig
 
 # ============================================================
 # PROGNOSE-FUNKTIONEN
@@ -1195,7 +1042,6 @@ def load_country_preset(country_code: str) -> List[float]:
         values.append(float(params.get(key, default_params[key])))
     return values
 
-
 def run_simulation_with_radar_and_delta(*vals):
     params = _collect_params_from_values(list(vals))
 
@@ -1219,7 +1065,6 @@ def run_simulation_with_radar_and_delta(*vals):
     fig_res = plot_resilience_radar(scores_new)
 
     return summary, warning, fig_radar, fig_delta, fig_res
-
 
 def tech_radar(params: dict):
     labels = [
@@ -1370,24 +1215,6 @@ def interpret_handel_supply(params, scores):
 
     return text
 
-def interpret_cluster(cluster_id: int) -> str:
-    if cluster_id == 0:
-        return (
-            "Niedrige Risiken: gut diversifizierter Handel, stabile Lieferketten, "
-            "solide Finanzen, geringe Tech- und Energieabhängigkeit."
-        )
-    elif cluster_id == 1:
-        return (
-            "Mittlere Risiken: einige Abhängigkeiten in Handel, Lieferketten oder Tech; "
-            "moderate Energieverwundbarkeit."
-        )
-    elif cluster_id == 2:
-        return (
-            "Hohe Risiken: starke Abhängigkeiten in Handel, Lieferketten, Tech oder Energie; "
-            "anfällig für externe Schocks."
-        )
-    return "Unbekannt"
-
 def interpret_scores(scores: dict) -> str:
     lines = []
     total = scores["total"]
@@ -1460,88 +1287,6 @@ def interpret_scores(scores: dict) -> str:
     return "\n".join(lines)
 
 
-def interpret_country(name: str, params: dict) -> str:
-    scores = compute_risk_scores(params)
-
-    lines = []
-    lines.append(f"## Länderprofil: {name}\n")
-
-    # Gesamtbild
-    lines.append(f"- **Gesamtrisiko:** {scores['total']:.3f}")
-    lines.append(f"- **Makro:** {scores['macro']:.3f}")
-    lines.append(f"- **Geo:** {scores['geo']:.3f}")
-    lines.append(f"- **Governance:** {scores['governance']:.3f}")
-    lines.append(f"- **Handel:** {scores['handel']:.3f}")
-    lines.append(f"- **Lieferketten:** {scores['supply_chain']:.3f}")
-    lines.append(f"- **Finanzen:** {scores['financial']:.3f}")
-    lines.append(f"- **Technologie:** {scores['tech']:.3f}\n")
-
-    # Makro
-    if scores["macro"] > 0.66:
-        lines.append("• **Makroökonomische Lage: kritisch** – hohe Verschuldung, FX-Risiken oder geringe Reserven.")
-    elif scores["macro"] > 0.33:
-        lines.append("• **Makroökonomische Lage: angespannt** – Verwundbarkeiten vorhanden, aber beherrschbar.")
-    else:
-        lines.append("• **Makroökonomische Lage: stabil** – solide Puffer und geringe Schockanfälligkeit.")
-
-    # Geo
-    if scores["geo"] > 0.66:
-        lines.append("• **Geopolitische Lage: hohes Risiko** – starke USD-Abhängigkeit, Sanktionen oder fehlende Alternativen.")
-    elif scores["geo"] > 0.33:
-        lines.append("• **Geopolitische Lage: mittleres Risiko** – gewisse Abhängigkeiten, aber Ausweichoptionen vorhanden.")
-    else:
-        lines.append("• **Geopolitische Lage: robust** – Diversifizierung und Alternativnetzwerke vorhanden.")
-
-    # Governance
-    if scores["governance"] > 0.66:
-        lines.append("• **Governance: schwach** – Defizite bei Demokratie, Korruption oder Fachkräften.")
-    elif scores["governance"] > 0.33:
-        lines.append("• **Governance: durchwachsen** – gemischtes Bild mit Stärken und Schwächen.")
-    else:
-        lines.append("• **Governance: stark** – gute Institutionen, Innovationskraft und Fachkräftebasis.")
-
-    # Handel
-    if scores["handel"] > 0.66:
-        lines.append("• **Handel: hohe Abhängigkeit** – starke Konzentration bei Exporten, Importen oder Partnern.")
-    elif scores["handel"] > 0.33:
-        lines.append("• **Handel: moderat abhängig** – Diversifizierung ausbaufähig.")
-    else:
-        lines.append("• **Handel: gut diversifiziert** – geringe strukturelle Abhängigkeiten.")
-
-    # Lieferketten
-    if scores["supply_chain"] > 0.66:
-        lines.append("• **Lieferketten: fragil** – hohe Abhängigkeit von Chokepoints, JIT oder konzentrierter Produktion.")
-    elif scores["supply_chain"] > 0.33:
-        lines.append("• **Lieferketten: teilweise anfällig** – gewisse Risiken, aber Puffer vorhanden.")
-    else:
-        lines.append("• **Lieferketten: robust** – gute Diversifizierung und resiliente Logistik.")
-
-    # Finanzen
-    if scores["financial"] > 0.66:
-        lines.append("• **Finanzielle Abhängigkeit: hoch** – starke Kapitalmarktbindung oder FX-Refinanzierung.")
-    elif scores["financial"] > 0.33:
-        lines.append("• **Finanzielle Abhängigkeit: moderat**.")
-    else:
-        lines.append("• **Finanzielle Abhängigkeit: gering** – stabile Finanzierungsbasis.")
-
-    # Technologie
-    if scores["tech"] > 0.66:
-        lines.append("• **Technologische Abhängigkeit: hoch** – starke Importabhängigkeit bei Halbleitern, Software oder IP.")
-    elif scores["tech"] > 0.33:
-        lines.append("• **Technologische Abhängigkeit: moderat** – gewisse Abhängigkeiten, aber Alternativen vorhanden.")
-    else:
-        lines.append("• **Technologische Abhängigkeit: gering** – robuste technologische Basis und Diversifizierung.")
-
-    # Energieabhängigkeit
-    if scores["energie"] > 0.66:
-        lines.append("• **Energieabhängigkeit: hoch** – starke Importabhängigkeit, geringe Resilienz bei Schocks.")
-    elif scores["energie"] > 0.33:
-        lines.append("• **Energieabhängigkeit: moderat** – gewisse Abhängigkeiten, aber Alternativen vorhanden.")
-    else:
-        lines.append("• **Energieabhängigkeit: gering** – hohe Eigenproduktion oder diversifizierte Quellen.")
-
-    return "\n".join(lines)
-
 def interpret_dashboard(params: dict, scores: dict) -> str:
     lines = []
     lines.append("## Interpretation des Dashboards\n")
@@ -1606,6 +1351,313 @@ def interpret_dashboard(params: dict, scores: dict) -> str:
 
     return "\n".join(lines)
 
+
+
+# ------------------------------------------------------------
+# 3. Radar-Plots
+# ------------------------------------------------------------
+def plot_status_radar(scores: dict):
+    labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
+    values = [
+        scores["macro"],
+        scores["geo"],
+        scores["governance"],
+        scores["finanz"],
+        scores["sozial"],
+    ]
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+    values = np.concatenate((values, [values[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(angles, values, "o-", linewidth=2)
+    ax.fill(angles, values, alpha=0.25)
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+
+    return fig
+
+def plot_risk_radar(scores: dict):
+    labels = [
+        "Makro", "Geo", "Governance", "Handel",
+        "Lieferkette", "Finanzen", "Tech", "Energie"
+    ]
+
+    values = [
+        scores["macro"],
+        scores["geo"],
+        scores["governance"],
+        scores["handel"],
+        scores["supply_chain"],
+        scores["financial"],
+        scores["tech"],
+        scores["energie"],
+    ]
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+    values = np.concatenate((values, [values[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(angles, values, "o-", linewidth=2)
+    ax.fill(angles, values, alpha=0.25)
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+
+    return fig
+
+def plot_multi_risk_radar(presets: dict):
+    labels = [
+        "Makro", "Geo", "Governance", "Handel",
+        "Lieferkette", "Finanzen", "Tech", "Energie"
+    ]
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+
+    for land, params in presets.items():
+        scores = compute_risk_scores(params)
+
+        values = [
+            scores["macro"],
+            scores["geo"],
+            scores["governance"],
+            scores["handel"],
+            scores["supply_chain"],
+            scores["financial"],
+            scores["tech"],
+            scores["energie"],
+        ]
+        values = np.concatenate((values, [values[0]]))
+
+        ax.plot(angles, values, linewidth=1.5, label=land)
+        ax.fill(angles, values, alpha=0.1)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
+
+    return fig
+
+# ------------------------------------------------------------
+# 4. Clusteranalyse + Hilfsfunktionen
+# ------------------------------------------------------------
+
+def cluster_risk_dimensions(presets: dict):
+    countries = list(presets.keys())
+
+    X = np.array([
+        [
+            compute_risk_scores(presets[land])["handel"],
+            compute_risk_scores(presets[land])["supply_chain"],
+            compute_risk_scores(presets[land])["financial"],
+            compute_risk_scores(presets[land])["tech"],
+            compute_risk_scores(presets[land])["energie"],
+        ]
+        for land in countries
+    ])
+
+    centers = np.array([
+        X.mean(axis=0) - 0.15,
+        X.mean(axis=0),
+        X.mean(axis=0) + 0.15,
+    ])
+
+    for _ in range(5):
+        dists = np.linalg.norm(X[:, None, :] - centers[None, :, :], axis=2)
+        labels = np.argmin(dists, axis=1)
+
+        for k in range(3):
+            if np.any(labels == k):
+                centers[k] = X[labels == k].mean(axis=0)
+
+    return countries, labels
+
+
+def interpret_cluster(cluster_id: int) -> str:
+    if cluster_id == 0:
+        return (
+            "Niedrige Risiken: gut diversifizierter Handel, stabile Lieferketten, "
+            "solide Finanzen, geringe Tech- und Energieabhängigkeit."
+        )
+    elif cluster_id == 1:
+        return (
+            "Mittlere Risiken: einige Abhängigkeiten in Handel, Lieferketten oder Tech; "
+            "moderate Energieverwundbarkeit."
+        )
+    elif cluster_id == 2:
+        return (
+            "Hohe Risiken: starke Abhängigkeiten in Handel, Lieferketten, Tech oder Energie; "
+            "anfällig für externe Schocks."
+        )
+    return "Unbekannt"
+
+
+def plot_cluster_heatmap(presets: dict):
+    countries = list(presets.keys())
+
+    data = [
+        [
+            compute_risk_scores(presets[land])["handel"],
+            compute_risk_scores(presets[land])["supply_chain"],
+            compute_risk_scores(presets[land])["financial"],
+            compute_risk_scores(presets[land])["tech"],
+            compute_risk_scores(presets[land])["energie"],
+        ]
+        for land in countries
+    ]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.heatmap(
+        data,
+        annot=True,
+        cmap="Reds",
+        xticklabels=["Handel", "Lieferkette", "Finanzen", "Tech", "Energie"],
+        yticklabels=countries,
+        ax=ax
+    )
+    ax.set_title("Cluster-Heatmap: Risiko-Dimensionen")
+    return fig
+
+
+def plot_cluster_radar(presets: dict):
+    countries, labels = cluster_risk_dimensions(presets)
+
+    dims = ["handel", "supply_chain", "financial", "tech", "energie"]
+    labels_radar = ["Handel", "Lieferkette", "Finanzen", "Tech", "Energie"]
+
+    cluster_means = {}
+    for c in [0, 1, 2]:
+        cluster_vals = [
+            [compute_risk_scores(presets[land])[d] for d in dims]
+            for land, lab in zip(countries, labels)
+            if lab == c
+        ]
+        if cluster_vals:
+            cluster_means[c] = np.mean(cluster_vals, axis=0)
+        else:
+            cluster_means[c] = np.zeros(len(dims))
+
+    angles = np.linspace(0, 2*np.pi, len(labels_radar), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    for c in [0, 1, 2]:
+        vals = np.concatenate((cluster_means[c], [cluster_means[c][0]]))
+        ax.plot(angles, vals, label=f"Cluster {c}", linewidth=2)
+        ax.fill(angles, vals, alpha=0.15)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels_radar)
+    ax.set_ylim(0, 1)
+    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
+
+    return fig
+
+def plot_compare_radar(country_a, country_b):
+    scores_a = compute_risk_scores(presets[country_a])
+    scores_b = compute_risk_scores(presets[country_b])
+
+    labels = ["Makro", "Geo", "Governance", "Handel", "Lieferkette", "Finanzen", "Tech", "Energie"]
+
+    values_a = [scores_a[k] for k in ["macro","geo","governance","handel","supply_chain","financial","tech","energie"]]
+    values_b = [scores_b[k] for k in ["macro","geo","governance","handel","supply_chain","financial","tech","energie"]]
+
+    # Radar-Plot erstellen
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
+
+    ax.plot(angles, values_a + [values_a[0]], label=country_a, linewidth=2)
+    ax.plot(angles, values_b + [values_b[0]], label=country_b, linewidth=2)
+
+    ax.fill(angles, values_a + [values_a[0]], alpha=0.15)
+    ax.fill(angles, values_b + [values_b[0]], alpha=0.15)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.legend()
+
+    return fig
+
+def cluster_storyline(cluster_id: int) -> str:
+    if cluster_id == 0:
+        return (
+            "Cluster 0: Länder mit niedrigen Risiken – "
+            "gut diversifizierter Handel, robuste Lieferketten, solide Finanzen "
+            "und geringe technologische sowie energetische Abhängigkeit."
+        )
+    elif cluster_id == 1:
+        return (
+            "Cluster 1: Länder mit mittleren Risiken – "
+            "gewisse Abhängigkeiten in Handel, Lieferketten oder Tech, "
+            "sowie moderate Energieverwundbarkeit."
+        )
+    elif cluster_id == 2:
+        return (
+            "Cluster 2: Länder mit hohen Risiken – "
+            "starke Konzentration bei Handel, Lieferketten, Tech oder Energie; "
+            "hohe Anfälligkeit für externe Schocks."
+        )
+    return "Unbekannt"
+
+# ------------------------------------------------------------
+# 5. Länderprofil & Risiko-Storyline
+# ------------------------------------------------------------
+
+def interpret_country(scores: dict) -> str:
+    lines = []
+
+    # Makro
+    if scores["macro"] > 0.66:
+        lines.append("• Makroökonomisch ist das Land stark verwundbar.")
+    elif scores["macro"] > 0.33:
+        lines.append("• Makroökonomisch bestehen moderate Risiken.")
+    else:
+        lines.append("• Makroökonomisch ist das Land stabil.")
+
+    # Geo
+    if scores["geo"] > 0.66:
+        lines.append("• Geopolitisch ist das Land hohen Risiken ausgesetzt.")
+    elif scores["geo"] > 0.33:
+        lines.append("• Geopolitisch bestehen moderate Risiken.")
+    else:
+        lines.append("• Geopolitisch ist das Land stabil.")
+
+    # Governance
+    if scores["governance"] > 0.66:
+        lines.append("• Governance-Risiken sind hoch.")
+    elif scores["governance"] > 0.33:
+        lines.append("• Governance-Risiken sind moderat.")
+    else:
+        lines.append("• Governance-Strukturen sind stabil.")
+
+    # Tech
+    if scores["tech"] > 0.66:
+        lines.append("• Technologisch besteht starke Abhängigkeit (Halbleiter, Cloud, IP, Schlüsseltechnologien).")
+    elif scores["tech"] > 0.33:
+        lines.append("• Technologische Abhängigkeiten sind moderat.")
+    else:
+        lines.append("• Technologisch ist das Land gut diversifiziert.")
+
+    # Energie
+    if scores["energie"] > 0.75:
+        lines.append("• Die Energieabhängigkeit ist kritisch – starke Importabhängigkeit und hohe Verwundbarkeit bei Schocks.")
+    elif scores["energie"] > 0.5:
+        lines.append("• Die Energieabhängigkeit ist moderat – Diversifizierung wäre sinnvoll.")
+    else:
+        lines.append("• Die Energieabhängigkeit ist gering – hohe energetische Resilienz.")
+
+    return "\n".join(lines)
+
+
 def generate_country_profile(country: str, presets: dict):
     scores = compute_risk_scores(presets[country])
 
@@ -1624,161 +1676,105 @@ def generate_country_profile(country: str, presets: dict):
 
     return text
 
-# ============================================================
-# UI – HAUPTANWENDUNG
-# ============================================================
+# ------------------------------------------------------------
+# 6. Dashboard-KPIs
+# ------------------------------------------------------------
 
-with gr.Blocks(title="Makro-Simulation") as demo:
+def dashboard_kpis(country: str):
+    scores = compute_risk_scores(presets[country])
+    total_risk = scores.get("total", np.mean(list(scores.values())))
 
-    gr.Markdown("# Makro-Simulation")
-    gr.Markdown(
-        "Status-Radar, Delta-Radar, Resilienz-Radar, Szenarien, Sensitivität und Langfrist-Prognosen "
-        "für makrofinanzielle Risiken."
+    kpi_text = (
+        f"### KPI-Übersicht für {country}\n\n"
+        f"- Gesamt-Risiko (falls vorhanden): **{total_risk:.2f}**\n"
+        f"- Makro: **{scores['macro']:.2f}**\n"
+        f"- Geo: **{scores['geo']:.2f}**\n"
+        f"- Governance: **{scores['governance']:.2f}**\n"
+        f"- Tech: **{scores['tech']:.2f}**\n"
+        f"- Energie: **{scores['energie']:.2f}**\n"
     )
 
-    with gr.Tabs():
+    risk_fig = plot_risk_radar(scores)
 
-        # ----------------------------------------------------
-        # TAB 1 — SIMULATION
-        # ----------------------------------------------------
-        with gr.Tab("Simulation & Radar-Analysen"):
+    return kpi_text, risk_fig
 
-            gr.Markdown("### Risiko-Simulation mit Frühwarnsystem und Radar-Ansichten  & Multi-Radar-Vergleich")
 
-            country_dropdown = gr.Dropdown(
-                choices=[c for c in EXPECTED_COUNTRIES if c in presets.keys()],
-                label="Land (für Presets)",
-                value=[c for c in EXPECTED_COUNTRIES if c in presets.keys()][0]
-                if presets else None,
+# ------------------------------------------------------------
+# 7. Gradio-App Layout
+# ------------------------------------------------------------
+
+def build_app():
+
+    with gr.Blocks() as demo:
+
+        gr.Markdown("# Makro-Risiko-Dashboard")
+        gr.Markdown(
+            "Dieses Dashboard bündelt Simulation, Radar-Analysen, Heatmaps, "
+            "Clusteranalysen und Länderprofile in einer Oberfläche."
+        )
+
+        with gr.Tab("Dashboard"):
+            gr.Markdown("## Überblick & KPIs")
+
+            dash_country = gr.Dropdown(list(presets.keys()), label="Land auswählen")
+            dash_button = gr.Button("KPIs aktualisieren")
+            dash_kpi_output = gr.Markdown()
+            dash_radar_output = gr.Plot()
+
+            dash_button.click(
+                fn=dashboard_kpis,
+                inputs=[dash_country],
+                outputs=[dash_kpi_output, dash_radar_output],
             )
 
-            slider_components = []
-            half = len(PARAM_SLIDERS) // 2
-
-            with gr.Row():
-                with gr.Column(scale=2):
-                    for key, lo, hi, default in PARAM_SLIDERS[:half]:
-                        s = gr.Slider(
-                            minimum=lo,
-                            maximum=hi,
-                            value=default,
-                            label=key,
-                            step=0.01,
-                        )
-                        slider_components.append(s)
-
-                with gr.Column(scale=2):
-                    for key, lo, hi, default in PARAM_SLIDERS[half:]:
-                        s = gr.Slider(
-                            minimum=lo,
-                            maximum=hi,
-                            value=default,
-                            label=key,
-                            step=0.01,
-                        )
-                        slider_components.append(s)
-
-            summary_text = gr.Textbox(label="Risiko-Zusammenfassung", lines=6)
-            early_warning_box = gr.Textbox(label="Frühwarnindikatoren", lines=8)
-
-            radar_plot = gr.Plot(label="Status-Radar")
-            delta_radar_plot = gr.Plot(label="Delta-Radar")
-            resilience_radar_plot = gr.Plot(label="Risiko vs. Resilienz")
-            tech_radar_plot = gr.Plot(label="Tech-Radar")
-
-            # --- Tech-Radar (NEU integriert) ---
-            multi_radar_plot = gr.Plot(label="Multi-Radar (alle Länder)")
-            # --- Interpretation ---
-            with gr.Accordion("Interpretation der Radar-Diagramme", open=False):
-                gr.Markdown(f"```\n{status_radar_text}\n```")
-                gr.Markdown(f"```\n{delta_radar_text}\n```")
-                gr.Markdown(f"```\n{resilienz_radar_text}\n```")
-                gr.Markdown("**Tech-Radar:** zeigt die vier technologischen Abhängigkeiten eines Landes.")
-                gr.Markdown("**Multi-Radar:** vergleicht alle Länder gleichzeitig.")
-
-            # --- Buttons ---
-            run_button = gr.Button("Simulation starten")
-            multi_button = gr.Button("Multi-Radar erzeugen")
-
-
-            # --- Preset laden ---
-            country_dropdown.change(
-                fn=load_country_preset,
-                inputs=[country_dropdown],
-                outputs=slider_components,
-            )
-
-            # --- Simulation starten ---
-            def run_full_simulation(*slider_values):
-                summary, warnings, r1, r2, r3 = run_simulation_with_radar_and_delta(*slider_values)
-
-                # Tech-Radar zusätzlich erzeugen
-                country = country_dropdown.value
-                tech_fig = tech_radar(presets[country])
-
-                return summary, warnings, r1, r2, r3, tech_fig
-
-            run_button.click(
-                fn=run_full_simulation,
-                inputs=slider_components,
-                outputs=[
-                    summary_text,
-                    early_warning_box,
-                    radar_plot,
-                    delta_radar_plot,
-                    resilience_radar_plot,
-                    tech_radar_plot
-                ],
-            )
-
-            # --- Multi-Radar ---
-            multi_button.click(
-                lambda: multi_radar(presets),
-                None,
-                multi_radar_plot
+        with gr.Tab("Simulation & Radar"):
+            gr.Markdown("## Simulation & Radar-Analysen")
+            gr.Markdown(
+                "Dieser Bereich bietet Risiko-Radare für einzelne Länder, "
+                "Vergleiche zwischen zwei Ländern, Multi-Radare und Delta-Analysen."
             )
 
 
-            # --- Tech-Frühwarnsystem ---
-            gr.Markdown("### Tech-Frühwarnsystem")
+            # Hier kannst du deine bestehenden Slider & Simulation einbauen.
+            # Beispiel-Platzhalter:
+            sim_country = gr.Dropdown(list(presets.keys()), label="Land auswählen",value=list(presets.keys())[0],)
+            with gr.Accordion("📊 Risiko‑Radar (Einzelland)", open=False):
+                sim_risk_button = gr.Button("📊 Risiko‑Radar anzeigen", variant="primary")
+                sim_risk_output = gr.Plot()
 
-            tech_warn_output = gr.Textbox(
-                label="Tech-Warnungen",
-                lines=6
-            )
+                sim_risk_button.click(
+                    lambda land: plot_risk_radar(compute_risk_scores(presets[land])),
+                    inputs=[sim_country],
+                    outputs=sim_risk_output,
+                )
 
-            def ui_tech_warning(country):
-                return tech_early_warning(presets[country])
+            with gr.Accordion("🌐 Multi‑Risiko‑Radar (alle Länder)", open=False):
+                sim_multi_button = gr.Button("🌐 Länder‑Vergleichs‑Radar", variant="secondary")
+                sim_multi_output = gr.Plot()
 
-            tech_warn_button = gr.Button("Tech-Risiken analysieren")
+                sim_multi_button.click(
+                    lambda: plot_multi_risk_radar(presets),
+                    inputs=None,
+                    outputs=sim_multi_output,
+                )
 
-            tech_warn_button.click(
-                fn=ui_tech_warning,
-                inputs=[country_dropdown],
-                outputs=tech_warn_output
-            )
 
-            # --- Tech-Storyline ---
-            gr.Markdown("### Tech-Storyline")
+            with gr.Accordion("⚖️ Vergleich: Land A vs. Land B", open=False):
+                compare_country_a = gr.Dropdown(list(presets.keys()), label="Land A")
+                compare_country_b = gr.Dropdown(list(presets.keys()), label="Land B")
 
-            tech_story_output = gr.Markdown()
+                sim_compare_button = gr.Button("⚖️ Vergleich: Land A vs. Land B", variant="secondary")
+                sim_compare_output = gr.Plot()
+                
+                sim_compare_button.click(
+                    plot_compare_radar,
+                    inputs=[compare_country_a, compare_country_b],
+                    outputs=sim_compare_output,
+                )
 
-            def ui_tech_story(country):
-                return tech_storyline(country, presets[country])
 
-            tech_story_button = gr.Button("Tech-Storyline erzeugen")
-
-            tech_story_button.click(
-                fn=ui_tech_story,
-                inputs=[country_dropdown],
-                outputs=tech_story_output
-            )
-
-        # ----------------------------------------------------
-        # TAB 2 — HEATMAP
-        # ----------------------------------------------------
         with gr.Tab("Heatmaps"):
-            # Standard-Risiko-Heatmap
+
             gr.Markdown("### 1) Standard-Risiko-Heatmap")
 
             heat_button = gr.Button("Heatmap erzeugen")
@@ -1793,25 +1789,31 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 label="Standard-Risiko-Heatmap",
             )
 
-            heat_button.click(ui_heatmap, None, heat_output)
+            # Annahme: ui_heatmap() existiert und liefert die Datenliste
+            heat_button.click(
+                fn=ui_heatmap,
+                inputs=None,
+                outputs=heat_output
+            )
 
             with gr.Accordion("Interpretation", open=False):
                 gr.Markdown(f"```\n{heatmap_text}\n```")
 
-            # --- Tech-Risiko-Heatmap ---
             gr.Markdown("### 2) Tech-Risiko-Heatmap")
 
             tech_button = gr.Button("Tech-Heatmap aktualisieren")
-
             tech_output = gr.Dataframe(
                 headers=["Land", "Tech-Risiko", "Ampel"],
                 wrap=True,
                 label="Tech-Risiko-Heatmap",
             )
 
-            tech_button.click(lambda: tech_heatmap(presets), None, tech_output)
+            tech_button.click(
+                fn=lambda: tech_heatmap(presets),
+                inputs=None,
+                outputs=tech_output
+            )
 
-            # --- Cluster-Heatmap (NEU) ---
             gr.Markdown("### 3) Cluster-Heatmap: Handel + Lieferkette + Finanzen + Tech + Energie")
 
             cluster_heatmap_button = gr.Button("Cluster-Heatmap erzeugen")
@@ -1823,388 +1825,9 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 cluster_heatmap_output
             )
 
-        # ----------------------------------------------------
-        # TAB 3 — SZENARIEN
-        # ----------------------------------------------------
-        with gr.Tab("Szenarien"):
-            gr.Markdown("### Szenario-Engine (Governance-, Makro-, Geo-Schocks)")
-
-            scen_country = gr.Dropdown(
-                choices=list(presets.keys()),
-                label="Land",
-            )
-
-            scen_input = gr.Textbox(
-                label="Schock (JSON)",
-                value='{"demokratie": -0.2}',
-                lines=3,
-            )
-
-            scen_button = gr.Button("Szenario anwenden")
-
-            scen_score = gr.Number(label="Neuer Risiko-Score (Total)")
-            scen_report = gr.Dataframe(
-                headers=["Parameter", "Änderung", "Bedeutung", "Farbe"],
-                wrap=True,
-            )
-
-            with gr.Accordion("Interpretation der Szenario-Analyse", open=False):
-                gr.Markdown(f"```\n{szenario_text}\n```")
-
-            scen_button.click(
-                fn=ui_scenario,
-                inputs=[scen_country, scen_input],
-                outputs=[scen_score, scen_report],
-            )
-
-        # ----------------------------------------------------
-        # TAB 4 — SENSITIVITÄT
-        # ----------------------------------------------------
-        with gr.Tab("Sensitivität"):
-            gr.Markdown("### Sensitivitätsanalyse pro Land")
-
-            sens_country = gr.Dropdown(
-                choices=list(presets.keys()),
-                label="Land",
-            )
-
-            sens_button = gr.Button("Analyse starten")
-
-            sens_output = gr.Dataframe(
-                headers=["Parameter", "Δ Risiko", "Bedeutung", "Farbe"],
-                wrap=True,
-            )
-
-            with gr.Accordion("Interpretation der Sensitivitätsanalyse", open=False):
-                gr.Markdown(f"```\n{sensitivitaet_text}\n```")
-
-            sens_button.click(
-                fn=ui_sensitivity,
-                inputs=[sens_country],
-                outputs=[sens_output],
-            )
-
-        # ----------------------------------------------------
-        # TAB 5 — PROGNOSE
-        # ----------------------------------------------------
-        with gr.Tab("Prognose"):
-            gr.Markdown("### Langfrist-Prognosen (Deterministisch & Monte-Carlo)")
-
-            prog_country = gr.Dropdown(
-                choices=list(presets.keys()),
-                label="Land",
-            )
-
-            prog_years = gr.Slider(
-                minimum=5,
-                maximum=50,
-                value=20,
-                step=1,
-                label="Prognosehorizont (Jahre)",
-            )
-
-            prog_runs = gr.Slider(
-                minimum=100,
-                maximum=2000,
-                value=500,
-                step=100,
-                label="Monte-Carlo Läufe",
-            )
-
-            prog_button = gr.Button("Prognose starten")
-
-            prog_plot_det = gr.Plot(label="Deterministische Prognose")
-            prog_plot_mc = gr.Plot(label="Monte-Carlo-Prognose")
-
-            def ui_forecast(country, years, runs):
-                params = presets[country]
-                years = int(years)
-                runs = int(runs)
-
-                values = forecast(params, years)
-                fig_det = plot_forecast(values)
-
-                mc_vals = monte_carlo_forecast(params, years, runs)
-                fig_mc = plot_monte_carlo(mc_vals)
-
-                return fig_det, fig_mc
-
-            with gr.Accordion("Interpretation der Prognose", open=False):
-                gr.Markdown(f"```\n{prognose_text}\n```")
-
-            prog_button.click(
-                fn=ui_forecast,
-                inputs=[prog_country, prog_years, prog_runs],
-                outputs=[prog_plot_det, prog_plot_mc],
-            )
-
-
-        # ----------------------------------------------------
-        # TAB 6 — DASHBOARD
-        # ----------------------------------------------------
-        with gr.Tab("Dashboard"):
-
-            gr.Markdown("### Dashboard – Gesamtrisiko & Radar")
-
-            # Land auswählen
-            dash_country = gr.Dropdown(
-                choices=list(presets.keys()),
-                label="Land",
-                value=list(presets.keys())[0],
-            )
-
-            # Outputs
-            dash_risk_ampel = gr.Markdown()
-            dash_radar = gr.Plot()
-            dash_resilience = gr.Plot()
-            dash_delta = gr.Plot()
-            dash_warning = gr.Markdown()
-            dash_forecast = gr.Plot()
-            dash_heatmap = gr.Dataframe(
-                headers=["Land", "Makro", "Makro-Farbe", "Geo", "Geo-Farbe", "Gov", "Gov-Farbe", "Total", "Total-Farbe"],
-                wrap=True,
-                label="Risiko-Heatmap",
-            )
-
-            dash_handel_radar = gr.Plot(label="Handels-Radar")
-            dash_handel_heatmap = gr.Dataframe(
-                headers=["Land", "Handels-Risiko"],
-                wrap=True,
-                label="Handels-Heatmap",
-            )
-
-            # Systemrisiko-Radar (optional separat)
-            sys_country = gr.Dropdown(
-                choices=list(presets.keys()),
-                label="Land (Systemrisiko-Radar)",
-                value=list(presets.keys())[0],
-            )
-            sys_radar = gr.Plot(label="Systemrisiko-Radar")
-
-            def ui_system_radar(country):
-                params = presets[country]
-                return plot_systemrisiko_radar(params)
-
-            sys_country.change(
-                fn=ui_system_radar,
-                inputs=[sys_country],
-                outputs=[sys_radar],
-            )
-
-            # Interpretation
-
-            dash_interpret = gr.Markdown()
-
-            with gr.Accordion("Interpretation des Dashboards", open=False):
-                gr.Markdown(f"```\n{dashboard_text}\n```")
-                dash_interpret
-
-
-            # Dashboard-Funktion
-            def ui_dashboard(country):
-                params = presets[country]
-                scores = compute_risk_scores(params)
-                default_scores = compute_risk_scores(default_params)
-
-                # Ampel
-                cat, color = risk_category(scores["total"])
-                ampel = f"### Risiko-Ampel: **{scores['total']:.3f} ({cat})**"
-
-                # Plots
-                fig_radar = plot_radar(scores)
-                fig_res = plot_resilience_radar(scores)
-                fig_delta = plot_delta_radar(default_scores, scores)
-
-                # Frühwarnsystem
-                warn = build_early_warning_dashboard(params, scores)
-                warn_md = "### Frühwarnindikatoren\n" + warn.replace("-", "•")
-
-                # Mini-Prognose
-                values = forecast(params, years=10)
-                fig_forecast = plot_forecast(values)
-
-                # Risiko-Heatmap (bestehende Logik)
-                table = risk_heatmap(presets)
-                rows = []
-                for row in table:
-                    rows.append([
-                        row["land"],
-                        row["macro"], row["macro_color"],
-                        row["geo"], row["geo_color"],
-                        row["gov"], row["gov_color"],
-                        row["total"], row["total_color"],
-                    ])
-
-                # Handels-Radar
-                fig_handel = plot_handel_radar(params)
-
-                # Handels-Heatmap
-                handel_rows = handels_heatmap(presets)
-                # Dynamische Interpretation
-                interpretation = interpret_dashboard(params, scores)
-
-                return (
-                    ampel,
-                    fig_radar,
-                    fig_res,
-                    fig_delta,
-                    warn_md,
-                    fig_forecast,
-                    rows,
-                    fig_handel,
-                    handel_rows,
-                    interpretation,
-                )
-
-            dash_country.change(
-                fn=ui_dashboard,
-                inputs=[dash_country],
-                outputs=[
-                    dash_risk_ampel,
-                    dash_radar,
-                    dash_resilience,
-                    dash_delta,
-                    dash_warning,
-                    dash_forecast,
-                    dash_heatmap,
-                    dash_handel_radar,
-                    dash_handel_heatmap,
-                    dash_interpret,
-                ],
-            )
-
-        # ----------------------------------------------------
-        # TAB 7 — BENCHMARKING
-        # ----------------------------------------------------
-        with gr.Tab("Benchmarking"):
-
-            gr.Markdown("## Länder-Benchmarking")
-
-            bench_button = gr.Button("Benchmark aktualisieren")
-
-            bench_output = gr.Dataframe(
-                headers=[
-                    "Land", "Makro", "Geo", "Governance", "Handel",
-                    "Lieferkette", "Finanzen", "Tech", "Total"
-                ],
-                wrap=True,
-                label="Benchmark-Tabelle"
-            )
-
-            def ui_benchmark():
-                rows = []
-                for land, params in presets.items():
-                    scores = compute_risk_scores(params)
-                    rows.append([
-                        land,
-                        round(scores["macro"], 3),
-                        round(scores["geo"], 3),
-                        round(scores["governance"], 3),
-                        round(scores["handel"], 3),
-                        round(scores["supply_chain"], 3),
-                        round(scores["financial"], 3),
-                        round(scores["tech"], 3),
-                        round(scores["total"], 3),
-                    ])
-                return rows
-
-            bench_button.click(ui_benchmark, None, bench_output)
-
-            # Externe Interpretation
-            with gr.Accordion("Interpretation des Benchmarkings", open=False):
-                gr.Markdown(f"```\n{benchmarking_text}\n```")
-
-        
-        
-        # ----------------------------------------------------
-        # TAB 8 — HANDEL & LIEFERKETTEN
-        # ----------------------------------------------------
-        with gr.Tab("Handel & Lieferketten"):
-            gr.Markdown("### Analyse: Handelsabhängigkeit & Lieferkettenrisiko")
-
-            hls_country = gr.Dropdown(
-                choices=list(presets.keys()),
-                label="Land",
-                value=list(presets.keys())[0],
-            )
-
-            hls_handel_radar = gr.Plot(label="Handels-Radar")
-            hls_supply_radar = gr.Plot(label="Lieferketten-Radar")
-            hls_abhaengigkeiten_radar = gr.Plot(label="Abhängigkeiten-Radar")
-
-            hls_handel_heatmap = gr.Dataframe(
-                headers=["Land", "Handels-Risiko"],
-                wrap=True,
-                label="Handels-Heatmap",
-            )
-
-            hls_abhaengigkeiten_heatmap = gr.Dataframe(
-                headers=["Land", "Handel", "Lieferkette", "Finanzen"],
-                wrap=True,
-                label="Abhängigkeiten-Heatmap",
-            )
-
-            hls_supply_heatmap = gr.Dataframe(
-                headers=["Land", "Lieferketten-Risiko"],
-                wrap=True,
-                label="Lieferketten-Heatmap",
-            )
-
-            hls_interpret = gr.Markdown()
-
-            def ui_handel_supply(country):
-                params = presets[country]
-                scores = compute_risk_scores(params)
-
-                fig_handel = plot_handel_radar(params)
-                fig_supply = plot_supply_chain_radar(params)
-                fig_abhaeng = plot_abhaengigkeiten_radar(params)
-
-                heat_handel = handels_heatmap(presets)
-                heat_supply = supply_chain_heatmap(presets)
-                heat_abhaeng = abhaengigkeiten_heatmap(presets)
-
-
-                interpretation = interpret_handel_supply(params, scores)
-                warnings = build_trade_supply_early_warning(params, scores)
-
-                return (
-                    fig_handel,
-                    fig_supply,
-                    fig_abhaeng,
-                    heat_handel,
-                    heat_supply,
-                    heat_abhaeng,
-                    interpretation + "\n\n" + warnings,
-                )
-
-
-            hls_country.change(
-                fn=ui_handel_supply,
-                inputs=[hls_country],
-                outputs=[
-                    hls_handel_radar,
-                    hls_supply_radar,
-                    hls_abhaengigkeiten_radar,
-                    hls_handel_heatmap,
-                    hls_supply_heatmap,
-                    hls_abhaengigkeiten_heatmap,   # <-- NEU
-                    hls_interpret,
-                ],
-              
-            ) 
-
-            with gr.Accordion("Interpretation Handel & Lieferketten", open=False):
-                gr.Markdown(f"```\n{handel_lieferketten_text}\n```")
-        
-
-        # ----------------------------------------------------
-        # TAB 9 — CLUSTERANALYSE
-        # ----------------------------------------------------
         with gr.Tab("Clusteranalyse"):
             gr.Markdown("## Clusteranalyse: Handel + Lieferketten + Finanzen + Tech + Energie")
 
-            # --- Cluster-Berechnung ---
             cluster_button = gr.Button("Cluster berechnen")
             cluster_output = gr.Dataframe(
                 headers=["Land", "Cluster", "Interpretation"],
@@ -2221,7 +1844,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
 
             cluster_button.click(ui_cluster, None, cluster_output)
 
-            # --- Cluster-Radar ---
             gr.Markdown("### Cluster-Radar (Durchschnittswerte pro Cluster)")
 
             cluster_radar_button = gr.Button("Cluster-Radar erzeugen")
@@ -2233,7 +1855,6 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 cluster_radar_output
             )
 
-            # --- Cluster-Storyline ---
             gr.Markdown("### Cluster-Storyline")
 
             story_cluster = gr.Dropdown([0, 1, 2], label="Cluster auswählen")
@@ -2245,12 +1866,9 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 inputs=[story_cluster],
                 outputs=story_output
             )
-        # ----------------------------------------------------
-        # TAB Optional
-        # ----------------------------------------------------
+
         with gr.Tab("Länderprofil"):
             gr.Markdown("## Automatisches Länderprofil")
- 
 
             country_select = gr.Dropdown(
                 list(presets.keys()),
@@ -2261,10 +1879,7 @@ with gr.Blocks(title="Makro-Simulation") as demo:
             profile_output = gr.Markdown()
 
             def ui_country_profile(land):
-                # 1) Risiko-Interpretation
                 interpretation = interpret_country(compute_risk_scores(presets[land]))
-
-                # 2) Vollständiges Profil
                 profile = generate_country_profile(land, presets)
                 return f"{profile}\n\n---\n\n### Interpretation\n{interpretation}"
 
@@ -2274,42 +1889,21 @@ with gr.Blocks(title="Makro-Simulation") as demo:
                 outputs=profile_output
             )
 
-        # ----------------------------------------------------
-        # TAB 10 — METHODIK
-        # ----------------------------------------------------
         with gr.Tab("Methodik"):
-            gr.Markdown("### Dokumentation der Risiko-Methodik")
+            gr.Markdown("## Dokumentation der Risiko-Methodik")
 
             try:
-                method_path = ROOT.parent / "docs" / "risk_methodology.md"
+                method_path = ROOT / "docs" / "risk_methodology.md"
                 doc_text = method_path.read_text(encoding="utf-8")
             except Exception:
                 doc_text = "Dokumentation nicht gefunden."
 
             gr.Markdown(doc_text)
 
-
-# ============================================================
-# OPTIONAL: Lexikon
-# ============================================================
-
-def load_lexikon():
-    lexikon_path = ROOT.parent / "docs" / "lexikon_erweitert.md"
-    if lexikon_path.exists():
-        return lexikon_path.read_text(encoding="utf-8")
-    return "Lexikon nicht gefunden."
+        return demo
 
 
-try:
-    lexikon_erweitert_markdown = load_lexikon()
-except Exception:
-    lexikon_erweitert_markdown = "Lexikon konnte nicht geladen werden."
-
-
-__all__ = [
-    "demo",
-    "lexikon_erweitert_markdown",
-]
+demo = build_app()
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(theme="soft")
