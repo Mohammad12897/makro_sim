@@ -336,6 +336,179 @@ def tech_early_warning(params: dict) -> str:
 
     return "\n".join(warnings)
 
+def generate_risk_profile(country):
+    scores = compute_risk_scores(presets[country])
+
+    # Sortiere Dimensionen nach Risiko
+    sorted_dims = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+    top_risks = sorted_dims[:3]
+    low_risks = sorted_dims[-3:]
+
+    md = f"# 🇺🇳 Risiko-Profil: {country}\n"
+    md += f"**Gesamt-Risiko:** {scores['total']:.2f}\n\n"
+
+    md += "## 🔥 Top-Risikotreiber\n"
+    for dim, val in top_risks:
+        md += f"- **{dim}**: {val:.2f}\n"
+
+    md += "\n## 🟢 Stärkste Bereiche\n"
+    for dim, val in low_risks:
+        md += f"- **{dim}**: {val:.2f}\n"
+
+    md += "\n## 🧠 Interpretation\n"
+    if scores["total"] > 0.75:
+        md += "Das Land befindet sich in einem **kritischen Risikobereich**.\n"
+    elif scores["total"] > 0.55:
+        md += "Das Land weist ein **erhöhtes Risiko** auf.\n"
+    elif scores["total"] > 0.30:
+        md += "Das Land zeigt ein **moderates Risiko**.\n"
+    else:
+        md += "Das Land hat ein **geringes strukturelles Risiko**.\n"
+
+    md += "\n## 🛠 Handlungsempfehlungen\n"
+    md += "- Diversifikation von Handelspartnern\n"
+    md += "- Reduktion kritischer Abhängigkeiten\n"
+    md += "- Stärkung institutioneller Resilienz\n"
+    md += "- Ausbau erneuerbarer Energien\n"
+
+    return md
+
+def early_warning_system(country):
+    scores = compute_risk_scores(presets[country])
+
+    warnings = []
+    critical = []
+
+    for dim, val in scores.items():
+        if dim == "total":
+            continue
+        if val > 0.75:
+            critical.append((dim, val))
+        elif val > 0.55:
+            warnings.append((dim, val))
+
+    md = f"# 🚨 Frühwarnsystem für {country}\n"
+
+    if critical:
+        md += "## 🔴 Kritische Risiken\n"
+        for dim, val in critical:
+            md += f"- **{dim}**: {val:.2f}\n"
+    else:
+        md += "## 🔴 Kritische Risiken\nKeine.\n"
+
+    if warnings:
+        md += "\n## 🟠 Erhöhte Risiken\n"
+        for dim, val in warnings:
+            md += f"- **{dim}**: {val:.2f}\n"
+    else:
+        md += "\n## 🟠 Erhöhte Risiken\nKeine.\n"
+
+    md += "\n## 🟢 Stabilitätsindikatoren\n"
+    stable = [d for d in scores if scores[d] < 0.30 and d != "total"]
+    if stable:
+        for dim in stable:
+            md += f"- **{dim}**: {scores[dim]:.2f}\n"
+    else:
+        md += "Keine besonders stabilen Bereiche.\n"
+
+    return md
+
+def apply_scenario(country, scenario):
+    base = presets[country].copy()
+
+    if scenario == "Ölpreis +50%":
+        base["energie"] = min(1.0, base["energie"] + 0.15)
+
+    elif scenario == "USD-Zinsanstieg":
+        base["financial"] = min(1.0, base["financial"] + 0.12)
+        base["macro"] = min(1.0, base["macro"] + 0.08)
+
+    elif scenario == "Sanktionen":
+        base["geo"] = min(1.0, base["geo"] + 0.20)
+        base["handel"] = min(1.0, base["handel"] + 0.10)
+
+    elif scenario == "Lieferketten-Blockade":
+        base["supply_chain"] = min(1.0, base["supply_chain"] + 0.25)
+        base["tech"] = min(1.0, base["tech"] + 0.10)
+
+    scores = compute_risk_scores(base)
+    return plot_risk_radar(scores)
+
+
+def benchmarking_table():
+    rows = []
+    for country in presets:
+        scores = compute_risk_scores(presets[country])
+        rows.append((country, scores["total"]))
+
+    rows = sorted(rows, key=lambda x: x[1], reverse=True)
+
+    md = "# 🌍 Benchmarking\n\n"
+    md += "| Land | Risiko |\n|------|--------|\n"
+    for c, s in rows:
+        md += f"| {c} | {s:.2f} |\n"
+
+    return md
+
+def plot_heatmap():
+    dims = ["macro","geo","governance","handel","supply_chain","financial","tech","energie"]
+
+    data = []
+    labels = []
+
+    for country in presets:
+        scores = compute_risk_scores(presets[country])
+        row = [scores[d] for d in dims]
+        data.append(row)
+        labels.append(country)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    im = ax.imshow(data, cmap="Reds", vmin=0, vmax=1)
+
+    ax.set_xticks(range(len(dims)))
+    ax.set_xticklabels(dims, rotation=45, ha="right")
+
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels)
+
+    fig.colorbar(im, ax=ax)
+    return fig
+
+def storyline_v2(country):
+    scores = compute_risk_scores(presets[country])
+
+    dims_sorted = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top = dims_sorted[:3]
+    low = dims_sorted[-2:]
+
+    md = f"# 🧠 Storyline 2.0 – {country}\n"
+
+    md += "## 🔥 Haupttreiber des Risikos\n"
+    for d, v in top:
+        if d != "total":
+            md += f"- **{d}**: {v:.2f}\n"
+
+    md += "\n## 🟢 Stabilitätsanker\n"
+    for d, v in low:
+        if d != "total":
+            md += f"- **{d}**: {v:.2f}\n"
+
+    md += "\n## 📘 Narrative Analyse\n"
+    md += "Das Land zeigt eine komplexe Risikostruktur. "
+    md += f"Besonders prägend sind die Dimensionen **{top[0][0]}** und **{top[1][0]}**, "
+    md += "die das Gesamtbild dominieren. "
+    md += "Gleichzeitig wirken stabile Bereiche wie "
+    md += f"**{low[0][0]}** als Puffer gegen externe Schocks.\n"
+
+    md += "\n## 🛠 Handlungsempfehlungen\n"
+    md += "- Diversifikation kritischer Abhängigkeiten\n"
+    md += "- Stärkung institutioneller Resilienz\n"
+    md += "- Ausbau erneuerbarer Energien\n"
+    md += "- Reduktion geopolitischer Verwundbarkeit\n"
+
+    return md
+
 def tech_storyline(name: str, params: dict) -> str:
     h = params["halbleiter_abhaengigkeit"]
     s = params["software_cloud_abhaengigkeit"]
@@ -1884,6 +2057,89 @@ def build_app():
             with gr.Accordion("Interpretation", open=False):
                 gr.Markdown(f"```\n{finanzielle_abhaengigkeit_text}\n```")
 
+        
+        with gr.Tab("Risiko-Profil & Frühwarnsystem"):
+
+            gr.Markdown("## 📊 Risiko-Profil & 🚨 Frühwarnsystem")
+
+            country_select = gr.Dropdown(
+                list(presets.keys()),
+                label="Land auswählen",
+                value=list(presets.keys())[0]
+            )
+
+            with gr.Accordion("📘 Risiko-Profil (Markdown)", open=True):
+                profile_button = gr.Button("📄 Risiko-Profil generieren", variant="primary")
+                profile_output = gr.Markdown()
+
+                profile_button.click(
+                    generate_risk_profile,
+                    inputs=[country_select],
+                    outputs=profile_output
+                )
+
+            with gr.Accordion("🚨 Early-Warning-System", open=False):
+                ews_button = gr.Button("⚠️ Frühwarnsystem anzeigen", variant="secondary")
+                ews_output = gr.Markdown()
+
+                ews_button.click(
+                    early_warning_system,
+                    inputs=[country_select],
+                    outputs=ews_output
+                )
+        
+        with gr.Tab("Szenarien & Analyse"):
+            gr.Markdown("## 🔮 Szenarien, Benchmarking, Heatmap & Storyline 2.0")
+            country_sel = gr.Dropdown(list(presets.keys()), label="Land", value=list(presets.keys())[0])
+
+            # Szenario-Modul
+            with gr.Accordion("🧨 Szenario-Simulation", open=False):
+                scenario = gr.Dropdown(
+                    ["Ölpreis +50%", "USD-Zinsanstieg", "Sanktionen", "Lieferketten-Blockade"],
+                    label="Szenario auswählen"
+                )
+                scenario_btn = gr.Button("Szenario anwenden", variant="primary")
+                scenario_out = gr.Plot()
+
+                scenario_btn.click(
+                    apply_scenario,
+                    inputs=[country_sel, scenario],
+                    outputs=scenario_out
+                )
+
+            # Benchmarking
+            with gr.Accordion("🌍 Benchmarking", open=False):
+                bench_btn = gr.Button("Benchmarking anzeigen")
+                bench_out = gr.Markdown()
+
+                bench_btn.click(
+                    lambda: benchmarking_table(),
+                    inputs=None,
+                    outputs=bench_out
+                )
+
+            # Heatmap
+            with gr.Accordion("🔥 Risiko-Heatmap", open=False):
+                heat_btn = gr.Button("Heatmap anzeigen")
+                heat_out = gr.Plot()
+
+                heat_btn.click(
+                    lambda: plot_heatmap(),
+                    inputs=None,
+                    outputs=heat_out
+                )
+
+            # Storyline 2.0
+            with gr.Accordion("🧠 Storyline 2.0", open=False):
+                story_btn = gr.Button("Storyline generieren")
+                story_out = gr.Markdown()
+
+                story_btn.click(
+                    storyline_v2,
+                    inputs=[country_sel],
+                    outputs=story_out
+                ) 
+                
         with gr.Tab("Länderprofil"):
             gr.Markdown("## Automatisches Länderprofil")
 
