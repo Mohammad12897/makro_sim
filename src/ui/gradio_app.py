@@ -117,7 +117,8 @@ def load_textfile(path: Path) -> str:
         return "Textdatei konnte nicht geladen werden."
 
 def load_lexikon():
-    lexikon_path = ROOT / "docs" / "lexikon_erweitert.md"
+    lexikon_path = ROOT.parent / "docs" / "risk_methodology.md"
+    print (lexikon_path)
     if lexikon_path.exists():
         return lexikon_path.read_text(encoding="utf-8")
     return "Lexikon nicht gefunden."
@@ -138,7 +139,8 @@ prognose_text = load_textfile(ROOT.parent / "docs" / "interpretation_prognose.tx
 dashboard_text = load_textfile(ROOT.parent / "docs" / "interpretation_dashboard.txt")
 benchmarking_text = load_textfile(ROOT.parent / "docs" / "interpretation_benchmarking.txt")
 handel_lieferketten_text = load_textfile(ROOT.parent / "docs" / "interpretation_handel_lieferketten.txt")
-finanzielle_abhaengigkeit_text = load_textfile(ROOT.parent / "docs" / "interpretation_finanzielle_abhaengigkeit.txt") 
+finanzielle_abhaengigkeit_text = load_textfile(ROOT.parent / "docs" / "interpretation_finanzielle_abhaengigkeit.txt")
+technologische_abhaengigkeit_text = load_textfile(ROOT.parent / "docs" / "interpretation_technologische_abhaengigkeit.txt")
 
 # ============================================================
 # HILFSFUNKTIONEN FÜR DIE SIMULATION
@@ -1159,7 +1161,7 @@ def tech_delta_radar(old_params: dict, new_params: dict):
     ax.set_ylim(0, 1)
     ax.legend(loc="upper right")
 
-    return fig   
+    return fig
 
 def generate_benchmark_interpretation(scores: dict):
     """
@@ -1340,7 +1342,7 @@ def interpret_dashboard(params: dict, scores: dict) -> str:
         lines.append("\n### Finanzielle Abhängigkeit")
         lines.append("Geringe externe Abhängigkeit.")
 
-    
+
     lines.append("\n### Technologische Abhängigkeit")
     if scores["tech"] > 0.66:
         lines.append("Hohe technologische Abhängigkeit – Risiken bei Halbleitern, Software oder Cloud-Infrastruktur.")
@@ -1726,6 +1728,9 @@ def build_app():
                 inputs=[dash_country],
                 outputs=[dash_kpi_output, dash_radar_output],
             )
+            with gr.Accordion("Interpretation", open=False):
+                    gr.Markdown(f"```\n{dashboard_text}\n```")
+
 
         with gr.Tab("Simulation & Radar"):
             gr.Markdown("## Simulation & Radar-Analysen")
@@ -1747,6 +1752,10 @@ def build_app():
                     inputs=[sim_country],
                     outputs=sim_risk_output,
                 )
+                with gr.Accordion("Risiko‑Radar ", open=False):
+                    gr.Markdown(f"```\n{technologische_abhaengigkeit_text}\n```")
+                    gr.Markdown(f"```\n{resilienz_radar_text}\n```")
+
 
             with gr.Accordion("🌐 Multi‑Risiko‑Radar (alle Länder)", open=False):
                 sim_multi_button = gr.Button("🌐 Länder‑Vergleichs‑Radar", variant="secondary")
@@ -1757,6 +1766,8 @@ def build_app():
                     inputs=None,
                     outputs=sim_multi_output,
                 )
+                with gr.Accordion("Multi‑Risiko‑Radar ", open=False):
+                    gr.Markdown(f"```\n{status_radar_text}\n```")
 
 
             with gr.Accordion("⚖️ Vergleich: Land A vs. Land B", open=False):
@@ -1765,12 +1776,15 @@ def build_app():
 
                 sim_compare_button = gr.Button("⚖️ Vergleich: Land A vs. Land B", variant="secondary")
                 sim_compare_output = gr.Plot()
-                
+
                 sim_compare_button.click(
                     plot_compare_radar,
                     inputs=[compare_country_a, compare_country_b],
                     outputs=sim_compare_output,
                 )
+
+                with gr.Accordion("Vergleich", open=False):
+                    gr.Markdown(f"```\n{benchmarking_text}\n```")
 
 
         with gr.Tab("Heatmaps"):
@@ -1867,6 +1881,9 @@ def build_app():
                 outputs=story_output
             )
 
+            with gr.Accordion("Interpretation", open=False):
+                gr.Markdown(f"```\n{finanzielle_abhaengigkeit_text}\n```")
+
         with gr.Tab("Länderprofil"):
             gr.Markdown("## Automatisches Länderprofil")
 
@@ -1893,7 +1910,7 @@ def build_app():
             gr.Markdown("## Dokumentation der Risiko-Methodik")
 
             try:
-                method_path = ROOT / "docs" / "risk_methodology.md"
+                method_path = ROOT.parent / "docs" / "risk_methodology.md"
                 doc_text = method_path.read_text(encoding="utf-8")
             except Exception:
                 doc_text = "Dokumentation nicht gefunden."

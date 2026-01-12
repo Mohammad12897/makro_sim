@@ -250,44 +250,44 @@ Das Benchmarking-Modul bietet eine umfassende, intuitive und vergleichende Sicht
 
 ### Interpretation: Handel & Lieferketten
 
-Die Dimension „Handel & Lieferketten“ beschreibt die strukturellen Abhängigkeiten eines Landes von internationalen Warenströmen, kritischen Importen, 
+Die Dimension „Handel & Lieferketten“ beschreibt die strukturellen Abhängigkeiten eines Landes von internationalen Warenströmen, kritischen Importen,
 Exportmärkten und globalen Produktionsnetzwerken. Sie ist ein zentraler Treiber für wirtschaftliche Stabilität, geopolitische Verwundbarkeit und makroökonomische Resilienz.
 
 1. Export-Konzentration
-Eine hohe Export-Konzentration bedeutet, dass ein Land stark von wenigen Produkten oder Branchen abhängig ist. Beispiele sind Öl-Exporte, 
-Automobilindustrie oder Halbleiterproduktion. Je stärker die Konzentration, desto größer das Risiko bei Nachfrageschocks, technologischen Umbrüchen oder 
+Eine hohe Export-Konzentration bedeutet, dass ein Land stark von wenigen Produkten oder Branchen abhängig ist. Beispiele sind Öl-Exporte,
+Automobilindustrie oder Halbleiterproduktion. Je stärker die Konzentration, desto größer das Risiko bei Nachfrageschocks, technologischen Umbrüchen oder
 geopolitischen Konflikten. Länder mit diversifizierten Exportstrukturen sind widerstandsfähiger gegenüber globalen Krisen.
 
 2. Import kritischer Güter
-Importabhängigkeit bei kritischen Gütern wie Energie, Medikamenten, Maschinen, Halbleitern oder Nahrungsmitteln erhöht die Verwundbarkeit. 
-Lieferstopps, Sanktionen oder Transportstörungen können direkte Auswirkungen auf Produktion, Versorgungssicherheit und Preisstabilität haben. 
+Importabhängigkeit bei kritischen Gütern wie Energie, Medikamenten, Maschinen, Halbleitern oder Nahrungsmitteln erhöht die Verwundbarkeit.
+Lieferstopps, Sanktionen oder Transportstörungen können direkte Auswirkungen auf Produktion, Versorgungssicherheit und Preisstabilität haben.
 Eine hohe Importabhängigkeit in sicherheitsrelevanten Bereichen gilt als strategisches Risiko.
 
 3. Partner-Konzentration
-Wenn ein Land stark von wenigen Handelspartnern abhängig ist, entsteht ein geopolitisches Risiko. Politische Spannungen, 
-Sanktionen oder wirtschaftliche Schocks in diesen Partnerländern können die eigene Wirtschaft unmittelbar treffen. Eine breite Diversifizierung der 
+Wenn ein Land stark von wenigen Handelspartnern abhängig ist, entsteht ein geopolitisches Risiko. Politische Spannungen,
+Sanktionen oder wirtschaftliche Schocks in diesen Partnerländern können die eigene Wirtschaft unmittelbar treffen. Eine breite Diversifizierung der
 Handelspartner reduziert diese Abhängigkeit und erhöht die strategische Autonomie.
 
 4. Lieferkettenrisiko
-Globale Lieferketten sind komplex und anfällig für Störungen. Hohe Abhängigkeit von einzelnen Produktionsstandorten, Just-in-Time-Logistik, 
-geringe Lagerpuffer oder die Nutzung kritischer Seewege (z. B. Suezkanal, Taiwanstraße) erhöhen das Risiko. Naturkatastrophen, geopolitische Konflikte oder 
+Globale Lieferketten sind komplex und anfällig für Störungen. Hohe Abhängigkeit von einzelnen Produktionsstandorten, Just-in-Time-Logistik,
+geringe Lagerpuffer oder die Nutzung kritischer Seewege (z. B. Suezkanal, Taiwanstraße) erhöhen das Risiko. Naturkatastrophen, geopolitische Konflikte oder
 Transportengpässe können zu Produktionsausfällen und Preisschocks führen.
 
 5. Gesamtinterpretation
-Ein hohes Handels- und Lieferkettenrisiko weist auf strukturelle Verwundbarkeiten hin, die sich in Krisenzeiten schnell materialisieren können. 
-Länder mit hoher Export- oder Importkonzentration, wenigen Handelspartnern oder fragilen Lieferketten sind besonders anfällig für externe Schocks. 
+Ein hohes Handels- und Lieferkettenrisiko weist auf strukturelle Verwundbarkeiten hin, die sich in Krisenzeiten schnell materialisieren können.
+Länder mit hoher Export- oder Importkonzentration, wenigen Handelspartnern oder fragilen Lieferketten sind besonders anfällig für externe Schocks.
 Eine diversifizierte Handelsstruktur, robuste Logistik und strategische Lagerhaltung erhöhen die Resilienz.
 
-Die Dimension „Handel & Lieferketten“ ergänzt das bestehende Risiko-Modell um eine zentrale Perspektive, die sowohl wirtschaftliche als auch 
-geopolitische Stabilität beeinflusst. Sie ermöglicht eine präzisere Bewertung der strukturellen Abhängigkeiten eines Landes und unterstützt datenbasierte Entscheidungen 
+Die Dimension „Handel & Lieferketten“ ergänzt das bestehende Risiko-Modell um eine zentrale Perspektive, die sowohl wirtschaftliche als auch
+geopolitische Stabilität beeinflusst. Sie ermöglicht eine präzisere Bewertung der strukturellen Abhängigkeiten eines Landes und unterstützt datenbasierte Entscheidungen
 in Risikoanalyse, Szenarioplanung und strategischer Politikgestaltung.
 
 
-### Finanzielle Abhängigkeit beschreibt die strukturelle Verwundbarkeit eines Landes gegenüber externen Kapitalquellen, 
+### Finanzielle Abhängigkeit beschreibt die strukturelle Verwundbarkeit eines Landes gegenüber externen Kapitalquellen,
 internationalen Finanzmärkten und Fremdwährungsrisiken.
 
-Hohe Auslandsverschuldung, starke Kapitalmarktintegration, ein hoher Anteil ausländischer Investoren oder Refinanzierung in Fremdwährung 
-erhöhen das Risiko von Kapitalabflüssen, Zinsanstiegen und Währungsschocks. Länder mit hoher finanzieller Abhängigkeit sind besonders anfällig 
+Hohe Auslandsverschuldung, starke Kapitalmarktintegration, ein hoher Anteil ausländischer Investoren oder Refinanzierung in Fremdwährung
+erhöhen das Risiko von Kapitalabflüssen, Zinsanstiegen und Währungsschocks. Länder mit hoher finanzieller Abhängigkeit sind besonders anfällig
 für globale Finanzkrisen, Vertrauensverluste und externe Schocks.
 
 
@@ -357,7 +357,7 @@ für globale Finanzkrisen, Vertrauensverluste und externe Schocks.
 - **Verwendet nur:**
 - **verschuldung**
 - **FX_Schockempfindlichkeit**
-- **\mathrm{finanz}=\min \left( 1,\  rac{\mathrm{verschuldung}}{2}+rac{\mathrm{FX\_ Schockempfindlichkeit}}{2}ight)** 
+- **\mathrm{finanz}=\min \left( 1,\  rac{\mathrm{verschuldung}}{2}+rac{\mathrm{FX\_ Schockempfindlichkeit}}{2}ight)**
 - **Alles andere in den Presets (RMB, Zugangsresilienz, CBDC, Gold, etc.) hat keinen Einfluss auf finanz**
 
 
@@ -377,7 +377,7 @@ für globale Finanzkrisen, Vertrauensverluste und externe Schocks.
 - **Verwendet nur:**
 - **fachkraefte**
 - **demokratie**
-- **\mathrm{sozial}=\min \left( 1,\  0.5\cdot (1-\mathrm{fachkraefte})+0.5\cdot (1-\mathrm{demokratie})ight)** 
+- **\mathrm{sozial}=\min \left( 1,\  0.5\cdot (1-\mathrm{fachkraefte})+0.5\cdot (1-\mathrm{demokratie})ight)**
 - **Auch hier: Energie, Stabilität, Korruption etc. gehen nicht in sozial ein.**
 
 ### Ranking: Makro‑Risiko + Geopolitisches Risiko + Governance‑Risiko + finanz + sozial
@@ -417,4 +417,37 @@ für globale Finanzkrisen, Vertrauensverluste und externe Schocks.
   - **Volatilität**: Demokratie reduziert `system_volatilitaet` (z. B. kleinerer Basiseffekt), da Informationsflüsse und Institutionen Schocks dämpfen.
   - **Importkosten**: Demokratie kann `importkosten_mult` leicht senken durch besseren Eigentumsschutz und geringere Transaktionskosten.
 
+
+
+### **1. Ziel des Risiko-Modells**
+Das Risiko-Modell bewertet die Verwundbarkeit eines Landes gegenüber externen Schocks.  
+Es misst strukturelle Risiken, nicht die aktuelle Stärke eines Landes.
+
+### **2. Die acht Risiko-Dimensionen**
+1. **Makroökonomisches Risiko** – Verschuldung, FX-Schocks, Reserven  
+2. **Geopolitisches Risiko** – USD-Dominanz, Sanktionen, Alternativnetzwerke  
+3. **Governance-Risiko** – Demokratie, Korruption, Innovation, Fachkräfte  
+4. **Handelsrisiko** – Export-/Importkonzentration, kritische Güter  
+5. **Lieferkettenrisiko** – Chokepoints, JIT, Produktionskonzentration, Puffer  
+6. **Finanzielle Abhängigkeit** – Auslandsverschuldung, Kapitalmärkte, FX-Refi  
+7. **Technologische Abhängigkeit** – Halbleiter, Cloud, IP, Schlüsseltechnologien  
+8. **Energieabhängigkeit** – Importabhängigkeit, Diversifikation
+
+### **3. Gesamt-Risiko**
+Gewichtetes Mittel der acht Dimensionen.
+
+### **4. Interpretation**
+- 0.00–0.30: gering  
+- 0.30–0.55: moderat  
+- 0.55–0.75: erhöht  
+- >0.75: kritisch  
+
+### **5. Verwendung im System**
+- Risiko-Radar  
+- Multi-Risiko-Radar  
+- Dashboard  
+- Clusteranalyse  
+- Storyline  
+- Early-Warning  
+  
 

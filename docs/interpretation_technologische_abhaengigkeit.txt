@@ -1,0 +1,33 @@
+# Dokumentation der Risiko-Methodik")
+
+### **1. Ziel des Risiko-Modells**
+Das Risiko-Modell bewertet die Verwundbarkeit eines Landes gegenüber externen Schocks.  
+Es misst strukturelle Risiken, nicht die aktuelle Stärke eines Landes.
+
+### **2. Die acht Risiko-Dimensionen**
+1. **Makroökonomisches Risiko** – Verschuldung, FX-Schocks, Reserven  
+2. **Geopolitisches Risiko** – USD-Dominanz, Sanktionen, Alternativnetzwerke  
+3. **Governance-Risiko** – Demokratie, Korruption, Innovation, Fachkräfte  
+4. **Handelsrisiko** – Export-/Importkonzentration, kritische Güter  
+5. **Lieferkettenrisiko** – Chokepoints, JIT, Produktionskonzentration, Puffer  
+6. **Finanzielle Abhängigkeit** – Auslandsverschuldung, Kapitalmärkte, FX-Refi  
+7. **Technologische Abhängigkeit** – Halbleiter, Cloud, IP, Schlüsseltechnologien  
+8. **Energieabhängigkeit** – Importabhängigkeit, Diversifikation
+
+### **3. Gesamt-Risiko**
+Gewichtetes Mittel der acht Dimensionen.
+
+### **4. Interpretation**
+- 0.00–0.30: gering  
+- 0.30–0.55: moderat  
+- 0.55–0.75: erhöht  
+- >0.75: kritisch  
+
+### **5. Verwendung im System**
+- Risiko-Radar  
+- Multi-Risiko-Radar  
+- Dashboard  
+- Clusteranalyse  
+- Storyline  
+- Early-Warning  
+    
