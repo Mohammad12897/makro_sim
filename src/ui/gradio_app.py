@@ -225,8 +225,20 @@ def early_warning_system(country):
     return md
 
 def apply_scenario(country, scenario):
+    # Basisdaten holen
     base = presets[country].copy()
 
+    # Fehlende Keys automatisch ergänzen
+    required_keys = [
+        "macro", "geo", "governance", "handel",
+        "supply_chain", "financial", "tech", "energie"
+    ]
+
+    for key in required_keys:
+        if key not in base:
+            base[key] = 0.0  # neutraler Standardwert
+
+    # Szenarien anwenden
     if scenario == "Ölpreis +50%":
         base["energie"] = min(1.0, base["energie"] + 0.15)
 
@@ -242,9 +254,11 @@ def apply_scenario(country, scenario):
         base["supply_chain"] = min(1.0, base["supply_chain"] + 0.25)
         base["tech"] = min(1.0, base["tech"] + 0.10)
 
+    # Neue Scores berechnen
     scores = compute_risk_scores(base)
-    return plot_risk_radar(scores)
 
+    # Radar zurückgeben
+    return plot_risk_radar(scores)
 
 def benchmarking_table():
     rows = []
