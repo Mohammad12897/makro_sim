@@ -106,6 +106,57 @@ presets = load_presets()
 # Erwartete Länder-Codes laut deiner Angabe:
 EXPECTED_COUNTRIES = ["DE", "US", "IR", "CN", "FR", "IN", "BR", "GR", "GB"]
 
+
+
+RISK_KEYS = [
+    "macro", "geo", "governance", "handel",
+    "supply_chain", "financial", "tech", "energie"
+]
+
+KEY_ALIASES = {
+    "macroeconomic": "macro",
+    "geopolitical": "geo",
+    "gov": "governance",
+    "trade": "handel",
+    "supplychain": "supply_chain",
+    "supply_chain_risk": "supply_chain",
+    "finanz": "financial",
+    "finance": "financial",
+    "technology": "tech",
+    "energy": "energie",
+}
+
+SCENARIO_METADATA = {
+    "Ölpreis-Schock": {
+        "description": "Starker Anstieg der Ölpreise",
+        "params_info": "Intensität 0–1, wirkt v.a. auf Energie & Makro",
+    },
+    "USD-Zinsanstieg": {
+        "description": "Anstieg der US-Leitzinsen",
+        "params_info": "Intensität 0–1, wirkt auf Finanzen & Makro",
+    },
+    "Sanktionen": {
+        "description": "Handels- und Finanzsanktionen",
+        "params_info": "Intensität 0–1, wirkt auf Geo & Handel",
+    },
+    "Lieferketten-Blockade": {
+        "description": "Störung globaler Lieferketten",
+        "params_info": "Intensität 0–1, wirkt auf Supply Chain & Tech",
+    },
+    "Energieembargo": {
+        "description": "Starke Einschränkung von Energieimporten",
+        "params_info": "Intensität 0–1, wirkt auf Energie & Geo",
+    },
+    "Bankenkrise": {
+        "description": "Stress im Bankensystem",
+        "params_info": "Intensität 0–1, wirkt auf Finanzen & Makro",
+    },
+    "Cyberangriff": {
+        "description": "Schwere Cyberangriffe auf kritische Infrastruktur",
+        "params_info": "Intensität 0–1, wirkt auf Tech & Governance",
+    },
+}
+
 # ============================================================
 # TEXTDATEIEN (Interpretationen) LADEN
 # ============================================================
@@ -141,6 +192,75 @@ benchmarking_text = load_textfile(ROOT.parent / "docs" / "interpretation_benchma
 handel_lieferketten_text = load_textfile(ROOT.parent / "docs" / "interpretation_handel_lieferketten.txt")
 finanzielle_abhaengigkeit_text = load_textfile(ROOT.parent / "docs" / "interpretation_finanzielle_abhaengigkeit.txt")
 technologische_abhaengigkeit_text = load_textfile(ROOT.parent / "docs" / "interpretation_technologische_abhaengigkeit.txt")
+
+
+
+# ============================================================
+# PRESET‑VALIDATOR UND BASIS-HILFSFUNKTIONEN
+# ============================================================
+def normalize_value(v):
+    """Bringt Werte robust in [0,1]-Skala."""
+    try:
+        v = float(v)
+    except Exception:
+        return 0.0
+    if v < 0:
+        return 0.0
+    if v > 1:
+        # falls mal 0–100 vorliegt
+        if v <= 100:
+            return v / 100.0
+        return 1.0
+    return v
+
+
+def ensure_full_risk_vector(base: dict) -> dict:
+    """Sorgt dafür, dass alle RISK_KEYS existieren und normalisiert sind."""
+    base = base.copy()
+
+    # Aliase mappen
+    for old, new in KEY_ALIASES.items():
+        if old in base and new not in base:
+            base[new] = base[old]
+
+    # Fehlende Keys ergänzen
+    for key in RISK_KEYS:
+        if key not in base:
+            base[key] = 0.0
+
+    # Normalisieren
+    for key in RISK_KEYS:
+        base[key] = normalize_value(base[key])
+
+    return base
+
+
+def validate_all_presets(presets: dict):
+    """
+    Geht alle Länder-Presets durch, korrigiert sie und gibt einen Report zurück.
+    """
+    report_lines = []
+    fixed_presets = {}
+
+    for country, data in presets.items():
+        original_keys = set(data.keys())
+        fixed = ensure_full_risk_vector(data)
+        fixed_presets[country] = fixed
+        new_keys = set(fixed.keys())
+
+        added = new_keys - original_keys
+        aliased = [k for k in KEY_ALIASES if k in original_keys]
+
+        line = f"- {country}: hinzugefügt: {list(added)}"
+        if aliased:
+            line += f" | Aliase genutzt: {aliased}"
+        report_lines.append(line)
+
+    report = "# ✅ Preset-Validierung\n\n"
+    report += "Die folgenden Anpassungen wurden vorgenommen:\n\n"
+    report += "\n".join(report_lines)
+
+    return fixed_presets, report
 
 # ============================================================
 # HILFSFUNKTIONEN FÜR DIE SIMULATION
@@ -333,6 +453,81 @@ def storyline_v2(country):
 
     return md
 
+def ensure_full_risk_vector(base: dict) -> dict:
+    required_keys = [
+        "macro", "geo", "governance", "handel",
+        "supply_chain", "financial", "tech", "energie"
+    ]
+    base = base.copy()
+    for key in required_keys:
+        if key not in base:
+            base[key] = 0.0
+    return base
+
+
+def apply_single_shock(base: dict, shock_type: str, intensity: float) -> dict:
+    """
+    base: Risiko-Vektor (vollständig, normalisiert)
+    shock_type: Name des Schocks
+    intensity: 0.0–1.0 (Stärke)
+    """
+    base = ensure_full_risk_vector(base)
+    f = max(0.0, min(1.0, float(intensity)))
+
+    if shock_type == "Ölpreis-Schock":
+        base["energie"] = min(1.0, base["energie"] + 0.25 * f)
+        base["macro"] = min(1.0, base["macro"] + 0.10 * f)
+
+    elif shock_type == "USD-Zinsanstieg":
+        base["financial"] = min(1.0, base["financial"] + 0.20 * f)
+        base["macro"] = min(1.0, base["macro"] + 0.10 * f)
+
+    elif shock_type == "Sanktionen":
+        base["geo"] = min(1.0, base["geo"] + 0.25 * f)
+        base["handel"] = min(1.0, base["handel"] + 0.15 * f)
+
+    elif shock_type == "Lieferketten-Blockade":
+        base["supply_chain"] = min(1.0, base["supply_chain"] + 0.30 * f)
+        base["tech"] = min(1.0, base["tech"] + 0.10 * f)
+
+    elif shock_type == "Energieembargo":
+        base["energie"] = min(1.0, base["energie"] + 0.35 * f)
+        base["geo"] = min(1.0, base["geo"] + 0.10 * f)
+
+    elif shock_type == "Bankenkrise":
+        base["financial"] = min(1.0, base["financial"] + 0.30 * f)
+        base["macro"] = min(1.0, base["macro"] + 0.15 * f)
+
+    elif shock_type == "Cyberangriff":
+        base["tech"] = min(1.0, base["tech"] + 0.25 * f)
+        base["governance"] = min(1.0, base["governance"] + 0.10 * f)
+
+    return base
+
+def apply_multiple_shocks(country: str, shocks: List[Tuple[str, float]]) -> dict:
+    """
+    shocks: Liste von (shock_type, intensity) Paaren
+    """
+    base = ensure_full_risk_vector(presets[country])
+
+    for shock_type, intensity in shocks:
+        base = apply_single_shock(base, shock_type, intensity)
+
+    return base
+
+def apply_multiple_shocks_for_country(country: str, shock_config: dict) -> dict:
+    """
+    shock_config: dict {shock_type: intensity}
+    """
+    base = ensure_full_risk_vector(presets[country])
+
+    for shock_type, intensity in shock_config.items():
+        if intensity is None:
+            continue
+        base = apply_single_shock(base, shock_type, intensity)
+
+    return base
+
 # ============================================================
 # RADAR-FUNKTIONEN
 # ============================================================
@@ -358,98 +553,186 @@ def tech_heatmap(presets):
 # ============================================================
 # PROGNOSE-FUNKTIONEN
 # ============================================================
+def plot_scenario_compare_radar(scores_base: dict, scores_scenario: dict):
+    labels = [
+        "Makro", "Geo", "Governance", "Handel",
+        "Lieferkette", "Finanzen", "Tech", "Energie"
+    ]
+    dims = [
+        "macro", "geo", "governance", "handel",
+        "supply_chain", "financial", "tech", "energie"
+    ]
 
-def forecast(params: Dict[str, float], years: int = 20) -> List[float]:
-    results = []
-    current = params.copy()
+    v_base = [scores_base[d] for d in dims]
+    v_scen = [scores_scenario[d] for d in dims]
 
-    for _ in range(years):
-        current["innovation"] *= 1.01
-        current["verschuldung"] *= 1.03
-        current["energie"] *= 0.99
-        current["demokratie"] *= 0.995
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles, [angles[0]]))
 
-        scores = compute_risk_scores(current)
-        results.append(scores["total"])
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.set_ylim(0, 1)
 
-    return results
+    # Baseline
+    ax.plot(angles, v_base + [v_base[0]], label="Baseline", linewidth=2, color="grey")
+    ax.fill(angles, v_base + [v_base[0]], alpha=0.1, color="grey")
 
+    # Szenario
+    ax.plot(angles, v_scen + [v_scen[0]], label="Szenario", linewidth=2, color="red")
+    ax.fill(angles, v_scen + [v_scen[0]], alpha=0.2, color="red")
 
-def monte_carlo_forecast(
-    params: Dict[str, float],
-    years: int = 20,
-    runs: int = 500,
-) -> np.ndarray:
-    all_runs = []
-    for _ in range(runs):
-        current = params.copy()
-        values = []
-        for _y in range(years):
-            current["innovation"] *= np.random.normal(1.01, 0.01)
-            current["verschuldung"] *= np.random.normal(1.03, 0.02)
-            current["energie"] *= np.random.normal(0.99, 0.01)
-            current["demokratie"] *= np.random.normal(0.995, 0.005)
-            scores = compute_risk_scores(current)
-            values.append(scores["total"])
-        all_runs.append(values)
-    return np.array(all_runs)
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.legend(loc="upper right")
 
-
-def plot_forecast(values: List[float]):
-    fig, ax = plt.subplots()
-    ax.plot(values, linewidth=2)
-    ax.set_title("Langfrist-Prognose (Deterministisch)")
-    ax.set_xlabel("Jahre")
-    ax.set_ylabel("Risiko-Score")
-    ax.grid(True)
     return fig
 
+def scenario_report(country: str, scores_base: dict, scores_scen: dict, shock_config: dict) -> str:
+    dims_order = [
+        "macro", "geo", "governance", "handel",
+        "supply_chain", "financial", "tech", "energie"
+    ]
+    dim_names = {
+        "macro": "Makroökonomie",
+        "geo": "Geopolitik",
+        "governance": "Governance",
+        "handel": "Handel",
+        "supply_chain": "Lieferkette",
+        "financial": "Finanzen",
+        "tech": "Technologie",
+        "energie": "Energie",
+    }
 
-def plot_monte_carlo(mc_values: np.ndarray):
-    if mc_values.size == 0:
-        fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, "Keine Daten", ha="center", va="center")
-        return fig
+    md = f"# 📊 Szenario-Report – {country}\n\n"
+    md += f"**Baseline-Gesamtrisiko:** {scores_base['total']:.2f}\n\n"
+    md += f"**Szenario-Gesamtrisiko:** {scores_scen['total']:.2f}\n\n"
 
-    years = mc_values.shape[1]
-    x = np.arange(years)
+    delta_total = scores_scen["total"] - scores_base["total"]
+    md += f"**Δ Gesamtrisiko:** {delta_total:+.2f}\n\n"
 
-    median = np.median(mc_values, axis=0)
-    p05 = np.percentile(mc_values, 5, axis=0)
-    p95 = np.percentile(mc_values, 95, axis=0)
+    md += "## 🔧 Eingesetzte Schocks\n"
+    if not shock_config:
+        md += "- Keine Schocks aktiv.\n\n"
+    else:
+        for shock, intensity in shock_config.items():
+            if intensity and intensity > 0:
+                meta = SCENARIO_METADATA.get(shock, {})
+                desc = meta.get("description", "")
+                md += f"- **{shock}** (Intensität: {intensity:.2f}) – {desc}\n"
+        md += "\n"
 
-    fig, ax = plt.subplots()
-    ax.plot(x, median, label="Median", color="blue")
-    ax.fill_between(x, p05, p95, color="blue", alpha=0.2, label="5–95% Band")
-    ax.set_title("Monte-Carlo-Prognose")
-    ax.set_xlabel("Jahre")
-    ax.set_ylabel("Risiko-Score")
-    ax.legend()
-    ax.grid(True)
-    return fig
+    # Dimensionale Deltas
+    md += "## 📈 Veränderung nach Dimension\n\n"
+    md += "| Dimension | Baseline | Szenario | Δ |\n"
+    md += "|-----------|----------|----------|----|\n"
+    for d in dims_order:
+        db = scores_base[d]
+        ds = scores_scen[d]
+        dd = ds - db
+        md += f"| {dim_names[d]} | {db:.2f} | {ds:.2f} | {dd:+.2f} |\n"
+    md += "\n"
+
+    # stärkste Anstiege
+    deltas = [
+        (dim_names[d], scores_scen[d] - scores_base[d])
+        for d in dims_order
+    ]
+    deltas_sorted = sorted(deltas, key=lambda x: x[1], reverse=True)
+
+    md += "## 🔥 Stärkste Risikoanstiege\n"
+    for name, d in deltas_sorted[:3]:
+        if d > 0:
+            md += f"- **{name}**: {d:+.2f}\n"
+    if all(d <= 0 for _, d in deltas_sorted):
+        md += "- Keine signifikanten Risikoanstiege.\n"
+    md += "\n"
+
+    md += "## 🧠 Kurzinterpretation\n"
+    if delta_total > 0.15:
+        md += "Das Szenario führt zu einem **deutlich erhöhten strukturellen Risiko**.\n"
+    elif delta_total > 0.05:
+        md += "Das Szenario erhöht das Gesamtrisiko **spürbar, aber moderat**.\n"
+    elif delta_total > 0:
+        md += "Das Szenario erhöht das Gesamtrisiko **nur leicht**.\n"
+    else:
+        md += "Das Szenario hat **keine oder sogar leicht entlastende Wirkung** auf das Gesamtrisiko.\n"
+
+    md += "\n## 🛠 Mögliche Handlungsempfehlungen\n"
+    md += "- Diversifikation kritischer Abhängigkeiten (Handel, Energie, Lieferketten)\n"
+    md += "- Stärkung institutioneller Resilienz und Governance\n"
+    md += "- Aufbau von Pufferkapazitäten in Lieferketten und Energieversorgung\n"
+    md += "- Reduktion finanzieller Verwundbarkeiten (Verschuldung, externe Finanzierung)\n"
+
+    return md
+
+def run_scenario(country,
+                 oil_intensity,
+                 usd_intensity,
+                 sanc_intensity,
+                 supply_intensity,
+                 energy_intensity,
+                 bank_intensity,
+                 cyber_intensity):
+
+    base_vec = ensure_full_risk_vector(presets[country])
+    scores_base = compute_risk_scores(base_vec)
+
+    shock_config = {
+        "Ölpreis-Schock": oil_intensity,
+        "USD-Zinsanstieg": usd_intensity,
+        "Sanktionen": sanc_intensity,
+        "Lieferketten-Blockade": supply_intensity,
+        "Energieembargo": energy_intensity,
+        "Bankenkrise": bank_intensity,
+        "Cyberangriff": cyber_intensity,
+    }
+
+    # prüfen, ob überhaupt ein Schock > 0 ist
+    any_shock = any(v and v > 0 for v in shock_config.values())
+
+    if not any_shock:
+        # nur Baseline anzeigen
+        fig = plot_risk_radar(scores_base)
+        md = (
+            f"### ℹ️ Kein aktiver Schock\n"
+            f"Es wird nur das Baseline-Risiko für **{country}** angezeigt.\n\n"
+            f"**Gesamt-Risiko:** {scores_base['total']:.2f}"
+        )
+        report = scenario_report(country, scores_base, scores_base, {})
+        return fig, md, report
+
+    # Szenario anwenden
+    scen_vec = apply_multiple_shocks_for_country(country, shock_config)
+    scores_scen = compute_risk_scores(scen_vec)
+
+    fig = plot_scenario_compare_radar(scores_base, scores_scen)
+
+    delta_total = scores_scen["total"] - scores_base["total"]
+
+    md = f"### 📊 Szenario-Auswertung für {country}\n"
+    md += f"- Baseline-Gesamtrisiko: **{scores_base['total']:.2f}**\n"
+    md += f"- Szenario-Gesamtrisiko: **{scores_scen['total']:.2f}**\n"
+    md += f"- Δ Risiko (Szenario - Baseline): **{delta_total:+.2f}**\n\n"
+
+    md += "**Aktive Schocks:**\n"
+    for s, val in shock_config.items():
+        if val and val > 0:
+            md += f"- {s} (Intensität: {val:.2f})\n"
+
+    if delta_total > 0.15:
+        md += "\n⚠️ Das Szenario führt zu einem **deutlich erhöhten Gesamtrisiko**.\n"
+    elif delta_total > 0.05:
+        md += "\nℹ️ Das Szenario erhöht das Risiko **moderaten Ausmaßes**.\n"
+    else:
+        md += "\n✅ Das Szenario verändert das Gesamtrisiko **nur geringfügig**.\n"
+
+    report = scenario_report(country, scores_base, scores_scen, shock_config)
+
+    return fig, md, report
 
 
 # ============================================================
 # UI-FUNKTIONEN (Heatmap, Szenarien, Sensitivität)
 # ============================================================
-
-def ui_scenario(country_code, shock_json):
-    params = presets[country_code]
-    shock = json.loads(shock_json)
-    new_params, new_score, report = apply_shock(params, shock)
-
-    table = []
-    for r in report:
-        table.append([
-            r["parameter"],
-            r["änderung"],
-            r["bedeutung"],
-            r["farbe"]
-        ])
-
-    return new_score["total"], table
-
-
 def ui_heatmap():
     table = risk_heatmap(presets)
     rows = []
@@ -463,284 +746,9 @@ def ui_heatmap():
         ])
     return rows
 
-
-def ui_sensitivity(country_code):
-    params = presets[country_code]
-    results = sensitivity_analysis(params)
-
-    table = []
-    for r in results:
-        table.append([
-            r["parameter"],
-            r["delta"],
-            r["bedeutung"],
-            r["farbe"],
-        ])
-    return table
-
-# ============================================================
-# UI-FUNKTIONEN – Simulation mit LÄNDER-DROPDOWN
-# ============================================================
-
-def load_country_preset(country_code: str) -> List[float]:
-    if country_code in presets:
-        params = presets[country_code]
-    else:
-        params = default_params
-
-    values = []
-    for key, _lo, _hi, _default in PARAM_SLIDERS:
-        values.append(float(params.get(key, default_params[key])))
-    return values
-
-def tech_radar(params: dict):
-    labels = [
-        "Halbleiter",
-        "Software/Cloud",
-        "IP/Lizenzen",
-        "Schlüsseltechnologien"
-    ]
-
-    values = [
-        params["halbleiter_abhaengigkeit"],
-        params["software_cloud_abhaengigkeit"],
-        params["ip_lizenzen_abhaengigkeit"],
-        params["schluesseltechnologie_importe"]
-    ]
-
-    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
-    values = np.concatenate((values, [values[0]]))
-    angles = np.concatenate((angles, [angles[0]]))
-
-    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
-    ax.plot(angles, values, "o-", linewidth=2)
-    ax.fill(angles, values, alpha=0.25)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels)
-    ax.set_ylim(0, 1)
-
-    return fig
-
-
-
-def generate_benchmark_interpretation(scores: dict):
-    """
-    scores = {
-        "DE": {"total":..., "macro":..., ...},
-        "US": {...},
-        ...
-    }
-    """
-    text = "Benchmark-Analyse:\n\n"
-
-    # Ranking
-    ranking = sorted(scores.items(), key=lambda x: x[1]["total"])
-    text += "Risikoranking (niedrig → hoch):\n"
-    for i, (land, sc) in enumerate(ranking, 1):
-        text += f"{i}. {land}: {sc['total']:.3f}\n"
-
-    # Unterschiede hervorheben
-    best = ranking[0][0]
-    worst = ranking[-1][0]
-
-    text += f"\nNiedrigstes Risiko: {best}\n"
-    text += f"Höchstes Risiko: {worst}\n"
-
-    # Dimensionale Analyse
-    text += "\nDimensionale Unterschiede:\n"
-    dims = ["macro", "geo", "governance", "finanz", "sozial"]
-    for d in dims:
-        sorted_dim = sorted(scores.items(), key=lambda x: x[1][d])
-        text += f"- {d.capitalize()}: Bestes Land = {sorted_dim[0][0]}, Schwächstes Land = {sorted_dim[-1][0]}\n"
-
-    return text
-
-def interpret_handel_supply(params, scores):
-    text = "### Handel & Lieferketten – Automatische Interpretation\n\n"
-
-    text += f"- Handelsrisiko: **{scores['handel']:.3f}**\n"
-    text += f"- Lieferkettenrisiko: **{scores['supply_chain']:.3f}**\n\n"
-
-    if scores["handel"] > 0.66:
-        text += "• Das Land weist eine **kritische Handelsabhängigkeit** auf.\n"
-    elif scores["handel"] > 0.33:
-        text += "• Die Handelsabhängigkeit ist **moderat**, aber verwundbar.\n"
-    else:
-        text += "• Die Handelsabhängigkeit ist **gering** und gut diversifiziert.\n"
-
-    if scores["supply_chain"] > 0.66:
-        text += "• Die Lieferketten sind **hochgradig fragil**.\n"
-    elif scores["supply_chain"] > 0.33:
-        text += "• Die Lieferketten sind **teilweise anfällig**.\n"
-    else:
-        text += "• Die Lieferketten sind **robust**.\n"
-
-    return text
-
-def interpret_scores(scores: dict) -> str:
-    lines = []
-    total = scores["total"]
-
-    # Gesamtbild
-    if total > 0.75:
-        lines.append("Das Gesamtrisiko liegt im **kritischen Bereich**. Mehrere strukturelle Verwundbarkeiten überlagern sich.")
-    elif total > 0.55:
-        lines.append("Das Gesamtrisiko ist **erhöht**. Einzelne Risikofaktoren dominieren das Profil.")
-    else:
-        lines.append("Das Gesamtrisiko ist **moderat bis stabil**. Keine dominanten systemischen Schwächen.")
-
-    # Makro
-    if scores["macro"] > 0.66:
-        lines.append("• **Makroökonomisch kritisch**: Verschuldung, FX‑Risiken oder geringe Reserven belasten die Stabilität.")
-    elif scores["macro"] > 0.33:
-        lines.append("• **Makroökonomisch angespannt**: Einige Verwundbarkeiten sind sichtbar.")
-    else:
-        lines.append("• **Makroökonomisch solide**: Puffer und Stabilität vorhanden.")
-
-    # Geo
-    if scores["geo"] > 0.66:
-        lines.append("• **Geopolitisch hoch riskant**: Starke Abhängigkeiten oder Sanktionsrisiken.")
-    elif scores["geo"] > 0.33:
-        lines.append("• **Geopolitisch moderat riskant**: Teilweise Abhängigkeiten bestehen.")
-    else:
-        lines.append("• **Geopolitisch robust**: Diversifizierte Position.")
-
-    # Governance
-    if scores["governance"] > 0.66:
-        lines.append("• **Governance schwach**: Institutionelle Risiken, Korruption oder geringe Innovationskraft.")
-    elif scores["governance"] > 0.33:
-        lines.append("• **Governance durchwachsen**: Reformbedarf vorhanden.")
-    else:
-        lines.append("• **Governance stark**: Gute Institutionen und Innovationsfähigkeit.")
-
-    # Handel
-    if scores["handel"] > 0.66:
-        lines.append("• **Handelsabhängigkeit hoch**: Konzentration auf wenige Partner oder kritische Güter.")
-    elif scores["handel"] > 0.33:
-        lines.append("• **Handelsrisiko moderat**.")
-    else:
-        lines.append("• **Handel gut diversifiziert**.")
-
-    # Lieferketten
-    if scores["supply_chain"] > 0.66:
-        lines.append("• **Lieferketten fragil**: Chokepoints oder geringe Puffer.")
-    elif scores["supply_chain"] > 0.33:
-        lines.append("• **Lieferketten teilweise anfällig**.")
-    else:
-        lines.append("• **Lieferketten robust**.")
-
-    # Finanzielle Abhängigkeit
-    if scores["financial"] > 0.66:
-        lines.append("• **Finanzielle Abhängigkeit hoch**: Kapitalmarkt‑ oder FX‑Refinanzierungsrisiken.")
-    elif scores["financial"] > 0.33:
-        lines.append("• **Finanzielle Abhängigkeit moderat**.")
-    else:
-        lines.append("• **Finanzielle Abhängigkeit gering**.")
-
-    # Tech-Abhängigkeit
-    if scores["tech"] > 0.66:
-        lines.append("• **Technologische Abhängigkeit kritisch**: Hohe Importabhängigkeit bei Halbleitern, Software oder Schlüsseltechnologien.")
-    elif scores["tech"] > 0.33:
-        lines.append("• **Technologische Abhängigkeit moderat**: Teilweise Abhängigkeit von externen Hightech-Komponenten.")
-    else:
-        lines.append("• **Technologische Abhängigkeit gering**: Gute technologische Eigenständigkeit.")
-
-
-    return "\n".join(lines)
-
-
-def interpret_dashboard_old(params: dict, scores: dict) -> str:
-    lines = []
-    lines.append("## Interpretation des Dashboards\n")
-
-    # Gesamtampel
-    if scores["total"] > 0.75:
-        lines.append("Das Gesamtrisiko befindet sich im **kritischen Bereich**. Mehrere Risikodimensionen verstärken sich gegenseitig.")
-    elif scores["total"] > 0.55:
-        lines.append("Das Gesamtrisiko ist **erhöht**, jedoch nicht akut kritisch.")
-    else:
-        lines.append("Das Gesamtrisiko ist **moderat** und zeigt keine unmittelbaren systemischen Spannungen.")
-
-    # Systemrisiko-Radar
-    lines.append("\n### Systemrisiko-Radar")
-    lines.append("Das Radar zeigt die strukturelle Balance zwischen Makro, Geo, Governance und Abhängigkeiten.")
-
-    # Frühwarnindikatoren
-    lines.append("\n### Frühwarnindikatoren")
-    lines.append(build_early_warning_dashboard(params, scores))
-
-    # Handelsrisiken
-    if scores["handel"] > 0.66:
-        lines.append("\n### Handelsrisiko")
-        lines.append("Hohe Handelsabhängigkeit – Diversifizierung empfohlen.")
-    elif scores["handel"] > 0.33:
-        lines.append("\n### Handelsrisiko")
-        lines.append("Moderate Handelsrisiken – Monitoring sinnvoll.")
-    else:
-        lines.append("\n### Handelsrisiko")
-        lines.append("Handel gut diversifiziert.")
-
-    # Lieferketten
-    if scores["supply_chain"] > 0.66:
-        lines.append("\n### Lieferketten")
-        lines.append("Lieferketten sind fragil – Chokepoints und geringe Puffer.")
-    elif scores["supply_chain"] > 0.33:
-        lines.append("\n### Lieferketten")
-        lines.append("Teilweise Verwundbarkeit – Puffer erhöhen.")
-    else:
-        lines.append("\n### Lieferketten")
-        lines.append("Lieferketten robust.")
-
-    # Finanzielle Abhängigkeit
-    if scores["financial"] > 0.66:
-        lines.append("\n### Finanzielle Abhängigkeit")
-        lines.append("Hohe externe Abhängigkeit – Kapitalmarkt‑ oder FX‑Risiken.")
-    elif scores["financial"] > 0.33:
-        lines.append("\n### Finanzielle Abhängigkeit")
-        lines.append("Moderate externe Abhängigkeit.")
-    else:
-        lines.append("\n### Finanzielle Abhängigkeit")
-        lines.append("Geringe externe Abhängigkeit.")
-
-
-    lines.append("\n### Technologische Abhängigkeit")
-    if scores["tech"] > 0.66:
-        lines.append("Hohe technologische Abhängigkeit – Risiken bei Halbleitern, Software oder Cloud-Infrastruktur.")
-    elif scores["tech"] > 0.33:
-        lines.append("Moderate technologische Abhängigkeit – Monitoring sinnvoll.")
-    else:
-        lines.append("Geringe technologische Abhängigkeit – robuste technologische Basis.")
-
-    return "\n".join(lines)
-
-
-
 # ------------------------------------------------------------
 # 3. Radar-Plots
 # ------------------------------------------------------------
-def plot_status_radar(scores: dict):
-    labels = ["Makro", "Geo", "Governance", "Finanz", "Sozial"]
-    values = [
-        scores["macro"],
-        scores["geo"],
-        scores["governance"],
-        scores["finanz"],
-        scores["sozial"],
-    ]
-
-    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
-    angles = np.concatenate((angles, [angles[0]]))
-    values = np.concatenate((values, [values[0]]))
-
-    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
-    ax.plot(angles, values, "o-", linewidth=2)
-    ax.fill(angles, values, alpha=0.25)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels)
-    ax.set_ylim(0, 1)
-
-    return fig
-
 def plot_risk_radar(scores: dict):
     labels = [
         "Makro", "Geo", "Governance", "Handel",
@@ -1327,6 +1335,55 @@ def build_app():
                     outputs=story_out
                 ) 
 
+        
+        with gr.Tab("Szenario-Dashboard"):
+            gr.Markdown("## 🔮 Szenario-Dashboard")
+            gr.Markdown(
+                "Kombiniere mehrere Schocks, steuere ihre Intensität und vergleiche Baseline- mit Szenario-Risiko."
+            )
+
+            country = gr.Dropdown(
+                list(presets.keys()),
+                label="Land",
+                value=list(presets.keys())[0],
+            )
+
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### 🔧 Schocks & Intensitäten")
+
+                    oil_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Ölpreis-Schock")
+                    usd_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="USD-Zinsanstieg")
+                    sanc_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Sanktionen")
+                    supply_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Lieferketten-Blockade")
+                    energy_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Energieembargo")
+                    bank_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Bankenkrise")
+                    cyber_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Cyberangriff")
+
+                    run_btn = gr.Button("Szenario berechnen", variant="primary")
+
+                with gr.Column():
+                    radar_out = gr.Plot(label="Baseline vs. Szenario (Radar)")
+                    summary_out = gr.Markdown(label="Kurz-Auswertung")
+                    report_out = gr.Markdown(label="Szenario-Report")
+
+            run_btn.click(
+                run_scenario,
+                inputs=[
+                    country,
+                    oil_intensity,
+                    usd_intensity,
+                    sanc_intensity,
+                    supply_intensity,
+                    energy_intensity,
+                    bank_intensity,
+                    cyber_intensity,
+                ],
+                outputs=[radar_out, summary_out, report_out],
+            )
+
+            
+          
         with gr.Tab("Länderprofil"):
             gr.Markdown("## Automatisches Länderprofil")
 
