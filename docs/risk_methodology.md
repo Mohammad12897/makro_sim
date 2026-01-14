@@ -420,34 +420,54 @@ für globale Finanzkrisen, Vertrauensverluste und externe Schocks.
 
 
 ### **1. Ziel des Risiko-Modells**
-Das Risiko-Modell bewertet die Verwundbarkeit eines Landes gegenüber externen Schocks.  
+Das Risiko-Modell bewertet die Verwundbarkeit eines Landes gegenüber externen Schocks.
 Es misst strukturelle Risiken, nicht die aktuelle Stärke eines Landes.
 
 ### **2. Die acht Risiko-Dimensionen**
-1. **Makroökonomisches Risiko** – Verschuldung, FX-Schocks, Reserven  
-2. **Geopolitisches Risiko** – USD-Dominanz, Sanktionen, Alternativnetzwerke  
-3. **Governance-Risiko** – Demokratie, Korruption, Innovation, Fachkräfte  
-4. **Handelsrisiko** – Export-/Importkonzentration, kritische Güter  
-5. **Lieferkettenrisiko** – Chokepoints, JIT, Produktionskonzentration, Puffer  
-6. **Finanzielle Abhängigkeit** – Auslandsverschuldung, Kapitalmärkte, FX-Refi  
-7. **Technologische Abhängigkeit** – Halbleiter, Cloud, IP, Schlüsseltechnologien  
+1. **Makroökonomisches Risiko** – Verschuldung, FX-Schocks, Reserven
+2. **Geopolitisches Risiko** – USD-Dominanz, Sanktionen, Alternativnetzwerke
+3. **Governance-Risiko** – Demokratie, Korruption, Innovation, Fachkräfte
+4. **Handelsrisiko** – Export-/Importkonzentration, kritische Güter
+5. **Lieferkettenrisiko** – Chokepoints, JIT, Produktionskonzentration, Puffer
+6. **Finanzielle Abhängigkeit** – Auslandsverschuldung, Kapitalmärkte, FX-Refi
+7. **Technologische Abhängigkeit** – Halbleiter, Cloud, IP, Schlüsseltechnologien
 8. **Energieabhängigkeit** – Importabhängigkeit, Diversifikation
 
 ### **3. Gesamt-Risiko**
 Gewichtetes Mittel der acht Dimensionen.
 
 ### **4. Interpretation**
-- 0.00–0.30: gering  
-- 0.30–0.55: moderat  
-- 0.55–0.75: erhöht  
-- >0.75: kritisch  
+- 0.00–0.30: gering
+- 0.30–0.55: moderat
+- 0.55–0.75: erhöht
+- >0.75: kritisch
 
 ### **5. Verwendung im System**
-- Risiko-Radar  
-- Multi-Risiko-Radar  
-- Dashboard  
-- Clusteranalyse  
-- Storyline  
-- Early-Warning  
-  
+- Risiko-Radar
+- Multi-Risiko-Radar
+- Dashboard
+- Clusteranalyse
+- Storyline
+- Early-Warning
+
+### 6) Währungs‑ und Zahlungsabhängigkeit
+
+Die Währungs‑ und Zahlungsabhängigkeit beschreibt, wie stark ein Land von internationalen Leitwährungen, globalen Zahlungssystemen und externen Finanzinfrastrukturen abhängig ist. Je höher diese Abhängigkeit, desto größer die Verwundbarkeit gegenüber geopolitischen, regulatorischen oder finanzmarktgetriebenen Schocks.
+
+**Einflussfaktoren:**
+
+- Dominanz des US‑Dollars im Handel und in der Finanzierung
+- Nutzung internationaler Zahlungssysteme (z. B. SWIFT, CHIPS, Euroclear)
+- Verfügbarkeit alternativer Zahlungskanäle
+  (z. B. RMB‑Clearing, bilaterale Swap‑Lines, CIPS)
+- Höhe und Zusammensetzung der Währungsreserven
+  (USD‑Anteil, Diversifikation, Liquidität)
+- Exposure gegenüber Wechselkurs‑ und Zinszyklen großer Leitwährungen
+- Abhängigkeit von ausländischen Banken und Korrespondenznetzwerken
+
+**Risiko:**
+- Sanktionen oder Ausschlüsse aus globalen Zahlungssystemen können Handel, Energieimporte und Finanzströme abrupt unterbrechen.
+- Hohe USD‑Abhängigkeit erhöht die Anfälligkeit für US‑Zins‑ und Wechselkurspolitik.
+- Währungskrisen können Kapitalflucht, Inflation und Refinanzierungsprobleme auslösen.
+- Mangel an Alternativen erhöht die strukturelle Verwundbarkeit gegenüber geopolitischen Spannungen.
 

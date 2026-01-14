@@ -107,11 +107,37 @@ presets = load_presets()
 EXPECTED_COUNTRIES = ["DE", "US", "IR", "CN", "FR", "IN", "BR", "GR", "GB"]
 
 
+# ---------------------------------------------------------
+#  RISIKO-DIMENSIONEN & GEWICHTE
+# ---------------------------------------------------------
 
 RISK_KEYS = [
-    "macro", "geo", "governance", "handel",
-    "supply_chain", "financial", "tech", "energie"
+    "macro",
+    "geo",
+    "governance",
+    "handel",
+    "supply_chain",
+    "currency",       # neue Dimension
+    "financial",
+    "tech",
+    "energie",
 ]
+
+WEIGHTS = {
+    "macro": 0.24,
+    "geo": 0.20,
+    "governance": 0.16,
+    "handel": 0.11,
+    "supply_chain": 0.06,
+    "currency": 0.07,     # neue Gewichtung
+    "financial": 0.06,
+    "tech": 0.05,
+    "energie": 0.05,
+}
+
+# ---------------------------------------------------------
+#  ALIAS-MAPPING
+# ---------------------------------------------------------
 
 KEY_ALIASES = {
     "macroeconomic": "macro",
@@ -124,7 +150,21 @@ KEY_ALIASES = {
     "finance": "financial",
     "technology": "tech",
     "energy": "energie",
+
+    # Aliase für Währungs- und Zahlungsabhängigkeit
+    "currency_risk": "currency",
+    "currency": "currency",
+    "fx": "currency",
+    "fx_risk": "currency",
+    "waehrung": "currency",
+    "waehrungsabhaengigkeit": "currency",
+    "payment": "currency",
+    "payment_risk": "currency",
+    "swift": "currency",
+    "swift_risk": "currency",
 }
+
+
 
 SCENARIO_METADATA = {
     "Ölpreis-Schock": {
@@ -155,7 +195,47 @@ SCENARIO_METADATA = {
         "description": "Schwere Cyberangriffe auf kritische Infrastruktur",
         "params_info": "Intensität 0–1, wirkt auf Tech & Governance",
     },
+
+    # Neue Schocks
+    "Dollar-Schock": {
+        "description": "Starke USD-Aufwertung und Zinsanstieg",
+        "params_info": "Intensität 0–1, wirkt auf Currency, Finanzen & Makro",
+    },
+    "SWIFT-Ausschluss": {
+        "description": "Ausschluss oder Einschränkung des Zugangs zu SWIFT",
+        "params_info": "Intensität 0–1, wirkt auf Currency, Handel & Geo",
+    },
 }
+
+# Standard-Szenario-Presets (Beispiele)
+scenario_presets = {
+    "Russland-Sanktionen": {
+        "Sanktionen": 0.9,
+        "SWIFT-Ausschluss": 0.8,
+        "Dollar-Schock": 0.3,
+    },
+    "Ölpreis-Schock 150%": {
+        "Ölpreis-Schock": 1.0,
+        "Energieembargo": 0.4,
+    },
+    "Bankenstress": {
+        "Bankenkrise": 0.8,
+        "USD-Zinsanstieg": 0.6,
+    },
+}
+
+SCENARIO_ORDER = [
+    "Ölpreis-Schock",
+    "USD-Zinsanstieg",
+    "Sanktionen",
+    "Lieferketten-Blockade",
+    "Energieembargo",
+    "Bankenkrise",
+    "Cyberangriff",
+    "Dollar-Schock",
+    "SWIFT-Ausschluss",
+]
+
 
 # ============================================================
 # TEXTDATEIEN (Interpretationen) LADEN
@@ -195,32 +275,35 @@ technologische_abhaengigkeit_text = load_textfile(ROOT.parent / "docs" / "interp
 
 
 
-# ============================================================
-# PRESET‑VALIDATOR UND BASIS-HILFSFUNKTIONEN
-# ============================================================
+
+
+
+# ---------------------------------------------------------
+#  NORMALISIERUNG
+# ---------------------------------------------------------
+
 def normalize_value(v):
-    """Bringt Werte robust in [0,1]-Skala."""
     try:
         v = float(v)
-    except Exception:
+    except:
         return 0.0
-    if v < 0:
-        return 0.0
-    if v > 1:
-        # falls mal 0–100 vorliegt
-        if v <= 100:
-            return v / 100.0
-        return 1.0
-    return v
+    return max(0.0, min(1.0, v))
+
+# ---------------------------------------------------------
+#  ensure_full_risk_vector (WICHTIG!)
+# ---------------------------------------------------------
 
 
 def ensure_full_risk_vector(base: dict) -> dict:
-    """Sorgt dafür, dass alle RISK_KEYS existieren und normalisiert sind."""
+    """
+    Stellt sicher, dass alle Risiko-Dimensionen vorhanden sind.
+    Ergänzt fehlende Keys, wendet Aliase an und normalisiert Werte.
+    """
     base = base.copy()
 
-    # Aliase mappen
+    # Aliase anwenden
     for old, new in KEY_ALIASES.items():
-        if old in base and new not in base:
+        if old in base:
             base[new] = base[old]
 
     # Fehlende Keys ergänzen
@@ -233,7 +316,6 @@ def ensure_full_risk_vector(base: dict) -> dict:
         base[key] = normalize_value(base[key])
 
     return base
-
 
 def validate_all_presets(presets: dict):
     """
@@ -304,9 +386,7 @@ def generate_risk_profile(country):
 
     return md
 
-def early_warning_system(country):
-    scores = compute_risk_scores(presets[country])
-
+def ews_from_scores(scores: dict, title: str = "Frühwarnsystem"):
     warnings = []
     critical = []
 
@@ -318,8 +398,9 @@ def early_warning_system(country):
         elif val > 0.55:
             warnings.append((dim, val))
 
-    md = f"# 🚨 Frühwarnsystem für {country}\n"
+    md = f"# 🚨 {title}\n"
 
+    # Kritische Risiken
     if critical:
         md += "## 🔴 Kritische Risiken\n"
         for dim, val in critical:
@@ -327,6 +408,7 @@ def early_warning_system(country):
     else:
         md += "## 🔴 Kritische Risiken\nKeine.\n"
 
+    # Erhöhte Risiken
     if warnings:
         md += "\n## 🟠 Erhöhte Risiken\n"
         for dim, val in warnings:
@@ -334,15 +416,37 @@ def early_warning_system(country):
     else:
         md += "\n## 🟠 Erhöhte Risiken\nKeine.\n"
 
+    # Stabilitätsindikatoren
     md += "\n## 🟢 Stabilitätsindikatoren\n"
-    stable = [d for d in scores if scores[d] < 0.30 and d != "total"]
+    stable = [d for d in scores if d != "total" and scores[d] < 0.30]
     if stable:
         for dim in stable:
             md += f"- **{dim}**: {scores[dim]:.2f}\n"
     else:
         md += "Keine besonders stabilen Bereiche.\n"
 
+    # 🔥 Spezielle Zusatzwarnungen für Currency
+    if "currency" in scores:
+        if scores["currency"] > 0.75:
+            md += (
+                "\n## ⚠️ Spezielle Warnung: Währungs- & Zahlungsabhängigkeit\n"
+                f"- Die Abhängigkeit von Leitwährungen und Zahlungssystemen ist **kritisch hoch** "
+                f"({scores['currency']:.2f}).\n"
+                "- Risiko: Hohe USD-Exposure, SWIFT-Abhängigkeit, mögliche Sanktionen.\n"
+            )
+        elif scores["currency"] > 0.55:
+            md += (
+                "\n## ⚠️ Hinweis: Erhöhte Währungsabhängigkeit\n"
+                f"- Die Währungs- und Zahlungsabhängigkeit ist **erhöht** "
+                f"({scores['currency']:.2f}).\n"
+                "- Risiko: Sensitivität gegenüber USD-Zins- und Wechselkurspolitik.\n"
+            )
+
     return md
+
+def early_warning_system(country):
+    scores = compute_risk_scores(presets[country])
+    return ews_from_scores(scores, title=f"Frühwarnsystem – {country}")
 
 def apply_scenario(country, scenario):
     # Basisdaten holen
@@ -465,13 +569,13 @@ def ensure_full_risk_vector(base: dict) -> dict:
     return base
 
 
+
 def apply_single_shock(base: dict, shock_type: str, intensity: float) -> dict:
     """
-    base: Risiko-Vektor (vollständig, normalisiert)
-    shock_type: Name des Schocks
-    intensity: 0.0–1.0 (Stärke)
+    Wendet einen einzelnen Schock auf einen Risiko-Vektor an.
     """
     base = ensure_full_risk_vector(base)
+    print("DEBUG:", base.keys())
     f = max(0.0, min(1.0, float(intensity)))
 
     if shock_type == "Ölpreis-Schock":
@@ -502,6 +606,16 @@ def apply_single_shock(base: dict, shock_type: str, intensity: float) -> dict:
         base["tech"] = min(1.0, base["tech"] + 0.25 * f)
         base["governance"] = min(1.0, base["governance"] + 0.10 * f)
 
+    elif shock_type == "Dollar-Schock":
+        base["currency"] = min(1.0, base["currency"] + 0.30 * f)
+        base["financial"] = min(1.0, base["financial"] + 0.15 * f)
+        base["macro"] = min(1.0, base["macro"] + 0.10 * f)
+
+    elif shock_type == "SWIFT-Ausschluss":
+        base["currency"] = min(1.0, base["currency"] + 0.35 * f)
+        base["handel"] = min(1.0, base["handel"] + 0.20 * f)
+        base["geo"] = min(1.0, base["geo"] + 0.20 * f)
+
     return base
 
 def apply_multiple_shocks(country: str, shocks: List[Tuple[str, float]]) -> dict:
@@ -517,17 +631,191 @@ def apply_multiple_shocks(country: str, shocks: List[Tuple[str, float]]) -> dict
 
 def apply_multiple_shocks_for_country(country: str, shock_config: dict) -> dict:
     """
-    shock_config: dict {shock_type: intensity}
+    Wendet mehrere Schocks nacheinander auf das Länderprofil an.
     """
     base = ensure_full_risk_vector(presets[country])
 
     for shock_type, intensity in shock_config.items():
-        if intensity is None:
+        if intensity is None or intensity == 0:
             continue
         base = apply_single_shock(base, shock_type, intensity)
 
     return base
 
+
+def delta_ews_panel(scores_base: dict, scores_scen: dict) -> str:
+    """
+    Erzeugt ein Markdown-Panel, das zeigt:
+    - neu kritisch
+    - neu erhöht
+    - entschärft
+    """
+    def level(v: float) -> str:
+        if v > 0.75:
+            return "critical"
+        if v > 0.55:
+            return "warning"
+        return "normal"
+
+    newly_critical = []
+    newly_warning = []
+    deescalated = []
+
+    for dim, base_val in scores_base.items():
+        if dim == "total":
+            continue
+        scen_val = scores_scen.get(dim, base_val)
+        base_lvl = level(base_val)
+        scen_lvl = level(scen_val)
+
+        # neu kritisch: vorher nicht critical, jetzt critical
+        if base_lvl != "critical" and scen_lvl == "critical":
+            newly_critical.append((dim, base_val, scen_val))
+        # neu erhöht: vorher normal, jetzt warning
+        elif base_lvl == "normal" and scen_lvl == "warning":
+            newly_warning.append((dim, base_val, scen_val))
+        # entschärft: vorher critical/warning, jetzt normal
+        elif base_lvl in ("critical", "warning") and scen_lvl == "normal":
+            deescalated.append((dim, base_val, scen_val))
+
+    md = "## 🔺 Delta‑Frühwarnsystem\n\n"
+
+    # Neu kritisch
+    md += "### 🔴 Neu kritisch geworden\n"
+    if newly_critical:
+        for dim, b, s in newly_critical:
+            md += f"- **{dim}**: {b:.2f} → **{s:.2f}**\n"
+    else:
+        md += "- Keine Dimension neu kritisch.\n"
+
+    # Neu erhöht
+    md += "\n### 🟠 Neu erhöht (aber nicht kritisch)\n"
+    if newly_warning:
+        for dim, b, s in newly_warning:
+            md += f"- **{dim}**: {b:.2f} → **{s:.2f}**\n"
+    else:
+        md += "- Keine Dimension neu erhöht.\n"
+
+    # Entschärft
+    md += "\n### 🟢 Entschärft\n"
+    if deescalated:
+        for dim, b, s in deescalated:
+            md += f"- **{dim}**: {b:.2f} → **{s:.2f}**\n"
+    else:
+        md += "- Keine Dimension deutlich entschärft.\n"
+
+    return md
+
+def load_scenario_preset(preset_name: str):
+    """
+    Gibt die Intensitäten in genau der Reihenfolge von SCENARIO_ORDER zurück.
+    Fehlt ein Schock im Preset, wird 0.0 verwendet.
+    """
+    if not preset_name or preset_name not in scenario_presets:
+        return [0.0] * len(SCENARIO_ORDER)
+
+    config = scenario_presets[preset_name]
+    values = []
+    for shock in SCENARIO_ORDER:
+        values.append(float(config.get(shock, 0.0)))
+    return values
+
+def decision_support_view(country: str,
+                          oil_intensity,
+                          usd_intensity,
+                          sanc_intensity,
+                          supply_intensity,
+                          energy_intensity,
+                          bank_intensity,
+                          cyber_intensity,
+                          dollar_intensity,
+                          swift_intensity):
+
+    # Baseline
+    base_vec = ensure_full_risk_vector(presets[country])
+    scores_base = compute_risk_scores(base_vec)
+
+    # Szenario
+    shock_config = {
+        "Ölpreis-Schock": oil_intensity,
+        "USD-Zinsanstieg": usd_intensity,
+        "Sanktionen": sanc_intensity,
+        "Lieferketten-Blockade": supply_intensity,
+        "Energieembargo": energy_intensity,
+        "Bankenkrise": bank_intensity,
+        "Cyberangriff": cyber_intensity,
+        "Dollar-Schock": dollar_intensity,
+        "SWIFT-Ausschluss": swift_intensity,
+    }
+    any_shock = any(v and v > 0 for v in shock_config.values())
+
+    if any_shock:
+        scen_vec = apply_multiple_shocks_for_country(country, shock_config)
+        scores_scen = compute_risk_scores(scen_vec)
+        radar_fig = plot_scenario_compare_radar(scores_base, scores_scen)
+        delta_ews_md = delta_ews_panel(scores_base, scores_scen)
+        scen_report = scenario_report(country, scores_base, scores_scen, shock_config)
+    else:
+        scores_scen = scores_base
+        radar_fig = plot_risk_radar(scores_base)
+        delta_ews_md = "## 🔺 Delta‑Frühwarnsystem\n\nKeine Szenario‑Änderungen aktiv."
+        scen_report = scenario_report(country, scores_base, scores_base, {})
+
+    # EWS
+    ews_base_md = ews_from_scores(scores_base, title=f"Frühwarnsystem – Baseline ({country})")
+    ews_scen_md = ews_from_scores(scores_scen, title=f"Frühwarnsystem – Szenario ({country})")
+
+    # Benchmarking (sehr einfach: vorhandene Funktion aufrufen)
+    bench_md = benchmarking_table()
+
+    # Kurze Empfehlung (sehr kompakt)
+    delta_total = scores_scen["total"] - scores_base["total"]
+    rec_md = f"## 🧠 Decision Support – Kurzinterpretation\n\n"
+    rec_md += f"- Δ Gesamtrisiko: **{delta_total:+.2f}**\n"
+    if delta_total > 0.15:
+        rec_md += "- Das Szenario erhöht das strukturelle Risiko deutlich.\n"
+    elif delta_total > 0.05:
+        rec_md += "- Das Szenario erhöht das Risiko moderat.\n"
+    elif delta_total > 0:
+        rec_md += "- Das Szenario erhöht das Risiko leicht.\n"
+    else:
+        rec_md += "- Keine relevante Erhöhung des Gesamtrisikos.\n"
+
+    return radar_fig, ews_base_md, ews_scen_md, delta_ews_md, scen_report, bench_md, rec_md
+
+
+def scenario_ranking(country: str, intensity: float = 1.0) -> str:
+    """
+    Testet jeden Schock einzeln (mit gegebener Intensität)
+    und gibt ein Ranking nach Δ Gesamtrisiko aus.
+    """
+    base_vec = ensure_full_risk_vector(presets[country])
+    scores_base = compute_risk_scores(base_vec)
+    base_total = scores_base["total"]
+
+    results = []
+
+    for shock_name in SCENARIO_METADATA.keys():
+        # Nur Schocks berücksichtigen, die in deiner Logik implementiert sind
+        scen_vec = apply_multiple_shocks_for_country(country, {shock_name: intensity})
+        scores_scen = compute_risk_scores(scen_vec)
+        delta = scores_scen["total"] - base_total
+        results.append((shock_name, delta))
+
+    results_sorted = sorted(results, key=lambda x: x[1], reverse=True)
+
+    md = f"## 📈 Szenario-Ranking (Einzelschocks, Intensität = {intensity:.2f}) – {country}\n\n"
+    md += "| Schock | Δ Gesamtrisiko |\n"
+    md += "|--------|----------------|\n"
+    for shock, d in results_sorted:
+        md += f"| {shock} | {d:+.2f} |\n"
+
+    if results_sorted:
+        top_shock, top_delta = results_sorted[0]
+        md += "\n### Fazit\n"
+        md += f"Der stärkste Einzeltreiber in diesem Land ist **{top_shock}** mit Δ Gesamtrisiko {top_delta:+.2f}.\n"
+
+    return md
 # ============================================================
 # RADAR-FUNKTIONEN
 # ============================================================
@@ -664,15 +952,65 @@ def scenario_report(country: str, scores_base: dict, scores_scen: dict, shock_co
 
     return md
 
-def run_scenario(country,
-                 oil_intensity,
-                 usd_intensity,
-                 sanc_intensity,
-                 supply_intensity,
-                 energy_intensity,
-                 bank_intensity,
-                 cyber_intensity):
 
+def scenario_summary(scores_base: dict, scores_scen: dict, shock_config: dict) -> str:
+    """
+    Kompakte Markdown-Zusammenfassung eines Szenarios.
+    """
+    delta_total = scores_scen["total"] - scores_base["total"]
+
+    md = "## 📊 Szenario – Kurz-Auswertung\n\n"
+
+    # Gesamtänderung
+    md += f"**Δ Gesamtrisiko:** {delta_total:+.2f}\n\n"
+
+    # Aktive Schocks
+    active = {k: v for k, v in shock_config.items() if v and v > 0}
+    if active:
+        md += "### 🔧 Aktive Schocks\n"
+        for shock, val in active.items():
+            md += f"- **{shock}** (Intensität: {val:.2f})\n"
+    else:
+        md += "### 🔧 Aktive Schocks\nKeine.\n"
+
+    # Dimensionen mit größter Veränderung
+    md += "\n### 🔺 Stärkste Veränderungen\n"
+    deltas = []
+    for dim in scores_base:
+        if dim == "total":
+            continue
+        deltas.append((dim, scores_scen[dim] - scores_base[dim]))
+
+    deltas_sorted = sorted(deltas, key=lambda x: abs(x[1]), reverse=True)
+
+    for dim, d in deltas_sorted[:4]:
+        md += f"- **{dim}**: {scores_base[dim]:.2f} → {scores_scen[dim]:.2f} (Δ {d:+.2f})\n"
+
+    # Interpretation
+    md += "\n### 🧠 Interpretation\n"
+    if delta_total > 0.15:
+        md += "Das Szenario erhöht das strukturelle Risiko **deutlich**.\n"
+    elif delta_total > 0.05:
+        md += "Das Szenario erhöht das Risiko **moderat**.\n"
+    elif delta_total > 0:
+        md += "Das Szenario erhöht das Risiko **leicht**.\n"
+    else:
+        md += "Das Szenario **reduziert** das Gesamtrisiko leicht.\n"
+
+    return md
+
+def run_scenario(
+    country,
+    oil_intensity,
+    usd_intensity,
+    sanc_intensity,
+    supply_intensity,
+    energy_intensity,
+    bank_intensity,
+    cyber_intensity,
+    dollar_intensity,
+    swift_intensity,
+    ):
     base_vec = ensure_full_risk_vector(presets[country])
     scores_base = compute_risk_scores(base_vec)
 
@@ -684,13 +1022,15 @@ def run_scenario(country,
         "Energieembargo": energy_intensity,
         "Bankenkrise": bank_intensity,
         "Cyberangriff": cyber_intensity,
+        "Dollar-Schock": dollar_intensity,
+        "SWIFT-Ausschluss": swift_intensity,
     }
 
-    # prüfen, ob überhaupt ein Schock > 0 ist
     any_shock = any(v and v > 0 for v in shock_config.values())
 
+    ews_base_md = ews_from_scores(scores_base, title=f"Frühwarnsystem – Baseline ({country})")
+
     if not any_shock:
-        # nur Baseline anzeigen
         fig = plot_risk_radar(scores_base)
         md = (
             f"### ℹ️ Kein aktiver Schock\n"
@@ -698,37 +1038,18 @@ def run_scenario(country,
             f"**Gesamt-Risiko:** {scores_base['total']:.2f}"
         )
         report = scenario_report(country, scores_base, scores_base, {})
-        return fig, md, report
+        ews_scen_md = ews_from_scores(scores_base, title=f"Frühwarnsystem – Szenario ({country})")
+        return fig, md, report, ews_base_md, ews_scen_md
 
-    # Szenario anwenden
     scen_vec = apply_multiple_shocks_for_country(country, shock_config)
     scores_scen = compute_risk_scores(scen_vec)
 
     fig = plot_scenario_compare_radar(scores_base, scores_scen)
-
-    delta_total = scores_scen["total"] - scores_base["total"]
-
-    md = f"### 📊 Szenario-Auswertung für {country}\n"
-    md += f"- Baseline-Gesamtrisiko: **{scores_base['total']:.2f}**\n"
-    md += f"- Szenario-Gesamtrisiko: **{scores_scen['total']:.2f}**\n"
-    md += f"- Δ Risiko (Szenario - Baseline): **{delta_total:+.2f}**\n\n"
-
-    md += "**Aktive Schocks:**\n"
-    for s, val in shock_config.items():
-        if val and val > 0:
-            md += f"- {s} (Intensität: {val:.2f})\n"
-
-    if delta_total > 0.15:
-        md += "\n⚠️ Das Szenario führt zu einem **deutlich erhöhten Gesamtrisiko**.\n"
-    elif delta_total > 0.05:
-        md += "\nℹ️ Das Szenario erhöht das Risiko **moderaten Ausmaßes**.\n"
-    else:
-        md += "\n✅ Das Szenario verändert das Gesamtrisiko **nur geringfügig**.\n"
-
+    md = scenario_summary(scores_base, scores_scen, shock_config)
     report = scenario_report(country, scores_base, scores_scen, shock_config)
+    ews_scen_md = ews_from_scores(scores_scen, title=f"Frühwarnsystem – Szenario ({country})")
 
-    return fig, md, report
-
+    return fig, md, report, ews_base_md, ews_scen_md
 
 # ============================================================
 # UI-FUNKTIONEN (Heatmap, Szenarien, Sensitivität)
@@ -1252,7 +1573,7 @@ def build_app():
             with gr.Accordion("Interpretation", open=False):
                 gr.Markdown(f"```\n{finanzielle_abhaengigkeit_text}\n```")
 
-        
+
         with gr.Tab("Risiko-Profil & Frühwarnsystem"):
 
             gr.Markdown("## 📊 Risiko-Profil & 🚨 Frühwarnsystem")
@@ -1282,7 +1603,7 @@ def build_app():
                     inputs=[country_select],
                     outputs=ews_output
                 )
-        
+
         with gr.Tab("Szenarien & Analyse"):
             gr.Markdown("## 🔮 Szenarien, Benchmarking, Heatmap & Storyline 2.0")
             country_sel = gr.Dropdown(list(presets.keys()), label="Land", value=list(presets.keys())[0])
@@ -1333,9 +1654,9 @@ def build_app():
                     storyline_v2,
                     inputs=[country_sel],
                     outputs=story_out
-                ) 
+                )
 
-        
+
         with gr.Tab("Szenario-Dashboard"):
             gr.Markdown("## 🔮 Szenario-Dashboard")
             gr.Markdown(
@@ -1352,6 +1673,10 @@ def build_app():
                 with gr.Column():
                     gr.Markdown("### 🔧 Schocks & Intensitäten")
 
+                    preset_dropdown = gr.Dropdown( list(scenario_presets.keys()), label="Szenario-Preset auswählen", value=None, )
+                    load_preset_btn = gr.Button("Preset laden")
+
+
                     oil_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Ölpreis-Schock")
                     usd_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="USD-Zinsanstieg")
                     sanc_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Sanktionen")
@@ -1359,6 +1684,8 @@ def build_app():
                     energy_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Energieembargo")
                     bank_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Bankenkrise")
                     cyber_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Cyberangriff")
+                    dollar_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="Dollar-Schock")
+                    swift_intensity = gr.Slider(0.0, 1.0, value=0.0, step=0.1, label="SWIFT-Ausschluss")
 
                     run_btn = gr.Button("Szenario berechnen", variant="primary")
 
@@ -1366,6 +1693,30 @@ def build_app():
                     radar_out = gr.Plot(label="Baseline vs. Szenario (Radar)")
                     summary_out = gr.Markdown(label="Kurz-Auswertung")
                     report_out = gr.Markdown(label="Szenario-Report")
+
+            # EWS-Bereich
+            with gr.Row():
+                with gr.Column():
+                    ews_base_out = gr.Markdown(label="Frühwarnsystem – Baseline")
+                with gr.Column():
+                    ews_scen_out = gr.Markdown(label="Frühwarnsystem – Szenario")
+
+
+            load_preset_btn.click(
+                fn=lambda name: load_scenario_preset(name),
+                inputs=[preset_dropdown],
+                outputs=[
+                    oil_intensity,
+                    usd_intensity,
+                    sanc_intensity,
+                    supply_intensity,
+                    energy_intensity,
+                    bank_intensity,
+                    cyber_intensity,
+                    dollar_intensity,
+                    swift_intensity,
+                ],
+            )
 
             run_btn.click(
                 run_scenario,
@@ -1378,12 +1729,89 @@ def build_app():
                     energy_intensity,
                     bank_intensity,
                     cyber_intensity,
+                    dollar_intensity,
+                    swift_intensity,
                 ],
-                outputs=[radar_out, summary_out, report_out],
+                outputs=[radar_out, summary_out, report_out, ews_base_out, ews_scen_out],
+
             )
 
-            
-          
+
+
+        with gr.Tab("Decision Support"):
+            gr.Markdown("## 🧭 Decision Support")
+            gr.Markdown(
+                "Profil, Frühwarnsystem, Szenario und Benchmarking in einem integrierten Blick."
+            )
+
+            country = gr.Dropdown(
+                list(presets.keys()),
+                label="Land",
+                value=list(presets.keys())[0],
+            )
+
+            with gr.Accordion("Szenario-Einstellungen", open=True):
+                oil_intensity = gr.Slider(0.0, 1.0, 0.0, 0.1, label="Ölpreis-Schock")
+                usd_intensity = gr.Slider(0.0, 1.0, 0.0, 0.1, label="USD-Zinsanstieg")
+                sanc_intensity = gr.Slider(0.0, 1.0, 0.0, 0.1, label="Sanktionen")
+                supply_intensity = gr.Slider(0.0, 1.0, 0.0, 0.1, label="Lieferketten-Blockade")
+                energy_intensity = gr.Slider(0.0, 1.0, 0.0, 0.1, label="Energieembargo")
+                bank_intensity = gr.Slider(0.0, 1.0, 0.0, 0.1, label="Bankenkrise")
+                cyber_intensity = gr.Slider(0.0, 1.0, 0.0, 0.1, label="Cyberangriff")
+                dollar_intensity = gr.Slider(0.0, 1.0, 0.0, 0.1, label="Dollar-Schock")
+                swift_intensity = gr.Slider(0.0, 1.0, 0.0, 0.1, label="SWIFT-Ausschluss")
+
+                run_btn = gr.Button("Decision-Support aktualisieren", variant="primary")
+
+            with gr.Row():
+                radar_out = gr.Plot(label="Baseline vs. Szenario (Radar)")
+                rec_out = gr.Markdown(label="Kurzinterpretation")
+
+            with gr.Row():
+                ews_base_out = gr.Markdown(label="Frühwarnsystem – Baseline")
+                ews_scen_out = gr.Markdown(label="Frühwarnsystem – Szenario")
+
+            delta_ews_out = gr.Markdown(label="Delta-EWS")
+            scen_report_out = gr.Markdown(label="Szenario-Report")
+            bench_out = gr.Markdown(label="Benchmarking")
+
+            run_btn.click(
+                decision_support_view,
+                inputs=[
+                    country,
+                    oil_intensity,
+                    usd_intensity,
+                    sanc_intensity,
+                    supply_intensity,
+                    energy_intensity,
+                    bank_intensity,
+                    cyber_intensity,
+                    dollar_intensity,
+                    swift_intensity,
+                ],
+                outputs=[
+                    radar_out,
+                    ews_base_out,
+                    ews_scen_out,
+                    delta_ews_out,
+                    scen_report_out,
+                    bench_out,
+                    rec_out,
+                ],
+            )
+
+            with gr.Accordion("Szenario-Ranking (Einzelschocks)", open=False):
+                rank_intensity = gr.Slider(0.1, 1.0, 1.0, 0.1, label="Test-Intensität für Ranking")
+                rank_btn = gr.Button("Ranking berechnen")
+                rank_out = gr.Markdown(label="Szenario-Ranking")
+
+                rank_btn.click(
+                    scenario_ranking,
+                    inputs=[country, rank_intensity],
+                    outputs=[rank_out],
+                )
+
+
         with gr.Tab("Länderprofil"):
             gr.Markdown("## Automatisches Länderprofil")
 

@@ -1,0 +1,22 @@
+# ### Währungs‑ und Zahlungsabhängigkeit
+
+Die Währungs‑ und Zahlungsabhängigkeit beschreibt, wie stark ein Land von internationalen Leitwährungen, globalen Zahlungssystemen und externen Finanzinfrastrukturen abhängig ist.
+Je höher diese Abhängigkeit, desto größer die Verwundbarkeit gegenüber geopolitischen, regulatorischen oder finanzmarktgetriebenen Schocks.
+
+**Einflussfaktoren:**
+
+- Dominanz des US‑Dollars im Handel und in der Finanzierung
+- Nutzung internationaler Zahlungssysteme (z. B. SWIFT, CHIPS, Euroclear)
+- Verfügbarkeit alternativer Zahlungskanäle
+  (z. B. RMB‑Clearing, bilaterale Swap‑Lines, CIPS)
+- Höhe und Zusammensetzung der Währungsreserven
+  (USD‑Anteil, Diversifikation, Liquidität)
+- Exposure gegenüber Wechselkurs‑ und Zinszyklen großer Leitwährungen
+- Abhängigkeit von ausländischen Banken und Korrespondenznetzwerken
+
+**Risiko:**
+- Sanktionen oder Ausschlüsse aus globalen Zahlungssystemen können Handel, Energieimporte und Finanzströme abrupt unterbrechen.
+- Hohe USD‑Abhängigkeit erhöht die Anfälligkeit für US‑Zins‑ und Wechselkurspolitik.
+- Währungskrisen können Kapitalflucht, Inflation und Refinanzierungsprobleme auslösen.
+- Mangel an Alternativen erhöht die strukturelle Verwundbarkeit gegenüber geopolitischen Spannungen.
+
