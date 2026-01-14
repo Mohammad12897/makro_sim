@@ -137,16 +137,38 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
     # 8) Energieabhängigkeit (NEU)
     energie = p.get("energie", 0.5)
 
-    # 9) GESAMTRISIKO
+    # 9) Währungs- & Zahlungsabhängigkeit (NEU)
+    usd_dom = p.get("USD_Dominanz", 0.7)
+    sank_exp = p.get("Sanktions_Exposure", 0.1)
+    fx_sens = p.get("FX_Schockempfindlichkeit", 0.5)
+    refi = p.get("fremdwaehrungs_refinanzierung", 0.5)
+    kap_abh = p.get("kapitalmarkt_abhaengigkeit", 0.5)
+    alt_net = p.get("Alternativnetz_Abdeckung", 0.5)
+
+    currency = (
+        0.30 * clamp01(usd_dom) +
+        0.25 * clamp01(sank_exp * 2.0) +
+        0.20 * clamp01(fx_sens / 2.0) +
+        0.15 * clamp01(refi) +
+        0.10 * clamp01(kap_abh) -
+        0.10 * clamp01(alt_net)   # Alternativnetz reduziert Risiko
+    )
+
+    currency = clamp01(currency)
+
+
+
+    # 10) GESAMTRISIKO
     total = (
-        0.26 * macro +
-        0.21 * geo +
-        0.17 * governance +
-        0.12 * handel +
+        0.24 * macro +
+        0.20 * geo +
+        0.16 * governance +
+        0.11 * handel +
         0.06 * supply_chain +
+        0.07 * currency +
         0.06 * financial +
-        0.06 * tech +
-        0.06 * energie
+        0.05 * tech +
+        0.05 * energie
     )
 
     return {
@@ -158,9 +180,10 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         "financial": financial,
         "tech": tech,
         "energie": energie,
+        "currency": currency,
         "total": total,
     }
-    
+
 def risk_category(score: float) -> Tuple[str, str]:
     if score < 0.33:
         return "stabil", "green"

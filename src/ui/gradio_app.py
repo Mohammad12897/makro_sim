@@ -275,9 +275,6 @@ technologische_abhaengigkeit_text = load_textfile(ROOT.parent / "docs" / "interp
 
 
 
-
-
-
 # ---------------------------------------------------------
 #  NORMALISIERUNG
 # ---------------------------------------------------------
@@ -292,8 +289,6 @@ def normalize_value(v):
 # ---------------------------------------------------------
 #  ensure_full_risk_vector (WICHTIG!)
 # ---------------------------------------------------------
-
-
 def ensure_full_risk_vector(base: dict) -> dict:
     """
     Stellt sicher, dass alle Risiko-Dimensionen vorhanden sind.
@@ -629,7 +624,7 @@ def apply_multiple_shocks(country: str, shocks: List[Tuple[str, float]]) -> dict
 
     return base
 
-def apply_multiple_shocks_for_country(country: str, shock_config: dict) -> dict:
+def apply_multiple_shocks_for_country_old(country: str, shock_config: dict) -> dict:
     """
     Wendet mehrere Schocks nacheinander auf das Länderprofil an.
     """
@@ -642,6 +637,19 @@ def apply_multiple_shocks_for_country(country: str, shock_config: dict) -> dict:
 
     return base
 
+
+def apply_multiple_shocks_for_country(base_vec: dict, shock_config: dict) -> dict:
+    """
+    Wendet mehrere Schocks nacheinander auf einen Risiko-Vektor an.
+    Erwartet: base_vec = Risiko-Vektor (nicht Indikator-Vektor!)
+    """
+    base = ensure_full_risk_vector(base_vec)
+
+    for shock_type, intensity in shock_config.items():
+        if intensity and intensity > 0:
+            base = apply_single_shock(base, shock_type, intensity)
+
+    return base
 
 def delta_ews_panel(scores_base: dict, scores_scen: dict) -> str:
     """
@@ -732,7 +740,9 @@ def decision_support_view(country: str,
                           swift_intensity):
 
     # Baseline
-    base_vec = ensure_full_risk_vector(presets[country])
+    #base_vec = ensure_full_risk_vector(presets[country])
+    base_vec = compute_risk_scores(presets[country])
+    base_vec = ensure_full_risk_vector(base_vec)
     scores_base = compute_risk_scores(base_vec)
 
     # Szenario
@@ -750,7 +760,8 @@ def decision_support_view(country: str,
     any_shock = any(v and v > 0 for v in shock_config.values())
 
     if any_shock:
-        scen_vec = apply_multiple_shocks_for_country(country, shock_config)
+        #scen_vec = apply_multiple_shocks_for_country(country, shock_config)
+        scen_vec = apply_multiple_shocks_for_country(base_vec, shock_config)
         scores_scen = compute_risk_scores(scen_vec)
         radar_fig = plot_scenario_compare_radar(scores_base, scores_scen)
         delta_ews_md = delta_ews_panel(scores_base, scores_scen)
@@ -789,7 +800,9 @@ def scenario_ranking(country: str, intensity: float = 1.0) -> str:
     Testet jeden Schock einzeln (mit gegebener Intensität)
     und gibt ein Ranking nach Δ Gesamtrisiko aus.
     """
-    base_vec = ensure_full_risk_vector(presets[country])
+    #base_vec = ensure_full_risk_vector(presets[country])
+    base_vec = compute_risk_scores(presets[country])
+    base_vec = ensure_full_risk_vector(base_vec)
     scores_base = compute_risk_scores(base_vec)
     base_total = scores_base["total"]
 
@@ -1011,7 +1024,11 @@ def run_scenario(
     dollar_intensity,
     swift_intensity,
     ):
-    base_vec = ensure_full_risk_vector(presets[country])
+  
+    #base_vec = ensure_full_risk_vector(presets[country])
+    indicator_vec = presets[country]
+    base_vec = compute_risk_scores(indicator_vec)
+    base_vec = ensure_full_risk_vector(base_vec)
     scores_base = compute_risk_scores(base_vec)
 
     shock_config = {
@@ -1041,7 +1058,8 @@ def run_scenario(
         ews_scen_md = ews_from_scores(scores_base, title=f"Frühwarnsystem – Szenario ({country})")
         return fig, md, report, ews_base_md, ews_scen_md
 
-    scen_vec = apply_multiple_shocks_for_country(country, shock_config)
+    #scen_vec = apply_multiple_shocks_for_country(country, shock_config)
+    scen_vec = apply_multiple_shocks_for_country(base_vec, shock_config)
     scores_scen = compute_risk_scores(scen_vec)
 
     fig = plot_scenario_compare_radar(scores_base, scores_scen)

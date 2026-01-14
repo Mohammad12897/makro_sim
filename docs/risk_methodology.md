@@ -471,3 +471,11 @@ Die Währungs‑ und Zahlungsabhängigkeit beschreibt, wie stark ein Land von in
 - Währungskrisen können Kapitalflucht, Inflation und Refinanzierungsprobleme auslösen.
 - Mangel an Alternativen erhöht die strukturelle Verwundbarkeit gegenüber geopolitischen Spannungen.
 
+currency =
+    0.30 * USD_Dominanz_norm +
+    0.25 * Sanktions_Exposure_norm +
+    0.20 * FX_Schockempfindlichkeit_norm +
+    0.15 * Fremdwährungsrefinanzierung_norm +
+    0.10 * Kapitalmarktabhängigkeit_norm
+  – 0.10 * Alternativnetz_Abdeckung_norm
+
