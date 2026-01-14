@@ -118,21 +118,23 @@ RISK_KEYS = [
     "handel",
     "supply_chain",
     "currency",       # neue Dimension
+    "political_security",
     "financial",
     "tech",
     "energie",
 ]
 
 WEIGHTS = {
-    "macro": 0.24,
-    "geo": 0.20,
-    "governance": 0.16,
-    "handel": 0.11,
+    "macro": 0.22,
+    "geo": 0.18,
+    "governance": 0.15,
+    "handel": 0.10,
     "supply_chain": 0.06,
     "currency": 0.07,     # neue Gewichtung
     "financial": 0.06,
     "tech": 0.05,
     "energie": 0.05,
+    "political_security": 0.06
 }
 
 # ---------------------------------------------------------

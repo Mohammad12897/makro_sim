@@ -31,7 +31,12 @@
     "halbleiter_abhaengigkeit": 0.7,
     "software_cloud_abhaengigkeit": 0.8,
     "ip_lizenzen_abhaengigkeit": 0.6,
-    "schluesseltechnologie_importe": 0.7
+    "schluesseltechnologie_importe": 0.7,
+    "sicherheitsgarantien": 0.5,
+    "aussenpolitische_abhaengigkeit": 0.5,
+    "externer_einfluss": 0.5,
+    "sanktionsverwundbarkeit": 0.5,
+    "diplomatische_resilienz": 0.5
   },
   "US": {
     "USD_Dominanz": 0.95,
@@ -65,7 +70,12 @@
     "halbleiter_abhaengigkeit": 0.3,
     "software_cloud_abhaengigkeit": 0.2,
     "ip_lizenzen_abhaengigkeit": 0.3,
-    "schluesseltechnologie_importe": 0.3
+    "schluesseltechnologie_importe": 0.3,
+    "sicherheitsgarantien": 0.5,
+    "aussenpolitische_abhaengigkeit": 0.5,
+    "externer_einfluss": 0.5,
+    "sanktionsverwundbarkeit": 0.5,
+    "diplomatische_resilienz": 0.5
   },
   "CN": {
     "USD_Dominanz": 0.4,
@@ -99,7 +109,12 @@
     "halbleiter_abhaengigkeit": 0.9,
     "software_cloud_abhaengigkeit": 0.9,
     "ip_lizenzen_abhaengigkeit": 0.8,
-    "schluesseltechnologie_importe": 0.9
+    "schluesseltechnologie_importe": 0.9,
+    "sicherheitsgarantien": 0.5,
+    "aussenpolitische_abhaengigkeit": 0.5,
+    "externer_einfluss": 0.5,
+    "sanktionsverwundbarkeit": 0.5,
+    "diplomatische_resilienz": 0.5
   },
   "IN": {
     "USD_Dominanz": 0.6,
@@ -133,7 +148,12 @@
     "halbleiter_abhaengigkeit": 0.8,
     "software_cloud_abhaengigkeit": 0.9,
     "ip_lizenzen_abhaengigkeit": 0.8,
-    "schluesseltechnologie_importe": 0.8
+    "schluesseltechnologie_importe": 0.8,
+    "sicherheitsgarantien": 0.5,
+    "aussenpolitische_abhaengigkeit": 0.5,
+    "externer_einfluss": 0.5,
+    "sanktionsverwundbarkeit": 0.5,
+    "diplomatische_resilienz": 0.5
   },
   "IR": {
     "USD_Dominanz": 0.2,
@@ -167,7 +187,12 @@
     "halbleiter_abhaengigkeit": 0.9,
     "software_cloud_abhaengigkeit": 0.9,
     "ip_lizenzen_abhaengigkeit": 0.8,
-    "schluesseltechnologie_importe": 0.9
+    "schluesseltechnologie_importe": 0.9,
+    "sicherheitsgarantien": 0.5,
+    "aussenpolitische_abhaengigkeit": 0.5,
+    "externer_einfluss": 0.5,
+    "sanktionsverwundbarkeit": 0.5,
+    "diplomatische_resilienz": 0.5
   },
   "BR": {
     "USD_Dominanz": 0.65,
@@ -201,7 +226,12 @@
     "halbleiter_abhaengigkeit": 0.8,
     "software_cloud_abhaengigkeit": 0.8,
     "ip_lizenzen_abhaengigkeit": 0.7,
-    "schluesseltechnologie_importe": 0.8
+    "schluesseltechnologie_importe": 0.8,
+    "sicherheitsgarantien": 0.5,
+    "aussenpolitische_abhaengigkeit": 0.5,
+    "externer_einfluss": 0.5,
+    "sanktionsverwundbarkeit": 0.5,
+    "diplomatische_resilienz": 0.5
   },
   "FR": {
     "USD_Dominanz": 0.65,
@@ -235,7 +265,12 @@
     "halbleiter_abhaengigkeit": 0.6,
     "software_cloud_abhaengigkeit": 0.7,
     "ip_lizenzen_abhaengigkeit": 0.6,
-    "schluesseltechnologie_importe": 0.6
+    "schluesseltechnologie_importe": 0.6,
+    "sicherheitsgarantien": 0.5,
+    "aussenpolitische_abhaengigkeit": 0.5,
+    "externer_einfluss": 0.5,
+    "sanktionsverwundbarkeit": 0.5,
+    "diplomatische_resilienz": 0.5
   },
   "GB": {
     "USD_Dominanz": 0.7,
@@ -269,7 +304,12 @@
     "halbleiter_abhaengigkeit": 0.6,
     "software_cloud_abhaengigkeit": 0.7,
     "ip_lizenzen_abhaengigkeit": 0.6,
-    "schluesseltechnologie_importe": 0.6
+    "schluesseltechnologie_importe": 0.6,
+    "sicherheitsgarantien": 0.5,
+    "aussenpolitische_abhaengigkeit": 0.5,
+    "externer_einfluss": 0.5,
+    "sanktionsverwundbarkeit": 0.5,
+    "diplomatische_resilienz": 0.5
   },
   "GR": {
     "USD_Dominanz": 0.65,
@@ -303,6 +343,11 @@
     "halbleiter_abhaengigkeit": 0.8,
     "software_cloud_abhaengigkeit": 0.8,
     "ip_lizenzen_abhaengigkeit": 0.7,
-    "schluesseltechnologie_importe": 0.8
+    "schluesseltechnologie_importe": 0.8,
+    "sicherheitsgarantien": 0.5,
+    "aussenpolitische_abhaengigkeit": 0.5,
+    "externer_einfluss": 0.5,
+    "sanktionsverwundbarkeit": 0.5,
+    "diplomatische_resilienz": 0.5
   }
 }
