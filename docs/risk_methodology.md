@@ -452,7 +452,7 @@ Diese Dimension ist zentral für:
 ---
 
 ### 6.5 Normalisierung
-Alle Indikatoren werden auf den Bereich \([0,1]\) normalisiert:
+Alle Indikatoren werden auf den Bereich [0,1] normalisiert:
 
 - clamp01(x) für lineare Indikatoren  
 - Verstärkung bei Sanktionsrisiko (`*2.0`)  
@@ -680,3 +680,101 @@ energie = p.get("energie", 0.5)
 | **geringe Diversifikation** | Versorgungslücken |
 | **kritische Lieferländer** | geopolitische Risiken |
 
+## Modul 10 – Politische & sicherheitspolitische Abhängigkeit („political_security“)
+
+### 10.1 Definition
+Die politische und sicherheitspolitische Abhängigkeit beschreibt, wie stark ein Land auf andere Staaten, Bündnisse oder externe Akteure angewiesen ist, um seine außen‑, sicherheits‑ und verteidigungspolitischen Interessen durchzusetzen.  
+Hohe Abhängigkeit reduziert die strategische Autonomie und erhöht die Verwundbarkeit gegenüber geopolitischen Spannungen.
+
+---
+
+### 10.2 Relevanz
+Diese Dimension ist zentral für:
+- nationale Sicherheit  
+- außenpolitische Handlungsfreiheit  
+- Stabilität von Handels‑ und Investitionsbeziehungen  
+- Resilienz gegenüber geopolitischem Druck  
+
+---
+
+### 10.3 Einflussfaktoren (Indikatoren)
+
+| Indikator | Wirkung auf Risiko |
+|----------|--------------------|
+| Sicherheitsgarantien durch fremde Staaten | ↑ Risiko (Abhängigkeit) |
+| Stationierung ausländischer Truppen | ↑ Risiko (Einfluss externer Akteure) |
+| Abhängigkeit von außenpolitischer Unterstützung | ↑ Risiko |
+| Einfluss externer Akteure auf Innenpolitik | ↑ Risiko |
+| Sanktions‑ und Embargo‑Verwundbarkeit | ↑ Risiko |
+| Diplomatische Resilienz / Alternativen | ↓ Risiko |
+
+---
+
+### 10.4 Risiko‑Mechanismen
+
+**Erhöhtes Risiko durch:**
+- politische Konflikte mit Schutz‑ oder Partnerstaaten  
+- Abhängigkeit von einem dominanten geopolitischen Akteur  
+- außenpolitischen Druck (Sanktionen, Embargos, diplomatische Isolation)  
+- Einflussnahme auf innenpolitische Entscheidungen  
+
+**Reduziertes Risiko durch:**
+- multilaterale Bündnisse  
+- diversifizierte außenpolitische Beziehungen  
+- starke diplomatische Netzwerke  
+- eigene militärische Fähigkeiten  
+
+---
+
+### 10.5 Normalisierung
+Alle Indikatoren werden auf den Bereich \([0,1]\) normalisiert:
+
+- direkte Abhängigkeiten → linear (clamp01)  
+- Einfluss externer Akteure → verstärkt  
+- diplomatische Alternativen → risikomindernd  
+
+---
+
+### 10.6 Aggregationsformel (Vorschlag)
+political_security = 0.35 * sicherheitsgarantien_norm + 0.25 * aussenpolitische_abhaengigkeit_norm + 0.20 * externer_einfluss_norm + 0.20 * sanktionsverwundbarkeit_norm – 0.20 * diplomatische_resilienz_norm
+
+---
+
+### 10.7 Interpretation
+
+| Score | Bedeutung |
+|-------|-----------|
+| 0.00–0.30 | hohe Autonomie, geringe Abhängigkeit |
+| 0.30–0.55 | moderat |
+| 0.55–0.75 | erhöhte Verwundbarkeit |
+| >0.75 | kritisch, strategische Abhängigkeit |
+
+---
+
+### 10.8 Typische Risikoprofile
+
+**Hohes Risiko:**
+- Staaten mit starken sicherheitspolitischen Abhängigkeiten  
+- Länder unter geopolitischem Druck  
+- Staaten mit hoher Sanktionsverwundbarkeit  
+
+**Niedriges Risiko:**
+- Länder mit breiten diplomatischen Netzwerken  
+- Staaten mit eigener militärischer Kapazität  
+- geopolitisch neutrale oder diversifizierte Länder  
+
+---
+
+### 10.9 Verbindung zu anderen Modulen
+- **Geo:** politische Abhängigkeit verstärkt Sanktionsrisiken  
+- **Handel:** politische Konflikte → Handelsunterbrechungen  
+- **Currency:** Ausschluss aus Zahlungssystemen als politisches Druckmittel  
+- **Energie:** Abhängigkeit von Lieferländern → politisches Risiko  
+
+---
+
+### 10.10 Nutzung im Modell
+- Radar (als zusätzliche Dimension)  
+- Szenarien (z. B. diplomatische Krise, Bündnisbruch)  
+- Early‑Warning‑System  
+- Benchmarking  
