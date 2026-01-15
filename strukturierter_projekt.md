@@ -172,5 +172,7 @@ risk_dashboard/
 │
 ├── assets/
 │   └── icons/
+├── docs/
+│   
 │
 └── main.py
