@@ -164,15 +164,26 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
     diplo = p.get("diplomatische_resilienz", 0.5)
 
     political_security = (
-        0.35 * clamp01(sicherheit) +
-        0.25 * clamp01(aussen) +
-        0.20 * clamp01(einfluss) +
-        0.20 * clamp01(sanktion) -
-        0.20 * clamp01(diplo)
+        0.25 * (1 - clamp01(sicherheit)) +          # mehr Garantien = weniger Risiko
+        0.25 * clamp01(aussen) +                    # mehr Abhängigkeit = mehr Risiko
+        0.20 * clamp01(einfluss) +                  # mehr externer Einfluss = mehr Risiko
+        0.20 * clamp01(sanktion) +                  # mehr Verwundbarkeit = mehr Risiko
+        0.10 * (1 - clamp01(diplo))                 # mehr Resilienz = weniger Risiko
     )
     political_security = clamp01(political_security)
 
-    # 11) GESAMTRISIKO
+
+    # 11) Strategische Autonomie (NEU)
+    strategische_autonomie = (
+        0.30 * (1 - clamp01(p.get("aussenpolitische_abhaengigkeit", 0.5))) +
+        0.25 * (1 - clamp01(p.get("sanktionsverwundbarkeit", 0.5))) +
+        0.20 * (1 - clamp01(p.get("externer_einfluss", 0.5))) +
+        0.15 * clamp01(p.get("sicherheitsgarantien", 0.5)) +
+        0.10 * clamp01(p.get("diplomatische_resilienz", 0.5))
+    )
+    strategische_autonomie = clamp01(strategische_autonomie)
+
+    # 12) GESAMTRISIKO
     total = (
         0.22 * macro +
         0.18 * geo +
@@ -197,6 +208,7 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
         "energie": energie,
         "currency": currency,
         "political_security": political_security,
+        "strategische_autonomie": strategische_autonomie,
         "total": total,
     }
 
