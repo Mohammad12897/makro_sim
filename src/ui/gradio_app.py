@@ -538,6 +538,78 @@ def storyline_v2(country):
 
     return md
 
+def storyline_v3(country):
+    scores = compute_risk_scores(presets[country])
+
+    dims_sorted = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top = dims_sorted[:3]
+    low = dims_sorted[-2:]
+
+    ps = scores["political_security"]
+    sa = scores["strategische_autonomie"]
+
+    md = f"# 🧠 Storyline 3.0 – {country}\n"
+
+    md += "## 🔥 Haupttreiber des Risikos\n"
+    for d, v in top:
+        if d not in ("total", "strategische_autonomie"):
+            md += f"- **{d}**: {v:.2f}\n"
+
+    md += "\n## 🟢 Stabilitätsanker\n"
+    for d, v in low:
+        if d not in ("total", "political_security"):
+            md += f"- **{d}**: {v:.2f}\n"
+
+    md += "\n## 🛡 Politische Abhängigkeit & Autonomie\n"
+    if ps > 0.75:
+        md += "- Das Land weist eine **kritisch hohe politische Abhängigkeit** auf.\n"
+    elif ps > 0.55:
+        md += "- Das Land zeigt eine **erhöhte politische Abhängigkeit**.\n"
+    else:
+        md += "- Die politische Abhängigkeit ist **moderat bis gering**.\n"
+
+    if sa > 0.75:
+        md += "- Die **strategische Autonomie** ist sehr hoch – das Land kann souverän handeln.\n"
+    elif sa > 0.50:
+        md += "- Die strategische Autonomie ist **solide**, aber nicht vollständig.\n"
+    else:
+        md += "- Die strategische Autonomie ist **eingeschränkt** – externe Akteure beeinflussen Entscheidungen.\n"
+
+    md += "\n## 📘 Narrative Analyse\n"
+    md += (
+        "Das Land zeigt eine komplexe Risikostruktur. "
+        f"Besonders prägend sind die Dimensionen **{top[0][0]}** und **{top[1][0]}**, "
+        "die das Gesamtbild dominieren. "
+        "Gleichzeitig wirken stabile Bereiche als Puffer gegen externe Schocks. "
+        "Die Balance zwischen politischer Abhängigkeit und strategischer Autonomie "
+        "prägt die langfristige Handlungsfähigkeit des Landes.\n"
+    )
+
+    md += "\n## 🛠 Handlungsempfehlungen\n"
+    md += "- Reduktion politischer Abhängigkeiten\n"
+    md += "- Ausbau strategischer Autonomie (Diplomatie, Industrie, Energie)\n"
+    md += "- Diversifikation kritischer Abhängigkeiten\n"
+    md += "- Stärkung institutioneller Resilienz\n"
+
+    return md  
+
+def autonomy_heatmap(presets):
+    rows = []
+    for land, params in presets.items():
+        scores = compute_risk_scores(params)
+        a = scores["strategische_autonomie"]
+
+        if a > 0.75:
+            color = "🟢"   # hohe Autonomie
+        elif a > 0.50:
+            color = "🟡"   # mittlere Autonomie
+        else:
+            color = "🔴"   # niedrige Autonomie
+
+        rows.append([land, round(a, 3), color])
+
+    return rows
+
 def apply_single_shock(base: dict, shock_type: str, intensity: float) -> dict:
     base = ensure_full_risk_vector(base)
     f = max(0.0, min(1.0, float(intensity)))
@@ -1755,6 +1827,12 @@ def build_app():
                     rec_out,
                 ],
             )
+
+            with gr.Tab("Autonomie-Heatmap"):
+                auto_btn = gr.Button("Autonomie-Heatmap anzeigen")
+                auto_out = gr.Dataframe(headers=["Land", "Autonomie", "Ampel"])
+
+                auto_btn.click(lambda: autonomy_heatmap(presets), None, auto_out)
 
             with gr.Accordion("Szenario-Ranking (Einzelschocks)", open=False):
                 rank_intensity = gr.Slider(0.1, 1.0, 1.0, 0.1, label="Test-Intensität für Ranking")
