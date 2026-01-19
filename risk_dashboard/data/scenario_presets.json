@@ -1,0 +1,48 @@
+ {
+  "Ölpreisschock": [
+    { "type": "Ölpreis +50%", "intensity": 1.0 }
+  ],
+  "Gasembargo": [
+    { "type": "Gasembargo", "intensity": 1.0 }
+  ],
+  "Dollar-Schock": [
+    { "type": "Dollar-Schock", "intensity": 1.0 },
+    { "type": "USD-Zinsanstieg", "intensity": 0.8 }
+  ],
+  "SWIFT-Ausschluss": [
+    { "type": "SWIFT-Ausschluss", "intensity": 1.0 }
+  ],
+  "Lieferketten-Blockade": [
+    { "type": "Lieferketten-Blockade", "intensity": 1.0 }
+  ],
+  "Exportstopp": [
+    { "type": "Exportstopp", "intensity": 1.0 }
+  ],
+  "Technologie-Embargo": [
+    { "type": "Technologie-Embargo", "intensity": 1.0 }
+  ],
+  "Cyberangriff": [
+    { "type": "Cyberangriff", "intensity": 1.0 }
+  ],
+  "Geopolitische Spannung": [
+    { "type": "Geopolitische Spannung", "intensity": 1.0 }
+  ],
+  "Bündnisverlust": [
+    { "type": "Bündnisverlust", "intensity": 1.0 }
+  ],
+  "Sanktionen": [
+    { "type": "Sanktionen", "intensity": 1.0 }
+  ],
+  "Doppelschock Energie + Politik": [
+    { "type": "Ölpreis +50%", "intensity": 1.0 },
+    { "type": "Geopolitische Spannung", "intensity": 0.8 }
+  ],
+  "Finanzielle Stressphase": [
+    { "type": "USD-Zinsanstieg", "intensity": 1.0 },
+    { "type": "Dollar-Schock", "intensity": 0.7 }
+  ],
+  "Tech + Lieferkette": [
+    { "type": "Technologie-Embargo", "intensity": 1.0 },
+    { "type": "Lieferketten-Blockade", "intensity": 0.8 }
+  ]
+}
