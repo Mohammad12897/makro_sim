@@ -305,7 +305,7 @@
     "diplomatische_resilienz": 0.3
   },
 
-    "Israel": {
+  "Israel": {
     "verschuldung": 0.6,
     "FX_Schockempfindlichkeit": 0.5,
     "Reserven_Monate": 8,
@@ -345,5 +345,47 @@
     "externer_einfluss": 0.6,
     "sanktionsverwundbarkeit": 0.3,
     "diplomatische_resilienz": 0.7
+  },
+
+  "Russland": {
+    "verschuldung": 0.7,
+    "FX_Schockempfindlichkeit": 0.8,
+    "Reserven_Monate": 14,
+
+    "USD_Dominanz": 0.9,
+    "Sanktions_Exposure": 0.9,
+    "Alternativnetz_Abdeckung": 0.3,
+
+    "export_konzentration": 0.8,
+    "import_kritische_gueter": 0.8,
+    "partner_konzentration": 0.7,
+
+    "chokepoint_abhaengigkeit": 0.7,
+    "just_in_time_anteil": 0.5,
+    "produktions_konzentration": 0.7,
+    "lager_puffer": 0.4,
+
+    "auslandsverschuldung": 0.5,
+    "kapitalmarkt_abhaengigkeit": 0.7,
+    "investoren_anteil": 0.6,
+    "fremdwaehrungs_refinanzierung": 0.7,
+
+    "halbleiter_abhaengigkeit": 0.8,
+    "software_cloud_abhaengigkeit": 0.8,
+    "ip_lizenzen_abhaengigkeit": 0.7,
+    "schluesseltechnologie_importe": 0.8,
+
+    "energie": 0.8,
+
+    "demokratie": 0.2,
+    "innovation": 0.5,
+    "fachkraefte": 0.5,
+    "korruption": 0.7,
+
+    "sicherheitsgarantien": 0.2,
+    "aussenpolitische_abhaengigkeit": 0.7,
+    "externer_einfluss": 0.8,
+    "sanktionsverwundbarkeit": 0.9,
+    "diplomatische_resilienz": 0.4
   }
-}
+ }
