@@ -3,6 +3,8 @@
 from __future__ import annotations
 from typing import Dict
 from core.risk_model import compute_risk_scores
+from core.scenario_engine import load_lexicon
+
 
 
 # ---------------------------------------------------------
@@ -114,4 +116,9 @@ def storyline_v3(country: str, params: Dict) -> str:
     md += "- Stärkung institutioneller Resilienz\n"
     md += "- Ausbau technologischer und finanzieller Eigenständigkeit\n"
 
+    lex = load_lexicon()
+
+    md += "## Kontext\n"
+    md += f"Die Dimension **macro** bedeutet: {lex['macro']}\n\n"
+    
     return md

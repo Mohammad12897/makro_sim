@@ -2,6 +2,8 @@
 
 import plotly.graph_objects as go
 import gradio as gr
+from core.scenario_engine import load_lexicon
+
 
 
 # ---------------------------------------------------------
@@ -12,6 +14,7 @@ def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
     """
     Erstellt einen Radar-Plot für ein einzelnes Land.
     Enthält alle 11 Risiko-Dimensionen + strategische Autonomie.
+    Mit Tooltip-Texten aus dem Lexikon.
     """
 
     labels = [
@@ -26,8 +29,16 @@ def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
         "currency", "political_security", "strategische_autonomie"
     ]
 
+    # Werte extrahieren
     values = [scores[d] for d in dims]
     values.append(values[0])  # Radar schließen
+
+    # Lexikon laden
+    lex = load_lexicon()
+
+    # Tooltip-Mapping
+    tooltips = [lex.get(dim, "") for dim in dims]
+    tooltips.append(tooltips[0])  # Radar schließen
 
     fig = go.Figure()
 
@@ -36,7 +47,9 @@ def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
         theta=labels + [labels[0]],
         fill='toself',
         name=title,
-        line=dict(color="royalblue", width=3)
+        line=dict(color="royalblue", width=3),
+        customdata=tooltips,
+        hovertemplate="<b>%{theta}</b><br>Wert: %{r}<br><br>%{customdata}"
     ))
 
     fig.update_layout(
@@ -53,7 +66,6 @@ def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
 
     return fig
 
-
 # ---------------------------------------------------------
 # Multi-Radar-Vergleich
 # ---------------------------------------------------------
@@ -61,7 +73,9 @@ def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
 def make_multi_radar_plot(score_list):
     """
     score_list = [(country, scores), ...]
+    Multi-Radar-Vergleich mit Tooltip-Texten aus dem Lexikon.
     """
+ 
     labels = [
         "Makro", "Geo", "Governance", "Handel",
         "Lieferkette", "Finanzen", "Tech", "Energie",
@@ -73,6 +87,11 @@ def make_multi_radar_plot(score_list):
         "supply_chain", "financial", "tech", "energie",
         "currency", "political_security", "strategische_autonomie"
     ]
+
+    # Lexikon laden
+    lex = load_lexicon()
+    tooltips = [lex.get(dim, "") for dim in dims]
+    tooltips.append(tooltips[0])  # Radar schließen
 
     fig = go.Figure()
 
@@ -90,7 +109,9 @@ def make_multi_radar_plot(score_list):
             theta=labels + [labels[0]],
             fill='none',
             name=country,
-            line=dict(color=colors[i % len(colors)], width=3)
+            line=dict(color=colors[i % len(colors)], width=3),
+            customdata=tooltips,
+            hovertemplate="<b>%{theta}</b><br>%{r}<br><br>%{customdata}"
         ))
 
     fig.update_layout(
@@ -107,7 +128,6 @@ def make_multi_radar_plot(score_list):
 
     return fig
 
-
 # ---------------------------------------------------------
 # Dropdown-Komponenten
 # ---------------------------------------------------------
@@ -119,10 +139,10 @@ def make_country_dropdown(countries):
         value=countries[0]
     )
 
-
 def make_scenario_dropdown(scenarios):
     return gr.Dropdown(
         choices=scenarios,
         label="Szenario auswählen",
         value=scenarios[0]
     )
+

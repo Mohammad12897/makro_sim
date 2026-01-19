@@ -44,5 +44,11 @@
   "Tech + Lieferkette": [
     { "type": "Technologie-Embargo", "intensity": 1.0 },
     { "type": "Lieferketten-Blockade", "intensity": 0.8 }
+  ],
+  "Russland – Energie- und Sanktionseskalation": [
+    { "type": "Sanktionen", "intensity": 1.0 },
+    { "type": "SWIFT-Ausschluss", "intensity": 0.8 },
+    { "type": "Ölpreis +50%", "intensity": 0.7 },
+    { "type": "Technologie-Embargo", "intensity": 0.9 }
   ]
 }

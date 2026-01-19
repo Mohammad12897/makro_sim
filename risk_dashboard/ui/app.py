@@ -15,6 +15,8 @@ from core.storyline import storyline_v3
 from core.ews import ews_for_country
 from core.scenario_engine import run_scenario, decision_support_view
 from core.cluster import cluster_heatmap
+from core.scenario_engine import rank_countries
+from core.utils import load_presets, load_scenarios
 
 from ui.components import (
     make_radar_plot,
@@ -22,6 +24,9 @@ from ui.components import (
     make_country_dropdown,
     make_scenario_dropdown
 )
+from ui.plots import plot_radar
+from core.scenario_engine import load_lexicon
+lex = load_lexicon()
 
 
 # ---------------------------------------------------------
@@ -37,9 +42,6 @@ SCENARIO_FILE = ROOT / "data" / "scenario_presets.json"
 # Presets laden
 # ---------------------------------------------------------
 
-def load_presets():
-    with open(PRESET_FILE, "r") as f:
-        return json.load(f)
 
 
 def load_scenarios():
@@ -181,6 +183,33 @@ def build_app():
             btn_cluster = gr.Button("Cluster berechnen")
 
             btn_cluster.click(lambda: compute_cluster(), None, cluster_out)
+
+        with gr.Tab("Länder-Ranking"):
+            btn_rank = gr.Button("Ranking berechnen")
+            rank_out = gr.Markdown()
+
+            def compute_country_ranking():
+                presets = load_presets()
+                ranking = rank_countries(presets)
+
+                md = "# 🌍 Länder-Ranking nach Gesamtrisiko\n\n"
+                for land, score in ranking:
+                    md += f"- **{land}** → Risiko: **{score:.2f}**\n"
+                return md
+
+            btn_rank.click(compute_country_ranking, outputs=rank_out)
+
+        with gr.Tab("Lexikon"):
+            lex_md = gr.Markdown()
+
+            def show_lexicon():
+                md = "# 📘 Risiko-Lexikon\n\n"
+                for key, desc in lex.items():
+                    md += f"### {key}\n{desc}\n\n"
+                return md
+
+            lex_md.value = show_lexicon()
+
 
     return app
 

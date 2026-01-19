@@ -5,11 +5,15 @@ from typing import Dict, List
 from copy import deepcopy
 
 from core.risk_model import compute_risk_scores, clamp01
-
+import json
 
 # ---------------------------------------------------------
 # Hilfsfunktion: sichere Addition mit Begrenzung
 # ---------------------------------------------------------
+def load_lexicon() -> dict:
+    with open("data/lexicon.json", "r") as f:
+        return json.load(f)
+
 
 def add_risk(value: float, delta: float) -> float:
     """
@@ -128,17 +132,17 @@ def run_scenario(params: dict, shocks: List[Dict]) -> Dict[str, float]:
 # Szenario Ranking
 # ---------------------------------------------------------
 
-def rank_scenarios_old(base_params: dict, scenario_dict: Dict[str, List[Dict]]) -> List[tuple]:
+def rank_countries(presets: dict) -> list:
     """
-    Bewertet mehrere Szenarien nach ihrem Gesamtrisiko.
-    Rückgabe: Liste [(szenario_name, total_risk), ...] sortiert absteigend.
+    Erstellt ein Ranking aller Länder nach Gesamtrisiko.
+    Rückgabe: Liste [(Land, Risiko), ...] absteigend sortiert.
     """
-    results = []
-    for name, shocks in scenario_dict.items():
-        scores = run_scenario(base_params, shocks)
-        results.append((name, scores["total"]))
+    ranking = []
+    for country, params in presets.items():
+        scores = compute_risk_scores(params)
+        ranking.append((country, scores["total"]))
 
-    return sorted(results, key=lambda x: x[1], reverse=True)
+    return sorted(ranking, key=lambda x: x[1], reverse=True)
 
 def rank_scenarios(base_params: dict, scenario_dict: Dict[str, List[Dict]]) -> List[tuple]:
     """
@@ -159,80 +163,6 @@ def rank_scenarios(base_params: dict, scenario_dict: Dict[str, List[Dict]]) -> L
 # Decision Support View
 # ---------------------------------------------------------
 
-def decision_support_view_old(base_params: dict, scenario_dict: Dict[str, List[Dict]]) -> str:
-    """
-    Erzeugt eine textuelle Entscheidungshilfe für alle Szenarien.
-    """
-    ranking = rank_scenarios(base_params, scenario_dict)
-
-    md = "# 🧭 Decision Support – Szenarioanalyse\n\n"
-    md += "Die Szenarien sind nach Gesamtrisiko sortiert:\n\n"
-
-    for name, score in ranking:
-        md += f"- **{name}** → Risiko: **{score:.2f}**\n"
-
-    md += "\n## Empfehlung\n"
-    worst = ranking[0]
-    best = ranking[-1]
-
-    md += (
-        f"- Kritischstes Szenario: **{worst[0]}** (Risiko {worst[1]:.2f})\n"
-        f"- Günstigstes Szenario: **{best[0]}** (Risiko {best[1]:.2f})\n"
-    )
-
-    return md
-
-def decision_support_view(base_params: dict, scenario_dict: Dict[str, List[Dict]]) -> str:
-    """
-    Hybrid-Version:
-    - Ranking aller Szenarien
-    - Empfehlung (bestes / schlechtestes Szenario)
-    - Kompakte technische Interpretation
-    - Ausführliche narrative Analyse (optional)
-    """
-    ranking = rank_scenarios(base_params, scenario_dict)
-
-    md = "# 🧭 Decision Support – Szenarioanalyse\n\n"
-    md += "Die Szenarien sind nach Gesamtrisiko sortiert:\n\n"
-
-    # -------------------------
-    # Ranking
-    # -------------------------
-    for name, score in ranking:
-        md += f"- **{name}** → Risiko: **{score:.2f}**\n"
-
-    # -------------------------
-    # Empfehlung
-    # -------------------------
-    worst = ranking[0]
-    best = ranking[-1]
-
-    md += "\n## Empfehlung\n"
-    md += (
-        f"- Kritischstes Szenario: **{worst[0]}** (Risiko {worst[1]:.2f})\n"
-        f"- Günstigstes Szenario: **{best[0]}** (Risiko {best[1]:.2f})\n"
-    )
-
-    # -------------------------
-    # Detailanalyse
-    # -------------------------
-    md += "\n---\n"
-    md += "## Detailanalyse\n\n"
-
-    for name, shocks in scenario_dict.items():
-
-        # Kompakte technische Interpretation
-        md += f"### 🔹 {name}\n"
-        md += interpret_single_scenario(base_params, name, shocks)
-
-        # Ausführliche narrative Interpretation (optional)
-        md += "\n<details>\n"
-        md += "<summary>📘 Ausführliche Analyse anzeigen</summary>\n\n"
-        md += interpret_single_scenario(base_params, name, shocks)
-        md += "\n</details>\n"
-        md += "\n---\n"
-
-    return md
     
 ### Automatische Szenario-Interpretation  
 def interpret_single_scenario(base_params: dict, scenario_name: str, shocks: list) -> str:
@@ -285,13 +215,11 @@ def interpret_single_scenario(base_params: dict, scenario_name: str, shocks: lis
     return md
 
 
-def interpret_single_scenario_new(base_params: dict, scenario_name: str, shocks: list) -> str:
+def interpret_single_scenario_compact(base_params: dict, scenario_name: str, shocks: list) -> str:
     base_scores = compute_risk_scores(base_params)
     scen_scores = run_scenario(base_params, shocks)
 
-    md = f"### Wirkung des Szenarios: {scenario_name}\n\n"
-    md += "#### Änderungen der Risiko-Dimensionen\n"
-
+    md = ""
     for dim in [
         "macro", "geo", "governance", "handel", "supply_chain",
         "financial", "tech", "energie", "currency",
@@ -307,5 +235,108 @@ def interpret_single_scenario_new(base_params: dict, scenario_name: str, shocks:
         sign = "▲" if delta > 0 else "▼"
         md += f"- **{dim}**: {before:.2f} → {after:.2f} ({sign} {delta:+.2f})\n"
 
-    md += "\n"
+    return md
+
+def interpret_single_scenario_full(base_params: dict, scenario_name: str, shocks: list) -> str:
+    base_scores = compute_risk_scores(base_params)
+    scen_scores = run_scenario(base_params, shocks)
+
+    md = f"# 📉 Szenario-Interpretation – {scenario_name}\n\n"
+
+    md += "## Δ Risiko-Dimensionen\n"
+    for dim in [
+        "macro", "geo", "governance", "handel", "supply_chain",
+        "financial", "tech", "energie", "currency",
+        "political_security", "strategische_autonomie", "total"
+    ]:
+        before = base_scores[dim]
+        after = scen_scores[dim]
+        delta = after - before
+        if abs(delta) < 0.02:
+            continue
+        sign = "▲" if delta > 0 else "▼"
+        md += f"- **{dim}**: {before:.2f} → {after:.2f} ({sign} {delta:+.2f})\n"
+
+    md += "\n## Kernaussage\n"
+    total_delta = scen_scores["total"] - base_scores["total"]
+
+    if total_delta > 0.1:
+        md += "- Das Szenario **verschärft die Gesamtrisikolage deutlich**.\n"
+    elif total_delta > 0.03:
+        md += "- Das Szenario **erhöht das Risiko moderat**.\n"
+    elif total_delta > -0.03:
+        md += "- Das Szenario verändert die Gesamtrisikolage **nur geringfügig**.\n"
+    else:
+        md += "- Das Szenario **reduziert die Gesamtrisikolage**.\n"
+
+    md += "\n## Politische Abhängigkeit & Autonomie\n"
+    ps_delta = scen_scores["political_security"] - base_scores["political_security"]
+    sa_delta = scen_scores["strategische_autonomie"] - base_scores["strategische_autonomie"]
+
+    if ps_delta > 0.05:
+        md += "- Die **politische Abhängigkeit nimmt spürbar zu**.\n"
+    elif ps_delta < -0.05:
+        md += "- Die **politische Abhängigkeit nimmt ab**.\n"
+
+    if sa_delta > 0.05:
+        md += "- Die **strategische Autonomie verbessert sich**.\n"
+    elif sa_delta < -0.05:
+        md += "- Die **strategische Autonomie verschlechtert sich**.\n"
+
+    return md
+
+def decision_support_view(base_params: dict, scenario_dict: Dict[str, List[Dict]]) -> str:
+    """
+    Hybrid-Version:
+    - Ranking aller Szenarien
+    - Empfehlung (bestes / schlechtestes Szenario)
+    - Kompakte technische Interpretation
+    - Ausführliche narrative Analyse (optional)
+    """
+    ranking = rank_scenarios(base_params, scenario_dict)
+
+    md = "# 🧭 Decision Support – Szenarioanalyse\n\n"
+    md += "Die Szenarien sind nach Gesamtrisiko sortiert:\n\n"
+
+    # -------------------------
+    # Ranking
+    # -------------------------
+    for name, score in ranking:
+        md += f"- **{name}** → Risiko: **{score:.2f}**\n"
+
+    # -------------------------
+    # Empfehlung
+    # -------------------------
+    worst = ranking[0]
+    best = ranking[-1]
+
+    md += "\n## Empfehlung\n"
+    md += (
+        f"- Kritischstes Szenario: **{worst[0]}** (Risiko {worst[1]:.2f})\n"
+        f"- Günstigstes Szenario: **{best[0]}** (Risiko {best[1]:.2f})\n"
+    )
+
+    # -------------------------
+    # Detailanalyse
+    # -------------------------
+    md += "\n---\n"
+    md += "## Detailanalyse\n\n"
+
+    for name, shocks in scenario_dict.items():
+
+        # Kompakte technische Interpretation
+        md += f"### 🔹 {name}\n"
+        md += interpret_single_scenario_compact(base_params, name, shocks)
+
+        # Ausführliche narrative Interpretation (optional)
+        md += "\n<details>\n"
+        md += "<summary>📘 Ausführliche Analyse anzeigen</summary>\n\n"
+        md += interpret_single_scenario_full(base_params, name, shocks)
+        md += "\n</details>\n"
+        md += "\n---\n"
+
+    lex = load_lexicon()
+    md += "\n---\n## 📘 Lexikon der Risiko-Dimensionen\n\n"
+    for key, desc in lex.items():
+        md += f"- **{key}**: {desc}\n"
     return md
