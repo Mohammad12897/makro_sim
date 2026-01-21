@@ -22,7 +22,8 @@ from ui.components import (
     make_radar_plot,
     make_multi_radar_plot,
     make_country_dropdown,
-    make_scenario_dropdown
+    make_scenario_dropdown,
+    make_delta_radar_plot
 )
 from ui.plots import plot_radar
 from core.scenario_engine import load_lexicon
@@ -77,15 +78,21 @@ def compute_ews(country):
     presets = load_presets()
     return ews_for_country(country, presets[country])
 
-
 def compute_scenario(country, scenario_name):
     presets = load_presets()
     scenarios = load_scenarios()
+
     params = presets[country]
     shocks = scenarios[scenario_name]
-    scores = run_scenario(params, shocks)
-    return make_radar_plot(scores, title=f"Szenario: {scenario_name}")
 
+    base_scores = compute_risk_scores(params)
+    scenario_scores = run_scenario(params, shocks)
+
+    return make_delta_radar_plot(
+        base_scores,
+        scenario_scores,
+        title=f"Szenario: {scenario_name}"
+    )
 
 def compute_decision_support(country):
     presets = load_presets()
