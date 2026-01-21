@@ -31,27 +31,7 @@ lex = load_lexicon()
 
 
 # ---------------------------------------------------------
-# ROOT-Pfad
-# ---------------------------------------------------------
-
-ROOT = Path("/content/makro_sim/risk_dashboard")
-PRESET_FILE = ROOT / "data" / "slider_presets.json"
-SCENARIO_FILE = ROOT / "data" / "scenario_presets.json"
-
-
-# ---------------------------------------------------------
-# Presets laden
-# ---------------------------------------------------------
-
-
-
-def load_scenarios():
-    with open(SCENARIO_FILE, "r") as f:
-        return json.load(f)
-
-
-# ---------------------------------------------------------
-# UI-Funktionen
+# Compute-Funktionen (Backend-Wrapper)
 # ---------------------------------------------------------
 
 def compute_single_radar(country):
@@ -78,6 +58,7 @@ def compute_ews(country):
     presets = load_presets()
     return ews_for_country(country, presets[country])
 
+
 def compute_scenario(country, scenario_name):
     presets = load_presets()
     scenarios = load_scenarios()
@@ -94,6 +75,7 @@ def compute_scenario(country, scenario_name):
         title=f"Szenario: {scenario_name}"
     )
 
+
 def compute_decision_support(country):
     presets = load_presets()
     scenarios = load_scenarios()
@@ -105,23 +87,137 @@ def compute_cluster():
     return cluster_heatmap(presets, k=3)
 
 
+def compute_heatmap_radar(country):
+    presets = load_presets()
+    params = presets[country]
+    scores = compute_risk_scores(params)
+    return make_heatmap_radar(scores, title=f"Heatmap-Radar – {country}")
+
+
+def compute_scenario_comparison(country, scenario_names):
+    presets = load_presets()
+    scenarios = load_scenarios()
+    params = presets[country]
+
+    base_scores = compute_risk_scores(params)
+    base_avg = sum(base_scores.values()) / len(base_scores)
+
+    results = []
+
+    for name in scenario_names:
+        shocks = scenarios[name]
+        scen_scores = run_scenario(params, shocks)
+        scen_avg = sum(scen_scores.values()) / len(scen_scores)
+        delta = scen_avg - base_avg
+        results.append((name, scen_avg, delta))
+
+    # Sortierung: stärkster Risikoanstieg zuerst
+    results.sort(key=lambda x: x[2], reverse=True)
+
+    def arrow(d):
+        if d > 0:
+            return "▲"
+        elif d < 0:
+            return "▼"
+        return "■"
+
+    def color(v):
+        if v < 0.33:
+            return "🟢"
+        elif v < 0.66:
+            return "🟡"
+        return "🔴"
+
+    lines = [f"# Szenario-Vergleich – {country}", ""]
+    lines.append(f"**Baseline Ø-Risiko:** {base_avg:.2f}")
+    lines.append("")
+
+    lines.append("## Ranking der Szenarien (nach Risikoanstieg)")
+    lines.append("")
+
+    for name, avg, delta in results:
+        lines.append(
+            f"- **{name}:** Ø {avg:.2f} {color(avg)} "
+            f"({arrow(delta)} {delta:+.2f})"
+        )
+
+    return "\n".join(lines)
+
+
+def compute_risk_cockpit(country):
+    presets = load_presets()
+    params = presets[country]
+    scores = compute_risk_scores(params)
+
+    def risk_level(v):
+        if v < 0.33:
+            return "🟢 niedrig"
+        elif v < 0.66:
+            return "🟡 mittel"
+        else:
+            return "🔴 hoch"
+
+    mapping = {
+        "macro": "Makro",
+        "geo": "Geo",
+        "governance": "Governance",
+        "handel": "Handel",
+        "supply_chain": "Lieferkette",
+        "financial": "Finanzen",
+        "tech": "Tech",
+        "energie": "Energie",
+        "currency": "Währung",
+        "political_security": "Politische Abhängigkeit",
+        "strategische_autonomie": "Strategische Autonomie",
+    }
+
+    # Sortierung für Top-3
+    sorted_dims = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top3_risks = sorted_dims[:3]
+    top3_strengths = sorted_dims[-3:]
+
+    avg = sum(scores.values()) / len(scores)
+
+    lines = [f"# Risiko-Cockpit – {country}", ""]
+    lines.append(f"**Ø-Risiko:** {avg:.2f}")
+    lines.append("")
+
+    # Top-3 Risiken
+    lines.append("## 🔥 Top‑3 Risiken")
+    for key, val in top3_risks:
+        lines.append(f"- **{mapping[key]}:** {val:.2f} ({risk_level(val)})")
+    lines.append("")
+
+    # Top-3 Stärken
+    lines.append("## 🌱 Top‑3 Stärken")
+    for key, val in top3_strengths:
+        lines.append(f"- **{mapping[key]}:** {val:.2f} ({risk_level(val)})")
+    lines.append("")
+
+    # Alle Dimensionen
+    lines.append("## Gesamtübersicht")
+    for key, label in mapping.items():
+        v = scores[key]
+        lines.append(f"- {label}: **{v:.2f}** ({risk_level(v)})")
+
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
 
 def build_app():
 
-    with gr.Blocks(title="Makro Risk Dashboard") as app:
+    with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
 
         gr.Markdown("# 🌍 Makro Risk Dashboard – Professional Edition")
 
         presets = load_presets()
         countries = list(presets.keys())
         scenarios = load_scenarios()
+        scenario_names = list(scenarios.keys())
 
-        # -------------------------------------------------
-        # TAB: Länderprofil
-        # -------------------------------------------------
         with gr.Tab("Länderprofil"):
             country = make_country_dropdown(countries)
 
@@ -131,95 +227,68 @@ def build_app():
 
             btn_radar = gr.Button("Radar anzeigen")
             btn_story = gr.Button("Storyline erzeugen")
-            btn_ews = gr.Button("EWS anzeigen")
+            btn_ews = gr.Button("Early Warning System")
 
             btn_radar.click(compute_single_radar, country, radar_out)
             btn_story.click(compute_storyline, country, storyline_out)
             btn_ews.click(compute_ews, country, ews_out)
 
-        # -------------------------------------------------
-        # TAB: Vergleich
-        # -------------------------------------------------
-        with gr.Tab("Vergleich"):
-            multi_select = gr.CheckboxGroup(countries, label="Länder auswählen")
+        with gr.Tab("Multi-Radar"):
+            country_multi = gr.CheckboxGroup(
+                choices=countries,
+                label="Länder auswählen",
+                value=countries[:3]
+            )
             multi_radar_out = gr.Plot()
-            btn_multi = gr.Button("Vergleich anzeigen")
+            btn_multi = gr.Button("Multi-Radar anzeigen")
+            btn_multi.click(compute_multi_radar, country_multi, multi_radar_out)
 
-            btn_multi.click(compute_multi_radar, multi_select, multi_radar_out)
-
-        # -------------------------------------------------
-        # TAB: Heatmaps
-        # -------------------------------------------------
-        with gr.Tab("Heatmaps"):
-            heat_out = gr.Dataframe()
-            pol_out = gr.Dataframe()
-            auto_out = gr.Dataframe()
-            comb_out = gr.Dataframe()
-
-            btn_heat = gr.Button("Risiko-Heatmap")
-            btn_pol = gr.Button("Politische Abhängigkeit")
-            btn_auto = gr.Button("Strategische Autonomie")
-            btn_comb = gr.Button("Kombinierte Analyse")
-
-            btn_heat.click(lambda: risk_heatmap(load_presets()), None, heat_out)
-            btn_pol.click(lambda: political_heatmap(load_presets()), None, pol_out)
-            btn_auto.click(lambda: autonomy_heatmap(load_presets()), None, auto_out)
-            btn_comb.click(lambda: combined_political_autonomy_heatmap(load_presets()), None, comb_out)
-
-        # -------------------------------------------------
-        # TAB: Szenarien
-        # -------------------------------------------------
         with gr.Tab("Szenarien"):
             country_s = make_country_dropdown(countries)
-            scenario_s = make_scenario_dropdown(list(scenarios.keys()))
+            scenario_s = make_scenario_dropdown(scenario_names)
 
             scen_radar_out = gr.Plot()
             scen_decision_out = gr.Markdown()
 
-            btn_scen = gr.Button("Szenario ausführen")
+            btn_scen = gr.Button("Szenario (Delta-Radar) ausführen")
             btn_decision = gr.Button("Decision Support")
 
             btn_scen.click(compute_scenario, [country_s, scenario_s], scen_radar_out)
             btn_decision.click(compute_decision_support, country_s, scen_decision_out)
 
-        # -------------------------------------------------
-        # TAB: Cluster
-        # -------------------------------------------------
-        with gr.Tab("Cluster"):
-            cluster_out = gr.Dataframe()
-            btn_cluster = gr.Button("Cluster berechnen")
+        with gr.Tab("Szenario-Vergleich"):
+            country_cmp = make_country_dropdown(countries)
+            scenario_cmp = gr.CheckboxGroup(
+                choices=scenario_names,
+                label="Szenarien auswählen",
+                value=scenario_names[:3]
+            )
+            scen_cmp_out = gr.Markdown()
+            btn_cmp = gr.Button("Szenarien vergleichen")
+            btn_cmp.click(
+                compute_scenario_comparison,
+                [country_cmp, scenario_cmp],
+                scen_cmp_out
+            )
 
+        with gr.Tab("Cluster"):
+            cluster_out = gr.Plot()
+            btn_cluster = gr.Button("Cluster-Heatmap berechnen")
             btn_cluster.click(lambda: compute_cluster(), None, cluster_out)
 
-        with gr.Tab("Länder-Ranking"):
-            btn_rank = gr.Button("Ranking berechnen")
-            rank_out = gr.Markdown()
+        with gr.Tab("Heatmap-Radar"):
+            country_hm = make_country_dropdown(countries)
+            heatmap_out = gr.Plot()
+            btn_hm = gr.Button("Heatmap-Radar anzeigen")
+            btn_hm.click(compute_heatmap_radar, country_hm, heatmap_out)
 
-            def compute_country_ranking():
-                presets = load_presets()
-                ranking = rank_countries(presets)
-
-                md = "# 🌍 Länder-Ranking nach Gesamtrisiko\n\n"
-                for land, score in ranking:
-                    md += f"- **{land}** → Risiko: **{score:.2f}**\n"
-                return md
-
-            btn_rank.click(compute_country_ranking, outputs=rank_out)
-
-        with gr.Tab("Lexikon"):
-            lex_md = gr.Markdown()
-
-            def show_lexicon():
-                md = "# 📘 Risiko-Lexikon\n\n"
-                for key, desc in lex.items():
-                    md += f"### {key}\n{desc}\n\n"
-                return md
-
-            lex_md.value = show_lexicon()
-
+        with gr.Tab("Risiko-Cockpit"):
+            country_cockpit = make_country_dropdown(countries)
+            cockpit_out = gr.Markdown()
+            btn_cockpit = gr.Button("Cockpit anzeigen")
+            btn_cockpit.click(compute_risk_cockpit, country_cockpit, cockpit_out)
 
     return app
-
 
 # ---------------------------------------------------------
 # Start

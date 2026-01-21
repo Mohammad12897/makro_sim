@@ -5,6 +5,8 @@ from typing import Dict, List
 from copy import deepcopy
 
 from core.risk_model import compute_risk_scores, clamp01
+from core.shock_mapping import convert_events_to_shocks
+
 import json
 
 # ---------------------------------------------------------
@@ -152,7 +154,8 @@ def rank_scenarios(base_params: dict, scenario_dict: Dict[str, List[Dict]]) -> L
     ranking = []
 
     for name, shocks in scenario_dict.items():
-        scen_scores = run_scenario(base_params, shocks)
+        shock_values = convert_events_to_shocks(shocks)
+        scen_scores = run_scenario(base_params, shock_values)
         scen_total = scen_scores["total"]
         ranking.append((name, scen_total))
 
@@ -170,7 +173,8 @@ def interpret_single_scenario(base_params: dict, scenario_name: str, shocks: lis
     Erzeugt eine narrative Interpretation eines einzelnen Szenarios.
     """
     base_scores = compute_risk_scores(base_params)
-    scen_scores = run_scenario(base_params, shocks)
+    shock_values = convert_events_to_shocks(shocks)
+    scen_scores = run_scenario(base_params, shock_values)
 
     md = f"# 📉 Szenario-Interpretation – {scenario_name}\n\n"
 
@@ -217,7 +221,8 @@ def interpret_single_scenario(base_params: dict, scenario_name: str, shocks: lis
 
 def interpret_single_scenario_compact(base_params: dict, scenario_name: str, shocks: list) -> str:
     base_scores = compute_risk_scores(base_params)
-    scen_scores = run_scenario(base_params, shocks)
+    shock_values = convert_events_to_shocks(shocks)
+    scen_scores = run_scenario(base_params, shock_values)
 
     md = ""
     for dim in [
@@ -239,7 +244,8 @@ def interpret_single_scenario_compact(base_params: dict, scenario_name: str, sho
 
 def interpret_single_scenario_full(base_params: dict, scenario_name: str, shocks: list) -> str:
     base_scores = compute_risk_scores(base_params)
-    scen_scores = run_scenario(base_params, shocks)
+    shock_values = convert_events_to_shocks(shocks)
+    scen_scores = run_scenario(base_params, shock_values)
 
     md = f"# 📉 Szenario-Interpretation – {scenario_name}\n\n"
 

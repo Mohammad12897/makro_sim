@@ -23,4 +23,4 @@ def load_scenarios():
     """
     Lädt die Szenarien aus scenarios.json.
     """
-    return load_json("scenarios.json")
+    return load_json("scenario_presets.json")
