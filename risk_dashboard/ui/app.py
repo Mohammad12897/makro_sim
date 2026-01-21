@@ -4,6 +4,7 @@ import gradio as gr
 import json
 from pathlib import Path
 
+from core.shock_mapping import convert_events_to_shocks
 from core.risk_model import compute_risk_scores
 from core.heatmap import (
     risk_heatmap,
@@ -67,7 +68,10 @@ def compute_scenario(country, scenario_name):
     shocks = scenarios[scenario_name]
 
     base_scores = compute_risk_scores(params)
-    scenario_scores = run_scenario(params, shocks)
+    #scenario_scores = run_scenario(params, shocks)
+    shock_values = convert_events_to_shocks(shocks)
+    scenario_scores = run_scenario(params, shock_values)
+
 
     return make_delta_radar_plot(
         base_scores,

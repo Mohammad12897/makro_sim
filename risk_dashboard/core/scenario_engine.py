@@ -114,7 +114,8 @@ def apply_multiple_shocks(params: dict, shocks: List[Dict]) -> dict:
     """
     p = deepcopy(params)
     for s in shocks:
-        p = apply_shock(p, s["type"], s.get("intensity", 1.0))
+        #p = apply_shock(p, s["type"], s.get("intensity", 1.0))
+        raise RuntimeError("apply_multiple_shocks() should not be used with event-based scenarios")
     return p
 
 
@@ -153,8 +154,8 @@ def rank_scenarios(base_params: dict, scenario_dict: Dict[str, List[Dict]]) -> L
     """
     ranking = []
 
-    for name, shocks in scenario_dict.items():
-        shock_values = convert_events_to_shocks(shocks)
+    for name, events  in scenario_dict.items():
+        shock_values = convert_events_to_shocks(events)
         scen_scores = run_scenario(base_params, shock_values)
         scen_total = scen_scores["total"]
         ranking.append((name, scen_total))
