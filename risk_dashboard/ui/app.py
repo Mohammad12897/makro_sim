@@ -24,7 +24,8 @@ from ui.components import (
     make_multi_radar_plot,
     make_country_dropdown,
     make_scenario_dropdown,
-    make_delta_radar_plot
+    make_delta_radar_plot,
+    make_heatmap_radar
 )
 from ui.plots import plot_radar
 from core.scenario_engine import load_lexicon
@@ -35,12 +36,25 @@ lex = load_lexicon()
 # Compute-Funktionen (Backend-Wrapper)
 # ---------------------------------------------------------
 
-def compute_single_radar(country):
+def compute_single_radar_old(country):
     presets = load_presets()
     params = presets[country]
     scores = compute_risk_scores(params)
     return make_radar_plot(scores, title=f"Risiko-Radar – {country}")
 
+def compute_single_radar(country):
+    presets = load_presets()
+    params = presets[country]
+    scores = compute_risk_scores(params)
+
+    fig = make_radar_plot(scores, title=f"Risiko-Radar – {country}")
+
+    if isinstance(fig, list):
+        fig = fig[0]
+    if isinstance(fig, tuple):
+        fig = fig[0]
+
+    return fig
 
 def compute_multi_radar(countries):
     presets = load_presets()
@@ -65,19 +79,31 @@ def compute_scenario(country, scenario_name):
     scenarios = load_scenarios()
 
     params = presets[country]
-    shocks = scenarios[scenario_name]
+    events = scenarios[scenario_name]
 
+    # Events → Risiko-Shocks
+    shock_values = convert_events_to_shocks(events)
+
+    # Baseline
     base_scores = compute_risk_scores(params)
-    #scenario_scores = run_scenario(params, shocks)
-    shock_values = convert_events_to_shocks(shocks)
+
+    # Szenario
     scenario_scores = run_scenario(params, shock_values)
 
-
-    return make_delta_radar_plot(
+    # Plot erzeugen
+    fig = make_delta_radar_plot(
         base_scores,
         scenario_scores,
         title=f"Szenario: {scenario_name}"
     )
+
+    # Falls make_delta_radar_plot eine Liste zurückgibt → erste Figur nehmen
+    if isinstance(fig, list):
+        fig = fig[0]
+    if isinstance(fig, tuple):
+        fig = fig[0]
+
+    return fig
 
 
 def compute_decision_support(country):
@@ -85,18 +111,38 @@ def compute_decision_support(country):
     scenarios = load_scenarios()
     return decision_support_view(presets[country], scenarios)
 
-
 def compute_cluster():
     presets = load_presets()
-    return cluster_heatmap(presets, k=3)
+    result = cluster_heatmap(presets, k=3)
+
+    # cluster_heatmap gibt eine Liste zurück → wir nehmen die erste Figure
+    if isinstance(result, list):
+        # Falls die Liste leer ist → Fehler vermeiden
+        if len(result) > 0:
+            return result[0]
+        else:
+            raise ValueError("cluster_heatmap returned an empty list")
+
+    # Falls Tuple → erste Komponente
+    if isinstance(result, tuple):
+        return result[0]
+
+    # Falls bereits eine Figure → direkt zurückgeben
+    return result
 
 
 def compute_heatmap_radar(country):
     presets = load_presets()
-    params = presets[country]
-    scores = compute_risk_scores(params)
-    return make_heatmap_radar(scores, title=f"Heatmap-Radar – {country}")
+    scores = compute_risk_scores(presets[country])
 
+    fig = make_heatmap_radar(scores, title=f"Heatmap-Radar – {country}")
+
+    if isinstance(fig, list):
+        fig = fig[0]
+    if isinstance(fig, tuple):
+        fig = fig[0]
+
+    return fig
 
 def compute_scenario_comparison(country, scenario_names):
     presets = load_presets()
@@ -109,13 +155,14 @@ def compute_scenario_comparison(country, scenario_names):
     results = []
 
     for name in scenario_names:
-        shocks = scenarios[name]
-        scen_scores = run_scenario(params, shocks)
+        events = scenarios[name]
+        shock_values = convert_events_to_shocks(events)
+        scen_scores = run_scenario(params, shock_values)
+
         scen_avg = sum(scen_scores.values()) / len(scen_scores)
         delta = scen_avg - base_avg
         results.append((name, scen_avg, delta))
 
-    # Sortierung: stärkster Risikoanstieg zuerst
     results.sort(key=lambda x: x[2], reverse=True)
 
     def arrow(d):
@@ -146,7 +193,6 @@ def compute_scenario_comparison(country, scenario_names):
         )
 
     return "\n".join(lines)
-
 
 def compute_risk_cockpit(country):
     presets = load_presets()
@@ -278,7 +324,7 @@ def build_app():
         with gr.Tab("Cluster"):
             cluster_out = gr.Plot()
             btn_cluster = gr.Button("Cluster-Heatmap berechnen")
-            btn_cluster.click(lambda: compute_cluster(), None, cluster_out)
+            btn_cluster.click(compute_cluster, None, cluster_out)
 
         with gr.Tab("Heatmap-Radar"):
             country_hm = make_country_dropdown(countries)

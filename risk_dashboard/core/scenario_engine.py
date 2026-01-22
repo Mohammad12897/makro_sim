@@ -104,30 +104,26 @@ def apply_shock(params: dict, shock_type: str, intensity: float = 1.0) -> dict:
 
 
 # ---------------------------------------------------------
-# Multi-Shock Engine
-# ---------------------------------------------------------
-
-def apply_multiple_shocks(params: dict, shocks: List[Dict]) -> dict:
-    """
-    Wendet mehrere Schocks nacheinander an.
-    shocks = [{"type": "...", "intensity": 1.0}, ...]
-    """
-    p = deepcopy(params)
-    for s in shocks:
-        #p = apply_shock(p, s["type"], s.get("intensity", 1.0))
-        raise RuntimeError("apply_multiple_shocks() should not be used with event-based scenarios")
-    return p
-
-
-# ---------------------------------------------------------
 # Szenario Runner
 # ---------------------------------------------------------
+def run_scenario(params, shocks):
+    """
+    shocks = bereits konvertierte Risiko-Shocks (Dict)
+    oder eine Event-Liste (List)
+    """
 
-def run_scenario(params: dict, shocks: List[Dict]) -> Dict[str, float]:
-    """
-    Führt ein Szenario aus und gibt die Risiko-Scores zurück.
-    """
-    modified = apply_multiple_shocks(params, shocks)
+    # Falls shocks eine Event-Liste ist → konvertieren
+    if isinstance(shocks, list):
+        shocks = convert_events_to_shocks(shocks)
+
+    # params kopieren
+    modified = params.copy()
+
+    # Risiko-Shocks anwenden
+    for dim, delta in shocks.items():
+        if dim in modified:
+            modified[dim] = min(1.0, modified[dim] + delta)
+
     return compute_risk_scores(modified)
 
 
