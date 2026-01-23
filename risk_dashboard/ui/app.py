@@ -15,7 +15,7 @@ from core.heatmap import (
 from core.storyline import storyline_v3
 from core.ews import ews_for_country
 from core.scenario_engine import run_scenario, decision_support_view
-from core.cluster import cluster_heatmap
+from core.cluster import cluster_heatmap, describe_clusters, cluster_risk_dimensions, cluster_scatterplot
 from core.scenario_engine import rank_countries
 from core.utils import load_presets, load_scenarios
 
@@ -111,25 +111,34 @@ def compute_decision_support(country):
     scenarios = load_scenarios()
     return decision_support_view(presets[country], scenarios)
 
+
 def compute_cluster():
     presets = load_presets()
-    result = cluster_heatmap(presets, k=3)
+    clusters, _ = cluster_risk_dimensions(presets, k=3)
 
-    # cluster_heatmap gibt eine Liste zurück → wir nehmen die erste Figure
-    if isinstance(result, list):
-        # Falls die Liste leer ist → Fehler vermeiden
-        if len(result) > 0:
-            return result[0]
-        else:
-            raise ValueError("cluster_heatmap returned an empty list")
+    # Tabelle (Dataframe) für Cluster-Zuordnung
+    rows = cluster_heatmap(presets)
 
-    # Falls Tuple → erste Komponente
-    if isinstance(result, tuple):
-        return result[0]
+    # Lexikon als Markdown
+    lexikon = describe_clusters(presets, clusters)
 
-    # Falls bereits eine Figure → direkt zurückgeben
-    return result
+    return rows, lexikon
 
+
+def compute_cluster_complete():
+    presets = load_presets()
+    clusters, _ = cluster_risk_dimensions(presets, k=3)
+
+    # Tabelle (Dataframe)
+    rows = cluster_heatmap(presets)
+
+    # Scatterplot
+    fig = cluster_scatterplot(presets, k=3)
+
+    # Lexikon
+    lexikon = describe_clusters(presets, clusters)
+
+    return rows, fig, lexikon
 
 def compute_heatmap_radar(country):
     presets = load_presets()
@@ -321,10 +330,23 @@ def build_app():
                 scen_cmp_out
             )
 
-        with gr.Tab("Cluster"):
-            cluster_out = gr.Plot()
-            btn_cluster = gr.Button("Cluster-Heatmap berechnen")
-            btn_cluster.click(compute_cluster, None, cluster_out)
+        with gr.Tab("Cluster-Komplettansicht"):
+            with gr.Row():
+                cluster_out = gr.Dataframe(
+                    headers=["Land", "Cluster", "Political Security", "Strategische Autonomie", "Total"],
+                    label="Cluster-Zuordnungstabelle"
+                )
+                scatter_out = gr.Plot(label="Cluster-Visualisierung")
+
+            cluster_lexikon_out = gr.Markdown(label="Cluster-Lexikon")
+
+            btn_cluster_complete = gr.Button("Cluster-Analyse starten")
+            btn_cluster_complete.click(
+                compute_cluster_complete,
+                None,
+                [cluster_out, scatter_out, cluster_lexikon_out]
+            )
+
 
         with gr.Tab("Heatmap-Radar"):
             country_hm = make_country_dropdown(countries)
