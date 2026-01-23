@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 import plotly.express as px
 import pandas as pd
-
+import matplotlib.pyplot as plt
 
 from core.risk_model import compute_risk_scores
 
@@ -226,3 +226,67 @@ def describe_clusters(presets, clusters, model):
         lines.append("")
 
     return "\n".join(lines)
+
+def investment_profile_for_cluster(ps: float, aut: float, total: float) -> str:
+    """
+    ps: politisches Risiko (0 = gut, 1 = schlecht)
+    aut: strategische Autonomie (0 = schlecht, 1 = gut)
+    total: Gesamtrisiko (0 = gut, 1 = schlecht)
+    """
+    lines = []
+
+    # Grundcharakter
+    if total < 0.4 and ps < 0.3 and aut > 0.7:
+        titel = "Resiliente, autonome Staaten (niedriges Gesamtrisiko)"
+        lines.append("- Geeignet für: Staatsanleihen hoher Bonität, breite Aktien-ETFs, Infrastruktur-ETFs.")
+        lines.append("- Fokus: Stabilität, langfristige Planbarkeit, niedrige Ausfallrisiken.")
+    elif total < 0.6:
+        titel = "Staaten mit mittlerem Risiko (Schwellenländer-Profil)"
+        lines.append("- Geeignet für: Emerging-Markets-ETFs, Branchen-ETFs (Industrie, Energie, Rohstoffe).")
+        lines.append("- Fokus: Wachstumspotenzial, aber höhere Volatilität und politische Unsicherheit.")
+    else:
+        titel = "Verwundbare Staaten (hohes Gesamtrisiko)"
+        lines.append("- Nur selektive, taktische Investments, z.B. Rohstoff-Exposure oder spezielle Projekte.")
+        lines.append("- Fokus: Spekulation, nicht Kernbaustein eines defensiven Portfolios.")
+
+    # Zusatz: Einordnung der Autonomie
+    if aut > 0.7:
+        lines.append("- Hohe strategische Autonomie: geringere Abhängigkeit von externen Akteuren.")
+    elif aut < 0.3:
+        lines.append("- Geringe strategische Autonomie: hohe Abhängigkeit von externen Akteuren.")
+    else:
+        lines.append("- Mittlere strategische Autonomie: gemischtes Abhängigkeitsprofil.")
+
+    # Zusatz: Einordnung des politischen Risikos
+    if ps > 0.7:
+        lines.append("- Hohes politisches Risiko: erhöhte Gefahr von Schocks, Sanktionen oder Instabilität.")
+    elif ps < 0.3:
+        lines.append("- Niedriges politisches Risiko: stabile politische Rahmenbedingungen.")
+    else:
+        lines.append("- Mittleres politisches Risiko: gewisse Unsicherheiten, aber keine Extremrisiken.")
+
+    md = [f"### {titel}", ""]
+    md.extend(lines)
+    return "\n".join(md)
+
+
+def cluster_radar_plot(model):
+    centers = model.cluster_centers_  # (k, 3)
+    labels = ["Politisches Risiko", "Strategische Autonomie", "Gesamtrisiko"]
+    k = centers.shape[0]
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
+    angles = np.concatenate([angles, angles[:1]])
+
+    fig, ax = plt.subplots(subplot_kw={"polar": True})
+
+    for cid in range(k):
+        values = centers[cid]
+        values = np.concatenate([values, values[:1]])
+        ax.plot(angles, values, label=f"Cluster {cid}")
+        ax.fill(angles, values, alpha=0.1)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
+    return fig

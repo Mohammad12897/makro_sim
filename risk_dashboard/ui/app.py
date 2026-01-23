@@ -15,7 +15,14 @@ from core.heatmap import (
 from core.storyline import storyline_v3
 from core.ews import ews_for_country
 from core.scenario_engine import run_scenario, decision_support_view
-from core.cluster import cluster_heatmap, describe_clusters, cluster_risk_dimensions, cluster_scatterplot
+from core.cluster import ( 
+    cluster_heatmap, 
+    describe_clusters, 
+    cluster_risk_dimensions, 
+    cluster_scatterplot, 
+    investment_profile_for_cluster, 
+    cluster_radar_plot
+)
 from core.scenario_engine import rank_countries
 from core.utils import load_presets, load_scenarios
 
@@ -140,7 +147,18 @@ def compute_cluster_complete():
     # Lexikon (mit Modell!)
     lexikon = describe_clusters(presets, clusters, model)
 
-    return rows, fig, lexikon
+    centers = model.cluster_centers_
+    inv_profiles = []
+
+    for cid, center in enumerate(centers):
+        ps, aut, total = center
+        profile_md = investment_profile_for_cluster(ps, aut, total)
+        inv_profiles.append(f"## Cluster {cid}\n\n{profile_md}")
+
+    inv_markdown = "\n\n---\n\n".join(inv_profiles)
+
+    radar_fig = cluster_radar_plot(model)
+    return rows, fig, lexikon, inv_markdown, radar_fig
 
 def compute_heatmap_radar(country):
     presets = load_presets()
@@ -341,14 +359,15 @@ def build_app():
                 scatter_out = gr.Plot(label="Cluster-Visualisierung")
 
             cluster_lexikon_out = gr.Markdown(label="Cluster-Lexikon")
+            cluster_invest_out = gr.Markdown(label="Investment-Profile nach Cluster")
+            radar_out = gr.Plot(label="Cluster-Radar-Chart")
 
             btn_cluster_complete = gr.Button("Cluster-Analyse starten")
             btn_cluster_complete.click(
                 compute_cluster_complete,
                 None,
-                [cluster_out, scatter_out, cluster_lexikon_out]
+                [cluster_out, scatter_out, cluster_lexikon_out, cluster_invest_out, radar_out]
             )
-
 
         with gr.Tab("Heatmap-Radar"):
             country_hm = make_country_dropdown(countries)
