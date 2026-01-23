@@ -21,7 +21,12 @@ from core.cluster import (
     cluster_risk_dimensions, 
     cluster_scatterplot, 
     investment_profile_for_cluster, 
-    cluster_radar_plot
+    cluster_radar_plot,
+    aktienrendite,
+    goldrendite,
+    laender_investment_profil,
+    portfolio_simulator,
+    asset_klassen_vergleich
 )
 from core.scenario_engine import rank_countries
 from core.utils import load_presets, load_scenarios
@@ -367,6 +372,66 @@ def build_app():
                 compute_cluster_complete,
                 None,
                 [cluster_out, scatter_out, cluster_lexikon_out, cluster_invest_out, radar_out]
+            )
+
+
+        with gr.Tab("Rendite-Berechnung"):
+            gr.Markdown("## Rendite-Berechnung für Aktien und Gold")
+
+            with gr.Row():
+                kurs_alt = gr.Number(label="Aktienkurs (alt)")
+                kurs_neu = gr.Number(label="Aktienkurs (neu)")
+                dividende = gr.Number(label="Dividende pro Aktie", value=0)
+
+            aktien_out = gr.Markdown(label="Aktienrendite")
+
+            btn_aktie = gr.Button("Aktienrendite berechnen")
+            btn_aktie.click(
+                aktienrendite,
+                [kurs_alt, kurs_neu, dividende],
+                aktien_out
+            )
+
+            gr.Markdown("---")
+
+            with gr.Row():
+                gold_alt = gr.Number(label="Goldpreis (alt)")
+                gold_neu = gr.Number(label="Goldpreis (neu)")
+
+            gold_out = gr.Markdown(label="Goldrendite")
+
+            btn_gold = gr.Button("Goldrendite berechnen")
+            btn_gold.click(
+                goldrendite,
+                [gold_alt, gold_neu],
+                gold_out
+            )
+
+        with gr.Tab("Länder-Investment-Profil"):
+            land_input = gr.Textbox(label="Land eingeben (z.B. USA)")
+            land_output = gr.Markdown(label="Investment-Profil")
+
+            btn_land = gr.Button("Profil anzeigen")
+            btn_land.click(
+                lambda land: laender_investment_profil(land, load_presets(), cluster_risk_dimensions(load_presets())[0], cluster_risk_dimensions(load_presets())[1]),
+                land_input,
+                land_output
+            )
+
+        with gr.Tab("Portfolio-Simulator"):
+            gr.Markdown("## Portfolio-Simulation basierend auf Cluster-Risiken")
+
+            w0 = gr.Slider(0, 100, label="Cluster 0 Anteil (%)")
+            w1 = gr.Slider(0, 100, label="Cluster 1 Anteil (%)")
+            w2 = gr.Slider(0, 100, label="Cluster 2 Anteil (%)")
+
+            port_out = gr.Markdown(label="Portfolio-Profil")
+
+            btn_port = gr.Button("Portfolio simulieren")
+            btn_port.click(
+                lambda a, b, c: portfolio_simulator(a, b, c, cluster_risk_dimensions(load_presets())[1]),
+                [w0, w1, w2],
+                port_out
             )
 
         with gr.Tab("Heatmap-Radar"):

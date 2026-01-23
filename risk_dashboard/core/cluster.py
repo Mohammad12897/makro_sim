@@ -290,3 +290,77 @@ def cluster_radar_plot(model):
     ax.set_ylim(0, 1)
     ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
     return fig
+
+
+def aktienrendite(kurs_alt: float, kurs_neu: float, dividende: float = 0.0):
+    kursrendite = (kurs_neu - kurs_alt) / kurs_alt
+    dividendenrendite = dividende / kurs_alt
+    gesamt = kursrendite + dividendenrendite
+
+    return (
+        f"**Kursrendite:** {kursrendite*100:.2f}%\n"
+        f"**Dividendenrendite:** {dividendenrendite*100:.2f}%\n"
+        f"**Gesamtrendite:** {gesamt*100:.2f}%"
+    )
+
+def goldrendite(preis_alt: float, preis_neu: float):
+    rendite = (preis_neu - preis_alt) / preis_alt
+    return f"**Goldrendite:** {rendite*100:.2f}%"
+
+
+def laender_investment_profil(land: str, presets: dict, clusters: dict, model):
+    if land not in presets:
+        return f"Land '{land}' nicht gefunden."
+
+    cid = clusters[land]
+    ps, aut, total = model.cluster_centers_[cid]
+
+    profil = investment_profile_for_cluster(ps, aut, total)
+
+    md = f"# Länder-Investment-Profil: {land}\n"
+    md += f"**Cluster:** {cid}\n\n"
+    md += profil
+
+    return md
+
+def portfolio_simulator(w0: float, w1: float, w2: float, model):
+    centers = model.cluster_centers_
+
+    # Normalisieren
+    total = w0 + w1 + w2
+    w0, w1, w2 = w0/total, w1/total, w2/total
+
+    ps = w0*centers[0][0] + w1*centers[1][0] + w2*centers[2][0]
+    aut = w0*centers[0][1] + w1*centers[1][1] + w2*centers[2][1]
+    tot = w0*centers[0][2] + w1*centers[1][2] + w2*centers[2][2]
+
+    profil = investment_profile_for_cluster(ps, aut, tot)
+
+    md = "# Portfolio-Simulation\n"
+    md += f"**Ø Politisches Risiko:** {ps:.2f}\n\n"
+    md += f"**Ø Autonomie:** {aut:.2f}\n\n"
+    md += f"**Ø Gesamtrisiko:** {tot:.2f}\n\n"
+    md += profil
+
+    return md
+
+def asset_klassen_vergleich():
+    md = """
+# Asset-Klassen Vergleich
+
+## Aktien
+- Renditequellen: Kursgewinn + Dividende
+- Risiko: mittel bis hoch
+- Geeignet für: Wachstum, langfristige Vermögensbildung
+
+## Gold
+- Renditequelle: nur Preisentwicklung
+- Risiko: mittel
+- Geeignet für: Absicherung, Krisenschutz, Diversifikation
+
+## Staatsanleihen
+- Renditequelle: Kupon + Rückzahlung
+- Risiko: abhängig von Bonität (AAA = sehr niedrig)
+- Geeignet für: Stabilität, planbare Cashflows
+"""
+    return md
