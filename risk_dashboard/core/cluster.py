@@ -41,26 +41,26 @@ def extract_vector(scores: dict) -> np.ndarray:
 # Cluster-Berechnung
 # ---------------------------------------------------------
 
-def cluster_risk_dimensions(presets: Dict[str, dict], k: int = 3):
-    """
-    Führt ein K-Means-Clustering über alle Länder durch.
-    """
-    countries = list(presets.keys())
-    vectors = []
+def cluster_risk_dimensions(presets: dict, k: int = 3):
+    X = []
+    lands = []
+    for land, params in presets.items():
+        scores = compute_risk_scores(params)
+        X.append([
+            scores["political_security"],
+            scores["strategische_autonomie"],
+            scores["total"]
+        ])
+        lands.append(land)
 
-    for land in countries:
-        scores = compute_risk_scores(presets[land])
-        vectors.append(extract_vector(scores))
+    X = np.array(X)
 
-    X = np.vstack(vectors)
-
-    model = KMeans(n_clusters=k, n_init=10, random_state=42)
+    model = KMeans(n_clusters=k, random_state=42)
     labels = model.fit_predict(X)
 
-    result = {country: int(label) for country, label in zip(countries, labels)}
-    centers = model.cluster_centers_
+    clusters = {land: int(label) for land, label in zip(lands, labels)}
 
-    return result, centers
+    return clusters, model   # ❗ WICHTIG
 
 
 # ---------------------------------------------------------
@@ -132,74 +132,6 @@ def cluster_heatmap(presets: Dict[str, dict], k: int = 3):
 
     return rows
 
-def describe_clusters(presets, clusters):
-    """
-    Erzeugt ein Markdown-Lexikon für die Cluster-Ergebnisse.
-    """
-    # Cluster-Mittelwerte berechnen
-    cluster_summary = {}
-    for land, cid in clusters.items():
-        scores = compute_risk_scores(presets[land])
-        if cid not in cluster_summary:
-            cluster_summary[cid] = {"political_security": [], "strategische_autonomie": [], "total": [], "länder": []}
-        cluster_summary[cid]["political_security"].append(scores["political_security"])
-        cluster_summary[cid]["strategische_autonomie"].append(scores["strategische_autonomie"])
-        cluster_summary[cid]["total"].append(scores["total"])
-        cluster_summary[cid]["länder"].append(land)
-
-    # Markdown-Text bauen
-    lines = ["# Cluster-Lexikon", ""]
-    for cid, vals in cluster_summary.items():
-        avg_ps = sum(vals["political_security"]) / len(vals["political_security"])
-        avg_aut = sum(vals["strategische_autonomie"]) / len(vals["strategische_autonomie"])
-        avg_total = sum(vals["total"]) / len(vals["total"])
-        laender = ", ".join(vals["länder"])
-
-        # einfache Beschreibung abhängig von Werten
-        if avg_total < 0.33:
-            desc = "Niedriges Gesamtrisiko, hohe Stabilität."
-        elif avg_total < 0.66:
-            desc = "Mittleres Gesamtrisiko, gemischte Stabilität."
-        else:
-            desc = "Hohes Gesamtrisiko, verwundbare Struktur."
-
-        lines.append(f"## Cluster {cid}")
-        lines.append(f"**Beschreibung:** {desc}")
-        lines.append(f"**Beispiel-Länder:** {laender}")
-        lines.append("")
-        lines.append("| Ø Political Security | Ø Autonomie | Ø Total |")
-        lines.append("|----------------------|-------------|---------|")
-        lines.append(f"| {avg_ps:.2f} | {avg_aut:.2f} | {avg_total:.2f} |")
-        lines.append("")
-
-    return "\n".join(lines)
-
-
-def cluster_risk_dimensions(presets: dict, k: int = 3):
-    """
-    Teilt Länder anhand ihrer Risiko-Scores in k Cluster ein.
-    Gibt ein Dict {Land: Cluster-ID} und das KMeans-Modell zurück.
-    """
-    X = []
-    lands = []
-    for land, params in presets.items():
-        scores = compute_risk_scores(params)
-        X.append([
-            scores["political_security"],
-            scores["strategische_autonomie"],
-            scores["total"]
-        ])
-        lands.append(land)
-
-    X = np.array(X)
-
-    model = KMeans(n_clusters=k, random_state=42)
-    labels = model.fit_predict(X)
-
-    clusters = {land: int(label) for land, label in zip(lands, labels)}
-    return clusters, model
-
-
 def cluster_scatterplot(presets: dict, k: int = 3):
     """
     Erstellt einen Scatterplot: Political Security vs. Strategische Autonomie,
@@ -231,3 +163,66 @@ def cluster_scatterplot(presets: dict, k: int = 3):
     )
     fig.update_layout(height=600)
     return fig
+
+def describe_clusters(presets, clusters, model):
+    centers = model.cluster_centers_  # shape: (k, 3)
+    lines = ["# Cluster-Lexikon", ""]
+
+    # Dimensionen extrahieren
+    ps_vals = centers[:, 0]   # politisches Risiko
+    aut_vals = centers[:, 1]  # strategische Autonomie
+    tot_vals = centers[:, 2]  # Gesamtrisiko
+
+    # Hilfsfunktionen für relative Einordnung
+    def rel_risk(value, all_values):
+        if value == max(all_values):
+            return "höchstes"
+        elif value == min(all_values):
+            return "niedrigstes"
+        else:
+            return "mittleres"
+
+    def rel_aut(value, all_values):
+        if value == max(all_values):
+            return "höchste"
+        elif value == min(all_values):
+            return "geringste"
+        else:
+            return "mittlere"
+
+    for cid in range(len(centers)):
+        ps = ps_vals[cid]
+        aut = aut_vals[cid]
+        tot = tot_vals[cid]
+
+        laender = [land for land, c in clusters.items() if c == cid]
+        laender_str = ", ".join(laender)
+
+        # relative Beschreibungen
+        ps_desc = rel_risk(ps, ps_vals) + " politisches Risiko"
+        aut_desc = rel_aut(aut, aut_vals) + " strategische Autonomie"
+        tot_desc = rel_risk(tot, tot_vals) + " Gesamtrisiko"
+
+        # Cluster-Namen automatisch generieren
+        if ps == min(ps_vals) and aut == max(aut_vals):
+            cluster_name = "Resiliente, autonome Staaten"
+        elif ps == max(ps_vals) and aut == min(aut_vals):
+            cluster_name = "Politisch verwundbare, abhängige Staaten"
+        elif tot == max(tot_vals):
+            cluster_name = "Hochrisiko-Staaten"
+        elif tot == min(tot_vals):
+            cluster_name = "Niedrigrisiko-Staaten"
+        else:
+            cluster_name = "Staaten mit gemischtem Risikoprofil"
+
+        # Markdown-Ausgabe
+        lines.append(f"## Cluster {cid}: {cluster_name}")
+        lines.append(f"**Beschreibung:** {ps_desc}, {aut_desc}, {tot_desc}.")
+        lines.append(f"**Beispiel-Länder:** {laender_str}")
+        lines.append("")
+        lines.append("| Ø Politisches Risiko | Ø Autonomie | Ø Gesamtrisiko |")
+        lines.append("|----------------------|-------------|-----------------|")
+        lines.append(f"| {ps:.2f} | {aut:.2f} | {tot:.2f} |")
+        lines.append("")
+
+    return "\n".join(lines)

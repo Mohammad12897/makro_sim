@@ -127,16 +127,18 @@ def compute_cluster():
 
 def compute_cluster_complete():
     presets = load_presets()
-    clusters, _ = cluster_risk_dimensions(presets, k=3)
 
-    # Tabelle (Dataframe)
+    # Clustering durchführen
+    clusters, model = cluster_risk_dimensions(presets, k=3)
+
+    # Tabelle
     rows = cluster_heatmap(presets)
 
     # Scatterplot
     fig = cluster_scatterplot(presets, k=3)
 
-    # Lexikon
-    lexikon = describe_clusters(presets, clusters)
+    # Lexikon (mit Modell!)
+    lexikon = describe_clusters(presets, clusters, model)
 
     return rows, fig, lexikon
 
