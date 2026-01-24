@@ -25,6 +25,8 @@ from core.cluster import (
     aktienrendite,
     goldrendite,
     laender_investment_profil,
+    laender_radar_plot,
+    laender_dashboard,
     portfolio_simulator,
     asset_klassen_vergleich
 )
@@ -377,7 +379,11 @@ def build_app():
 
         with gr.Tab("Rendite-Berechnung"):
             gr.Markdown("## Rendite-Berechnung für Aktien und Gold")
+            asset_out = gr.Markdown(label="Asset-Klassen Vergleich")
+            btn_asset = gr.Button("Asset-Vergleich anzeigen")
+            btn_asset.click(lambda: asset_klassen_vergleich(), None, asset_out)
 
+          
             with gr.Row():
                 kurs_alt = gr.Number(label="Aktienkurs (alt)")
                 kurs_neu = gr.Number(label="Aktienkurs (neu)")
@@ -408,15 +414,52 @@ def build_app():
             )
 
         with gr.Tab("Länder-Investment-Profil"):
-            land_input = gr.Textbox(label="Land eingeben (z.B. USA)")
-            land_output = gr.Markdown(label="Investment-Profil")
+            presets = load_presets()
+            laender_liste = list(presets.keys())
 
-            btn_land = gr.Button("Profil anzeigen")
-            btn_land.click(
-                lambda land: laender_investment_profil(land, load_presets(), cluster_risk_dimensions(load_presets())[0], cluster_risk_dimensions(load_presets())[1]),
-                land_input,
-                land_output
+            land_input = gr.Dropdown(
+                choices=laender_liste,
+                label="Land auswählen"
             )
+
+            land_dashboard_md = gr.Markdown(label="Länder-Dashboard")
+            land_radar_plot = gr.Plot(label="Länder-Radar")
+            land_invest_md = gr.Markdown(label="Investment-Profil")
+
+            btn_land = gr.Button("Analyse starten")
+            def laender_analyse(land):
+                presets = load_presets()
+                clusters, model = cluster_risk_dimensions(presets)
+
+                # Dashboard
+                cid = clusters[land]
+                scores = compute_risk_scores(presets[land])
+
+                dashboard = f"""
+# Länder-Dashboard: {land}
+
+**Cluster:** {cid}
+
+## Risiko-Scores
+- Politisches Risiko: {scores["political_security"]:.2f}
+- Strategische Autonomie: {scores["strategische_autonomie"]:.2f}
+- Gesamtrisiko: {scores["total"]:.2f}
+"""
+
+                # Investment-Profil
+                ps, aut, total = model.cluster_centers_[cid]
+                invest = investment_profile_for_cluster(ps, aut, total)
+
+                # Radar-Chart
+                radar = laender_radar_plot(land, presets)
+                return dashboard, radar, invest
+
+            btn_land.click(
+                laender_analyse,
+                land_input,
+                [land_dashboard_md, land_radar_plot, land_invest_md]
+            )
+
 
         with gr.Tab("Portfolio-Simulator"):
             gr.Markdown("## Portfolio-Simulation basierend auf Cluster-Risiken")

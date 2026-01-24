@@ -29,6 +29,12 @@ CLUSTER_DIMS = [
     "strategische_autonomie"
 ]
 
+CLUSTER_COLORS = {
+    0: "#d62728",  # rot (hohes Risiko)
+    1: "#ffbf00",  # gelb (mittleres Risiko)
+    2: "#2ca02c",  # grün (niedriges Risiko)
+    # ggf. weitere Cluster-Farben ergänzen
+}
 
 def extract_vector(scores: dict) -> np.ndarray:
     """
@@ -134,10 +140,11 @@ def cluster_heatmap(presets: Dict[str, dict], k: int = 3):
 
 def cluster_scatterplot(presets: dict, k: int = 3):
     """
-    Erstellt einen Scatterplot: Political Security vs. Strategische Autonomie,
-    Farbe = Cluster, Größe = Total-Risiko.
+    Scatterplot: Politisches Risiko vs. Strategische Autonomie
+    Farbe = Cluster (einheitlich)
+    Punktgröße = Gesamtrisiko
     """
-    clusters, _ = cluster_risk_dimensions(presets, k)
+    clusters, model = cluster_risk_dimensions(presets, k)
     rows = []
 
     for land, params in presets.items():
@@ -147,7 +154,8 @@ def cluster_scatterplot(presets: dict, k: int = 3):
             "Cluster": clusters[land],
             "Political Security": scores["political_security"],
             "Strategische Autonomie": scores["strategische_autonomie"],
-            "Total": scores["total"]
+            "Total": scores["total"],
+            "Color": CLUSTER_COLORS[clusters[land]]
         })
 
     df = pd.DataFrame(rows)
@@ -157,12 +165,44 @@ def cluster_scatterplot(presets: dict, k: int = 3):
         x="Political Security",
         y="Strategische Autonomie",
         color="Cluster",
+        color_discrete_map=CLUSTER_COLORS,
         size="Total",
         hover_name="Land",
         title="Cluster-Scatterplot: Länder nach Risiko-Dimensionen"
     )
-    fig.update_layout(height=600)
+
+    fig.update_layout(
+        height=600,
+        xaxis_title="Politisches Risiko (hoch = schlecht)",
+        yaxis_title="Strategische Autonomie (hoch = gut)",
+        legend_title="Cluster"
+    )
+
     return fig
+
+def etf_mapping_for_cluster(cid: int) -> str:
+    if cid == 2:
+        return """
+### ETF-Mapping für Cluster 2 (niedriges Risiko)
+- Industrieländer-ETFs
+- Infrastruktur-ETFs
+- Qualitätsaktien-ETFs
+- Staatsanleihen hoher Bonität
+"""
+    elif cid == 1:
+        return """
+### ETF-Mapping für Cluster 1 (mittleres Risiko)
+- Emerging-Markets-ETFs
+- Rohstoff-ETFs
+- Branchen-ETFs (Industrie, Energie)
+"""
+    else:
+        return """
+### ETF-Mapping für Cluster 0 (hohes Risiko)
+- Frontier-Markets-ETFs (kleiner Anteil)
+- Rohstoff-Exposure
+- Themen-ETFs (taktisch)
+"""
 
 def describe_clusters(presets, clusters, model):
     centers = model.cluster_centers_  # shape: (k, 3)
@@ -224,6 +264,8 @@ def describe_clusters(presets, clusters, model):
         lines.append("|----------------------|-------------|-----------------|")
         lines.append(f"| {ps:.2f} | {aut:.2f} | {tot:.2f} |")
         lines.append("")
+        lines.append(etf_mapping_for_cluster(cid))
+        lines.append("")
 
     return "\n".join(lines)
 
@@ -269,28 +311,46 @@ def investment_profile_for_cluster(ps: float, aut: float, total: float) -> str:
     md.extend(lines)
     return "\n".join(md)
 
-
 def cluster_radar_plot(model):
-    centers = model.cluster_centers_  # (k, 3)
-    labels = ["Politisches Risiko", "Strategische Autonomie", "Gesamtrisiko"]
+    """
+    Erzeugt ein Radar-Chart für alle Cluster (Politisches Risiko, Autonomie, Gesamtrisiko).
+    - model.cluster_centers_ erwartet shape (k, 3) mit Werten in [0,1].
+    """
+    centers = model.cluster_centers_
     k = centers.shape[0]
+    labels = ["Politisches Risiko", "Strategische Autonomie", "Gesamtrisiko"]
+
+    # Winkel für die Achsen
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
     angles = np.concatenate([angles, angles[:1]])
 
-    fig, ax = plt.subplots(subplot_kw={"polar": True})
+    fig, ax = plt.subplots(subplot_kw={"polar": True}, figsize=(6, 6))
 
     for cid in range(k):
+        # Sicherheitschecks
+        if cid not in CLUSTER_COLORS:
+            raise KeyError(f"Keine Farbe für Cluster {cid} in CLUSTER_COLORS definiert.")
         values = centers[cid]
+        # Werte zyklisch schließen
         values = np.concatenate([values, values[:1]])
-        ax.plot(angles, values, label=f"Cluster {cid}")
-        ax.fill(angles, values, alpha=0.1)
 
+        # Label setzen, damit legend() etwas hat
+        label = f"Cluster {cid}"
+        ax.plot(angles, values, color=CLUSTER_COLORS[cid], linewidth=2, label=label)
+        ax.fill(angles, values, color=CLUSTER_COLORS[cid], alpha=0.15)
+
+    # Achsenbeschriftung und Limits
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels)
     ax.set_ylim(0, 1)
-    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
-    return fig
 
+    # Legende nur anzeigen, wenn es Labels gibt
+    handles, legend_labels = ax.get_legend_handles_labels()
+    if legend_labels:
+        ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
+
+    fig.tight_layout()
+    return fig
 
 def aktienrendite(kurs_alt: float, kurs_neu: float, dividende: float = 0.0):
     kursrendite = (kurs_neu - kurs_alt) / kurs_alt
@@ -315,13 +375,74 @@ def laender_investment_profil(land: str, presets: dict, clusters: dict, model):
     cid = clusters[land]
     ps, aut, total = model.cluster_centers_[cid]
 
+    # 1) Investment-Profil erzeugen
     profil = investment_profile_for_cluster(ps, aut, total)
+
+    # 2) ETF-Mapping hinzufügen
+    profil += "\n\n" + etf_mapping_for_cluster(cid)
+
+    # 3) Markdown zusammenbauen
 
     md = f"# Länder-Investment-Profil: {land}\n"
     md += f"**Cluster:** {cid}\n\n"
     md += profil
 
     return md
+
+def laender_radar_plot(land: str, presets: dict):
+    if land not in presets:
+        return None
+
+    scores = compute_risk_scores(presets[land])
+
+    labels = ["Politisches Risiko", "Strategische Autonomie", "Gesamtrisiko"]
+    values = [
+        scores["political_security"],
+        scores["strategische_autonomie"],
+        scores["total"]
+    ]
+
+    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
+    angles = np.concatenate([angles, angles[:1]])
+    values = np.concatenate([values, values[:1]])
+
+    fig, ax = plt.subplots(subplot_kw={"polar": True}, figsize=(6, 6))
+    ax.plot(angles, values, linewidth=2)
+    ax.fill(angles, values, alpha=0.15)
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1)
+
+    return fig
+
+
+def laender_dashboard(land: str, presets: dict, clusters: dict, model):
+    if land not in presets:
+        return "Land nicht gefunden.", None
+
+    cid = clusters[land]
+    scores = compute_risk_scores(presets[land])
+
+    md = f"""
+# Risiko-Dashboard: {land}
+
+**Cluster:** {cid}
+
+## Risiko-Scores
+- Politisches Risiko: {scores["political_security"]:.2f}
+- Strategische Autonomie: {scores["strategische_autonomie"]:.2f}
+- Gesamtrisiko: {scores["total"]:.2f}
+
+## Investment-Profil
+{investment_profile_for_cluster(
+    model.cluster_centers_[cid][0],
+    model.cluster_centers_[cid][1],
+    model.cluster_centers_[cid][2]
+)}
+"""
+
+    radar = laender_radar_plot(land, presets)
+    return md, radar
 
 def portfolio_simulator(w0: float, w1: float, w2: float, model):
     centers = model.cluster_centers_
@@ -345,22 +466,42 @@ def portfolio_simulator(w0: float, w1: float, w2: float, model):
     return md
 
 def asset_klassen_vergleich():
-    md = """
-# Asset-Klassen Vergleich
+    return """
+# Vergleich der wichtigsten Asset-Klassen
 
 ## Aktien
-- Renditequellen: Kursgewinn + Dividende
+- Renditequellen: Kursgewinne + Dividenden
 - Risiko: mittel bis hoch
-- Geeignet für: Wachstum, langfristige Vermögensbildung
+- Rolle: Wachstum, langfristige Vermögensbildung
 
 ## Gold
-- Renditequelle: nur Preisentwicklung
+- Renditequelle: reine Preisentwicklung
 - Risiko: mittel
-- Geeignet für: Absicherung, Krisenschutz, Diversifikation
+- Rolle: Absicherung, Krisenschutz, Diversifikation
 
 ## Staatsanleihen
-- Renditequelle: Kupon + Rückzahlung
-- Risiko: abhängig von Bonität (AAA = sehr niedrig)
-- Geeignet für: Stabilität, planbare Cashflows
+- Renditequellen: Kupon + Rückzahlung
+- Risiko: abhängig von der Bonität (AAA = sehr niedrig)
+- Rolle: Stabilität, planbare Cashflows
 """
-    return md
+
+
+def country_credit_spread_from_score(ps_score):
+    # ps_score in [0,1], 0 = sehr gut, 1 = sehr schlecht
+    # Beispiel: linear mapping 0->0.1% ; 1->8%
+    return 0.001 + ps_score * 0.08
+
+def political_premium(ps_score):
+    return ps_score * 0.02  # bis 2% zusätzlich
+
+def sovereign_ytm(rf_yield, ps_score):
+    spread = country_credit_spread_from_score(ps_score)
+    pol = political_premium(ps_score)
+    return rf_yield + spread + pol  
+
+def country_equity_premium(total_score):
+    # total_score in [0,1], 0 = sehr sicher, 1 = sehr riskant
+    return total_score * 0.06  # bis +6% country premium
+
+def expected_equity_return(rf, beta, erp, total_score):
+    return rf + beta * erp + country_equity_premium(total_score)
