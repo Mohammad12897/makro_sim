@@ -14,12 +14,9 @@ def test_risk_metrics_basic():
 
     metrics = mc_risk_metrics(sim)
 
-    assert "mean" in metrics
-    assert "std" in metrics
+    assert metrics["mean"] > 0
+    assert metrics["std"] >= 0
     assert "sharpe" in metrics
     assert "var95" in metrics
     assert "cvar95" in metrics
     assert "max_drawdown" in metrics
-
-    assert metrics["mean"] > 0
-    assert metrics["std"] >= 0
