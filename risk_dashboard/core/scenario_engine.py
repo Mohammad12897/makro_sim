@@ -8,6 +8,8 @@ from core.risk_model import compute_risk_scores, clamp01
 from core.shock_mapping import convert_events_to_shocks
 
 import json
+import numpy as np
+import pandas as pd
 
 # ---------------------------------------------------------
 # Hilfsfunktion: sichere Addition mit Begrenzung
@@ -102,6 +104,86 @@ def apply_shock(params: dict, shock_type: str, intensity: float = 1.0) -> dict:
 
     return p
 
+
+def apply_deterministic_shock(mu, cov, shock):
+    """
+    shock: dict mit keys wie 'equity', 'bonds', 'gold'
+    Beispiel: {'equity': -0.05, 'bonds': 0.01}
+    """
+    mu_new = mu.copy()
+    for asset, delta in shock.items():
+        if asset in mu_new:
+            mu_new[asset] += delta
+    return mu_new, cov
+
+
+def apply_volatility_shock(cov, factor):
+    """
+    Erhöht oder senkt die Volatilität.
+    factor = 1.2 bedeutet +20% Volatilität
+    """
+    return cov * (factor ** 2)
+
+
+def apply_correlation_shock(cov, rho_new):
+    """
+    Setzt alle Off-Diagonal-Korrelationen auf rho_new.
+    """
+    std = np.sqrt(np.diag(cov))
+    new_cov = np.outer(std, std) * rho_new
+    np.fill_diagonal(new_cov, std ** 2)
+    return pd.DataFrame(new_cov, index=cov.index, columns=cov.columns)
+
+
+def geopolitical_shock(mu, cluster_id):
+    """
+    Cluster 0 = hohe Instabilität
+    Cluster 1 = mittel
+    Cluster 2 = stabil
+    """
+    factors = {
+        0: -0.05,
+        1: -0.02,
+        2:  0.00,
+    }
+    delta = factors.get(cluster_id, 0)
+    return {k: v + delta for k, v in mu.items()}
+
+
+def scenario_by_name(name):
+    """
+    Liefert eine shock_fn(mu, cov, year) für multi_period_mc
+    """
+    name = name.lower()
+
+    def base(mu, cov, year):
+        return mu, cov
+
+    if name == "keins":
+        return base
+
+    if name == "krise":
+        def crisis(mu, cov, year):
+            mu["equity"] -= 0.08
+            cov = cov * 1.5
+            return mu, cov
+        return crisis
+
+    if name == "zinsanstieg":
+        def rates(mu, cov, year):
+            mu["bonds"] += 0.01
+            cov = cov * 1.2
+            return mu, cov
+        return rates
+
+    if name == "ölpreisschock":
+        def oil(mu, cov, year):
+            mu["equity"] -= 0.03
+            mu["gold"] += 0.04
+            return mu, cov
+        return oil
+
+    return base
 
 # ---------------------------------------------------------
 # Szenario Runner

@@ -115,39 +115,14 @@ makro_sim/
 │       └── gradio_app.py          # lädt nur slider_presets.json
 
 
-risk_dashboard/
-│
-├── core/
-│   ├── risk_model.py
-│   ├── scenario_engine.py
-│   ├── cluster.py
-│   ├── heatmap.py
-│   ├── storyline.py
-│   ├── ews.py
-│   └── utils.py
-│
-├── ui/
-│   ├── app.py
-│   ├── components.py
-│   └── layout.py
-│
-├── data/
-│   ├── slider_presets.json
-│   ├── scenario_presets.json
-│   └── texts/
-│       ├── radar_text.md
-│       ├── storyline_text.md
-│       ├── interpretation_text.md
-│       └── methodology.md
-│
-├── assets/
-│   └── icons/   (optional)
-│
-└── main.py
 
 /content/makro_sim/risk_dashboard
 │
 ├── core/
+│   ├── data_import.py
+│   ├── covariance.py
+│   ├── mc_simulator.py
+│   ├── portfolio.py
 │   ├── risk_model.py
 │   ├── scenario_engine.py
 │   ├── cluster.py
@@ -163,17 +138,20 @@ risk_dashboard/
 │   └── layout.py
 │
 ├── data/
+│   ├── equity_returns.csv
+│   ├── bond_returns.csv
+│   ├── gold_returns.csv
 │   ├── slider_presets.json
 │   ├── scenario_presets.json
-│   └── texts/
-│       ├── radar_text.md
-│       ├── storyline_text.md
-│       ├── interpretation_text.md
-│       └── methodology.md
+│   └── lexicon.json
+│       
 │
 ├── assets/
 │   └── icons/
 ├── docs/
-│   
+│
+├── test/
+│   ├── app.py
+│   └── example_presets.py   
 │
 └── main.py
