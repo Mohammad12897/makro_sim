@@ -1,8 +1,9 @@
 # core/data_import.py
 
-import yfinance as yf
 import pandas as pd
 import numpy as np
+import yfinance as yf
+
 
 def load_returns_csv(path: str, expected_assets: list = None) -> pd.DataFrame:
     """
@@ -29,15 +30,30 @@ def load_returns_csv(path: str, expected_assets: list = None) -> pd.DataFrame:
             raise ValueError(f"Fehlende Spalten in {path}: {missing}")
 
     # Fehlende Werte füllen
-    df = df.fillna(method="ffill").fillna(method="bfill")
+    #df = df.fillna(method="bfill").fillna(method="bfill")
+    df = df.ffill().bfill()
 
     # Sicherstellen, dass alles numerisch ist
     df = df.apply(pd.to_numeric, errors="coerce")
 
     return df
 
- 
- def validate_returns(df, expected_assets):
+
+def load_yahoo_returns(ticker, start="2010-01-01", end=None):
+    """
+    Lädt historische Renditen von Yahoo Finance.
+    """
+    data = yf.download(ticker, start=start, end=end)
+    if "Adj Close" not in data:
+        raise ValueError(f"Ticker {ticker} hat keine Adj Close Daten.")
+    returns = data["Adj Close"].pct_change().dropna()
+    return returns
+
+
+def validate_returns(df, expected_assets):
+    """
+    Validiert Rendite-DataFrames.
+    """
     errors = []
 
     # Spalten prüfen
@@ -57,10 +73,3 @@ def load_returns_csv(path: str, expected_assets: list = None) -> pd.DataFrame:
         errors.append("Unrealistische Renditen (>100% oder < -100%).")
 
     return errors
-
-def load_yahoo_returns(ticker, start="2010-01-01", end=None):
-    data = yf.download(ticker, start=start, end=end)
-    if "Adj Close" not in data:
-        raise ValueError(f"Ticker {ticker} hat keine Adj Close Daten.")
-    returns = data["Adj Close"].pct_change().dropna()
-    return returns

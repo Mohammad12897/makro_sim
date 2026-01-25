@@ -1,8 +1,32 @@
 # ui/app.py
 
+import sys
+sys.path.append("/content/makro_sim/risk_dashboard")
+
 import gradio as gr
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 import json
 from pathlib import Path
+
+
+from core.country_assets import (
+    compute_country_asset_expectations,
+    portfolio_metrics,
+    monte_carlo_portfolio,
+    build_cov_matrix,
+    etf_mapping_for_cluster,
+    investment_profile_for_cluster,
+)
+
+from core.portfolio_sim.mc_engine import run_portfolio_mc
+from core.portfolio_sim.risk_metricks import mc_risk_metrics
+from core.data_import import load_returns_csv
+from core.portfolio_sim.covariance import compute_covariance, build_asset_covariance
+from core.scenario_engine import scenario_by_name
+from core.mc_simulator import multi_period_mc, summarize_paths
+from test.example_presets import EXAMPLE_PRESETS, CLUSTERS, MODEL
 
 from core.shock_mapping import convert_events_to_shocks
 from core.risk_model import compute_risk_scores
@@ -44,6 +68,24 @@ from ui.components import (
 from ui.plots import plot_radar
 from core.scenario_engine import load_lexicon
 lex = load_lexicon()
+
+
+DATA_PATH = "/content/makro_sim/risk_dashboard/data"
+
+equity_df = load_returns_csv(
+    f"{DATA_PATH}/equity_returns.csv",
+    expected_assets=["USA", "Germany", "India", "Brazil", "SouthAfrica"]
+)
+
+bond_df = load_returns_csv(
+    f"{DATA_PATH}/bond_returns.csv",
+    expected_assets=["USA", "Germany", "India", "Brazil", "SouthAfrica"]
+)
+
+gold_df = load_returns_csv(
+    f"{DATA_PATH}/gold_returns.csv",
+    expected_assets=["Gold"]
+)
 
 
 # ---------------------------------------------------------
@@ -288,12 +330,28 @@ def compute_risk_cockpit(country):
 
     return "\n".join(lines)
 
+def run_multi_period_simulation(land, w_equity, w_bond, w_gold, years, scenario_name):
+    presets = load_presets()
+    sim, summary, fig, fig2 = run_portfolio_mc(
+        land, presets, w_equity, w_bond, w_gold, years, scenario_name
+    )
+    metrics = mc_risk_metrics(sim)
+
+    md = "**Portfolio-Risikoanalyse:**\n\n"
+    md += f"- Erwartete Gesamtrendite: {metrics['mean']*100:.2f}%\n"
+    md += f"- Volatilität: {metrics['std']*100:.2f}%\n"
+    md += f"- Sharpe Ratio: {metrics['sharpe']:.2f}\n"
+    md += f"- VaR 95%: {metrics['var95']*100:.2f}%\n"
+    md += f"- CVaR 95%: {metrics['cvar95']*100:.2f}%\n"
+    md += f"- Max. Drawdown (Ø): {metrics['max_drawdown']*100:.2f}%\n"
+
+    return md, fig, fig2
 
 # ---------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
 
-def build_app():
+def create_gradio_app(presets):
 
     with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
 
@@ -460,21 +518,30 @@ def build_app():
                 [land_dashboard_md, land_radar_plot, land_invest_md]
             )
 
-
+        # --- Portfolio-Simulator ---
         with gr.Tab("Portfolio-Simulator"):
-            gr.Markdown("## Portfolio-Simulation basierend auf Cluster-Risiken")
+            country_dropdown2 = gr.Dropdown(choices=countries, label="Land auswählen")
+            w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
+            w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
+            w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
 
-            w0 = gr.Slider(0, 100, label="Cluster 0 Anteil (%)")
-            w1 = gr.Slider(0, 100, label="Cluster 1 Anteil (%)")
-            w2 = gr.Slider(0, 100, label="Cluster 2 Anteil (%)")
+            years = gr.Slider(1, 20, value=10, step=1, label="Anzahl Jahre")
+            scenario = gr.Dropdown(
+                choices=["Keins", "Krise", "Zinsanstieg", "Ölpreisschock"],
+                value="Keins",
+                label="Szenario"
+            )
 
-            port_out = gr.Markdown(label="Portfolio-Profil")
+            sim_out = gr.Markdown()
+            path_plot = gr.Plot()
+            terminal_plot = gr.Plot()
 
-            btn_port = gr.Button("Portfolio simulieren")
-            btn_port.click(
-                lambda a, b, c: portfolio_simulator(a, b, c, cluster_risk_dimensions(load_presets())[1]),
-                [w0, w1, w2],
-                port_out
+            gr.Button("Mehrperioden-Simulation starten").click(
+                lambda land, we, wb, wg, yrs, scen: run_multi_period_simulation(
+                    land, we, wb, wg, yrs, scen
+                ),
+                [country_dropdown2, w_equity, w_bond, w_gold, years, scenario],
+                [sim_out, path_plot, terminal_plot],
             )
 
         with gr.Tab("Heatmap-Radar"):
@@ -490,11 +557,3 @@ def build_app():
             btn_cockpit.click(compute_risk_cockpit, country_cockpit, cockpit_out)
 
     return app
-
-# ---------------------------------------------------------
-# Start
-# ---------------------------------------------------------
-
-if __name__ == "__main__":
-    app = build_app()
-    app.launch()

@@ -2,70 +2,95 @@
 import numpy as np
 import pandas as pd
 
-def multi_period_mc(
-    weights,
-    mu,
-    cov,
-    years=10,
-    n_paths=5000,
-    rebalancing=True,
-    shock_fn=None,
-    seed=42
-):
+
+def multi_period_mc(weights, mu, cov, years, n_paths=3000, rebalancing=True, shock_fn=None, seed=None):
     """
-    weights: np.array([w_equity, w_bond, w_gold])
-    mu: dict mit erwarteten Renditen
-    cov: Kovarianzmatrix
-    shock_fn: Funktion, die (mu, cov, year) -> (mu_new, cov_new) zurückgibt
+    Mehrperiodige Monte-Carlo-Simulation eines Portfolios.
+
+    Parameters
+    ----------
+    weights : array-like
+        Portfolio-Gewichte (z.B. [0.5, 0.3, 0.2]).
+    mu : dict
+        Erwartungswerte pro Asset-Klasse, z.B. {"equity": 0.06, "bonds": 0.02, "gold": 0.03}.
+    cov : DataFrame
+        Kovarianzmatrix (3x3).
+    years : int
+        Anzahl der Jahre.
+    n_paths : int
+        Anzahl der Simulationen.
+    rebalancing : bool
+        Ob jährlich rebalanciert wird.
+    shock_fn : callable
+        Funktion, die jährliche Schocks liefert (optional).
+    seed : int
+        Zufallsseed.
+
+    Returns
+    -------
+    dict
+        {
+            "paths": np.array shape (n_paths, years),
+            "terminal_distribution": np.array shape (n_paths,)
+        }
     """
 
     rng = np.random.default_rng(seed)
-    assets = list(mu.keys())
-    mu_vec = np.array([mu[a] for a in assets])
+
+    # Mean-Vektor in der richtigen Reihenfolge
+    mu_vec = np.array([mu["equity"], mu["bonds"], mu["gold"]])
+
     cov_mat = cov.values
+    n_assets = len(mu_vec)
 
-    results = np.zeros((n_paths, years))
+    paths = np.zeros((n_paths, years))
 
-    for path in range(n_paths):
+    for p in range(n_paths):
+        value = 1.0
         w = weights.copy()
-        mu_t = mu_vec.copy()
-        cov_t = cov_mat.copy()
 
         for t in range(years):
+            # Schock anwenden
+            if shock_fn is not None:
+                mu_t, cov_t = shock_fn(mu_vec, cov_mat, t)
+            else:
+                mu_t, cov_t = mu_vec, cov_mat
 
-            # Szenario-Schock pro Jahr
-            if shock_fn:
-                mu_dict = {a: mu_t[i] for i, a in enumerate(assets)}
-                mu_dict, cov_t = shock_fn(mu_dict, cov_t, t)
-                mu_t = np.array([mu_dict[a] for a in assets])
-
-            # Jahresrendite simulieren
+            # Renditen simulieren
             ret = rng.multivariate_normal(mu_t, cov_t)
-            portfolio_ret = np.dot(w, ret)
-            results[path, t] = portfolio_ret
+
+            # Portfolio-Rendite
+            port_ret = np.dot(w, ret)
+            value *= (1 + port_ret)
+
+            paths[p, t] = value
 
             # Rebalancing
             if rebalancing:
                 w = weights.copy()
 
+    terminal = paths[:, -1]
+
     return {
-        "paths": results,
-        "mean": results.mean(axis=0),
-        "var95": np.percentile(results, 5, axis=0),
-        "cvar95": results[results <= np.percentile(results, 5)].mean(),
-        "terminal_distribution": results.sum(axis=1)
+        "paths": paths,
+        "terminal_distribution": terminal,
     }
 
 
-def summarize_paths(results):
+def summarize_paths(sim):
     """
-    results: dict von multi_period_mc
-    Gibt DataFrame mit mean, var95, cvar95 pro Jahr zurück.
+    Aggregiert die MC-Pfade zu Jahresstatistiken.
+
+    Returns DataFrame:
+        year | mean | var95
     """
-    years = results["paths"].shape[1]
-    df = pd.DataFrame({
+    paths = sim["paths"]
+    years = paths.shape[1]
+
+    summary = {
         "year": np.arange(1, years + 1),
-        "mean": results["mean"],
-        "var95": results["var95"],
-    })
-    return df
+        "mean": paths.mean(axis=0),
+        "var95": np.percentile(paths, 5, axis=0),
+    }
+
+    return pd.DataFrame(summary)

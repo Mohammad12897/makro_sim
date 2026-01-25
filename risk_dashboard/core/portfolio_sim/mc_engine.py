@@ -1,0 +1,39 @@
+#core/portfolio_sim/mc_engine.py
+import numpy as np
+import matplotlib.pyplot as plt
+
+from core.country_assets import compute_country_asset_expectations
+from core.portfolio_sim.covariance import build_asset_covariance
+from core.scenario_engine import scenario_by_name
+from core.mc_simulator import multi_period_mc, summarize_paths
+
+
+def run_portfolio_mc(land, presets, w_equity, w_bond, w_gold, years, scenario_name):
+    expectations = compute_country_asset_expectations(land, presets)
+
+    mu = {
+        "equity": expectations["equity_mu"],
+        "bonds": expectations["bond_yield"],
+        "gold": expectations["gold_mu"],
+    }
+
+    cov = build_asset_covariance()
+
+    weights = [w_equity, w_bond, w_gold]
+    weights = [w / sum(weights) for w in weights]
+
+    shock_fn = scenario_by_name(scenario_name)
+
+    sim = multi_period_mc(
+        weights=weights,
+        mu=mu,
+        cov=cov,
+        years=years,
+        n_paths=3000,
+        rebalancing=True,
+        shock_fn=shock_fn,
+        seed=42,
+    )
+
+    summary = summarize_paths(sim)
+    return sim, summary
