@@ -119,6 +119,12 @@ makro_sim/
 /content/makro_sim/risk_dashboard
 │
 ├── core/
+│   ├── portfolio_sim/
+│   │   ├── covariance.py
+│   │   ├── mc_engine.py
+│   │   ├── risk_metrics.py
+│   │   ├── scenario_adapter.py
+│   │   └── portfolio_model.py
 │   ├── data_import.py
 │   ├── covariance.py
 │   ├── mc_simulator.py
@@ -153,5 +159,13 @@ makro_sim/
 ├── test/
 │   ├── app.py
 │   └── example_presets.py   
+├── tests/
+│   ├── test_mc_engine.py
+│   ├── test_risk_metrics.py
+│   ├── test_covariance.py
+│   ├── test_scenario_adapter.py
+│   └── conftest.py
 │
+├── pytest.ini
+├── requirements.txt
 └── main.py
