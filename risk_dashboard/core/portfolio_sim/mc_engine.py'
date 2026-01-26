@@ -2,6 +2,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from core.country_assets import compute_country_asset_expectations
+from core.portfolio_sim.covariance import build_asset_covariance
+from core.mc_simulator import multi_period_mc, summarize_paths
+from core.portfolio_sim.covariance_dynamic import dynamic_covariance
 from core.scenario_engine import scenario_by_name, dynamic_covariance
 
 def run_portfolio_mc(land, presets, w_equity, w_bond, w_gold, years, scenario_name):

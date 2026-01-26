@@ -92,3 +92,29 @@ def plot_terminal_distribution(sim):
     ax.set_ylabel("Häufigkeit")
 
     return fig
+
+def plot_scenario_radar_overlay(scenario_metrics: dict):
+    """
+    scenario_metrics: {szenario_name: metrics_dict}
+    """
+    import plotly.graph_objects as go
+
+    categories = ["mean", "std", "sharpe", "var95", "max_drawdown"]
+
+    fig = go.Figure()
+
+    for scen, m in scenario_metrics.items():
+        values = [m[c] for c in categories]
+        fig.add_trace(go.Scatterpolar(
+            r=values,
+            theta=categories,
+            fill='toself',
+            name=scen
+        ))
+
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True)),
+        showlegend=True,
+        title="Szenario-Radar-Overlay"
+    )
+    return fig

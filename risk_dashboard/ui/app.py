@@ -27,13 +27,23 @@ from core.portfolio_sim.plots import (
     plot_fan_chart,
     plot_drawdown,
     plot_portfolio_radar,
+    plot_scenario_radar_overlay,
 )
-from core.portfolio_sim.scenario_compare import compare_scenarios, run_scenario_comparison
-from core.portfolio_sim.mc_engine import run_portfolio_mc
+
+from core.scenario_engine import ( 
+    scenario_radar_metrics, 
+    scenario_by_name,
+    run_scenario, 
+    decision_support_view,
+    rank_countries, 
+    SCENARIO_CONFIG
+)
 from core.portfolio_sim.risk_metrics import mc_risk_metrics
+from core.portfolio_sim.mc_engine import run_portfolio_mc
+
+from core.portfolio_sim.scenario_compare import compare_scenarios, run_scenario_comparison
 from core.data_import import load_returns_csv
 from core.portfolio_sim.covariance import compute_covariance, build_asset_covariance
-from core.scenario_engine import scenario_by_name
 from core.mc_simulator import multi_period_mc, summarize_paths
 from test.example_presets import EXAMPLE_PRESETS, CLUSTERS, MODEL
 
@@ -45,9 +55,9 @@ from core.heatmap import (
     autonomy_heatmap,
     combined_political_autonomy_heatmap
 )
+from core.lexicon import load_lexicon
 from core.storyline import storyline_v3
 from core.ews import ews_for_country
-from core.scenario_engine import run_scenario, decision_support_view
 from core.cluster import (
     cluster_heatmap,
     describe_clusters,
@@ -63,7 +73,7 @@ from core.cluster import (
     portfolio_simulator,
     asset_klassen_vergleich
 )
-from core.scenario_engine import rank_countries
+
 from core.utils import load_presets, load_scenarios
 
 from ui.components import (
@@ -75,7 +85,6 @@ from ui.components import (
     make_heatmap_radar
 )
 from ui.plots import plot_radar
-from core.scenario_engine import load_lexicon
 lex = load_lexicon()
 
 
@@ -95,6 +104,25 @@ gold_df = load_returns_csv(
     f"{DATA_PATH}/gold_returns.csv",
     expected_assets=["Gold"]
 )
+
+
+def update_krise_params(eq, bo, go):
+    SCENARIO_CONFIG["Krise"]["mu_shift"][0] = eq
+    SCENARIO_CONFIG["Krise"]["mu_shift"][1] = bo
+    SCENARIO_CONFIG["Krise"]["mu_shift"][2] = go
+    return f"**Krise aktualisiert:** Equity={eq}, Bonds={bo}, Gold={go}"
+
+def update_zins_params(eq, bo, go):
+    SCENARIO_CONFIG["Zinsanstieg"]["mu_shift"][0] = eq
+    SCENARIO_CONFIG["Zinsanstieg"]["mu_shift"][1] = bo
+    SCENARIO_CONFIG["Zinsanstieg"]["mu_shift"][2] = go
+    return f"**Zinsanstieg aktualisiert:** Equity={eq}, Bonds={bo}, Gold={go}"
+
+def update_oil_params(eq, bo, go):
+    SCENARIO_CONFIG["Ölpreisschock"]["mu_shift"][0] = eq
+    SCENARIO_CONFIG["Ölpreisschock"]["mu_shift"][1] = bo
+    SCENARIO_CONFIG["Ölpreisschock"]["mu_shift"][2] = go
+    return f"**Ölpreisschock aktualisiert:** Equity={eq}, Bonds={bo}, Gold={go}"
 
 
 # ---------------------------------------------------------
@@ -217,6 +245,22 @@ def compute_cluster_complete():
 
     radar_fig = cluster_radar_plot(model)
     return rows, fig, lexikon, inv_markdown, radar_fig
+
+def compute_radar_overlay(land, we, wb, wg, yrs):
+    presets = load_presets()
+    weights = [we, wb, wg]
+
+    metrics = scenario_radar_metrics(
+        land,
+        presets,
+        weights,
+        yrs,
+        run_portfolio_mc,
+        mc_risk_metrics
+    )
+
+    fig = plot_scenario_radar_overlay(metrics)
+    return fig
 
 def compute_heatmap_radar(country):
     presets = load_presets()
@@ -601,6 +645,87 @@ with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
             [sim_out, path_plot, terminal_plot, fan_plot, dd_plot, radar_plot],
         )
 
+    with gr.Tab("Szenario‑Parameter"):
+        gr.Markdown("## 🔧 Szenario‑Parameter konfigurieren")
+
+        # --- Krise ---
+        gr.Markdown("### Krise")
+
+        krise_equity_shift = gr.Slider(-0.2, 0.0, value=-0.08, label="Equity‑Shift")
+        krise_bond_shift = gr.Slider(-0.2, 0.2, value=-0.02, label="Bond‑Shift")
+        krise_gold_shift = gr.Slider(0.0, 0.2, value=0.03, label="Gold‑Shift")
+
+        btn_update_krise = gr.Button("Krise‑Parameter aktualisieren")
+        out_krise = gr.Markdown()
+
+        # --- Zinsanstieg ---
+        gr.Markdown("### Zinsanstieg")
+
+        zins_equity_shift = gr.Slider(-0.2, 0.2, value=-0.02, label="Equity‑Shift")
+        zins_bond_shift = gr.Slider(-0.2, 0.2, value=0.03, label="Bond‑Shift")
+        zins_gold_shift = gr.Slider(-0.2, 0.2, value=0.00, label="Gold‑Shift")
+
+        btn_update_zins = gr.Button("Zinsanstieg‑Parameter aktualisieren")
+        out_zins = gr.Markdown()
+
+        # --- Ölpreisschock ---
+        gr.Markdown("### Ölpreisschock")
+
+        oil_equity_shift = gr.Slider(-0.2, 0.2, value=-0.03, label="Equity‑Shift")
+        oil_bond_shift = gr.Slider(-0.2, 0.2, value=0.00, label="Bond‑Shift")
+        oil_gold_shift = gr.Slider(0.0, 0.3, value=0.05, label="Gold‑Shift")
+
+        btn_update_oil = gr.Button("Ölpreisschock‑Parameter aktualisieren")
+        out_oil = gr.Markdown()
+
+        btn_update_krise.click(
+            update_krise_params,
+            [krise_equity_shift, krise_bond_shift, krise_gold_shift],
+            out_krise
+        )
+
+        btn_update_zins.click(
+            update_zins_params,
+            [zins_equity_shift, zins_bond_shift, zins_gold_shift],
+            out_zins
+        )
+
+        btn_update_oil.click(
+            update_oil_params,
+            [oil_equity_shift, oil_bond_shift, oil_gold_shift],
+            out_oil
+        )
+
+    with gr.Tab("Szenario‑Radar‑Overlay"):
+
+        gr.Markdown("## 📊 Szenario‑Radar‑Overlay")
+
+        radar_country = gr.Dropdown(choices=countries, label="Land")
+        radar_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
+        radar_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
+        radar_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
+        radar_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
+
+        btn_radar = gr.Button("Radar‑Overlay erzeugen")
+
+        radar_plot_out = gr.Plot(label="Radar‑Overlay")
+        btn_radar.click(
+            compute_radar_overlay,
+            [radar_country, radar_w_equity, radar_w_bond, radar_w_gold, radar_years],
+            radar_plot_out
+        )
+
+    with gr.Tab("Cluster‑Lexikon"):
+        lexikon_md = gr.Markdown()
+
+        def show_lexikon():
+            lex = load_lexicon()
+            text = "\n\n".join([f"### {k}\n{v}" for k, v in lex.items()])
+            return text
+
+        btn_show_lexikon = gr.Button("Lexikon anzeigen")
+        btn_show_lexikon.click(show_lexikon, None, lexikon_md)
+    
     with gr.Tab("Heatmap-Radar"):
         country_hm = make_country_dropdown(countries)
         heatmap_out = gr.Plot()
