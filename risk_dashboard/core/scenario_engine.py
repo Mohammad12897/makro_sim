@@ -163,23 +163,27 @@ def scenario_by_name(name):
         return base
 
     if name == "krise":
-        def crisis(mu, cov, year):
-            mu["equity"] -= 0.08
-            cov = cov * 1.5
+        def crisis(mu, cov, t):
+            mu = mu.copy()
+            mu[0] -= 0.08   # equity
+            mu[1] -= 0.02   # bonds
+            mu[2] += 0.03   # gold
             return mu, cov
         return crisis
 
     if name == "zinsanstieg":
-        def rates(mu, cov, year):
-            mu["bonds"] += 0.01
-            cov = cov * 1.2
+        def rates(mu, cov, t):
+            mu = mu.copy()
+            mu[0] += 0.02   # equity
+            mu[1] += 0.03   # bonds
             return mu, cov
         return rates
 
     if name == "ölpreisschock":
-        def oil(mu, cov, year):
-            mu["equity"] -= 0.03
-            mu["gold"] += 0.04
+        def oil(mu, cov, t):
+            mu = mu.copy()
+            mu[2] += 0.05   # gold
+            mu[0] -= 0.03   # equity
             return mu, cov
         return oil
 
