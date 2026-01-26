@@ -32,11 +32,8 @@ from core.portfolio_sim.plots import (
 
 from core.scenario_engine import ( 
     scenario_radar_metrics, 
-    scenario_by_name,
-    run_scenario, 
-    decision_support_view,
-    rank_countries, 
-    SCENARIO_CONFIG
+    scenario_by_name, 
+    SCENARIO_CONFIG,
 )
 from core.portfolio_sim.risk_metrics import mc_risk_metrics
 from core.portfolio_sim.mc_engine import run_portfolio_mc

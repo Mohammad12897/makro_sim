@@ -2,7 +2,7 @@
 
 import plotly.graph_objects as go
 import gradio as gr
-from core.scenario_engine import load_lexicon
+from core.lexicon import load_lexicon
 
 
 # ---------------------------------------------------------
@@ -293,7 +293,6 @@ def make_heatmap_radar(scores, title="Heatmap-Radar"):
     )
 
     return fig
-
 
 # ---------------------------------------------------------
 # Dropdown-Komponenten

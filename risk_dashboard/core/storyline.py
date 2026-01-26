@@ -3,7 +3,7 @@
 from __future__ import annotations
 from typing import Dict
 from core.risk_model import compute_risk_scores
-from core.scenario_engine import load_lexicon
+from core.lexicon import load_lexicon
 
 
 
