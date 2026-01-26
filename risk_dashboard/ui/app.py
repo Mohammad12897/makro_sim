@@ -20,8 +20,16 @@ from core.country_assets import (
     investment_profile_for_cluster,
 )
 
+from core.portfolio_sim.plots import (
+    plot_path_plot,
+    plot_terminal_distribution,
+    plot_fan_chart,
+    plot_drawdown,
+    plot_portfolio_radar,
+)
+from core.portfolio_sim.scenario_compare import compare_scenarios, run_scenario_comparison
 from core.portfolio_sim.mc_engine import run_portfolio_mc
-from core.portfolio_sim.risk_metricks import mc_risk_metrics
+from core.portfolio_sim.risk_metrics import mc_risk_metrics
 from core.data_import import load_returns_csv
 from core.portfolio_sim.covariance import compute_covariance, build_asset_covariance
 from core.scenario_engine import scenario_by_name
@@ -39,12 +47,12 @@ from core.heatmap import (
 from core.storyline import storyline_v3
 from core.ews import ews_for_country
 from core.scenario_engine import run_scenario, decision_support_view
-from core.cluster import ( 
-    cluster_heatmap, 
-    describe_clusters, 
-    cluster_risk_dimensions, 
-    cluster_scatterplot, 
-    investment_profile_for_cluster, 
+from core.cluster import (
+    cluster_heatmap,
+    describe_clusters,
+    cluster_risk_dimensions,
+    cluster_scatterplot,
+    investment_profile_for_cluster,
     cluster_radar_plot,
     aktienrendite,
     goldrendite,
@@ -332,20 +340,41 @@ def compute_risk_cockpit(country):
 
 def run_multi_period_simulation(land, w_equity, w_bond, w_gold, years, scenario_name):
     presets = load_presets()
-    sim, summary, fig, fig2 = run_portfolio_mc(
-        land, presets, w_equity, w_bond, w_gold, years, scenario_name
+
+    # 1. Simulation ausführen
+    sim, summary = run_portfolio_mc(
+        land=land,
+        presets=presets,
+        w_equity=w_equity,
+        w_bond=w_bond,
+        w_gold=w_gold,
+        years=years,
+        scenario_name=scenario_name
     )
+
+    # 2. Risiko-Metriken berechnen
     metrics = mc_risk_metrics(sim)
 
-    md = "**Portfolio-Risikoanalyse:**\n\n"
-    md += f"- Erwartete Gesamtrendite: {metrics['mean']*100:.2f}%\n"
-    md += f"- Volatilität: {metrics['std']*100:.2f}%\n"
-    md += f"- Sharpe Ratio: {metrics['sharpe']:.2f}\n"
-    md += f"- VaR 95%: {metrics['var95']*100:.2f}%\n"
-    md += f"- CVaR 95%: {metrics['cvar95']*100:.2f}%\n"
-    md += f"- Max. Drawdown (Ø): {metrics['max_drawdown']*100:.2f}%\n"
+    # 3. Markdown-KPIs erzeugen
+    md = (
+        f"### Portfolio-Kennzahlen\n\n"
+        f"- **Erwartete Gesamtrendite:** {metrics['mean']*100:.2f}%\n"
+        f"- **Volatilität:** {metrics['std']*100:.2f}%\n"
+        f"- **Sharpe Ratio:** {metrics['sharpe']:.2f}\n"
+        f"- **VaR 95%:** {metrics['var95']*100:.2f}%\n"
+        f"- **CVaR 95%:** {metrics['cvar95']*100:.2f}%\n"
+        f"- **Max Drawdown:** {metrics['max_drawdown']*100:.2f}%\n"
+    )
 
-    return md, fig, fig2
+    # 4. Plots erzeugen
+    fig_path = plot_path_plot(summary)
+    fig_terminal = plot_terminal_distribution(sim)
+    fig_fan = plot_fan_chart(sim)
+    fig_dd = plot_drawdown(sim)
+    fig_radar = plot_portfolio_radar(metrics)
+
+    return md, fig_path, fig_terminal, fig_fan, fig_dd, fig_radar
+
 
 # ---------------------------------------------------------
 # Gradio App
@@ -401,18 +430,19 @@ def create_gradio_app(presets):
             btn_decision.click(compute_decision_support, country_s, scen_decision_out)
 
         with gr.Tab("Szenario-Vergleich"):
-            country_cmp = make_country_dropdown(countries)
-            scenario_cmp = gr.CheckboxGroup(
-                choices=scenario_names,
-                label="Szenarien auswählen",
-                value=scenario_names[:3]
-            )
-            scen_cmp_out = gr.Markdown()
-            btn_cmp = gr.Button("Szenarien vergleichen")
-            btn_cmp.click(
-                compute_scenario_comparison,
-                [country_cmp, scenario_cmp],
-                scen_cmp_out
+            scen_country = gr.Dropdown(choices=countries, label="Land")
+            scen_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
+            scen_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
+            scen_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
+            scen_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
+
+            scen_button = gr.Button("Szenarien vergleichen")
+            scen_table = gr.Dataframe()
+
+            scen_button.click(
+                run_scenario_comparison,
+                [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
+                scen_table
             )
 
         with gr.Tab("Cluster-Komplettansicht"):
@@ -441,7 +471,7 @@ def create_gradio_app(presets):
             btn_asset = gr.Button("Asset-Vergleich anzeigen")
             btn_asset.click(lambda: asset_klassen_vergleich(), None, asset_out)
 
-          
+
             with gr.Row():
                 kurs_alt = gr.Number(label="Aktienkurs (alt)")
                 kurs_neu = gr.Number(label="Aktienkurs (neu)")
@@ -520,28 +550,45 @@ def create_gradio_app(presets):
 
         # --- Portfolio-Simulator ---
         with gr.Tab("Portfolio-Simulator"):
-            country_dropdown2 = gr.Dropdown(choices=countries, label="Land auswählen")
-            w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
-            w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
-            w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
 
-            years = gr.Slider(1, 20, value=10, step=1, label="Anzahl Jahre")
-            scenario = gr.Dropdown(
-                choices=["Keins", "Krise", "Zinsanstieg", "Ölpreisschock"],
-                value="Keins",
-                label="Szenario"
-            )
+            with gr.Row():
+                with gr.Column(scale=1):
+                    country_dropdown2 = gr.Dropdown(choices=countries, label="Land")
+                    w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
+                    w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
+                    w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
+                    years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
+                    scenario = gr.Dropdown(
+                        choices=["Keins", "Krise", "Zinsanstieg", "Ölpreisschock"],
+                        value="Keins",
+                        label="Szenario"
+                    )
 
-            sim_out = gr.Markdown()
-            path_plot = gr.Plot()
-            terminal_plot = gr.Plot()
+                    run_button = gr.Button("Simulation starten")
 
-            gr.Button("Mehrperioden-Simulation starten").click(
-                lambda land, we, wb, wg, yrs, scen: run_multi_period_simulation(
-                    land, we, wb, wg, yrs, scen
-                ),
+                with gr.Column(scale=2):
+                    with gr.Tab("KPIs"):
+                        sim_out = gr.Markdown()
+
+                    with gr.Tab("Pfad-Plot"):
+                        path_plot = gr.Plot()
+
+                    with gr.Tab("Terminalverteilung"):
+                        terminal_plot = gr.Plot()
+
+                    with gr.Tab("Fan Chart"):
+                        fan_plot = gr.Plot()
+
+                    with gr.Tab("Drawdown"):
+                        dd_plot = gr.Plot()
+
+                    with gr.Tab("Portfolio Radar"):
+                        radar_plot = gr.Plot()
+
+            run_button.click(
+                run_multi_period_simulation,
                 [country_dropdown2, w_equity, w_bond, w_gold, years, scenario],
-                [sim_out, path_plot, terminal_plot],
+                [sim_out, path_plot, terminal_plot, fan_plot, dd_plot, radar_plot],
             )
 
         with gr.Tab("Heatmap-Radar"):
