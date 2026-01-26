@@ -6,6 +6,7 @@ from core.country_assets import compute_country_asset_expectations
 from core.portfolio_sim.covariance import build_asset_covariance
 from core.scenario_engine import scenario_by_name
 from core.mc_simulator import multi_period_mc, summarize_paths
+from core.portfolio_sim.covariance_dynamic import dynamic_covariance
 
 
 def run_portfolio_mc(land, presets, w_equity, w_bond, w_gold, years, scenario_name):
@@ -18,6 +19,7 @@ def run_portfolio_mc(land, presets, w_equity, w_bond, w_gold, years, scenario_na
     }
 
     cov = build_asset_covariance()
+    cov = dynamic_covariance(cov, scenario_name)
 
     weights = [w_equity, w_bond, w_gold]
     weights = [w / sum(weights) for w in weights]

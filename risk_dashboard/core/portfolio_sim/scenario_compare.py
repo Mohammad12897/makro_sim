@@ -1,4 +1,5 @@
 #core/portfolio_sim/scenario_compare.py
+import pandas as pd
 from core.portfolio_sim.mc_engine import run_portfolio_mc
 from core.portfolio_sim.risk_metrics import mc_risk_metrics
 
@@ -21,29 +22,32 @@ def compare_scenarios(land, presets, weights, years, scenarios):
 
     return results
 
-def run_scenario_comparison(land, w_equity, w_bond, w_gold, years):
-    presets = load_presets()
+
+def run_scenario_comparison(land, presets, weights, years):
     scenarios = ["Keins", "Krise", "Zinsanstieg", "Ölpreisschock"]
-
-    results = compare_scenarios(
-        land=land,
-        presets=presets,
-        weights=[w_equity, w_bond, w_gold],
-        years=years,
-        scenarios=scenarios
-    )
-
-    # Tabelle bauen
     rows = []
-    for scen, m in results.items():
+
+    for scen in scenarios:
+        sim, summary = run_portfolio_mc(
+            land=land,
+            presets=presets,
+            w_equity=weights[0],
+            w_bond=weights[1],
+            w_gold=weights[2],
+            years=years,
+            scenario_name=scen
+        )
+
+        m = mc_risk_metrics(sim)
+
         rows.append([
             scen,
-            f"{m['mean']*100:.2f}%",
-            f"{m['std']*100:.2f}%",
-            f"{m['sharpe']:.2f}",
-            f"{m['var95']*100:.2f}%",
-            f"{m['cvar95']*100:.2f}%",
-            f"{m['max_drawdown']*100:.2f}%"
+            m["mean"],
+            m["std"],
+            m["sharpe"],
+            m["var95"],
+            m["cvar95"],
+            m["max_drawdown"]
         ])
 
     df = pd.DataFrame(rows, columns=[

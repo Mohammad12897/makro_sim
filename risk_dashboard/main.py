@@ -1,10 +1,6 @@
 # main.py
 
-
-#from ui.app import build_app
-from ui.app import create_gradio_app
-from test.example_presets import EXAMPLE_PRESETS
+from ui.app import app, theme
 
 if __name__ == "__main__":
-    app = create_gradio_app(EXAMPLE_PRESETS)
-    app.launch(share=True)
+    app.launch(share=True, theme=theme)

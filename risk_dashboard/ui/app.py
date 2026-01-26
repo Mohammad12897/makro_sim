@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import json
 from pathlib import Path
 
+theme = gr.themes.Soft(primary_hue="blue", secondary_hue="slate")
 
 from core.country_assets import (
     compute_country_asset_expectations,
@@ -380,150 +381,153 @@ def run_multi_period_simulation(land, w_equity, w_bond, w_gold, years, scenario_
 # Gradio App
 # ---------------------------------------------------------
 
-def create_gradio_app(presets):
 
-    with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
+with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
 
-        gr.Markdown("# 🌍 Makro Risk Dashboard – Professional Edition")
+    gr.Markdown("# 🌍 Makro Risk Dashboard – Professional Edition")
 
+    presets = load_presets()
+    countries = list(presets.keys())
+    scenarios = load_scenarios()
+    scenario_names = list(scenarios.keys())
+
+    with gr.Tab("Länderprofil"):
+        country = make_country_dropdown(countries)
+
+        radar_out = gr.Plot()
+        storyline_out = gr.Markdown()
+        ews_out = gr.Markdown()
+
+        btn_radar = gr.Button("Radar anzeigen")
+        btn_story = gr.Button("Storyline erzeugen")
+        btn_ews = gr.Button("Early Warning System")
+
+        btn_radar.click(compute_single_radar, country, radar_out)
+        btn_story.click(compute_storyline, country, storyline_out)
+        btn_ews.click(compute_ews, country, ews_out)
+
+    with gr.Tab("Multi-Radar"):
+        country_multi = gr.CheckboxGroup(
+            choices=countries,
+            label="Länder auswählen",
+            value=countries[:3]
+        )
+        multi_radar_out = gr.Plot()
+        btn_multi = gr.Button("Multi-Radar anzeigen")
+        btn_multi.click(compute_multi_radar, country_multi, multi_radar_out)
+
+    with gr.Tab("Szenarien"):
+        country_s = make_country_dropdown(countries)
+        scenario_s = make_scenario_dropdown(scenario_names)
+
+        scen_radar_out = gr.Plot()
+        scen_decision_out = gr.Markdown()
+
+        btn_scen = gr.Button("Szenario (Delta-Radar) ausführen")
+        btn_decision = gr.Button("Decision Support")
+
+        btn_scen.click(compute_scenario, [country_s, scenario_s], scen_radar_out)
+        btn_decision.click(compute_decision_support, country_s, scen_decision_out)
+
+    with gr.Tab("Szenario-Vergleich"):
+        scen_country = gr.Dropdown(choices=countries, label="Land")
+        scen_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
+        scen_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
+        scen_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
+        scen_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
+
+        scen_button = gr.Button("Szenarien vergleichen")
+        scen_table = gr.Dataframe()
+
+        def _scenario_wrapper(land, we, wb, wg, yrs):
+            return run_scenario_comparison(land, presets, [we, wb, wg], yrs)
+
+        scen_button.click(
+            _scenario_wrapper,
+            [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
+            scen_table
+        )
+
+
+    with gr.Tab("Cluster-Komplettansicht"):
+        with gr.Row():
+            cluster_out = gr.Dataframe(
+                headers=["Land", "Cluster", "Political Security", "Strategische Autonomie", "Total"],
+                label="Cluster-Zuordnungstabelle"
+            )
+        scatter_out = gr.Plot(label="Cluster-Visualisierung")
+
+        cluster_lexikon_out = gr.Markdown(label="Cluster-Lexikon")
+        cluster_invest_out = gr.Markdown(label="Investment-Profile nach Cluster")
+        radar_out = gr.Plot(label="Cluster-Radar-Chart")
+
+        btn_cluster_complete = gr.Button("Cluster-Analyse starten")
+        btn_cluster_complete.click(
+            compute_cluster_complete,
+            None,
+            [cluster_out, scatter_out, cluster_lexikon_out, cluster_invest_out, radar_out]
+        )
+
+
+    with gr.Tab("Rendite-Berechnung"):
+        gr.Markdown("## Rendite-Berechnung für Aktien und Gold")
+        asset_out = gr.Markdown(label="Asset-Klassen Vergleich")
+        btn_asset = gr.Button("Asset-Vergleich anzeigen")
+        btn_asset.click(lambda: asset_klassen_vergleich(), None, asset_out)
+
+        with gr.Row():
+            kurs_alt = gr.Number(label="Aktienkurs (alt)")
+            kurs_neu = gr.Number(label="Aktienkurs (neu)")
+            dividende = gr.Number(label="Dividende pro Aktie", value=0)
+
+        aktien_out = gr.Markdown(label="Aktienrendite")
+
+        btn_aktie = gr.Button("Aktienrendite berechnen")
+        btn_aktie.click(
+            aktienrendite,
+            [kurs_alt, kurs_neu, dividende],
+            aktien_out
+        )
+
+        gr.Markdown("---")
+
+        with gr.Row():
+            gold_alt = gr.Number(label="Goldpreis (alt)")
+            gold_neu = gr.Number(label="Goldpreis (neu)")
+
+        gold_out = gr.Markdown(label="Goldrendite")
+
+        btn_gold = gr.Button("Goldrendite berechnen")
+        btn_gold.click(
+            goldrendite,
+            [gold_alt, gold_neu],
+            gold_out
+        )
+
+    with gr.Tab("Länder-Investment-Profil"):
         presets = load_presets()
-        countries = list(presets.keys())
-        scenarios = load_scenarios()
-        scenario_names = list(scenarios.keys())
+        laender_liste = list(presets.keys())
 
-        with gr.Tab("Länderprofil"):
-            country = make_country_dropdown(countries)
+        land_input = gr.Dropdown(
+            choices=laender_liste,
+            label="Land auswählen"
+        )
 
-            radar_out = gr.Plot()
-            storyline_out = gr.Markdown()
-            ews_out = gr.Markdown()
+        land_dashboard_md = gr.Markdown(label="Länder-Dashboard")
+        land_radar_plot = gr.Plot(label="Länder-Radar")
+        land_invest_md = gr.Markdown(label="Investment-Profil")
 
-            btn_radar = gr.Button("Radar anzeigen")
-            btn_story = gr.Button("Storyline erzeugen")
-            btn_ews = gr.Button("Early Warning System")
+        btn_land = gr.Button("Analyse starten")
 
-            btn_radar.click(compute_single_radar, country, radar_out)
-            btn_story.click(compute_storyline, country, storyline_out)
-            btn_ews.click(compute_ews, country, ews_out)
-
-        with gr.Tab("Multi-Radar"):
-            country_multi = gr.CheckboxGroup(
-                choices=countries,
-                label="Länder auswählen",
-                value=countries[:3]
-            )
-            multi_radar_out = gr.Plot()
-            btn_multi = gr.Button("Multi-Radar anzeigen")
-            btn_multi.click(compute_multi_radar, country_multi, multi_radar_out)
-
-        with gr.Tab("Szenarien"):
-            country_s = make_country_dropdown(countries)
-            scenario_s = make_scenario_dropdown(scenario_names)
-
-            scen_radar_out = gr.Plot()
-            scen_decision_out = gr.Markdown()
-
-            btn_scen = gr.Button("Szenario (Delta-Radar) ausführen")
-            btn_decision = gr.Button("Decision Support")
-
-            btn_scen.click(compute_scenario, [country_s, scenario_s], scen_radar_out)
-            btn_decision.click(compute_decision_support, country_s, scen_decision_out)
-
-        with gr.Tab("Szenario-Vergleich"):
-            scen_country = gr.Dropdown(choices=countries, label="Land")
-            scen_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
-            scen_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
-            scen_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
-            scen_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
-
-            scen_button = gr.Button("Szenarien vergleichen")
-            scen_table = gr.Dataframe()
-
-            scen_button.click(
-                run_scenario_comparison,
-                [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
-                scen_table
-            )
-
-        with gr.Tab("Cluster-Komplettansicht"):
-            with gr.Row():
-                cluster_out = gr.Dataframe(
-                    headers=["Land", "Cluster", "Political Security", "Strategische Autonomie", "Total"],
-                    label="Cluster-Zuordnungstabelle"
-                )
-                scatter_out = gr.Plot(label="Cluster-Visualisierung")
-
-            cluster_lexikon_out = gr.Markdown(label="Cluster-Lexikon")
-            cluster_invest_out = gr.Markdown(label="Investment-Profile nach Cluster")
-            radar_out = gr.Plot(label="Cluster-Radar-Chart")
-
-            btn_cluster_complete = gr.Button("Cluster-Analyse starten")
-            btn_cluster_complete.click(
-                compute_cluster_complete,
-                None,
-                [cluster_out, scatter_out, cluster_lexikon_out, cluster_invest_out, radar_out]
-            )
-
-
-        with gr.Tab("Rendite-Berechnung"):
-            gr.Markdown("## Rendite-Berechnung für Aktien und Gold")
-            asset_out = gr.Markdown(label="Asset-Klassen Vergleich")
-            btn_asset = gr.Button("Asset-Vergleich anzeigen")
-            btn_asset.click(lambda: asset_klassen_vergleich(), None, asset_out)
-
-
-            with gr.Row():
-                kurs_alt = gr.Number(label="Aktienkurs (alt)")
-                kurs_neu = gr.Number(label="Aktienkurs (neu)")
-                dividende = gr.Number(label="Dividende pro Aktie", value=0)
-
-            aktien_out = gr.Markdown(label="Aktienrendite")
-
-            btn_aktie = gr.Button("Aktienrendite berechnen")
-            btn_aktie.click(
-                aktienrendite,
-                [kurs_alt, kurs_neu, dividende],
-                aktien_out
-            )
-
-            gr.Markdown("---")
-
-            with gr.Row():
-                gold_alt = gr.Number(label="Goldpreis (alt)")
-                gold_neu = gr.Number(label="Goldpreis (neu)")
-
-            gold_out = gr.Markdown(label="Goldrendite")
-
-            btn_gold = gr.Button("Goldrendite berechnen")
-            btn_gold.click(
-                goldrendite,
-                [gold_alt, gold_neu],
-                gold_out
-            )
-
-        with gr.Tab("Länder-Investment-Profil"):
+        def laender_analyse(land):
             presets = load_presets()
-            laender_liste = list(presets.keys())
+            clusters, model = cluster_risk_dimensions(presets)
 
-            land_input = gr.Dropdown(
-                choices=laender_liste,
-                label="Land auswählen"
-            )
+            # Dashboard
+            cid = clusters[land]
+            scores = compute_risk_scores(presets[land])
 
-            land_dashboard_md = gr.Markdown(label="Länder-Dashboard")
-            land_radar_plot = gr.Plot(label="Länder-Radar")
-            land_invest_md = gr.Markdown(label="Investment-Profil")
-
-            btn_land = gr.Button("Analyse starten")
-            def laender_analyse(land):
-                presets = load_presets()
-                clusters, model = cluster_risk_dimensions(presets)
-
-                # Dashboard
-                cid = clusters[land]
-                scores = compute_risk_scores(presets[land])
-
-                dashboard = f"""
+            dashboard = f"""
 # Länder-Dashboard: {land}
 
 **Cluster:** {cid}
@@ -534,73 +538,79 @@ def create_gradio_app(presets):
 - Gesamtrisiko: {scores["total"]:.2f}
 """
 
-                # Investment-Profil
-                ps, aut, total = model.cluster_centers_[cid]
-                invest = investment_profile_for_cluster(ps, aut, total)
+            # Investment-Profil
+            ps, aut, total = model.cluster_centers_[cid]
+            invest = investment_profile_for_cluster(ps, aut, total)
 
-                # Radar-Chart
-                radar = laender_radar_plot(land, presets)
-                return dashboard, radar, invest
+            # Radar-Chart
+            radar = laender_radar_plot(land, presets)
+            return dashboard, radar, invest
 
-            btn_land.click(
-                laender_analyse,
-                land_input,
-                [land_dashboard_md, land_radar_plot, land_invest_md]
-            )
+        btn_land.click(
+            laender_analyse,
+            land_input,
+            [land_dashboard_md, land_radar_plot, land_invest_md]
+        )
 
-        # --- Portfolio-Simulator ---
-        with gr.Tab("Portfolio-Simulator"):
+    # --- Portfolio-Simulator ---
+    with gr.Tab("Portfolio-Simulator"):
 
-            with gr.Row():
-                with gr.Column(scale=1):
-                    country_dropdown2 = gr.Dropdown(choices=countries, label="Land")
-                    w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
-                    w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
-                    w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
-                    years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
-                    scenario = gr.Dropdown(
-                        choices=["Keins", "Krise", "Zinsanstieg", "Ölpreisschock"],
-                        value="Keins",
-                        label="Szenario"
-                    )
+        with gr.Row():
+            with gr.Column(scale=1, min_width=300):
+                country_dropdown2 = gr.Dropdown(choices=countries, label="Land")
+                w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
+                w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
+                w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
+                years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
+                scenario = gr.Dropdown(
+                    choices=["Keins", "Krise", "Zinsanstieg", "Ölpreisschock"],
+                    value="Keins",
+                    label="Szenario"
+                )
 
-                    run_button = gr.Button("Simulation starten")
+                run_button = gr.Button("Simulation starten")
 
-                with gr.Column(scale=2):
-                    with gr.Tab("KPIs"):
-                        sim_out = gr.Markdown()
+            with gr.Column(scale=2):
+                with gr.Tab("KPIs"):
+                    gr.Markdown("**Kennzahlen des Portfolios:** Übersicht über Rendite, Risiko und Verlustkennzahlen.")
+                    sim_out = gr.Markdown()
 
-                    with gr.Tab("Pfad-Plot"):
-                        path_plot = gr.Plot()
+                with gr.Tab("Pfad-Plot"):
+                    gr.Markdown("**Zeitliche Entwicklung:** Erwartete Entwicklung des Portfolios über die Jahre.")
+                    path_plot = gr.Plot()
 
-                    with gr.Tab("Terminalverteilung"):
-                        terminal_plot = gr.Plot()
+                with gr.Tab("Terminalverteilung"):
+                    gr.Markdown("**Endwert-Verteilung:** Histogramm der simulierten Endwerte nach X Jahren.")
+                    terminal_plot = gr.Plot()
 
-                    with gr.Tab("Fan Chart"):
-                        fan_plot = gr.Plot()
+                with gr.Tab("Fan Chart"):
+                    gr.Markdown("**Unsicherheitsbandbreiten:** Percentile-Bänder (5–95%, 25–75%, Median).")
+                    fan_plot = gr.Plot()
 
-                    with gr.Tab("Drawdown"):
-                        dd_plot = gr.Plot()
+                with gr.Tab("Drawdown"):
+                    gr.Markdown("**Verlustanalyse:** Durchschnittlicher und schlimmster Drawdown über die Zeit.")
+                    dd_plot = gr.Plot()
 
-                    with gr.Tab("Portfolio Radar"):
-                        radar_plot = gr.Plot()
+                with gr.Tab("Portfolio Radar"):
+                    gr.Markdown("**Risiko-Profil:** Radar-Diagramm der wichtigsten Risiko- und Performance-Kennzahlen.")
+                    radar_plot = gr.Plot()
 
-            run_button.click(
-                run_multi_period_simulation,
-                [country_dropdown2, w_equity, w_bond, w_gold, years, scenario],
-                [sim_out, path_plot, terminal_plot, fan_plot, dd_plot, radar_plot],
-            )
+        run_button.click(
+            run_multi_period_simulation,
+            [country_dropdown2, w_equity, w_bond, w_gold, years, scenario],
+            [sim_out, path_plot, terminal_plot, fan_plot, dd_plot, radar_plot],
+        )
 
-        with gr.Tab("Heatmap-Radar"):
-            country_hm = make_country_dropdown(countries)
-            heatmap_out = gr.Plot()
-            btn_hm = gr.Button("Heatmap-Radar anzeigen")
-            btn_hm.click(compute_heatmap_radar, country_hm, heatmap_out)
+    with gr.Tab("Heatmap-Radar"):
+        country_hm = make_country_dropdown(countries)
+        heatmap_out = gr.Plot()
+        btn_hm = gr.Button("Heatmap-Radar anzeigen")
+        btn_hm.click(compute_heatmap_radar, country_hm, heatmap_out)
 
-        with gr.Tab("Risiko-Cockpit"):
-            country_cockpit = make_country_dropdown(countries)
-            cockpit_out = gr.Markdown()
-            btn_cockpit = gr.Button("Cockpit anzeigen")
-            btn_cockpit.click(compute_risk_cockpit, country_cockpit, cockpit_out)
+    with gr.Tab("Risiko-Cockpit"):
+        country_cockpit = make_country_dropdown(countries)
+        cockpit_out = gr.Markdown()
+        btn_cockpit = gr.Button("Cockpit anzeigen")
+        btn_cockpit.click(compute_risk_cockpit, country_cockpit, cockpit_out)
 
-    return app
+__all__ = ["app", "theme"]
