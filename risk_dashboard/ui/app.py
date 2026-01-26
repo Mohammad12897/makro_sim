@@ -13,7 +13,6 @@ from pathlib import Path
 theme = gr.themes.Soft(primary_hue="blue", secondary_hue="slate")
 
 from core.country_assets import (
-    compute_country_asset_expectations,
     portfolio_metrics,
     monte_carlo_portfolio,
     build_cov_matrix,
@@ -164,43 +163,138 @@ def compute_ews(country):
     return ews_for_country(country, presets[country])
 
 
+def compute_scenario_scores(params, shock_values=None):
+    country = params["land"]
+    presets = params["presets"]
+    weights = params["weights"]
+    years = params["years"]
+    scenario_name = params["scenario"]
+
+    sim, summary = run_portfolio_mc(
+        land=country,
+        presets=presets,
+        w_equity=weights[0],
+        w_bond=weights[1],
+        w_gold=weights[2],
+        years=years,
+        scenario_name=scenario_name,
+    )
+
+    return mc_risk_metrics(sim)
+
 def compute_scenario(country, scenario_name):
+
     presets = load_presets()
     scenarios = load_scenarios()
 
-    params = presets[country]
-    events = scenarios[scenario_name]
+    # Preset-Daten für das Land
+    preset_params = presets[country]
 
-    # Events → Risiko-Shocks
+    # Events → Shocks
+    events = scenarios[scenario_name]
     shock_values = convert_events_to_shocks(events)
 
+    # Szenario-Parameter für compute_scenario_scores()
+    params = {
+        "land": country,
+        "presets": preset_params,
+        "weights": [50, 30, 20],   # oder aus UI
+        "years": 10,               # oder aus UI
+        "scenario": scenario_name,
+    }
+
     # Baseline
-    base_scores = compute_risk_scores(params)
+    base_scores = compute_risk_scores(preset_params)
 
     # Szenario
-    scenario_scores = run_scenario(params, shock_values)
+    scenario_scores = compute_scenario_scores(params, shock_values)
 
-    # Plot erzeugen
+    # Plot
     fig = make_delta_radar_plot(
         base_scores,
         scenario_scores,
         title=f"Szenario: {scenario_name}"
     )
 
-    # Falls make_delta_radar_plot eine Liste zurückgibt → erste Figur nehmen
-    if isinstance(fig, list):
-        fig = fig[0]
-    if isinstance(fig, tuple):
+    if isinstance(fig, (list, tuple)):
         fig = fig[0]
 
     return fig
 
 
-def compute_decision_support(country):
+def compute_scenario_plot(country, scenario_name):
+
     presets = load_presets()
     scenarios = load_scenarios()
-    return decision_support_view(presets[country], scenarios)
 
+    # 1. Preset-Daten für das Land
+    preset_params = presets[country]
+
+    # 2. Szenario-Events laden
+    events = scenarios[scenario_name]
+
+    # 3. Events → Risiko-Shocks
+    shock_values = convert_events_to_shocks(events)
+
+    # 4. Baseline-Risiko
+    base_scores = compute_risk_scores(preset_params)
+
+    # 5. Szenario-Parameter für compute_scenario_scores()
+    params = {
+        "land": country,
+        "presets": preset_params,
+        "weights": [50, 30, 20],   # später aus UI
+        "years": 10,               # später aus UI
+        "scenario": scenario_name,
+    }
+
+    # 6. Szenario-Risiko
+    scenario_scores = compute_scenario_scores(params, shock_values)
+
+    # 7. Radar-Plot erzeugen
+    fig = make_delta_radar_plot(
+        base_scores,
+        scenario_scores,
+        title=f"Szenario: {scenario_name}"
+    )
+
+    # Falls Plot eine Liste oder Tuple ist
+    if isinstance(fig, (list, tuple)):
+        fig = fig[0]
+
+    return fig
+
+def make_decision_support_text(risk_scores):
+    lex = load_lexicon()
+
+    lines = []
+    lines.append("## 🧭 Decision Support Analyse\n")
+
+    # Beispiel: Risiko-Dimensionen interpretieren
+    for dim, value in risk_scores.items():
+        if dim in lex:
+            explanation = lex[dim]
+        else:
+            explanation = "Keine Beschreibung verfügbar."
+
+        if value > 0.7:
+            level = "🔴 Hoch"
+        elif value > 0.4:
+            level = "🟠 Mittel"
+        else:
+            level = "🟢 Niedrig"
+
+        lines.append(f"### {dim} — {level}")
+        lines.append(f"{explanation}")
+        lines.append(f"**Score:** {value:.2f}\n")
+
+    return "\n".join(lines)
+
+def compute_decision_support(country):
+    presets = load_presets()
+    params = presets[country]
+    text = make_decision_support_text(params)
+    return text
 
 def compute_cluster():
     presets = load_presets()
@@ -285,7 +379,8 @@ def compute_scenario_comparison(country, scenario_names):
     for name in scenario_names:
         events = scenarios[name]
         shock_values = convert_events_to_shocks(events)
-        scen_scores = run_scenario(params, shock_values)
+        #scen_scores = run_scenario(params, shock_values)
+        scen_scores = compute_scenario_scores(params, shock_values)
 
         scen_avg = sum(scen_scores.values()) / len(scen_scores)
         delta = scen_avg - base_avg
@@ -458,6 +553,8 @@ with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
         btn_multi.click(compute_multi_radar, country_multi, multi_radar_out)
 
     with gr.Tab("Szenarien"):
+        gr.Markdown("## 📊 Szenario-Analyse")
+
         country_s = make_country_dropdown(countries)
         scenario_s = make_scenario_dropdown(scenario_names)
 
@@ -467,8 +564,17 @@ with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
         btn_scen = gr.Button("Szenario (Delta-Radar) ausführen")
         btn_decision = gr.Button("Decision Support")
 
-        btn_scen.click(compute_scenario, [country_s, scenario_s], scen_radar_out)
-        btn_decision.click(compute_decision_support, country_s, scen_decision_out)
+        btn_scen.click(
+            compute_scenario_plot, 
+            [country_s, scenario_s], 
+            scen_radar_out
+        )
+
+        btn_decision.click(
+            compute_decision_support, 
+            [country_s], 
+            scen_decision_out
+        )
 
     with gr.Tab("Szenario-Vergleich"):
         scen_country = gr.Dropdown(choices=countries, label="Land")

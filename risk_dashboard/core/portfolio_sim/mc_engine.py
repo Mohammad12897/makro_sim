@@ -1,16 +1,17 @@
-#core/portfolio_sim/mc_engine.py
 import numpy as np
 import matplotlib.pyplot as plt
 
 from core.scenario_engine import scenario_by_name, dynamic_covariance
 
 def run_portfolio_mc(land, presets, w_equity, w_bond, w_gold, years, scenario_name):
-    expectations = compute_country_asset_expectations(land, presets)
+
+    # PRESETS ENTHALTEN BEREITS ALLE ERWARTUNGEN
+    expectations = presets
 
     mu = {
-        "equity": expectations["equity_mu"],
-        "bonds": expectations["bond_yield"],
-        "gold": expectations["gold_mu"],
+        "equity": expectations["equity"]["mu"][0],
+        "bonds": expectations["bonds"]["mu"][1],
+        "gold": expectations["gold"]["mu"][2],
     }
 
     cov = build_asset_covariance()
