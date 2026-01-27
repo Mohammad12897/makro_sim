@@ -79,12 +79,16 @@ def app():
             r_button = gr.Button("Radar aktualisieren")
             r_ampel = gr.Markdown()
             r_plot = gr.Plot()
+            r_story = gr.Markdown()
+
 
             r_button.click(
                 compute_radar_overlay,
                 [r_country, r_w_equity, r_w_bond, r_w_gold, r_years],
-                [r_ampel, r_plot],
+                [r_ampel, r_plot, r_story],
             )
+            pdf_button = gr.Button("PDF exportieren")
+            pdf_file = gr.File()
 
         # ---------------- Szenario-Vergleich ----------------
         with gr.Tab("Szenario-Vergleich"):
@@ -131,7 +135,7 @@ def app():
                  story = generate_storyline(base_scores)
 
                  # Tabelle generieren
-                 results = run_scenario_comparison(land, base_scores, [we, wb, wg], yrs)
+                 results = scenario_radar_overlay(base_scores)
                  rows = []
                  for scen_name, scores in results.items():
                      for key, val in scores.items():
@@ -139,7 +143,8 @@ def app():
                              rows.append([scen_name, key, val])
                  df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
 
-                 filename = "/content/risk_report.pdf"
+                 #filename = "/content/risk_report.pdf"
+                 filename = "/tmp/risk_report.pdf"
                  create_pdf_report(filename, radar_fig, df, story, ampel)
 
                  return filename
