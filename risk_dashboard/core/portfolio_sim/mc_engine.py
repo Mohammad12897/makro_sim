@@ -1,37 +1,15 @@
-import numpy as np
-import matplotlib.pyplot as plt
+#core/portfolio_sim/mc_engine.py
+# Portfolio-Simulator deaktiviert (Option A)
 
-from core.scenario_engine import scenario_by_name, dynamic_covariance
+import pandas as pd
 
-def run_portfolio_mc(land, presets, w_equity, w_bond, w_gold, years, scenario_name):
+def run_portfolio_mc(*args, **kwargs):
+    # Gibt Dummy-Werte zurück, damit kein Unpacking-Fehler entsteht
+    return None, None
 
-    # PRESETS ENTHALTEN BEREITS ALLE ERWARTUNGEN
-    expectations = presets
-
-    mu = {
-        "equity": expectations["equity"]["mu"][0],
-        "bonds": expectations["bonds"]["mu"][1],
-        "gold": expectations["gold"]["mu"][2],
-    }
-
-    cov = build_asset_covariance()
-    cov = dynamic_covariance(cov, scenario_name)
-
-    weights = [w_equity, w_bond, w_gold]
-    weights = [w / sum(weights) for w in weights]
-
-    shock_fn = scenario_by_name(scenario_name)
-
-    sim = multi_period_mc(
-        weights=weights,
-        mu=mu,
-        cov=cov,
-        years=years,
-        n_paths=3000,
-        rebalancing=True,
-        shock_fn=shock_fn,
-        seed=42,
-    )
-
-    summary = summarize_paths(sim)
-    return sim, summary
+def compare_portfolios(land, presets, portfolios, years, scenario):
+    # Gibt eine leere Tabelle zurück, damit die UI nicht abstürzt
+    df = pd.DataFrame(columns=[
+        "Portfolio", "Mean", "Volatilität", "Sharpe", "VaR95", "CVaR95", "Max Drawdown"
+    ])
+    return df

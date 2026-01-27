@@ -5,128 +5,71 @@ import pandas as pd
 
 
 # ---------------------------------------------------------
-# Szenario-Konfiguration (leicht anpassbar)
+# Risiko-Szenarien (für Radar, Storyline, Ampel)
 # ---------------------------------------------------------
 
-SCENARIO_CONFIG = {
+RISK_SCENARIOS = {
     "Krise": {
-        "mu_shift": np.array([-0.08, -0.02, 0.03]),   # equity, bonds, gold
-        "cov_scale": 1.5,
-        "corr_overwrite": None,
+        "macro": 0.4,
+        "geo": 0.3,
+        "financial": 0.5,
+        "energie": 0.6,
+        "supply_chain": 0.4,
     },
     "Zinsanstieg": {
-        "mu_shift": np.array([-0.02, 0.03, 0.00]),
-        "cov_scale": 1.0,
-        "corr_overwrite": {
-            ("equity", "bonds"): -0.5,
-        },
+        "macro": 0.3,
+        "financial": 0.6,
+        "currency": 0.5,
     },
     "Ölpreisschock": {
-        "mu_shift": np.array([-0.03, 0.00, 0.05]),
-        "cov_scale": 1.0,
-        "corr_overwrite": {
-            ("equity", "gold"): -0.5,
-            ("bonds", "gold"): 1.2,
-        },
+        "energie": 0.9,
+        "macro": 0.2,
+        "supply_chain": 0.3,
     },
-    "Keins": {
-        "mu_shift": np.array([0.0, 0.0, 0.0]),
-        "cov_scale": 1.0,
-        "corr_overwrite": None,
-    },
+    "Keins": {}
 }
 
-ASSETS = ["equity", "bonds", "gold"]
 
-
-# ---------------------------------------------------------
-# Dynamische Kovarianz pro Szenario
-# ---------------------------------------------------------
-
-def dynamic_covariance(base_cov: pd.DataFrame, scenario_name: str) -> pd.DataFrame:
-    cov = base_cov.copy()
-    cfg = SCENARIO_CONFIG.get(scenario_name, SCENARIO_CONFIG["Keins"])
-
-    # globale Skalierung
-    cov *= cfg["cov_scale"]
-
-    # optionale Korrelation-Overrides
-    corr_overwrite = cfg.get("corr_overwrite")
-    if corr_overwrite:
-        for (a1, a2), factor in corr_overwrite.items():
-            if a1 in cov.index and a2 in cov.columns:
-                cov.loc[a1, a2] *= factor
-                cov.loc[a2, a1] *= factor
-
-    return cov
-
-
-# ---------------------------------------------------------
-# Shock-Funktionen (array-basiert)
-# mu: np.array([equity, bonds, gold])
-# cov: np.ndarray oder DataFrame
-# ---------------------------------------------------------
-
-def crisis(mu, cov, t):
-    cfg = SCENARIO_CONFIG["Krise"]
-    mu = mu.copy() + cfg["mu_shift"]
-    return mu, cov
-
-
-def zinsanstieg(mu, cov, t):
-    cfg = SCENARIO_CONFIG["Zinsanstieg"]
-    mu = mu.copy() + cfg["mu_shift"]
-    return mu, cov
-
-
-def oil_shock(mu, cov, t):
-    cfg = SCENARIO_CONFIG["Ölpreisschock"]
-    mu = mu.copy() + cfg["mu_shift"]
-    return mu, cov
-
-
-def no_scenario(mu, cov, t):
-    return mu, cov
 
 
 # ---------------------------------------------------------
 # Szenario-Dispatcher
 # ---------------------------------------------------------
 
+
+def apply_risk_scenario(base_scores, scenario_name):
+    """
+    Wendet ein Risiko-Szenario direkt auf die Risiko-Scores an.
+    """
+    scenario = RISK_SCENARIOS.get(scenario_name, {})
+    new_scores = {}
+
+    for key, value in base_scores.items():
+        if isinstance(value, (int, float)):
+            shock = scenario.get(key, 0.0)
+            new_scores[key] = max(0.0, min(1.0, value + shock))
+        else:
+            new_scores[key] = value
+
+    return new_scores
+
 def scenario_by_name(name: str):
-    if name == "Krise":
-        return crisis
-    if name == "Zinsanstieg":
-        return zinsanstieg
-    if name == "Ölpreisschock":
-        return oil_shock
-    return no_scenario
-
-
-# ---------------------------------------------------------
-# Radar-Overlay: Kennzahlen pro Szenario
-# (Backend – Plot machst du in plots.py)
-# ---------------------------------------------------------
-
-def scenario_radar_metrics(land, presets, weights, years, run_portfolio_mc, mc_risk_metrics):
     """
-    Liefert ein Dict: {szenario_name: metrics_dict}
-    für Radar-Overlay (z.B. mean, std, sharpe, var95, max_drawdown).
+    Gibt eine Funktion zurück, die Risiko-Scores transformiert.
     """
-    scenarios = list(SCENARIO_CONFIG.keys())
+    def scenario_fn(base_scores):
+        return apply_risk_scenario(base_scores, name)
+    return scenario_fn
+
+
+def scenario_radar_overlay(base_scores):
+    """
+    Liefert ein Dict: {szenario_name: risk_scores_dict}
+    für Radar-Overlay.
+    """
     out = {}
-
-    for scen in scenarios:
-        sim, summary = run_portfolio_mc(
-            land=land,
-            presets=presets,
-            w_equity=weights[0],
-            w_bond=weights[1],
-            w_gold=weights[2],
-            years=years,
-            scenario_name=scen,
-        )
-        m = mc_risk_metrics(sim)
-        out[scen] = m
-
+    for scen in RISK_SCENARIOS.keys():
+        scen_fn = scenario_by_name(scen)
+        out[scen] = scen_fn(base_scores)
     return out
+    

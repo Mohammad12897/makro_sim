@@ -29,15 +29,16 @@ from core.portfolio_sim.plots import (
     plot_scenario_radar_overlay,
 )
 
-from core.scenario_engine import ( 
-    scenario_radar_metrics, 
-    scenario_by_name, 
-    SCENARIO_CONFIG,
+from core.scenario_engine import (
+    scenario_by_name,
+    RISK_SCENARIOS,
+    apply_risk_scenario, 
+    scenario_radar_overlay,
 )
-from core.portfolio_sim.risk_metrics import mc_risk_metrics
-from core.portfolio_sim.mc_engine import run_portfolio_mc
 
-from core.portfolio_sim.scenario_compare import compare_scenarios, run_scenario_comparison
+from core.portfolio_sim.risk_metrics import mc_risk_metrics
+
+from core.portfolio_sim.scenario_compare import run_scenario_comparison
 from core.data_import import load_returns_csv
 from core.portfolio_sim.covariance import compute_covariance, build_asset_covariance
 from core.mc_simulator import multi_period_mc, summarize_paths
@@ -69,6 +70,7 @@ from core.cluster import (
     portfolio_simulator,
     asset_klassen_vergleich
 )
+
 
 from core.utils import load_presets, load_scenarios
 
@@ -163,24 +165,37 @@ def compute_ews(country):
     return ews_for_country(country, presets[country])
 
 
+def apply_shocks_to_scores(base_scores, shock_values):
+    """
+    Wendet Szenario-Shocks auf die Risiko-Scores an.
+    Alle Werte werden auf [0, 1] begrenzt.
+    """
+
+    new_scores = {}
+
+    for key, value in base_scores.items():
+        shock = shock_values.get(key, 0.0)
+        new_scores[key] = max(0.0, min(1.0, value + shock))
+
+    return new_scores
+
 def compute_scenario_scores(params, shock_values=None):
-    country = params["land"]
-    presets = params["presets"]
-    weights = params["weights"]
-    years = params["years"]
-    scenario_name = params["scenario"]
+    """
+    Berechnet Szenario-Risiko-Scores direkt aus den Slider-Presets,
+    ohne Monte-Carlo-Portfolio-Simulation.
+    """
 
-    sim, summary = run_portfolio_mc(
-        land=country,
-        presets=presets,
-        w_equity=weights[0],
-        w_bond=weights[1],
-        w_gold=weights[2],
-        years=years,
-        scenario_name=scenario_name,
-    )
+    presets = params["presets"]  # das ist der Eintrag aus slider_presets.json
 
-    return mc_risk_metrics(sim)
+    # Baseline-Risiko aus den Slidern
+    base_scores = compute_risk_scores(presets)
+
+    # Falls du shock_values schon hast und anwenden willst:
+    if shock_values is None:
+        return base_scores
+
+    scenario_scores = apply_shocks_to_scores(base_scores, shock_values)
+    return scenario_scores
 
 def compute_scenario(country, scenario_name):
 
@@ -224,43 +239,30 @@ def compute_scenario(country, scenario_name):
 
 def compute_scenario_plot(country, scenario_name):
 
-    presets = load_presets()
-    scenarios = load_scenarios()
+    presets_all = load_presets()          # lädt slider_presets.json
+    scenarios = load_scenarios()          # deine Szenario-Definitionen
 
-    # 1. Preset-Daten für das Land
-    preset_params = presets[country]
+    preset_params = presets_all[country]  # das Dict mit verschuldung, energie, ...
 
-    # 2. Szenario-Events laden
     events = scenarios[scenario_name]
-
-    # 3. Events → Risiko-Shocks
     shock_values = convert_events_to_shocks(events)
 
-    # 4. Baseline-Risiko
+    # Baseline
     base_scores = compute_risk_scores(preset_params)
 
-    # 5. Szenario-Parameter für compute_scenario_scores()
+    # Szenario
     params = {
         "land": country,
         "presets": preset_params,
-        "weights": [50, 30, 20],   # später aus UI
-        "years": 10,               # später aus UI
         "scenario": scenario_name,
     }
-
-    # 6. Szenario-Risiko
     scenario_scores = compute_scenario_scores(params, shock_values)
 
-    # 7. Radar-Plot erzeugen
     fig = make_delta_radar_plot(
         base_scores,
         scenario_scores,
         title=f"Szenario: {scenario_name}"
     )
-
-    # Falls Plot eine Liste oder Tuple ist
-    if isinstance(fig, (list, tuple)):
-        fig = fig[0]
 
     return fig
 
@@ -338,17 +340,11 @@ def compute_cluster_complete():
     return rows, fig, lexikon, inv_markdown, radar_fig
 
 def compute_radar_overlay(land, we, wb, wg, yrs):
-    presets = load_presets()
-    weights = [we, wb, wg]
+    presets_all = load_presets()
+    base_scores = presets_all[land]
 
-    metrics = scenario_radar_metrics(
-        land,
-        presets,
-        weights,
-        yrs,
-        run_portfolio_mc,
-        mc_risk_metrics
-    )
+    # Risiko-Szenarien anwenden (MC-frei)
+    metrics = scenario_radar_overlay(base_scores)
 
     fig = plot_scenario_radar_overlay(metrics)
     return fig
@@ -475,43 +471,11 @@ def compute_risk_cockpit(country):
 
     return "\n".join(lines)
 
-def run_multi_period_simulation(land, w_equity, w_bond, w_gold, years, scenario_name):
-    presets = load_presets()
-
-    # 1. Simulation ausführen
-    sim, summary = run_portfolio_mc(
-        land=land,
-        presets=presets,
-        w_equity=w_equity,
-        w_bond=w_bond,
-        w_gold=w_gold,
-        years=years,
-        scenario_name=scenario_name
+def run_multi_period_simulation(*args, **kwargs):
+    return (
+        "Portfolio-Simulator ist deaktiviert (Option A).",
+        None, None, None, None, None
     )
-
-    # 2. Risiko-Metriken berechnen
-    metrics = mc_risk_metrics(sim)
-
-    # 3. Markdown-KPIs erzeugen
-    md = (
-        f"### Portfolio-Kennzahlen\n\n"
-        f"- **Erwartete Gesamtrendite:** {metrics['mean']*100:.2f}%\n"
-        f"- **Volatilität:** {metrics['std']*100:.2f}%\n"
-        f"- **Sharpe Ratio:** {metrics['sharpe']:.2f}\n"
-        f"- **VaR 95%:** {metrics['var95']*100:.2f}%\n"
-        f"- **CVaR 95%:** {metrics['cvar95']*100:.2f}%\n"
-        f"- **Max Drawdown:** {metrics['max_drawdown']*100:.2f}%\n"
-    )
-
-    # 4. Plots erzeugen
-    fig_path = plot_path_plot(summary)
-    fig_terminal = plot_terminal_distribution(sim)
-    fig_fan = plot_fan_chart(sim)
-    fig_dd = plot_drawdown(sim)
-    fig_radar = plot_portfolio_radar(metrics)
-
-    return md, fig_path, fig_terminal, fig_fan, fig_dd, fig_radar
-
 
 # ---------------------------------------------------------
 # Gradio App
@@ -565,14 +529,14 @@ with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
         btn_decision = gr.Button("Decision Support")
 
         btn_scen.click(
-            compute_scenario_plot, 
-            [country_s, scenario_s], 
+            compute_scenario_plot,
+            [country_s, scenario_s],
             scen_radar_out
         )
 
         btn_decision.click(
-            compute_decision_support, 
-            [country_s], 
+            compute_decision_support,
+            [country_s],
             scen_decision_out
         )
 
@@ -587,6 +551,10 @@ with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
         scen_table = gr.Dataframe()
 
         def _scenario_wrapper(land, we, wb, wg, yrs):
+            presets_all = load_presets()
+            presets = presets_all[land]
+
+            # weights werden aktuell nicht genutzt, können aber später in shocks einfließen
             return run_scenario_comparison(land, presets, [we, wb, wg], yrs)
 
         scen_button.click(
@@ -828,7 +796,7 @@ with gr.Blocks(title="Makro Risk Dashboard – Professional Edition") as app:
 
         btn_show_lexikon = gr.Button("Lexikon anzeigen")
         btn_show_lexikon.click(show_lexikon, None, lexikon_md)
-    
+
     with gr.Tab("Heatmap-Radar"):
         country_hm = make_country_dropdown(countries)
         heatmap_out = gr.Plot()
