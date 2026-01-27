@@ -7,13 +7,17 @@ from core.presets import load_presets
 from core.scenario_engine import scenario_radar_overlay
 from core.portfolio_sim.scenario_compare import run_scenario_comparison
 from core.plots.risk_plots import plot_scenario_radar_overlay
+from core.risk_ampel import compute_risk_score, risk_color
+from core.storyline_engine import generate_storyline
+from core.plots.heatmap_plots import plot_risk_heatmap
+from core.cluster_engine import compute_clusters
+from core.reporting.pdf_report import create_pdf_report
 
 # ---------------------------------------------------------
 # Theme
 # ---------------------------------------------------------
 
 theme = gr.themes.Soft()
-
 
 # ---------------------------------------------------------
 # Radar Overlay
@@ -23,10 +27,14 @@ def compute_radar_overlay(land, we, wb, wg, yrs):
     presets_all = load_presets()
     base_scores = presets_all[land]
 
-    metrics = scenario_radar_overlay(base_scores)
+    score = compute_risk_score(base_scores)
+    ampel = risk_color(score)
 
+    metrics = scenario_radar_overlay(base_scores)
     fig = plot_scenario_radar_overlay(metrics)
-    return fig
+
+    story = generate_storyline(base_scores)
+    return ampel, fig, story
 
 
 # ---------------------------------------------------------
@@ -69,12 +77,13 @@ def app():
             r_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
 
             r_button = gr.Button("Radar aktualisieren")
+            r_ampel = gr.Markdown()
             r_plot = gr.Plot()
 
             r_button.click(
                 compute_radar_overlay,
                 [r_country, r_w_equity, r_w_bond, r_w_gold, r_years],
-                r_plot,
+                [r_ampel, r_plot],
             )
 
         # ---------------- Szenario-Vergleich ----------------
@@ -92,6 +101,53 @@ def app():
                 scenario_table_wrapper,
                 [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
                 scen_table,
+            )
+
+        with gr.Tab("Heatmap & Cluster"):
+            h_button = gr.Button("Analyse starten")
+            h_plot = gr.Plot()
+            h_table = gr.Dataframe()
+
+            def run_heatmap_cluster():
+                presets_all = load_presets()
+                heatmap = plot_risk_heatmap(presets_all)
+                clusters = compute_clusters(presets_all)
+                return heatmap, clusters
+
+            h_button.click(run_heatmap_cluster, None, [h_plot, h_table])
+
+
+            pdf_button = gr.Button("PDF exportieren")
+            pdf_file = gr.File()
+
+            def export_pdf(land, we, wb, wg, yrs):
+                 presets_all = load_presets()
+                 base_scores = presets_all[land]
+
+                 score = compute_risk_score(base_scores)
+                 ampel = risk_color(score)
+                 metrics = scenario_radar_overlay(base_scores)
+                 radar_fig = plot_scenario_radar_overlay(metrics)
+                 story = generate_storyline(base_scores)
+
+                 # Tabelle generieren
+                 results = run_scenario_comparison(land, base_scores, [we, wb, wg], yrs)
+                 rows = []
+                 for scen_name, scores in results.items():
+                     for key, val in scores.items():
+                         if isinstance(val, (int, float)):
+                             rows.append([scen_name, key, val])
+                 df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
+
+                 filename = "/content/risk_report.pdf"
+                 create_pdf_report(filename, radar_fig, df, story, ampel)
+
+                 return filename
+
+            pdf_button.click(
+                export_pdf,
+                [r_country, r_w_equity, r_w_bond, r_w_gold, r_years],
+                pdf_file
             )
 
     return demo

@@ -1,24 +1,29 @@
 #core/reporting/pdf_report.py
-from fpdf import FPDF
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
 
-def generate_portfolio_report(metrics, figs, scenario_df, filename="portfolio_report.pdf"):
-    pdf = FPDF()
-    pdf.add_page()
+def create_pdf_report(filename, radar_fig, table_df, storyline_text, ampel_text):
+    with PdfPages(filename) as pdf:
 
-    pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, txt="Portfolio Analyse Report", ln=True)
+        # Radar
+        pdf.savefig(radar_fig)
 
-    pdf.set_font("Arial", size=12)
-    pdf.ln(5)
-    pdf.cell(200, 10, txt="Kennzahlen:", ln=True)
+        # Tabelle
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.axis("off")
+        ax.table(cellText=table_df.values,
+                 colLabels=table_df.columns,
+                 loc="center")
+        pdf.savefig(fig)
 
-    for k, v in metrics.items():
-        pdf.cell(200, 8, txt=f"{k}: {v}", ln=True)
+        # Storyline
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.axis("off")
+        ax.text(0, 1, storyline_text, va="top", wrap=True)
+        pdf.savefig(fig)
 
-    pdf.ln(10)
-    pdf.cell(200, 10, txt="Szenario-Vergleich:", ln=True)
-
-    for idx, row in scenario_df.iterrows():
-        pdf.cell(200, 8, txt=str(row.values), ln=True)
-
-    pdf.output(filename)
+        # Ampel
+        fig, ax = plt.subplots(figsize=(4, 2))
+        ax.axis("off")
+        ax.text(0.1, 0.5, f"Risiko‑Ampel: {ampel_text}", fontsize=14)
+        pdf.savefig(fig)
