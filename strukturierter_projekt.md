@@ -150,7 +150,7 @@ makro_sim/
 │   ├── slider_presets.json
 │   ├── scenario_presets.json
 │   └── lexicon.json
-│       
+│
 │
 ├── assets/
 │   └── icons/
@@ -158,7 +158,7 @@ makro_sim/
 │
 ├── test/
 │   ├── app.py
-│   └── example_presets.py   
+│   └── example_presets.py
 ├── tests/
 │   ├── test_mc_engine.py
 │   ├── test_risk_metrics.py
@@ -169,3 +169,28 @@ makro_sim/
 ├── pytest.ini
 ├── requirements.txt
 └── main.py
+
+risk_dashboard/
+│
+├── main.py
+│
+├── ui/
+│   ├── __init__.py
+│   └── app.py
+│
+├── core/
+│   ├── __init__.py
+│   ├── presets.py
+│   ├── scenario_engine.py
+│   ├── risk_engine.py
+│   ├── shock_mapping.py
+│   ├── utils.py
+│   └── ...
+│
+├── portfolio_sim/
+│   ├── __init__.py
+│   ├── mc_engine.py          ← deaktiviert
+│   └── scenario_compare.py   ← MC-frei
+│
+└── data/
+    └── slider_presets.json
