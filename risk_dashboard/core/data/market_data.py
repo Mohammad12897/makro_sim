@@ -1,3 +1,4 @@
+
 # core/data/market_data.py
 
 import yfinance as yf
@@ -11,16 +12,20 @@ def load_asset_series(ticker, start="2010-01-01", end=None):
     if data.empty:
         raise ValueError(f"Keine Daten für {ticker}")
 
+    # sichere Preisquelle
     prices = data["Close"].dropna()
 
-    # returns haben automatisch einen eigenen Index → perfekt
+    # returns haben automatisch einen eigenen Index
     returns = prices.pct_change().dropna()
+
+    # WICHTIG: returns und dates exakt gleich lang
+    dates = returns.index
 
     return {
         "ticker": ticker,
-        "dates": returns.index,                # <--- WICHTIG
-        "prices": prices.loc[returns.index],   # <--- exakt gleiche Länge
-        "returns": returns.values,             # <--- 1D
+        "dates": dates,
+        "prices": prices.loc[dates].values.reshape(-1),
+        "returns": returns.values.reshape(-1),   # <--- 100% 1D
     }
 
 
@@ -32,4 +37,3 @@ def get_gold():
 
 def get_bond():
     return load_asset_series("IEF")  # US 7-10y Treasury ETF
-
