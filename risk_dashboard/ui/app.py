@@ -38,6 +38,9 @@ from core.plots.portfolio_plots import plot_portfolio
 from core.portfolio.portfolio_storyline import generate_portfolio_storyline
 from core.country.country_compare import compare_countries, compute_country_metrics
 from core.country.country_storyline import generate_country_storyline
+from core.reporting.pdf_report import create_pdf_report, draw_portfolio_page
+from core.data.etf_db import list_etf_tickers
+from core.data.asset_map import resolve_asset
 
 
 # ---------------------------------------------------------
@@ -83,18 +86,28 @@ def scenario_table_wrapper(land, we, wb, wg, yrs):
     df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
     return df
 
-def run_portfolio_simulation(tickers, weights):
+def run_portfolio_simulation(tickers, weight):
+    if not tickers:
+        return None, None
+
+    # Gewichte erzeugen und normalisieren
+    w = {t: weight for t in tickers}
+    s = sum(w.values())
+    w = {k: v/s for k, v in w.items()}
+
+    # Marktdaten laden
     data = {t: load_asset_series(t) for t in tickers}
-    w = {t: weights[i] for i, t in enumerate(tickers)}
 
+    # Simulationen
     result = simulate_portfolio(data, w)
-    stats = portfolio_stats(result["portfolio"])
+    result_rb = simulate_portfolio_with_rebalancing(data, w, freq="M")
 
+    # Plots
     fig = plot_portfolio(result["portfolio"])
+    fig_rb = plot_portfolio(result_rb["portfolio_rebal"])
 
-    return fig, pd.DataFrame([stats])
-
-
+    return fig, fig_rb
+    
 # ---------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
@@ -125,7 +138,7 @@ def app():
                 [r_country, r_w_equity, r_w_bond, r_w_gold, r_years],
                 [r_ampel, r_plot, r_story],
             )
-            pdf_button = gr.Button("PDF exportieren")
+            pdf_button = gr.Button("Portfolio als PDF exportieren")
             pdf_file = gr.File()
 
         # ---------------- Szenario-Vergleich ----------------
@@ -170,7 +183,7 @@ def app():
             )
 
         with gr.Tab("Portfolio-Simulator"):
-            asset_list = ["AAPL", "MSFT", "SPY", "GLD", "IEF"]
+            asset_list = ["AAPL", "MSFT", "SPY", "GLD", "IEF"] + list_etf_tickers()
             assets = gr.CheckboxGroup(asset_list, label="Assets auswählen")
             weights = gr.Slider(0, 1, step=0.05, label="Gewicht (für jedes Asset)", value=0.2)
             run_button = gr.Button("Portfolio simulieren")
@@ -183,13 +196,14 @@ def app():
                 if not assets_selected:
                     return None, None, "Bitte mindestens ein Asset auswählen."
 
-                w = {a: weight for a in assets_selected}
+                tickers = [resolve_asset(a) for a in assets_selected]
+                w = {t: weight for t in tickers}
                 s = sum(w.values())
                 w = {k: v/s for k, v in w.items()}  # Normalisieren
 
-                data = {a: load_asset_series(a) for a in assets_selected}
-
+                data = {t: load_asset_series(t) for t in tickers}
                 result = simulate_portfolio(data, w)
+
                 stats = portfolio_stats(result["portfolio"])
                 fig = plot_portfolio(result["portfolio"])
                 story = generate_portfolio_storyline(w, stats)
@@ -216,48 +230,34 @@ def app():
             h_button.click(run_heatmap_cluster, None, [h_plot, h_table])
 
 
-            pdf_button = gr.Button("PDF exportieren")
+            pdf_button = gr.Button("Portfolio als PDF exportieren")
             pdf_file = gr.File()
 
-            def export_pdf(land, we, wb, wg, yrs):
-                 presets_all = load_presets()
-                 base_scores = presets_all[land]
+            def export_portfolio_pdf(assets_selected, weight):
+                if not assets_selected:
+                    return None
 
-                 score = compute_risk_score(base_scores)
-                 ampel = risk_color(score)
-                 metrics = scenario_radar_overlay(base_scores)
-                 radar_fig = plot_scenario_radar_overlay(metrics)
-                 story = generate_storyline(base_scores)
-                 summary = generate_executive_summary(base_scores, ampel)
+                # gleiche Logik wie run_portfolio_sim
+                w = {a: weight for a in assets_selected}
+                s = sum(w.values())
+                w = {k: v/s for k, v in w.items()}
 
-                 # einfache Tabelle aus metrics
+                data = {a: load_asset_series(a) for a in assets_selected}
+                result = simulate_portfolio(data, w)
+                stats = portfolio_stats(result["portfolio"])
+                fig = plot_portfolio(result["portfolio"])
 
-                 rows = []
-                 for scen_name, scores in metrics.items():
-                     for key, val in scores.items():
-                         rows.append([scen_name, key, val])
+                stats_df = pd.DataFrame([stats])
 
-                 df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
-                 # optional Heatmap für PDF
-                 heatmap_fig = plot_risk_heatmap(presets_all)
+                filename = "/tmp/portfolio_report.pdf"
+                with PdfPages(filename) as pdf:
+                    draw_portfolio_page(pdf, fig, stats_df, w)
 
-                 filename = "/tmp/risk_report.pdf"
-                 create_pdf_report(
-                     filename,
-                     land=land,
-                     radar_fig=radar_fig,
-                     df=df,
-                     storyline_text=story,
-                     ampel_text=ampel,
-                     summary_text=summary,
-                     heatmap_fig=heatmap_fig,
-                     logo_path=None,  # oder "logo.png", falls vorhanden
-                 )
-                 return filename
+                return filename
 
             pdf_button.click(
-                export_pdf,
-                [r_country, r_w_equity, r_w_bond, r_w_gold, r_years],
+                export_portfolio_pdf,
+                [assets, weights],
                 pdf_file
             )
 

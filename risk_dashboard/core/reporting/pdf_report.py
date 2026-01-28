@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import datetime
 
-
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Noto Color Emoji']
 
@@ -106,6 +105,36 @@ def draw_heatmap_page(pdf, heatmap_fig):
     pdf.savefig(heatmap_fig)
     plt.close(heatmap_fig)
 
+
+def draw_portfolio_page(pdf, fig_portfolio, stats_df, weights_dict):
+    # Seite: Portfolio-Performance + Kennzahlen + Gewichte
+    fig, ax = plt.subplots(figsize=(8.27, 11.69))
+    ax.axis("off")
+
+    ax.text(0.05, 0.95, "Portfolio-Analyse", fontsize=20, weight="bold", va="top")
+
+    # Platz für eingebettete Performance-Grafik
+    # Wir speichern die Figur separat in den PDF-Stream
+    pdf.savefig(fig_portfolio)
+
+    # Neue Seite für Kennzahlen + Gewichte
+    fig2, ax2 = plt.subplots(figsize=(8.27, 11.69))
+    ax2.axis("off")
+
+    ax2.text(0.05, 0.95, "Portfolio-Kennzahlen", fontsize=16, weight="bold", va="top")
+    ax2.table(
+        cellText=stats_df.values,
+        colLabels=stats_df.columns,
+        loc="upper left",
+        cellLoc="center"
+    )
+
+    ax2.text(0.05, 0.5, "Gewichtungen", fontsize=16, weight="bold", va="top")
+    weights_text = "\n".join([f"{k}: {v:.1%}" for k, v in weights_dict.items()])
+    ax2.text(0.05, 0.45, weights_text, fontsize=12, va="top")
+
+    pdf.savefig(fig2)
+    plt.close(fig2)
 
 def create_pdf_report(
     filename,
