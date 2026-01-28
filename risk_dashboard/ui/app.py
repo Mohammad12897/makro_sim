@@ -3,15 +3,25 @@
 import gradio as gr
 import pandas as pd
 
+
+from core.reporting.pdf_report import create_pdf_report
+from core.storyline_engine import (
+    generate_storyline,
+    generate_executive_summary,
+    compute_risk_score,
+    risk_color,
+)
+from core.plots.risk_plots import plot_scenario_radar_overlay
+from core.plots.heatmap_plots import plot_risk_heatmap  # falls du Heatmap im PDF willst
+
 from core.presets import load_presets
 from core.scenario_engine import scenario_radar_overlay
 from core.portfolio_sim.scenario_compare import run_scenario_comparison
 from core.plots.risk_plots import plot_scenario_radar_overlay
 from core.risk_ampel import compute_risk_score, risk_color
-from core.storyline_engine import generate_storyline
 from core.plots.heatmap_plots import plot_risk_heatmap
 from core.cluster_engine import compute_clusters
-from core.reporting.pdf_report import create_pdf_report
+
 
 # ---------------------------------------------------------
 # Theme
@@ -133,20 +143,31 @@ def app():
                  metrics = scenario_radar_overlay(base_scores)
                  radar_fig = plot_scenario_radar_overlay(metrics)
                  story = generate_storyline(base_scores)
+                 summary = generate_executive_summary(base_scores, ampel)
 
-                 # Tabelle generieren
-                 results = scenario_radar_overlay(base_scores)
+                 # einfache Tabelle aus metrics
+
                  rows = []
-                 for scen_name, scores in results.items():
+                 for scen_name, scores in metrics.items():
                      for key, val in scores.items():
-                         if isinstance(val, (int, float)):
-                             rows.append([scen_name, key, val])
+                         rows.append([scen_name, key, val])
+            
                  df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
+                 # optional Heatmap für PDF
+                 heatmap_fig = plot_risk_heatmap(presets_all)
 
-                 #filename = "/content/risk_report.pdf"
                  filename = "/tmp/risk_report.pdf"
-                 create_pdf_report(filename, radar_fig, df, story, ampel)
-
+                 create_pdf_report(
+                     filename,
+                     land=land,
+                     radar_fig=radar_fig,
+                     df=df,
+                     storyline_text=story,
+                     ampel_text=ampel,
+                     summary_text=summary,
+                     heatmap_fig=heatmap_fig,
+                     logo_path=None,  # oder "logo.png", falls vorhanden
+                 )
                  return filename
 
             pdf_button.click(
