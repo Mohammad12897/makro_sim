@@ -1,17 +1,16 @@
 # core/plots/portfolio_plots.py
-# Portfolio-Plotfunktionen (derzeit deaktiviert, da MC-Simulator abgeschaltet ist)
+import matplotlib.pyplot as plt
 
-def plot_fan_chart(sim):
-    raise RuntimeError("Portfolio-Simulation ist deaktiviert.")
+def plot_portfolio(portfolio_returns):
+    perf = (1 + portfolio_returns).cumprod()
 
-def plot_drawdown(sim):
-    raise RuntimeError("Portfolio-Simulation ist deaktiviert.")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(perf.index, perf.values, color="#1f77b4", linewidth=2.2)
+    ax.fill_between(perf.index, perf.values, alpha=0.15, color="#1f77b4")
 
-def plot_portfolio_radar(metrics):
-    raise RuntimeError("Portfolio-Simulation ist deaktiviert.")
+    ax.set_title("Portfolio Performance (kumuliert)", fontsize=14, pad=15)
+    ax.set_ylabel("Wachstumsfaktor")
+    ax.set_xlabel("Datum")
+    ax.grid(True, linestyle="--", alpha=0.4)
 
-def plot_path_plot(summary):
-    raise RuntimeError("Portfolio-Simulation ist deaktiviert.")
-
-def plot_terminal_distribution(sim):
-    raise RuntimeError("Portfolio-Simulation ist deaktiviert.")
+    return fig

@@ -21,7 +21,21 @@ from core.plots.risk_plots import plot_scenario_radar_overlay
 from core.risk_ampel import compute_risk_score, risk_color
 from core.plots.heatmap_plots import plot_risk_heatmap
 from core.cluster_engine import compute_clusters
-
+from core.data.market_data import (
+    load_asset_series,
+    get_etf,
+    get_gold,
+    get_bond,
+)
+from core.portfolio.portfolio_engine import (
+    max_drawdown,
+    simulate_portfolio,
+    portfolio_stats,
+    portfolio_volatility,
+    portfolio_performance,
+)
+from core.plots.portfolio_plots import plot_portfolio
+from core.portfolio.portfolio_storyline import generate_portfolio_storyline
 
 # ---------------------------------------------------------
 # Theme
@@ -65,6 +79,17 @@ def scenario_table_wrapper(land, we, wb, wg, yrs):
 
     df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
     return df
+
+def run_portfolio_simulation(tickers, weights):
+    data = {t: load_asset_series(t) for t in tickers}
+    w = {t: weights[i] for i, t in enumerate(tickers)}
+
+    result = simulate_portfolio(data, w)
+    stats = portfolio_stats(result["portfolio"])
+
+    fig = plot_portfolio(result["portfolio"])
+
+    return fig, pd.DataFrame([stats])
 
 
 # ---------------------------------------------------------
@@ -115,6 +140,40 @@ def app():
                 scenario_table_wrapper,
                 [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
                 scen_table,
+            )
+
+        with gr.Tab("Portfolio-Simulator"):
+            asset_list = gr.CheckboxGroup(["AAPL", "MSFT", "IEF", "GLD", "SPY"])
+            assets = gr.CheckboxGroup(asset_list, label="Assets auswählen")
+            weights = gr.Slider(0, 1, step=0.05, label="Gewicht (für jedes Asset)", value=0.2)
+            run_button = gr.Button("Portfolio simulieren")
+
+          
+            plot_output = gr.Plot()
+            stats_output = gr.Dataframe()
+            story_output = gr.Markdown()
+
+            def run_portfolio_sim(assets_selected, weight):
+                if not assets_selected:
+                    return None, None, "Bitte mindestens ein Asset auswählen."
+
+                w = {a: weight for a in assets_selected}
+                s = sum(w.values())
+                w = {k: v/s for k, v in w.items()}  # Normalisieren
+
+                data = {a: load_asset_series(a) for a in assets_selected}
+
+                result = simulate_portfolio(data, w)
+                stats = portfolio_stats(result["portfolio"])
+                fig = plot_portfolio(result["portfolio"])
+                story = generate_portfolio_storyline(w, stats)
+
+                return fig, pd.DataFrame([stats]), story
+
+            run_button.click(
+                run_portfolio_sim,
+                [assets, weights],
+                [plot_output, stats_output, story_output]
             )
 
         with gr.Tab("Heatmap & Cluster"):
