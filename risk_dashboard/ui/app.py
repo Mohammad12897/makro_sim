@@ -144,11 +144,10 @@ def app():
             )
 
         with gr.Tab("Portfolio-Simulator"):
-            asset_list = gr.CheckboxGroup(["AAPL", "MSFT", "IEF", "GLD", "SPY"])
+            asset_list = ["AAPL", "MSFT", "SPY", "GLD", "IEF"]
             assets = gr.CheckboxGroup(asset_list, label="Assets auswählen")
             weights = gr.Slider(0, 1, step=0.05, label="Gewicht (für jedes Asset)", value=0.2)
             run_button = gr.Button("Portfolio simulieren")
-
 
             plot_output = gr.Plot()
             stats_output = gr.Dataframe()

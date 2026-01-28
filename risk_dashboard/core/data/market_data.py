@@ -5,21 +5,24 @@ import pandas as pd
 import numpy as np
 
 
-def load_asset_series(ticker: str, start="2010-01-01", end=None):
+def load_asset_series(ticker, start="2010-01-01", end=None):
     data = yf.download(ticker, start=start, end=end, progress=False)
 
     if data.empty:
         raise ValueError(f"Keine Daten für {ticker}")
 
-    prices = data["Adj Close"].dropna()
+    prices = data["Close"].dropna()
+
+    # returns haben automatisch einen eigenen Index → perfekt
     returns = prices.pct_change().dropna()
 
     return {
         "ticker": ticker,
-        "dates": prices.index,
-        "prices": prices.values,
-        "returns": returns.values,
+        "dates": returns.index,                # <--- WICHTIG
+        "prices": prices.loc[returns.index],   # <--- exakt gleiche Länge
+        "returns": returns.values,             # <--- 1D
     }
+
 
 def get_etf(ticker):
     return load_asset_series(ticker)

@@ -3,22 +3,24 @@
 import numpy as np
 import pandas as pd
 
+
 def simulate_portfolio(asset_data: dict, weights: dict):
-    aligned = []
+    dfs = []
+
     for ticker, data in asset_data.items():
         df = pd.DataFrame({
-            "date": data["dates"],
-            ticker: data["returns"]
-        }).set_index("date")
-        aligned.append(df)
+            ticker: np.array(data["returns"]).reshape(-1)
+        }, index=data["dates"])
 
-    merged = pd.concat(aligned, axis=1).dropna()
+        dfs.append(df)
+
+    # Zeitreihen exakt nach Datum ausrichten
+    merged = pd.concat(dfs, axis=1, join="inner").dropna()
 
     w = np.array([weights[t] for t in merged.columns])
     merged["portfolio"] = merged.values @ w
 
     return merged
-
 
 def portfolio_performance(series):
     return (1 + series).cumprod() - 1
