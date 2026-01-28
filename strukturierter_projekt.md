@@ -194,3 +194,40 @@ risk_dashboard/
 │
 └── data/
     └── slider_presets.json
+
+makro_sim/
+│
+├── risk_dashboard/
+│   ├── ui/
+│   │   ├── app.py
+│   │   └── __init__.py
+│   │
+│   ├── core/
+│   │   ├── __init__.py
+│   │
+│   │   ├── data/
+│   │   │   ├── __init__.py
+│   │   │   └── market_data.py
+│   │
+│   │   ├── portfolio/
+│   │   │   ├── __init__.py
+│   │   │   ├── portfolio_engine.py
+│   │   │   ├── portfolio_plots.py
+│   │   │   └── portfolio_storyline.py
+│   │
+│   │   ├── plots/
+│   │   │   ├── __init__.py
+│   │   │   ├── risk_plots.py
+│   │   │   └── heatmap_plots.py
+│   │
+│   │   ├── reporting/
+│   │   │   ├── __init__.py
+│   │   │   └── pdf_report.py
+│   │
+│   │   └── storyline/
+│   │       ├── __init__.py
+│   │       └── storyline_engine.py
+│   │
+│   └── __init__.py
+│
+└── __init__.py

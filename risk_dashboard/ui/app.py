@@ -37,6 +37,7 @@ from core.portfolio.portfolio_engine import (
 from core.plots.portfolio_plots import plot_portfolio
 from core.portfolio.portfolio_storyline import generate_portfolio_storyline
 
+
 # ---------------------------------------------------------
 # Theme
 # ---------------------------------------------------------
@@ -148,7 +149,7 @@ def app():
             weights = gr.Slider(0, 1, step=0.05, label="Gewicht (für jedes Asset)", value=0.2)
             run_button = gr.Button("Portfolio simulieren")
 
-          
+
             plot_output = gr.Plot()
             stats_output = gr.Dataframe()
             story_output = gr.Markdown()
@@ -210,7 +211,7 @@ def app():
                  for scen_name, scores in metrics.items():
                      for key, val in scores.items():
                          rows.append([scen_name, key, val])
-            
+
                  df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
                  # optional Heatmap für PDF
                  heatmap_fig = plot_risk_heatmap(presets_all)
