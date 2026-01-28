@@ -36,6 +36,8 @@ from core.portfolio.portfolio_engine import (
 )
 from core.plots.portfolio_plots import plot_portfolio
 from core.portfolio.portfolio_storyline import generate_portfolio_storyline
+from core.country.country_compare import compare_countries, compute_country_metrics
+from core.country.country_storyline import generate_country_storyline
 
 
 # ---------------------------------------------------------
@@ -141,6 +143,30 @@ def app():
                 scenario_table_wrapper,
                 [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
                 scen_table,
+            )
+
+        with gr.Tab("Ländervergleich"):
+
+            country_list = ["^GDAXI", "^GSPC", "^FTSE", "^N225", "^HSI"]
+            countries = gr.CheckboxGroup(country_list, label="Länder/Indizes auswählen")
+            run_button = gr.Button("Vergleich starten")
+
+            table_output = gr.Dataframe()
+            story_output = gr.Markdown()
+
+            def run_country_compare(selected):
+                if not selected:
+                    return None, "Bitte mindestens ein Land auswählen."
+
+                df = compare_countries(selected)
+                story = generate_country_storyline(df)
+
+                return df, story
+
+            run_button.click(
+                run_country_compare,
+                [countries],
+                [table_output, story_output]
             )
 
         with gr.Tab("Portfolio-Simulator"):

@@ -4,6 +4,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 import datetime
 
 
+plt.rcParams['font.family'] = 'DejaVu Sans'
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Noto Color Emoji']
+
 def draw_footer(ax, text="MakroSim – Risikoanalyse"):
     ax.text(0.5, 0.02, text, ha="center", fontsize=8)
 
@@ -46,9 +49,9 @@ def draw_risk_traffic_light(pdf, ampel_text: str):
     fig, ax = plt.subplots(figsize=(8.27, 3))
     ax.axis("off")
 
-    if "🟢" in ampel_text:
+    if "Geringes Risiko" in ampel_text:
         color = "#2ca02c"
-    elif "🟡" in ampel_text:
+    elif "Mittleres Risiko" in ampel_text:
         color = "#ffbf00"
     else:
         color = "#d62728"
