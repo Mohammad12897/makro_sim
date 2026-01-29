@@ -43,9 +43,13 @@ from core.country.country_storyline import generate_country_storyline
 from core.reporting.pdf_report import create_pdf_report, draw_portfolio_page
 from core.data.etf_db import list_etf_tickers
 from core.data.asset_map import resolve_asset
-from core.data.etf_db_loader import list_etf_tickers
+from core.data.etf_db_loader import list_etf_tickers, list_etf_by_region
 from core.data.ticker_validation import validate_or_fix_ticker
-from core.country.country_map import get_country_choices, resolve_country
+from core.data.country_map import get_country_choices, resolve_country
+
+print("Europa:", list_etf_by_region("Europa"))
+print("USA:", list_etf_by_region("USA"))
+print("Global:", list_etf_by_region("Global"))
 
 
 # ---------------------------------------------------------
@@ -155,7 +159,7 @@ def app():
                 if not selected:
                     return None, "Bitte mindestens ein Land auswählen."
 
-                
+
                 tickers = [resolve_country(c) for c in selected]
                 df = compare_countries(tickers)
                 story = generate_country_storyline(df)
@@ -168,11 +172,62 @@ def app():
                 [table_output, story_output]
             )
 
+        with gr.Tab("ETF-Auswahl"):
+
+            # 1. Länder-Dropdown (mit lesbaren Namen)
+            country_dropdown = gr.Dropdown(
+                choices=get_country_choices(),
+                label="Land auswählen"
+            )
+
+            # 2. ETF-Liste (zunächst leer)
+            etf_assets = gr.CheckboxGroup(
+                choices=[],
+                label="Verfügbare ETFs"
+            )
+            
+            # 3. Update-Funktion
+            def update_etf_list(country):
+                # Debug-Log (erscheint im Server-Log)
+                print(f"[DEBUG] update_etf_list called with country={country}")
+                region = (
+                    "Europa" if country == "Deutschland (DAX)" else
+                    "USA" if country == "USA (S&P 500)" else
+                    "Global"
+                )
+                tickers = list_etf_by_region(region)
+                print(f"[DEBUG] list_etf_by_region({region}) -> {tickers}")
+
+                # WICHTIG: gib ein gr.update zurück, damit Gradio die CheckboxGroup sofort neu rendert
+                return gr.update(choices=tickers, value=None, interactive=True)
+
+            # 4. Gradio-Verknüpfung
+            country_dropdown.change(
+                update_etf_list,
+                inputs=[country_dropdown],
+                outputs=[etf_assets]
+            )
+
+            # Initialbefüllung beim Laden der App
+            def init_etf():
+                return gr.update(
+                    choices=list_etf_by_region("Global"),
+                    value=None,
+                    interactive=True
+                )
+
+            demo.load(init_etf, inputs=None, outputs=[etf_assets])
+
         with gr.Tab("Portfolio-Simulator"):
-            asset_list = ["AAPL", "MSFT", "SPY", "GLD", "IEF"] + list_etf_tickers()
-            assets = gr.CheckboxGroup(asset_list, label="Assets auswählen")
+            asset_list = [
+                "AAPL", "MSFT", "AMZN", "GOOGL", "META",
+                "SPY", "VTI", "EUNL.DE", "EUNA.DE",
+                "GLD", "SGLN.L", "4GLD.DE", "AGG"
+            ] + list_etf_tickers()
+            portfolio_assets = gr.CheckboxGroup(asset_list, label="Assets auswählen")
             weights = gr.Slider(0, 1, step=0.05, label="Gewicht pro Asset", value=0.2)
             run_button = gr.Button("Portfolio simulieren")
+
 
             plot_output = gr.Plot(label="Buy & Hold")
             plot_output_rb = gr.Plot(label="Rebalancing")
@@ -192,7 +247,7 @@ def app():
                     return None, None, None, f"Folgende ETFs sind ungültig oder delisted: {invalid}"
 
                 tickers = [t for t in tickers if t is not None]
-        
+
                 # Gewichte normalisieren
                 w = {t: weight for t in tickers}
                 s = sum(w.values())
@@ -218,7 +273,7 @@ def app():
 
             run_button.click(
                 run_portfolio_simulation,
-                [assets, weights],
+                [portfolio_assets, weights],
                 [plot_output, plot_output_rb, stats_output, story_output]
             )
 
@@ -250,7 +305,7 @@ def app():
 
             pdf_button.click(
                 export_portfolio_pdf,
-                [assets, weights],
+                [portfolio_assets, weights],
                 pdf_file
             )
 
@@ -295,7 +350,7 @@ def app():
 
             pdf_button.click(
                 export_portfolio_pdf,
-                [assets, weights],
+                [portfolio_assets, weights],
                 pdf_file
             )
 
