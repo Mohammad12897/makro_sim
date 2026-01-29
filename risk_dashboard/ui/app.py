@@ -2,7 +2,8 @@
 
 import gradio as gr
 import pandas as pd
-
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 from core.reporting.pdf_report import create_pdf_report
 from core.storyline_engine import (
@@ -86,28 +87,7 @@ def scenario_table_wrapper(land, we, wb, wg, yrs):
     df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
     return df
 
-def run_portfolio_simulation(tickers, weight):
-    if not tickers:
-        return None, None
 
-    # Gewichte erzeugen und normalisieren
-    w = {t: weight for t in tickers}
-    s = sum(w.values())
-    w = {k: v/s for k, v in w.items()}
-
-    # Marktdaten laden
-    data = {t: load_asset_series(t) for t in tickers}
-
-    # Simulationen
-    result = simulate_portfolio(data, w)
-    result_rb = simulate_portfolio_with_rebalancing(data, w, freq="M")
-
-    # Plots
-    fig = plot_portfolio(result["portfolio"])
-    fig_rb = plot_portfolio(result_rb["portfolio_rebal"])
-
-    return fig, fig_rb
-    
 # ---------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
@@ -185,35 +165,80 @@ def app():
         with gr.Tab("Portfolio-Simulator"):
             asset_list = ["AAPL", "MSFT", "SPY", "GLD", "IEF"] + list_etf_tickers()
             assets = gr.CheckboxGroup(asset_list, label="Assets auswählen")
-            weights = gr.Slider(0, 1, step=0.05, label="Gewicht (für jedes Asset)", value=0.2)
+            weights = gr.Slider(0, 1, step=0.05, label="Gewicht pro Asset", value=0.2)
             run_button = gr.Button("Portfolio simulieren")
 
-            plot_output = gr.Plot()
+            plot_output = gr.Plot(label="Buy & Hold")
+            plot_output_rb = gr.Plot(label="Rebalancing")
             stats_output = gr.Dataframe()
             story_output = gr.Markdown()
 
-            def run_portfolio_sim(assets_selected, weight):
-                if not assets_selected:
-                    return None, None, "Bitte mindestens ein Asset auswählen."
+            def run_portfolio_simulation(tickers, weight):
+                if not tickers:
+                    return None, None, None, "Bitte mindestens ein Asset auswählen."
 
-                tickers = [resolve_asset(a) for a in assets_selected]
+                # automatische Asset-Erkennung
+                tickers = [resolve_asset(t) for t in tickers]
+
+                # Gewichte normalisieren
                 w = {t: weight for t in tickers}
                 s = sum(w.values())
-                w = {k: v/s for k, v in w.items()}  # Normalisieren
+                w = {k: v/s for k, v in w.items()}
+
+                # Daten laden
+                data = {t: load_asset_series(t) for t in tickers}
+
+                # Simulationen
+                result = simulate_portfolio(data, w)
+                result_rb = simulate_portfolio_with_rebalancing(data, w, freq="M")
+                # Plots
+                fig = plot_portfolio(result["portfolio"])
+                fig_rb = plot_portfolio(result_rb["portfolio_rebal"])
+
+                # Kennzahlen
+                stats = portfolio_stats(result["portfolio"])
+
+                # Storyline
+                story = generate_portfolio_storyline(w, stats)
+
+                return fig, fig_rb, pd.DataFrame([stats]), story
+
+            run_button.click(
+                run_portfolio_simulation,
+                [assets, weights],
+                [plot_output, plot_output_rb, stats_output, story_output]
+            )
+
+            # PDF-Export nur hier!
+            pdf_button = gr.Button("Portfolio als PDF exportieren")
+            pdf_file = gr.File()
+
+            def export_portfolio_pdf(tickers, weight):
+                if not tickers:
+                    return None
+
+                tickers = [resolve_asset(t) for t in tickers]
+
+                w = {t: weight for t in tickers}
+                s = sum(w.values())
+                w = {k: v/s for k, v in w.items()}
 
                 data = {t: load_asset_series(t) for t in tickers}
                 result = simulate_portfolio(data, w)
-
                 stats = portfolio_stats(result["portfolio"])
                 fig = plot_portfolio(result["portfolio"])
-                story = generate_portfolio_storyline(w, stats)
 
-                return fig, pd.DataFrame([stats]), story
+                stats_df = pd.DataFrame([stats])
+                filename = "/tmp/portfolio_report.pdf"
+                with PdfPages(filename) as pdf:
+                    draw_portfolio_page(pdf, fig, stats_df, w)
 
-            run_button.click(
-                run_portfolio_sim,
+                return filename
+
+            pdf_button.click(
+                export_portfolio_pdf,
                 [assets, weights],
-                [plot_output, stats_output, story_output]
+                pdf_file
             )
 
         with gr.Tab("Heatmap & Cluster"):
