@@ -45,7 +45,7 @@ from core.data.etf_db import list_etf_tickers
 from core.data.asset_map import resolve_asset
 from core.data.etf_db_loader import list_etf_tickers
 from core.data.ticker_validation import validate_or_fix_ticker
-
+from core.country.country_map import get_country_choices, resolve_country
 
 
 # ---------------------------------------------------------
@@ -144,7 +144,7 @@ def app():
 
         with gr.Tab("Ländervergleich"):
 
-            country_list = ["^GDAXI", "^GSPC", "^FTSE", "^N225", "^HSI"]
+            country_list = get_country_choices()
             countries = gr.CheckboxGroup(country_list, label="Länder/Indizes auswählen")
             run_button = gr.Button("Vergleich starten")
 
@@ -155,7 +155,9 @@ def app():
                 if not selected:
                     return None, "Bitte mindestens ein Land auswählen."
 
-                df = compare_countries(selected)
+                
+                tickers = [resolve_country(c) for c in selected]
+                df = compare_countries(tickers)
                 story = generate_country_storyline(df)
 
                 return df, story
