@@ -34,6 +34,7 @@ from core.portfolio.portfolio_engine import (
     portfolio_stats,
     portfolio_volatility,
     portfolio_performance,
+    simulate_portfolio_with_rebalancing,
 )
 from core.plots.portfolio_plots import plot_portfolio
 from core.portfolio.portfolio_storyline import generate_portfolio_storyline
@@ -42,6 +43,9 @@ from core.country.country_storyline import generate_country_storyline
 from core.reporting.pdf_report import create_pdf_report, draw_portfolio_page
 from core.data.etf_db import list_etf_tickers
 from core.data.asset_map import resolve_asset
+from core.data.etf_db_loader import list_etf_tickers
+from core.data.ticker_validation import validate_or_fix_ticker
+
 
 
 # ---------------------------------------------------------
@@ -173,13 +177,20 @@ def app():
             stats_output = gr.Dataframe()
             story_output = gr.Markdown()
 
-            def run_portfolio_simulation(tickers, weight):
-                if not tickers:
+            def run_portfolio_simulation(assets_selected, weight):
+                if not assets_selected:
                     return None, None, None, "Bitte mindestens ein Asset auswählen."
 
-                # automatische Asset-Erkennung
-                tickers = [resolve_asset(t) for t in tickers]
+                # automatische Asset-Erkennung + ETF-Korrektur
+                tickers = [validate_or_fix_ticker(resolve_asset(t)) for t in assets_selected]
 
+                # ungültige Ticker herausfiltern
+                invalid = [t for t in tickers if t is None]
+                if invalid:
+                    return None, None, None, f"Folgende ETFs sind ungültig oder delisted: {invalid}"
+
+                tickers = [t for t in tickers if t is not None]
+        
                 # Gewichte normalisieren
                 w = {t: weight for t in tickers}
                 s = sum(w.values())
