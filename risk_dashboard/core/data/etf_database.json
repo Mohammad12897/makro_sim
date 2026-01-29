@@ -97,19 +97,19 @@
   },
   {
     "name": "Lyxor MSCI France UCITS ETF",
-    "ticker": "FRANCE_ETF",
+    "ticker": "EWQ",
     "region": "Europa",
     "asset_class": "Equity"
   },
   {
     "name": "iShares MSCI UK UCITS ETF",
-    "ticker": "UK_ETF",
+    "ticker": "ISF.L",
     "region": "Europa",
     "asset_class": "Equity"
   },
   {
     "name": "iShares MSCI Japan UCITS ETF",
-    "ticker": "JP_ETF",
+    "ticker": "EWJ",
     "region": "Asien",
     "asset_class": "Equity"
   }
