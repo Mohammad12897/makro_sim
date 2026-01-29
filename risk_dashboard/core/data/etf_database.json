@@ -1,0 +1,16 @@
+[
+  {
+    "name": "iShares Core MSCI World",
+    "ticker": "EUNL.DE",
+    "region": "Global",
+    "asset_class": "Equity",
+    "description": "Breit diversifizierter Welt-ETF"
+  },
+  {
+    "name": "iShares Core Euro Government Bond",
+    "ticker": "IEGA.DE",
+    "region": "Europa",
+    "asset_class": "Bond",
+    "description": "Staatsanleihen Eurozone"
+  }
+]
