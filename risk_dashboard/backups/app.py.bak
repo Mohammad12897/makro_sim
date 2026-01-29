@@ -377,30 +377,4 @@ def app():
                 pdf_file
             )
 
-            # --- ETF Länder-Check (automatisch eingefügt) ---
-            with gr.Tab("ETF Länder-Check"):
-                country_input = gr.Textbox(
-                    value="Deutschland (DAX), USA (S&P 500), Frankreich, UK, Japan",
-                    label="Länder (Komma-getrennt)"
-                )
-                check_btn = gr.Button("Prüfen")
-                result_md = gr.Markdown("Ergebnis erscheint hier")
-
-                def run_country_check(text):
-                    countries = [c.strip() for c in text.split(",") if c.strip()]
-                    from core.ui_helpers import countries_with_etfs
-                    res = countries_with_etfs(countries)
-                    lines = ["**Länder → Region → Anzahl ETFs → Ticker**\n"]
-                    for c in countries:
-                        info = res.get(c, {"tickers": [], "count": 0, "region": "Unbekannt"})
-                        if info["count"]:
-                            lines.append(f"- **{c}** ({info['region']}): {info['count']} → {', '.join(info['tickers'])}")
-                        else:
-                            lines.append(f"- **{c}** ({info['region']}): _keine ETFs in der DB_")
-                    return "\n\n".join(lines)
-
-                check_btn.click(run_country_check, inputs=[country_input], outputs=[result_md])
-            # --- Ende ETF Länder-Check ---
-
-
     return demo

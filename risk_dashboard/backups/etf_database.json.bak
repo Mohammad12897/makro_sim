@@ -1,0 +1,44 @@
+[
+  {
+    "name": "iShares Core MSCI World",
+    "ticker": "EUNL.DE",
+    "region": "Global",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "iShares Core Euro Government Bond",
+    "ticker": "EUNA.DE",
+    "region": "Europa",
+    "asset_class": "Bond"
+  },
+  {
+    "name": "SPDR S&P 500 ETF Trust",
+    "ticker": "SPY",
+    "region": "USA",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "iShares Physical Gold ETC",
+    "ticker": "SGLN.L",
+    "region": "Global",
+    "asset_class": "Gold"
+  },
+  {
+    "name": "Xetra-Gold",
+    "ticker": "4GLD.DE",
+    "region": "Europa",
+    "asset_class": "Gold"
+  },
+  {
+    "name": "Vanguard Total Stock Market ETF",
+    "ticker": "VTI",
+    "region": "USA",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "iShares Core US Aggregate Bond ETF",
+    "ticker": "AGG",
+    "region": "USA",
+    "asset_class": "Bond"
+  }
+]

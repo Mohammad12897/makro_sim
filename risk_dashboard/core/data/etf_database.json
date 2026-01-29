@@ -40,5 +40,77 @@
     "ticker": "AGG",
     "region": "USA",
     "asset_class": "Bond"
+  },
+  {
+    "name": "Apple Inc.",
+    "ticker": "AAPL",
+    "region": "USA",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "Microsoft Corporation",
+    "ticker": "MSFT",
+    "region": "USA",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "Amazon.com, Inc.",
+    "ticker": "AMZN",
+    "region": "USA",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "Alphabet Inc. Class A",
+    "ticker": "GOOGL",
+    "region": "USA",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "Meta Platforms, Inc.",
+    "ticker": "META",
+    "region": "USA",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "Tesla, Inc.",
+    "ticker": "TSLA",
+    "region": "USA",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "NVIDIA Corporation",
+    "ticker": "NVDA",
+    "region": "USA",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "SPDR Gold Shares",
+    "ticker": "GLD",
+    "region": "Global",
+    "asset_class": "Gold"
+  },
+  {
+    "name": "iShares Gold Trust",
+    "ticker": "IAU",
+    "region": "Global",
+    "asset_class": "Gold"
+  },
+  {
+    "name": "Lyxor MSCI France UCITS ETF",
+    "ticker": "FRANCE_ETF",
+    "region": "Europa",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "iShares MSCI UK UCITS ETF",
+    "ticker": "UK_ETF",
+    "region": "Europa",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "iShares MSCI Japan UCITS ETF",
+    "ticker": "JP_ETF",
+    "region": "Asien",
+    "asset_class": "Equity"
   }
 ]

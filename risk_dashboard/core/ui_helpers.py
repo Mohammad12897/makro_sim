@@ -1,13 +1,30 @@
-## core/ui_helpers.py
-import gradio as gr
-from core.data.etf_db_loader import list_etf_by_region
+# core/ui_helpers.py
+from typing import List, Dict
+from core.data.etf_db_loader import load_etf_db
+from core.data.country_to_region import country_to_region
 
-def update_etf_list(country):
-    """Aktualisiert die ETF-Liste basierend auf dem gewählten Land."""
-    region = (
-        "Europa" if country == "Deutschland (DAX)" else
-        "USA" if country == "USA (S&P 500)" else
-        "Global"
-    )
-    tickers = list_etf_by_region(region)
-    return gr.update(choices=tickers, value=None, interactive=True)
+def countries_with_etfs(countries: List[str]) -> Dict[str, Dict]:
+    """
+    Für jede Country-String in 'countries' gibt die Funktion:
+      {country: {"tickers": [...], "count": n, "region": region}}
+    zurück. Leere Liste bedeutet keine ETFs in der DB.
+    """
+    db = load_etf_db()
+    result = {}
+    for country in countries:
+        key = country.strip().lower()
+        region = country_to_region.get(key)
+        if region is None:
+            # heuristische Fallbacks
+            if any(k in key for k in ("deutsch", "germ", "frank", "brit", "uk")):
+                region = "Europa"
+            elif any(k in key for k in ("us", "america")):
+                region = "USA"
+            elif "jap" in key:
+                region = "Asien"
+            else:
+                region = "Global"
+
+        tickers = [e["ticker"] for e in db if e.get("region","").strip().lower() == region.strip().lower()]
+        result[country] = {"tickers": tickers, "count": len(tickers), "region": region}
+    return result
