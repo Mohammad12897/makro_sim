@@ -1,83 +1,45 @@
 # core/analysis/stock_compare.py
-from typing import Dict
-import pandas as pd
-import yfinance as yf
 import numpy as np
+from core.analysis.market_data import get_history, calc_returns, annual_vol, sharpe_ratio, max_drawdown
 
-from core.analysis.market_data import _get_history, _calc_returns, _annualized_volatility, _sharpe_ratio, _max_drawdown
+def stock_compare(t1, t2):
+    p1 = get_history(t1)
+    p2 = get_history(t2)
 
+    if p1.empty or p2.empty:
+        return f"Keine Daten für {t1} oder {t2}"
 
-def _basic_metrics(ticker: str) -> Dict:
-    prices = _get_history(ticker, years=5)
-    if prices.empty:
-        return {"ticker": ticker, "ok": False}
+    r1 = calc_returns(p1)
+    r2 = calc_returns(p2)
 
-    rets = _calc_returns(prices)
-    one_year = prices[prices.index >= (prices.index.max() - pd.Timedelta(days=365))]
-
-    def perf(series: pd.Series):
+    def perf(series):
         if series.empty:
             return np.nan
-        return float(series.iloc[-1] / series.iloc[0] - 1.0)
+        return float(series.iloc[-1] / series.iloc[0] - 1)
 
-    return {
-        "ticker": ticker,
-        "ok": True,
-        "perf_1y": perf(one_year),
-        "perf_5y": perf(prices),
-        "vol": _annualized_volatility(rets) if not rets.empty else np.nan,
-        "sharpe": _sharpe_ratio(rets) if not rets.empty else np.nan,
-        "mdd": _max_drawdown(prices),
-        "prices": prices,
-    }
+    one_year_1 = p1[p1.index >= (p1.index.max() - pd.Timedelta(days=365))]
+    one_year_2 = p2[p2.index >= (p2.index.max() - pd.Timedelta(days=365))]
 
+    corr = np.corrcoef(r1.align(r2, join="inner")[0].dropna(),
+                       r2.align(r1, join="inner")[0].dropna())[0, 1]
 
-def _correlation(a: pd.Series, b: pd.Series) -> float:
-    df = pd.concat([a, b], axis=1).dropna()
-    if df.shape[0] < 10:
-        return np.nan
-    return float(df.corr().iloc[0, 1])
+    md = f"""
+### Vergleich: {t1} vs {t2}
 
+| Kennzahl | {t1} | {t2} |
+|----------|------|------|
+| 1Y Rendite | {perf(one_year_1)*100:.2f}% | {perf(one_year_2)*100:.2f}% |
+| 5Y Rendite | {perf(p1)*100:.2f}% | {perf(p2)*100:.2f}% |
+| Volatilität | {annual_vol(r1)*100:.2f}% | {annual_vol(r2)*100:.2f}% |
+| Sharpe Ratio | {sharpe_ratio(r1):.2f} | {sharpe_ratio(r2):.2f} |
+| Max Drawdown | {max_drawdown(p1)*100:.2f}% | {max_drawdown(p2)*100:.2f}% |
+| Korrelation | {corr:.2f} | – |
 
-def stock_compare(t1: str, t2: str) -> str:
-    m1 = _basic_metrics(t1)
-    m2 = _basic_metrics(t2)
+"""
 
-    if not m1["ok"] or not m2["ok"]:
-        return f"Mindestens einer der Ticker ist ungültig oder hat keine Daten: {t1}, {t2}"
+    if sharpe_ratio(r1) > sharpe_ratio(r2):
+        md += f"**Empfehlung:** {t1} hat die bessere risikobereinigte Rendite."
+    else:
+        md += f"**Empfehlung:** {t2} hat die bessere risikobereinigte Rendite."
 
-    corr = _correlation(m1["prices"], m2["prices"])
-
-    def fmt_pct(x):
-        return "n/a" if x is None or np.isnan(x) else f"{x*100:,.2f}%"
-
-    def fmt(x):
-        return "n/a" if x is None or np.isnan(x) else f"{x:,.2f}"
-
-    lines = []
-    lines.append(f"### Vergleich: {t1} vs {t2}\n")
-    lines.append("| Kennzahl | {0} | {1} |".format(t1, t2))
-    lines.append("|----------|------|------|")
-    lines.append(f"| 1Y Rendite | {fmt_pct(m1['perf_1y'])} | {fmt_pct(m2['perf_1y'])} |")
-    lines.append(f"| 5Y Rendite | {fmt_pct(m1['perf_5y'])} | {fmt_pct(m2['perf_5y'])} |")
-    lines.append(f"| Volatilität | {fmt_pct(m1['vol'])} | {fmt_pct(m2['vol'])} |")
-    lines.append(f"| Sharpe Ratio | {fmt(m1['sharpe'])} | {fmt(m2['sharpe'])} |")
-    lines.append(f"| Max Drawdown | {fmt_pct(m1['mdd'])} | {fmt_pct(m2['mdd'])} |")
-    lines.append(f"| Korrelation | {fmt(corr)} | – |")
-
-    # einfache Empfehlung: höhere Sharpe gewinnt, bei ähnlicher Sharpe: höhere 5Y-Rendite
-    rec = ""
-    s1, s2 = m1["sharpe"], m2["sharpe"]
-    if not np.isnan(s1) and not np.isnan(s2):
-        if s1 > s2 + 0.1:
-            rec = f"**Tendenz:** {t1} hat die bessere risikobereinigte Rendite (Sharpe)."
-        elif s2 > s1 + 0.1:
-            rec = f"**Tendenz:** {t2} hat die bessere risikobereinigte Rendite (Sharpe)."
-        else:
-            if m1["perf_5y"] > m2["perf_5y"]:
-                rec = f"**Tendenz:** Beide ähnlich im Risiko, {t1} hat leicht bessere Langfrist-Rendite."
-            else:
-                rec = f"**Tendenz:** Beide ähnlich im Risiko, {t2} hat leicht bessere Langfrist-Rendite."
-    lines.append("\n" + rec)
-
-    return "\n".join(lines)
+    return md
