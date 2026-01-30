@@ -120,6 +120,18 @@
     "asset_class": "Equity"
   },
   {
+    "name": "Amundi MSCI France UCITS ETF",
+    "ticker": "FRC.PA",
+    "region": "Europa",
+    "asset_class": "Equity"
+  },
+  {
+    "name": "Lyxor MSCI France UCITS ETF",
+    "ticker": "MFR.PA",
+    "region": "Europa",
+    "asset_class": "Equity"
+  },
+  {
     "name": "Vanguard FTSE 100 UCITS ETF",
     "ticker": "VUKE.L",
     "region": "Europa",

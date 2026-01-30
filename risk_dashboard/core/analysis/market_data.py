@@ -8,10 +8,18 @@ def get_history(ticker, years=5):
     end = dt.date.today()
     start = end - dt.timedelta(days=365 * years)
     df = yf.Ticker(ticker).history(start=start, end=end)
+
     if df is None or df.empty:
         return pd.Series(dtype=float)
-    return df["Adj Close"].dropna()
 
+    # Robust: Fallback auf "Close", wenn "Adj Close" fehlt
+    if "Adj Close" in df.columns:
+        return df["Adj Close"].dropna()
+    elif "Close" in df.columns:
+        return df["Close"].dropna()
+    else:
+        return pd.Series(dtype=float)
+        
 def calc_returns(prices):
     return prices.pct_change().dropna()
 

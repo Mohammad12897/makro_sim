@@ -46,11 +46,13 @@ from core.data.asset_map import resolve_asset
 from core.data.etf_db_loader import list_etf_tickers, list_etf_by_region
 from core.data.ticker_validation import validate_or_fix_ticker
 from core.data.country_map import get_country_choices, resolve_country
+from core.ui_helpers import countries_with_etfs
 
 from core.data.etf_db_loader import load_etf_db
 from core.analysis.market_data import get_metrics
 from core.analysis.stock_compare import stock_compare
 from core.utils.country_utils import get_all_countries
+
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
@@ -190,7 +192,9 @@ def app():
                 value=build_table,
                 interactive=True,
                 label="ETF-Kennzahlen (sortierbar)",
-                height=500
+                row_count=20,     # erlaubt
+                col_count=None    # erlaubt
+
             )
 
             gr.Markdown("""
@@ -231,7 +235,6 @@ def app():
 
             def run_country_check(text):
                 countries = [c.strip() for c in text.split(",") if c.strip()]
-                from core.ui_helpers import countries_with_etfs
                 res = countries_with_etfs(countries)
                 lines = ["**Länder → Region → Anzahl ETFs → Ticker**\n"]
                 for c in countries:
