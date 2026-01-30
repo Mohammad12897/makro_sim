@@ -47,6 +47,11 @@ from core.data.etf_db_loader import list_etf_tickers, list_etf_by_region
 from core.data.ticker_validation import validate_or_fix_ticker
 from core.data.country_map import get_country_choices, resolve_country
 
+from core.data.etf_db_loader import load_etf_db
+from core.analysis.market_data import get_metrics
+from core.analysis.stock_compare import stock_compare
+from core.utils.country_utils import get_all_countries
+
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
 print("Global:", list_etf_by_region("Global"))
@@ -145,7 +150,7 @@ def app():
                 [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
                 scen_table,
             )
-
+            
         with gr.Tab("Ländervergleich"):
 
             country_list = get_country_choices()
@@ -171,6 +176,50 @@ def app():
                 [countries],
                 [table_output, story_output]
             )
+
+        with gr.Tab("ETF-Tabelle"):
+            def build_table():
+                rows = []
+                for e in load_etf_db():
+                    m = get_metrics(e)
+                    if m:
+                        rows.append(m)
+                return pd.DataFrame(rows)
+
+            etf_df = gr.Dataframe(
+                value=build_table,
+                interactive=True,
+                label="ETF-Kennzahlen (sortierbar)",
+                height=500
+            )
+
+            gr.Markdown("""
+### 📘 Finanzkennzahlen – Lexikon
+
+**Rendite (1Y, 5Y)** – Wertentwicklung über 1 bzw. 5 Jahre  
+**Volatilität** – Schwankungsbreite (Risiko)  
+**Sharpe Ratio** – Rendite pro Risiko  
+**Max Drawdown** – Größter Verlust vom Hoch  
+**Beta** – Sensitivität zum Markt  
+**TER** – Kostenquote des ETFs  
+""")
+
+        with gr.Tab("Aktienvergleich"):
+
+            t1 = gr.Textbox(label="Ticker 1", value="AAPL")
+            t2 = gr.Textbox(label="Ticker 2", value="MSFT")
+            btn = gr.Button("Vergleichen")
+            out = gr.Markdown()
+
+            btn.click(stock_compare, inputs=[t1, t2], outputs=out)
+
+        with gr.Tab("Länderauswahl"):
+            country = gr.Dropdown(
+                choices=get_all_countries(),
+                label="Land auswählen"
+            )
+
+            gr.Markdown("Dieses Dropdown enthält **alle Länder der Welt**.")
 
         with gr.Tab("ETF Länder-Check"):
             country_input = gr.Textbox(
@@ -208,7 +257,7 @@ def app():
                 choices=[],
                 label="Verfügbare ETFs"
             )
-            
+
             # 3. Update-Funktion
             def update_etf_list(country):
                 # Debug-Log (erscheint im Server-Log)
