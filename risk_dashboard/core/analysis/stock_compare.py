@@ -1,6 +1,14 @@
 # core/analysis/stock_compare.py
 import numpy as np
-from core.analysis.market_data import get_history, calc_returns, annual_vol, sharpe_ratio, max_drawdown
+import pandas as pd   # ← WICHTIG: dieser Import hat gefehlt!
+
+from core.analysis.market_data import (
+    get_history,
+    calc_returns,
+    annual_vol,
+    sharpe_ratio,
+    max_drawdown
+)
 
 def stock_compare(t1, t2):
     p1 = get_history(t1)
