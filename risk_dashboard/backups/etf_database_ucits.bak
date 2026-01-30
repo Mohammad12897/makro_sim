@@ -112,53 +112,5 @@
     "ticker": "EWJ",
     "region": "Asien",
     "asset_class": "Equity"
-  },
-  {
-    "name": "Lyxor CAC 40 UCITS ETF",
-    "ticker": "CAC.PA",
-    "region": "Europa",
-    "asset_class": "Equity"
-  },
-  {
-    "name": "Amundi MSCI France UCITS ETF",
-    "ticker": "FRC.PA",
-    "region": "Europa",
-    "asset_class": "Equity"
-  },
-  {
-    "name": "Lyxor MSCI France UCITS ETF",
-    "ticker": "MFR.PA",
-    "region": "Europa",
-    "asset_class": "Equity"
-  },
-  {
-    "name": "Vanguard FTSE 100 UCITS ETF",
-    "ticker": "VUKE.L",
-    "region": "Europa",
-    "asset_class": "Equity"
-  },
-  {
-    "name": "iShares MSCI UK UCITS ETF",
-    "ticker": "CSUK.L",
-    "region": "Europa",
-    "asset_class": "Equity"
-  },
-  {
-    "name": "iShares Core MSCI Japan IMI UCITS ETF",
-    "ticker": "SJPA.L",
-    "region": "Asien",
-    "asset_class": "Equity"
-  },
-  {
-    "name": "Xtrackers Nikkei 225 UCITS ETF",
-    "ticker": "XDJP.DE",
-    "region": "Asien",
-    "asset_class": "Equity"
-  },
-  {
-    "name": "Lyxor MSCI Japan UCITS ETF",
-    "ticker": "JPN.PA",
-    "region": "Asien",
-    "asset_class": "Equity"
   }
 ]
