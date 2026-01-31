@@ -53,6 +53,8 @@ from core.analysis.market_data import get_metrics
 from core.analysis.stock_compare import stock_compare
 from core.utils.country_utils import get_all_countries
 
+from core.visualization.radar import plot_radar
+
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
@@ -116,23 +118,87 @@ def app():
 
         # ---------------- Radar Overlay ----------------
         with gr.Tab("Radar-Overlay"):
-            r_country = gr.Dropdown(choices=countries, label="Land")
-            r_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
-            r_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
-            r_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
-            r_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
-
-            r_button = gr.Button("Radar aktualisieren")
-            r_ampel = gr.Markdown()
-            r_plot = gr.Plot()
-            r_story = gr.Markdown()
-
-
-            r_button.click(
-                compute_radar_overlay,
-                [r_country, r_w_equity, r_w_bond, r_w_gold, r_years],
-                [r_ampel, r_plot, r_story],
+            # Auswahl: mehrere Ticker
+            all_etfs = [e["ticker"] for e in load_etf_db()]
+            tickers_multi = gr.CheckboxGroup(
+                choices=all_etfs,
+                label="ETFs/Aktien für Radar-Overlay auswählen",
+                value=all_etfs[:3]  # Default: erste 3
             )
+
+            radar_plot = gr.Plot()
+            radar_table = gr.Dataframe(interactive=False, label="Kennzahlen (Rohwerte)")
+
+            def build_radar(selected):
+                db = load_etf_db()
+                rows = []
+                for e in db:
+                    if e["ticker"] in selected:
+                        m = get_metrics(e)
+                        if m:
+                            rows.append(m)
+                if not rows:
+                    return None, pd.DataFrame()
+                fig = plot_radar(rows)
+                return fig, pd.DataFrame(rows)
+
+            tickers_multi.change(build_radar, inputs=[tickers_multi], outputs=[radar_plot, radar_table])
+
+            gr.Markdown("""
+### Interpretation des Radar-Overlays
+
+- **Rendite 1Y / 5Y:** weiter außen = höhere Rendite  
+- **Volatilität:** weiter außen = höheres Risiko (wird intern so skaliert, dass "besser" außen liegt)  
+- **Sharpe Ratio:** weiter außen = bessere risikobereinigte Rendite  
+- **Max Drawdown:** weiter außen = geringerer maximaler Verlust  
+- **Beta:** weiter außen = näher an 1 (marktähnliches Verhalten)  
+
+Die Tabelle darunter zeigt die **exakten Werte** der Kennzahlen.
+
+## 📘 Finanzkennzahlen – Lexikon
+
+### Rendite (1Y, 5Y)
+Wie stark der Wert gestiegen ist.  
+- **1Y** = letztes Jahr  
+- **5Y** = letzte fünf Jahre  
+
+---
+
+### Volatilität
+Wie stark der Kurs schwankt.  
+- Hohe Volatilität = hohes Risiko  
+- Niedrige Volatilität = stabiler  
+
+---
+
+### Sharpe Ratio
+Rendite pro Risiko.  
+- **1.0 = gut**  
+- **2.0 = sehr gut**  
+
+---
+
+### Max Drawdown
+Größter Verlust vom letzten Hoch.  
+Zeigt, wie schlimm ein Crash war.  
+
+---
+
+### Beta
+Sensitivität zum Markt.  
+- **1.0 = bewegt sich wie der Markt**  
+- **> 1.0 = aggressiver**  
+- **< 1.0 = defensiver**  
+
+---
+
+### Korrelation
+Wie ähnlich sich zwei Werte bewegen.  
+- **1.0 = identisch**  
+- **0.0 = unabhängig**  
+- **−1.0 = gegensätzlich**  
+""")
+
             pdf_button = gr.Button("Portfolio als PDF exportieren")
             pdf_file = gr.File()
 
@@ -152,7 +218,7 @@ def app():
                 [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
                 scen_table,
             )
-            
+
         with gr.Tab("Ländervergleich"):
 
             country_list = get_country_choices()
@@ -200,12 +266,12 @@ def app():
             gr.Markdown("""
 ### 📘 Finanzkennzahlen – Lexikon
 
-**Rendite (1Y, 5Y)** – Wertentwicklung über 1 bzw. 5 Jahre  
-**Volatilität** – Schwankungsbreite (Risiko)  
-**Sharpe Ratio** – Rendite pro Risiko  
-**Max Drawdown** – Größter Verlust vom Hoch  
-**Beta** – Sensitivität zum Markt  
-**TER** – Kostenquote des ETFs  
+**Rendite (1Y, 5Y)** – Wertentwicklung über 1 bzw. 5 Jahre
+**Volatilität** – Schwankungsbreite (Risiko)
+**Sharpe Ratio** – Rendite pro Risiko
+**Max Drawdown** – Größter Verlust vom Hoch
+**Beta** – Sensitivität zum Markt
+**TER** – Kostenquote des ETFs
 """)
 
         with gr.Tab("Aktienvergleich"):
