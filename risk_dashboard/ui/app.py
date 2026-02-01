@@ -49,7 +49,7 @@ from core.data.country_map import get_country_choices, resolve_country
 from core.ui_helpers import countries_with_etfs
 
 from core.data.etf_db_loader import load_etf_db
-from core.analysis.market_data import get_metrics
+from core.analysis.market_data import get_metrics, get_fundamentals
 from core.analysis.stock_compare import stock_compare
 from core.utils.country_utils import get_all_countries
 
@@ -57,6 +57,11 @@ from core.visualization.radar import plot_radar
 from core.analysis.portfolio_metrics import aggregate_portfolio
 from core.visualization.lexicon import get_lexicon
 
+from core.data.stock_list import load_stock_list
+from core.visualization.radar_plotly import plot_radar_plotly
+from core.analysis.stock_clusterin import cluster_stocks
+
+    
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
@@ -121,17 +126,16 @@ def app():
         # ---------------- Radar Overlay ----------------
         with gr.Tab("Radar Aktien"):
             # Aktienliste laden
-            try:
-                stock_db = load_stock_db()
-                all_stocks = [s["ticker"] for s in stock_db]
-            except:
-                all_stocks = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL"]
-
+            
+            stock_list = load_stock_list()
             # Eingabe
-            aktien = gr.CheckboxGroup(
-                choices=all_stocks,
-                label="Aktien auswählen (beliebig viele)"
+            aktien = gr.Dropdown(
+                choices=stock_list,
+                multiselect=True,
+                label="Aktien auswählen (beliebig viele)",
+                info="Autocomplete aktiviert"
             )
+            benchmark = gr.Checkbox(label="SPY als Benchmark hinzufügen")
             btn = gr.Button("Radar anzeigen")
 
             # Ausgabe
@@ -139,31 +143,50 @@ def app():
             radar_table = gr.Dataframe(label="Kennzahlen", interactive=False)
             lexikon_table = gr.Dataframe(label="Lexikon", interactive=False)
 
-            def build_stock_radar(tickers):
-        
+            # --- Cluster Analyse UI ---
+            cluster_btn = gr.Button("Cluster-Analyse")
+            cluster_table = gr.Dataframe(label="Cluster-Ergebnis", interactive=False)
+
+            def build_stock_radar(tickers, benchmark):
+
                 if not tickers:
                     return None, pd.DataFrame(), pd.DataFrame()
 
                 rows = []
                 for t in tickers:
                     entry = {"ticker": t, "name": t, "region": "Global", "asset_class": "Equity"}
-                    m = get_metrics(entry)
-                    if m:
-                        rows.append(m)
+                    metrics = get_metrics(entry)
+                    fund = get_fundamentals(t)
+                    metrics.update(fund)
+                    rows.append(metrics)
 
-                if not rows:
-                    return None, pd.DataFrame(), pd.DataFrame()
+                if benchmark:
+                    spy_entry = {"ticker": "SPY", "name": "SPY", "region": "USA", "asset_class": "Equity"}
+                    spy_metrics = get_metrics(spy_entry)
+                    rows.append(spy_metrics)
 
-                fig = plot_radar(rows)
+                fig = plot_radar_plotly(rows)
                 lex = get_lexicon("aktien")
 
                 return fig, pd.DataFrame(rows), pd.DataFrame(lex)
 
-            btn.click(
-                build_stock_radar,
-                inputs=[aktien],
-                outputs=[radar_plot, radar_table, lexikon_table]
-            )
+
+            def run_cluster(tickers):
+                if not tickers:
+                    return pd.DataFrame({"Fehler": ["Bitte mindestens eine Aktie auswählen"]})
+
+                rows = []
+                for t in tickers:
+                    entry = {"ticker": t, "name": t, "region": "Global", "asset_class": "Equity"}
+                    metrics = get_metrics(entry)
+                    fund = get_fundamentals(t)
+                    metrics.update(fund)
+                    rows.append(metrics)
+
+                df = cluster_stocks(rows)
+                return df
+            btn.click(build_stock_radar, inputs=[aktien, benchmark], outputs=[radar_plot, radar_table, lexikon_table])
+            cluster_btn.click(run_cluster, inputs=[aktien], outputs=[cluster_table])
 
         with gr.Tab("Radar Länder"):
 
