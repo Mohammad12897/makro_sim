@@ -193,23 +193,27 @@ def app():
                 if not sel:
                     return None, pd.DataFrame({"Fehler": ["Bitte ETFs auswählen"]})
 
-                # 2. Gewichte robust parsen
-                try:
-                    ws = [float(x.strip()) for x in w_str.split(",") if x.strip() != ""]
-                except ValueError:
-                    return None, pd.DataFrame({"Fehler": ["Gewichte müssen Zahlen sein (z.B. 0.5,0.3,0.2)"]})
+                # 2. Wenn keine Gewichte eingegeben → automatisch gleich verteilen
+                if not w_str.strip():
+                    ws = [1 / len(sel)] * len(sel)
+                else:
+                    # 3. Gewichte robust parsen
+                    try:
+                        ws = [float(x.strip()) for x in w_str.split(",") if x.strip() != ""]
+                    except ValueError:
+                        return None, pd.DataFrame({"Fehler": ["Gewichte müssen Zahlen sein (z.B. 0.5,0.3,0.2)"]})
 
-                # 3. Anzahl prüfen
-                if len(ws) != len(sel):
-                    return None, pd.DataFrame({"Fehler": [f"Anzahl Gewichte ({len(ws)}) passt nicht zu Anzahl ETFs ({len(sel)})"]})
+                    # 4. Wenn Anzahl nicht passt → automatisch gleich verteilen
+                    if len(ws) != len(sel):
+                        ws = [1 / len(sel)] * len(sel)
 
-                # 4. Normieren
+                # 5. Normieren
                 s = sum(ws)
                 if s == 0:
                     return None, pd.DataFrame({"Fehler": ["Summe der Gewichte darf nicht 0 sein"]})
                 ws = [w / s for w in ws]
 
-                # 5. Kennzahlen laden
+                # 6. Kennzahlen laden
                 db = load_etf_db()
                 rows = []
                 for t in sel:
@@ -222,16 +226,14 @@ def app():
                 if not rows:
                     return None, pd.DataFrame({"Fehler": ["Keine Kennzahlen gefunden"]})
 
-                # 6. Portfolio aggregieren
+                # 7. Portfolio aggregieren
                 portfolio_row = aggregate_portfolio(rows, ws)
 
-                # 7. Radar zeichnen
+                # 8. Radar zeichnen
                 fig = plot_radar([portfolio_row])
 
                 return fig, pd.DataFrame([portfolio_row])
-
             btn.click(build_portfolio_radar, inputs=[tickers, weights], outputs=[radar_plot, radar_table])
-
 
 
         with gr.Tab("Radar-Overlay"):
