@@ -70,3 +70,13 @@ def get_metrics(entry):
         "Sharpe": round(sharpe_ratio(rets), 2),
         "Max Drawdown %": round(max_drawdown(prices) * 100, 2),
     }
+
+def get_fundamentals(ticker):
+    d = yf.Ticker(ticker).info
+
+    return {
+        "KGV": d.get("trailingPE"),
+        "KBV": d.get("priceToBook"),
+        "KUV": d.get("priceToSalesTrailing12Months"),
+        "DivRendite %": d.get("dividendYield", 0) * 100 if d.get("dividendYield") else None,
+    }
