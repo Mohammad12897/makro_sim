@@ -55,6 +55,7 @@ from core.utils.country_utils import get_all_countries
 
 from core.visualization.radar import plot_radar
 from core.analysis.portfolio_metrics import aggregate_portfolio
+from core.visualization.lexicon import get_lexicon
 
 
 print("Europa:", list_etf_by_region("Europa"))
@@ -119,102 +120,125 @@ def app():
 
         # ---------------- Radar Overlay ----------------
         with gr.Tab("Radar Aktien"):
-            t1 = gr.Textbox(label="Ticker 1", value="AAPL")
-            t2 = gr.Textbox(label="Ticker 2", value="MSFT")
-            btn = gr.Button("Radar anzeigen")
-            radar_plot = gr.Plot()
-            radar_table = gr.Dataframe(interactive=False)
+            # Aktienliste laden
+            try:
+                stock_db = load_stock_db()
+                all_stocks = [s["ticker"] for s in stock_db]
+            except:
+                all_stocks = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL"]
 
-            def build_stock_radar(a, b):
+            # Eingabe
+            aktien = gr.CheckboxGroup(
+                choices=all_stocks,
+                label="Aktien auswählen (beliebig viele)"
+            )
+            btn = gr.Button("Radar anzeigen")
+
+            # Ausgabe
+            radar_plot = gr.Plot(label="Radar-Chart")
+            radar_table = gr.Dataframe(label="Kennzahlen", interactive=False)
+            lexikon_table = gr.Dataframe(label="Lexikon", interactive=False)
+
+            def build_stock_radar(tickers):
+        
+                if not tickers:
+                    return None, pd.DataFrame(), pd.DataFrame()
+
                 rows = []
-                for t in [a, b]:
+                for t in tickers:
                     entry = {"ticker": t, "name": t, "region": "Global", "asset_class": "Equity"}
                     m = get_metrics(entry)
                     if m:
                         rows.append(m)
+
                 if not rows:
-                    return None, pd.DataFrame()
+                    return None, pd.DataFrame(), pd.DataFrame()
+
                 fig = plot_radar(rows)
-                return fig, pd.DataFrame(rows)
+                lex = get_lexicon("aktien")
 
-            btn.click(build_stock_radar, inputs=[t1, t2], outputs=[radar_plot, radar_table])
+                return fig, pd.DataFrame(rows), pd.DataFrame(lex)
 
+            btn.click(
+                build_stock_radar,
+                inputs=[aktien],
+                outputs=[radar_plot, radar_table, lexikon_table]
+            )
 
         with gr.Tab("Radar Länder"):
+
             region_map = {
                 "USA": ["SPY"],
                 "Europa": ["EUNA.DE"],
-                "Japan": ["EWJ", "XDJP.DE", "JPN.PA"]
+                "Japan": ["EWJ"],
+                "China": ["FXI"],
+                "Emerging Markets": ["EEM"],
             }
 
-            regions = gr.CheckboxGroup(
-                choices=list(region_map.keys()),
-                value=["USA", "Europa", "Japan"],
-                label="Regionen auswählen"
-            )
+            regions = gr.CheckboxGroup(choices=list(region_map.keys()), label="Regionen auswählen")
             radar_plot = gr.Plot()
             radar_table = gr.Dataframe(interactive=False)
+            lexikon_table = gr.Dataframe(interactive=False)
 
-            def build_region_radar(selected_regions):
+            def build_region_radar(selected):
+                if not selected:
+                    return None, pd.DataFrame(), pd.DataFrame()
+
                 db = load_etf_db()
                 rows = []
-                for r in selected_regions:
-                    tickers = region_map[r]
-                    # nimm den ersten, der in der DB existiert
-                    for t in tickers:
+
+                for r in selected:
+                    for t in region_map[r]:
                         entry = next((e for e in db if e["ticker"] == t), None)
                         if entry:
                             m = get_metrics(entry)
                             if m:
-                                m["Ticker"] = r  # Label = Region
+                                m["Ticker"] = r
                                 rows.append(m)
                             break
                 if not rows:
-                    return None, pd.DataFrame()
+                    return None, pd.DataFrame(), pd.DataFrame()
+
                 fig = plot_radar(rows)
-                return fig, pd.DataFrame(rows)
+                lex = get_lexicon("laender")
 
-            regions.change(build_region_radar, inputs=[regions], outputs=[radar_plot, radar_table])
+                return fig, pd.DataFrame(rows), pd.DataFrame(lex)
 
+            regions.change(build_region_radar, inputs=[regions], outputs=[radar_plot, radar_table, lexikon_table])
 
         with gr.Tab("Radar Portfolio"):
+
             db = load_etf_db()
             all_etfs = [e["ticker"] for e in db]
 
             tickers = gr.CheckboxGroup(choices=all_etfs, label="Portfolio-ETFs")
-            weights = gr.Textbox(label="Gewichte (z.B. 0.5,0.3,0.2)")
+            weights = gr.Textbox(label="Gewichte (optional, z.B. 0.5,0.3,0.2)")
             btn = gr.Button("Portfolio-Radar")
             radar_plot = gr.Plot()
             radar_table = gr.Dataframe(interactive=False)
+            lexikon_table = gr.Dataframe(interactive=False)
 
             def build_portfolio_radar(sel, w_str):
+                import pandas as pd
 
-                # 1. Keine Auswahl
                 if not sel:
-                    return None, pd.DataFrame({"Fehler": ["Bitte ETFs auswählen"]})
+                    return None, pd.DataFrame(), pd.DataFrame()
 
-                # 2. Wenn keine Gewichte eingegeben → automatisch gleich verteilen
+                # Auto-Gewichte
                 if not w_str.strip():
                     ws = [1 / len(sel)] * len(sel)
                 else:
-                    # 3. Gewichte robust parsen
                     try:
-                        ws = [float(x.strip()) for x in w_str.split(",") if x.strip() != ""]
-                    except ValueError:
-                        return None, pd.DataFrame({"Fehler": ["Gewichte müssen Zahlen sein (z.B. 0.5,0.3,0.2)"]})
+                        ws = [float(x.strip()) for x in w_str.split(",") if x.strip()]
+                    except:
+                        return None, pd.DataFrame({"Fehler": ["Ungültige Gewichte"]}), pd.DataFrame()
 
-                    # 4. Wenn Anzahl nicht passt → automatisch gleich verteilen
                     if len(ws) != len(sel):
                         ws = [1 / len(sel)] * len(sel)
 
-                # 5. Normieren
                 s = sum(ws)
-                if s == 0:
-                    return None, pd.DataFrame({"Fehler": ["Summe der Gewichte darf nicht 0 sein"]})
                 ws = [w / s for w in ws]
 
-                # 6. Kennzahlen laden
-                db = load_etf_db()
                 rows = []
                 for t in sel:
                     entry = next((e for e in db if e["ticker"] == t), None)
@@ -224,17 +248,15 @@ def app():
                             rows.append(m)
 
                 if not rows:
-                    return None, pd.DataFrame({"Fehler": ["Keine Kennzahlen gefunden"]})
+                    return None, pd.DataFrame(), pd.DataFrame()
 
-                # 7. Portfolio aggregieren
                 portfolio_row = aggregate_portfolio(rows, ws)
-
-                # 8. Radar zeichnen
                 fig = plot_radar([portfolio_row])
+                lex = get_lexicon("portfolio")
 
-                return fig, pd.DataFrame([portfolio_row])
-            btn.click(build_portfolio_radar, inputs=[tickers, weights], outputs=[radar_plot, radar_table])
+                return fig, pd.DataFrame([portfolio_row]), pd.DataFrame(lex)
 
+            btn.click(build_portfolio_radar, inputs=[tickers, weights], outputs=[radar_plot, radar_table, lexikon_table])
 
         with gr.Tab("Radar-Overlay"):
             # Auswahl: mehrere Ticker
