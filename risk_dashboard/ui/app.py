@@ -54,6 +54,7 @@ from core.analysis.stock_compare import stock_compare
 from core.utils.country_utils import get_all_countries
 
 from core.visualization.radar import plot_radar
+from core.analysis.portfolio_metrics import aggregate_portfolio
 
 
 print("Europa:", list_etf_by_region("Europa"))
@@ -117,6 +118,122 @@ def app():
     with gr.Blocks() as demo:
 
         # ---------------- Radar Overlay ----------------
+        with gr.Tab("Radar Aktien"):
+            t1 = gr.Textbox(label="Ticker 1", value="AAPL")
+            t2 = gr.Textbox(label="Ticker 2", value="MSFT")
+            btn = gr.Button("Radar anzeigen")
+            radar_plot = gr.Plot()
+            radar_table = gr.Dataframe(interactive=False)
+
+            def build_stock_radar(a, b):
+                rows = []
+                for t in [a, b]:
+                    entry = {"ticker": t, "name": t, "region": "Global", "asset_class": "Equity"}
+                    m = get_metrics(entry)
+                    if m:
+                        rows.append(m)
+                if not rows:
+                    return None, pd.DataFrame()
+                fig = plot_radar(rows)
+                return fig, pd.DataFrame(rows)
+
+            btn.click(build_stock_radar, inputs=[t1, t2], outputs=[radar_plot, radar_table])
+
+
+        with gr.Tab("Radar Länder"):
+            region_map = {
+                "USA": ["SPY"],
+                "Europa": ["EUNA.DE"],
+                "Japan": ["EWJ", "XDJP.DE", "JPN.PA"]
+            }
+
+            regions = gr.CheckboxGroup(
+                choices=list(region_map.keys()),
+                value=["USA", "Europa", "Japan"],
+                label="Regionen auswählen"
+            )
+            radar_plot = gr.Plot()
+            radar_table = gr.Dataframe(interactive=False)
+
+            def build_region_radar(selected_regions):
+                db = load_etf_db()
+                rows = []
+                for r in selected_regions:
+                    tickers = region_map[r]
+                    # nimm den ersten, der in der DB existiert
+                    for t in tickers:
+                        entry = next((e for e in db if e["ticker"] == t), None)
+                        if entry:
+                            m = get_metrics(entry)
+                            if m:
+                                m["Ticker"] = r  # Label = Region
+                                rows.append(m)
+                            break
+                if not rows:
+                    return None, pd.DataFrame()
+                fig = plot_radar(rows)
+                return fig, pd.DataFrame(rows)
+
+            regions.change(build_region_radar, inputs=[regions], outputs=[radar_plot, radar_table])
+
+
+        with gr.Tab("Radar Portfolio"):
+            db = load_etf_db()
+            all_etfs = [e["ticker"] for e in db]
+
+            tickers = gr.CheckboxGroup(choices=all_etfs, label="Portfolio-ETFs")
+            weights = gr.Textbox(label="Gewichte (z.B. 0.5,0.3,0.2)")
+            btn = gr.Button("Portfolio-Radar")
+            radar_plot = gr.Plot()
+            radar_table = gr.Dataframe(interactive=False)
+
+            def build_portfolio_radar(sel, w_str):
+
+                # 1. Keine Auswahl
+                if not sel:
+                    return None, pd.DataFrame({"Fehler": ["Bitte ETFs auswählen"]})
+
+                # 2. Gewichte robust parsen
+                try:
+                    ws = [float(x.strip()) for x in w_str.split(",") if x.strip() != ""]
+                except ValueError:
+                    return None, pd.DataFrame({"Fehler": ["Gewichte müssen Zahlen sein (z.B. 0.5,0.3,0.2)"]})
+
+                # 3. Anzahl prüfen
+                if len(ws) != len(sel):
+                    return None, pd.DataFrame({"Fehler": [f"Anzahl Gewichte ({len(ws)}) passt nicht zu Anzahl ETFs ({len(sel)})"]})
+
+                # 4. Normieren
+                s = sum(ws)
+                if s == 0:
+                    return None, pd.DataFrame({"Fehler": ["Summe der Gewichte darf nicht 0 sein"]})
+                ws = [w / s for w in ws]
+
+                # 5. Kennzahlen laden
+                db = load_etf_db()
+                rows = []
+                for t in sel:
+                    entry = next((e for e in db if e["ticker"] == t), None)
+                    if entry:
+                        m = get_metrics(entry)
+                        if m:
+                            rows.append(m)
+
+                if not rows:
+                    return None, pd.DataFrame({"Fehler": ["Keine Kennzahlen gefunden"]})
+
+                # 6. Portfolio aggregieren
+                portfolio_row = aggregate_portfolio(rows, ws)
+
+                # 7. Radar zeichnen
+                fig = plot_radar([portfolio_row])
+
+                return fig, pd.DataFrame([portfolio_row])
+
+            btn.click(build_portfolio_radar, inputs=[tickers, weights], outputs=[radar_plot, radar_table])
+
+
+
         with gr.Tab("Radar-Overlay"):
             # Auswahl: mehrere Ticker
             all_etfs = [e["ticker"] for e in load_etf_db()]
@@ -140,6 +257,7 @@ def app():
                 if not rows:
                     return None, pd.DataFrame()
                 fig = plot_radar(rows)
+
                 return fig, pd.DataFrame(rows)
 
             tickers_multi.change(build_radar, inputs=[tickers_multi], outputs=[radar_plot, radar_table])
@@ -147,56 +265,56 @@ def app():
             gr.Markdown("""
 ### Interpretation des Radar-Overlays
 
-- **Rendite 1Y / 5Y:** weiter außen = höhere Rendite  
-- **Volatilität:** weiter außen = höheres Risiko (wird intern so skaliert, dass "besser" außen liegt)  
-- **Sharpe Ratio:** weiter außen = bessere risikobereinigte Rendite  
-- **Max Drawdown:** weiter außen = geringerer maximaler Verlust  
-- **Beta:** weiter außen = näher an 1 (marktähnliches Verhalten)  
+- **Rendite 1Y / 5Y:** weiter außen = höhere Rendite
+- **Volatilität:** weiter außen = höheres Risiko (wird intern so skaliert, dass "besser" außen liegt)
+- **Sharpe Ratio:** weiter außen = bessere risikobereinigte Rendite
+- **Max Drawdown:** weiter außen = geringerer maximaler Verlust
+- **Beta:** weiter außen = näher an 1 (marktähnliches Verhalten)
 
 Die Tabelle darunter zeigt die **exakten Werte** der Kennzahlen.
 
 ## 📘 Finanzkennzahlen – Lexikon
 
 ### Rendite (1Y, 5Y)
-Wie stark der Wert gestiegen ist.  
-- **1Y** = letztes Jahr  
-- **5Y** = letzte fünf Jahre  
+Wie stark der Wert gestiegen ist.
+- **1Y** = letztes Jahr
+- **5Y** = letzte fünf Jahre
 
 ---
 
 ### Volatilität
-Wie stark der Kurs schwankt.  
-- Hohe Volatilität = hohes Risiko  
-- Niedrige Volatilität = stabiler  
+Wie stark der Kurs schwankt.
+- Hohe Volatilität = hohes Risiko
+- Niedrige Volatilität = stabiler
 
 ---
 
 ### Sharpe Ratio
-Rendite pro Risiko.  
-- **1.0 = gut**  
-- **2.0 = sehr gut**  
+Rendite pro Risiko.
+- **1.0 = gut**
+- **2.0 = sehr gut**
 
 ---
 
 ### Max Drawdown
-Größter Verlust vom letzten Hoch.  
-Zeigt, wie schlimm ein Crash war.  
+Größter Verlust vom letzten Hoch.
+Zeigt, wie schlimm ein Crash war.
 
 ---
 
 ### Beta
-Sensitivität zum Markt.  
-- **1.0 = bewegt sich wie der Markt**  
-- **> 1.0 = aggressiver**  
-- **< 1.0 = defensiver**  
+Sensitivität zum Markt.
+- **1.0 = bewegt sich wie der Markt**
+- **> 1.0 = aggressiver**
+- **< 1.0 = defensiver**
 
 ---
 
 ### Korrelation
-Wie ähnlich sich zwei Werte bewegen.  
-- **1.0 = identisch**  
-- **0.0 = unabhängig**  
-- **−1.0 = gegensätzlich**  
+Wie ähnlich sich zwei Werte bewegen.
+- **1.0 = identisch**
+- **0.0 = unabhängig**
+- **−1.0 = gegensätzlich**
 """)
 
             pdf_button = gr.Button("Portfolio als PDF exportieren")
