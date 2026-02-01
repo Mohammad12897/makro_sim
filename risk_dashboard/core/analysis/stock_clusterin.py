@@ -3,25 +3,33 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
-def cluster_stocks(rows, n_clusters=3):
+def cluster_stocks(rows):
     df = pd.DataFrame(rows)
 
-    # Features, die wir clustern wollen
+    # Features für Clustering
     features = ["1Y %", "5Y %", "Volatilität %", "Sharpe", "Max Drawdown %", "Beta"]
 
-    # Fehlende Spalten automatisch hinzufügen
+    # Fehlende Spalten automatisch ergänzen
     for f in features:
         if f not in df.columns:
             df[f] = 0
 
-    # Nur die Features extrahieren
     df_clean = df[features].fillna(0)
 
-    # Normalisieren
+    # Anzahl Aktien
+    n = len(df_clean)
+
+    # Wenn weniger als 3 Aktien → kein Clustering möglich
+    if n < 3:
+        df["Cluster"] = "Nicht genug Daten (min. 3 Aktien)"
+        return df
+
+    # Anzahl Cluster = min(3, Anzahl Aktien)
+    k = min(3, n)
+
     X = StandardScaler().fit_transform(df_clean)
 
-    # KMeans
-    kmeans = KMeans(n_clusters=n_clusters, n_init=10)
+    kmeans = KMeans(n_clusters=k, n_init=10)
     df["Cluster"] = kmeans.fit_predict(X)
 
     return df
