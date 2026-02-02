@@ -51,7 +51,7 @@ def get_metrics(entry):
     name = entry.get("name", ticker)
     region = entry.get("region", "Global")
     asset_class = entry.get("asset_class", "Equity")
-
+    
     prices = get_history(ticker, years=5)
     if prices.empty:
         return None
@@ -59,17 +59,18 @@ def get_metrics(entry):
     one_year = prices[prices.index >= (prices.index.max() - pd.Timedelta(days=365))]
     rets = calc_returns(prices)
 
-    return {
-        "Ticker": ticker,
-        "Name": name,
-        "Region": region,
-        "Asset-Klasse": asset_class,
+    metrics = {
+        "ticker": ticker,
+        "name": name,
+        "region": region,
+        "asset_class": asset_class,
         "1Y %": round(perf(one_year) * 100, 2),
         "5Y %": round(perf(prices) * 100, 2),
         "Volatilität %": round(annual_vol(rets) * 100, 2),
         "Sharpe": round(sharpe_ratio(rets), 2),
         "Max Drawdown %": round(max_drawdown(prices) * 100, 2),
     }
+    return metrics
 
 def get_fundamentals(ticker):
     d = yf.Ticker(ticker).info

@@ -61,7 +61,9 @@ from core.data.stock_list import load_stock_list
 from core.visualization.radar_plotly import plot_radar_plotly
 from core.analysis.stock_clusterin import cluster_stocks
 
-    
+from core.analysis.normalize import normalize_metrics
+
+
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
@@ -126,7 +128,7 @@ def app():
         # ---------------- Radar Overlay ----------------
         with gr.Tab("Radar Aktien"):
             # Aktienliste laden
-            
+
             stock_list = load_stock_list()
             # Eingabe
             aktien = gr.Dropdown(
@@ -164,6 +166,8 @@ def app():
                     spy_entry = {"ticker": "SPY", "name": "SPY", "region": "USA", "asset_class": "Equity"}
                     spy_metrics = get_metrics(spy_entry)
                     rows.append(spy_metrics)
+
+                rows = normalize_metrics(rows)
 
                 fig = plot_radar_plotly(rows)
                 lex = get_lexicon("aktien")
