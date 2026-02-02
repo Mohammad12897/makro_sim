@@ -1,4 +1,4 @@
-#core/analysis/visualization/lexicon.py
+#core/visualization/lexicon.py
 
 def get_lexicon(tab_type: str):
     """
