@@ -104,7 +104,6 @@ def plot_radar(rows: List[Dict]):
     # Achsenbeschriftung
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels)
-
     ax.set_yticklabels([])  # keine Radiallabels, nur Form
 
     # Farben
@@ -112,8 +111,7 @@ def plot_radar(rows: List[Dict]):
 
     for i, r in enumerate(rows):
         ticker = r.get("ticker") or r.get("Ticker")
-        vals = norm[ticker]
-        vals += vals[:1]
+        vals = norm[ticker] + norm[ticker][:1]
         ax.plot(angles, vals, color=colors[i % len(colors)], linewidth=2, label=ticker)
         ax.fill(angles, vals, color=colors[i % len(colors)], alpha=0.15)
 
