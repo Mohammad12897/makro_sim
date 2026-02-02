@@ -2,8 +2,8 @@
 import plotly.graph_objects as go
 
 def plot_radar_plotly(rows):
-    metrics = ["1Y %", "5Y %", "Volatilität %", "Sharpe", "Max Drawdown %", "Beta"]
-
+    metrics = ["1Y %", "5Y %", "Volatilität %", "Sharpe", "Max Drawdown %", "Beta",
+               "KGV", "KBV", "KUV", "DivRendite %"]
     fig = go.Figure()
 
     for r in rows:

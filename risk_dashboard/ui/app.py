@@ -137,7 +137,11 @@ def app():
                 label="Aktien auswählen (beliebig viele)",
                 info="Autocomplete aktiviert"
             )
-            benchmark = gr.Checkbox(label="SPY als Benchmark hinzufügen")
+            benchmark_choice = gr.Dropdown(
+                choices=["SPY", "QQQ", "VT", "None"],
+                value="None",
+                label="Benchmark auswählen"
+            )
             btn = gr.Button("Radar anzeigen")
 
             # Ausgabe
@@ -149,23 +153,25 @@ def app():
             cluster_btn = gr.Button("Cluster-Analyse")
             cluster_table = gr.Dataframe(label="Cluster-Ergebnis", interactive=False)
 
-            def build_stock_radar(tickers, benchmark):
+            def build_stock_radar(tickers, benchmark_choice):
 
                 if not tickers:
                     return None, pd.DataFrame(), pd.DataFrame()
 
                 rows = []
                 for t in tickers:
-                    entry = {"ticker": t, "name": t, "region": "Global", "asset_class": "Equity"}
+                    entry = {"ticker": t, "name": t}
                     metrics = get_metrics(entry)
                     fund = get_fundamentals(t)
                     metrics.update(fund)
                     rows.append(metrics)
 
-                if benchmark:
-                    spy_entry = {"ticker": "SPY", "name": "SPY", "region": "USA", "asset_class": "Equity"}
-                    spy_metrics = get_metrics(spy_entry)
-                    rows.append(spy_metrics)
+                if benchmark_choice != "None":
+                    entry = {"ticker": benchmark_choice, "name": benchmark_choice}
+                    bm = get_metrics(entry)
+                    fund_bm = get_fundamentals(benchmark_choice)
+                    bm.update(fund_bm)
+                    rows.append(bm)
 
                 rows = normalize_metrics(rows)
 
@@ -181,15 +187,17 @@ def app():
 
                 rows = []
                 for t in tickers:
-                    entry = {"ticker": t, "name": t, "region": "Global", "asset_class": "Equity"}
+                    entry = {"ticker": t, "name": t}
                     metrics = get_metrics(entry)
                     fund = get_fundamentals(t)
                     metrics.update(fund)
                     rows.append(metrics)
 
+                rows = normalize_metrics(rows)
                 df = cluster_stocks(rows)
                 return df
-            btn.click(build_stock_radar, inputs=[aktien, benchmark], outputs=[radar_plot, radar_table, lexikon_table])
+
+            btn.click(build_stock_radar, inputs=[aktien, benchmark_choice], outputs=[radar_plot, radar_table, lexikon_table])
             cluster_btn.click(run_cluster, inputs=[aktien], outputs=[cluster_table])
 
         with gr.Tab("Radar Länder"):
@@ -284,6 +292,28 @@ def app():
                 return fig, pd.DataFrame([portfolio_row]), pd.DataFrame(lex)
 
             btn.click(build_portfolio_radar, inputs=[tickers, weights], outputs=[radar_plot, radar_table, lexikon_table])
+
+        with gr.Tab("Aktien Screener"):
+            min_sharpe = gr.Slider(0, 2, value=0.5, label="Min Sharpe")
+            max_vol = gr.Slider(0, 50, value=25, label="Max Volatilität %")
+            max_kgv = gr.Slider(0, 60, value=30, label="Max KGV")
+
+            btn_screen = gr.Button("Filtern")
+            screen_table = gr.Dataframe(label="Gefilterte Aktien")
+
+            def screen_stocks(min_sharpe, max_vol, max_kgv):
+                rows = []
+                for t in load_stock_list():
+                    m = get_metrics({"ticker": t})
+                    if not m:
+                        continue
+
+                    if m["Sharpe"] >= min_sharpe and m["Volatilität %"] <= max_vol and m.get("KGV", 999) <= max_kgv:
+                        rows.append(m)
+
+                return pd.DataFrame(rows)
+            btn_screen.click(screen_stocks, inputs=[min_sharpe, max_vol, max_kgv], outputs=[screen_table])
+
 
         with gr.Tab("Radar-Overlay"):
             # Auswahl: mehrere Ticker

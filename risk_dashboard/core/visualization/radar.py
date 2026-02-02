@@ -42,7 +42,7 @@ def _normalize_values(rows: List[Dict]) -> Dict[str, List[float]]:
     # Normierung 0–1
     norm = {}
     for r in rows:
-        ticker = r["Ticker"]
+        ticker = r.get("ticker") or r.get("Ticker")
         vals = []
         for name, high_is_good in RADAR_METRICS:
             raw = r.get(name)
@@ -111,7 +111,7 @@ def plot_radar(rows: List[Dict]):
     colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown"]
 
     for i, r in enumerate(rows):
-        ticker = r["Ticker"]
+        ticker = r.get("ticker") or r.get("Ticker")
         vals = norm[ticker]
         vals += vals[:1]
         ax.plot(angles, vals, color=colors[i % len(colors)], linewidth=2, label=ticker)

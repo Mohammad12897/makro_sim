@@ -19,7 +19,7 @@ def get_history(ticker, years=5):
         return df["Close"].dropna()
     else:
         return pd.Series(dtype=float)
-        
+
 def calc_returns(prices):
     return prices.pct_change().dropna()
 
@@ -51,7 +51,7 @@ def get_metrics(entry):
     name = entry.get("name", ticker)
     region = entry.get("region", "Global")
     asset_class = entry.get("asset_class", "Equity")
-    
+
     prices = get_history(ticker, years=5)
     if prices.empty:
         return None
@@ -70,6 +70,9 @@ def get_metrics(entry):
         "Sharpe": round(sharpe_ratio(rets), 2),
         "Max Drawdown %": round(max_drawdown(prices) * 100, 2),
     }
+
+    fund = get_fundamentals(ticker)
+    metrics.update(fund)
     return metrics
 
 def get_fundamentals(ticker):

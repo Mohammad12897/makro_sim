@@ -19,6 +19,8 @@ def get_lexicon(tab_type: str):
         extra = [
             {"Kennzahl": "KGV", "Erklärung": "Kurs-Gewinn-Verhältnis"},
             {"Kennzahl": "KUV", "Erklärung": "Kurs-Umsatz-Verhältnis"},
+            {"Kennzahl": "KBV", "Erklärung": "Kurs-Buchwert-Verhältnis"},
+            {"Kennzahl": "DivRendite %", "Erklärung": "Dividendenrendite in Prozent"},
         ]
         return base + extra
 
