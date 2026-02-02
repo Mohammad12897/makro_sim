@@ -21,6 +21,10 @@ def get_lexicon(tab_type: str):
             {"Kennzahl": "KUV", "Erklärung": "Kurs-Umsatz-Verhältnis"},
             {"Kennzahl": "KBV", "Erklärung": "Kurs-Buchwert-Verhältnis"},
             {"Kennzahl": "DivRendite %", "Erklärung": "Dividendenrendite in Prozent"},
+            {"Kennzahl": "BIP-Wachstum", "Erklärung": "Wirtschaftswachstum des Landes"},
+            {"Kennzahl": "Inflation", "Erklärung": "Teuerungsrate im Land"},
+            {"Kennzahl": "Zinsen", "Erklärung": "Leitzins des Landes"},
+            {"Kennzahl": "Arbeitslosenquote", "Erklärung": "Arbeitslosenquote des Landes"},
         ]
         return base + extra
 

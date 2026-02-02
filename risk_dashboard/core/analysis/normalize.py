@@ -1,12 +1,19 @@
 #core/analysis/normalize.py
 def normalize_metrics(rows):
     # Alle Kennzahlen, die normiert werden sollen
-    metrics = [
+    base_metrics = [
         "1Y %", "5Y %", "Volatilität %", "Sharpe", "Max Drawdown %", "Beta",
         "KGV", "KBV", "KUV", "DivRendite %"
     ]
 
-    # Fehlende Werte ersetzen
+    # Makrodaten
+    macro_metrics = ["BIP-Wachstum", "Inflation", "Zinsen", "Arbeitslosenquote"]
+
+    fundamentals = ["KGV", "KBV", "KUV", "DivRendite %"]
+    
+    metrics = base_metrics + macro_metrics
+
+    #Fehlende Werte ersetzen
     for r in rows:
         for m in metrics:
             if r.get(m) is None:

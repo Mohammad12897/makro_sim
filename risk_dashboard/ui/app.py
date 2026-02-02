@@ -62,7 +62,8 @@ from core.visualization.radar_plotly import plot_radar_plotly
 from core.analysis.stock_clusterin import cluster_stocks
 
 from core.analysis.normalize import normalize_metrics
-
+from core.data.ticker_country_map import map_ticker_to_country
+from core.data.country_macro import get_country_macro
 
 
 print("Europa:", list_etf_by_region("Europa"))
@@ -162,8 +163,14 @@ def app():
                 for t in tickers:
                     entry = {"ticker": t, "name": t}
                     metrics = get_metrics(entry)
+                    if metrics is None:
+                        continue
                     fund = get_fundamentals(t)
                     metrics.update(fund)
+
+                    country = map_ticker_to_country(t)
+                    macro = get_country_macro(country)
+                    metrics.update(macro)
                     rows.append(metrics)
 
                 if benchmark_choice != "None":
@@ -171,6 +178,10 @@ def app():
                     bm = get_metrics(entry)
                     fund_bm = get_fundamentals(benchmark_choice)
                     bm.update(fund_bm)
+
+                    country_bm = map_ticker_to_country(benchmark_choice)
+                    bm.update(get_country_macro(country_bm))
+
                     rows.append(bm)
 
                 rows = normalize_metrics(rows)
@@ -189,8 +200,13 @@ def app():
                 for t in tickers:
                     entry = {"ticker": t, "name": t}
                     metrics = get_metrics(entry)
+                    if metrics is None:
+                        continue
                     fund = get_fundamentals(t)
                     metrics.update(fund)
+                    country = map_ticker_to_country(t)
+                    macro = get_country_macro(country)
+                    metrics.update(macro)
                     rows.append(metrics)
 
                 rows = normalize_metrics(rows)
