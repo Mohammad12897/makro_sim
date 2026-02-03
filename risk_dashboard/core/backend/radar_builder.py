@@ -10,6 +10,7 @@ from core.data.portfolio import get_portfolio_metrics
 from core.utils.normalize import normalize_metrics_list
 from core.utils.pdf import export_radar_pdf
 
+
 import traceback
 
 def build_country_radar(countries, mode):
@@ -51,16 +52,31 @@ def build_etf_radar(etfs, mode):
     return fig, pd.DataFrame(rows), pd.DataFrame(lex)
 
 
-def build_portfolio_radar(portfolio_name, mode):
-    # hier kannst du später echte Portfolio-Daten einhängen
-    metrics = get_portfolio_metrics(portfolio_name)  # dict mit Gewichteter Sharpe, Gewichtete Volatilität, 1Y %, 5Y %, Diversifikation, Region-Exposure
-    metrics["portfolio_name"] = portfolio_name
-    rows = [metrics]
 
-    rows = normalize_metrics_list(rows, scope="portfolio")
-    fig = plot_portfolio_radar(rows, mode=mode)
-    lex = get_lexicon("portfolio", mode=mode)
 
-    pdf_bytes = export_radar_pdf(fig, metrics, portfolio_name, mode)
+def build_portfolio_radar(portfolio_name: str, mode: str):
+    """
+    Baut das Portfolio-Radar + Tabelle + Lexikon + PDF-Pfad.
+    Rückgabe: fig, df_metrics, df_lexicon, pdf_path
+    """
+    try:
+        metrics = get_portfolio_metrics(portfolio_name)
+        if not metrics:
+            return None, pd.DataFrame(), pd.DataFrame(), None
 
-    return fig, pd.DataFrame(rows), pd.DataFrame(lex), pdf_bytes
+        # ggf. Normierung, falls du sie hier brauchst
+        rows = [metrics]
+        rows = normalize_metrics_list(rows, scope="portfolio")
+        df_metrics = pd.DataFrame(rows)
+
+        fig = plot_portfolio_radar(rows, mode=mode)
+        lex = get_lexicon("portfolio", mode=mode)
+        df_lex = pd.DataFrame(lex)
+
+        pdf_path = export_radar_pdf(fig, metrics, portfolio_name, mode)
+
+        return fig, df_metrics, df_lex, pdf_path
+
+    except Exception as e:
+        print("Fehler in build_portfolio_radar:", e)
+        return None, pd.DataFrame({"Fehler": [str(e)]}), pd.DataFrame(), None
