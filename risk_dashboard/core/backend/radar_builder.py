@@ -10,22 +10,28 @@ from core.data.portfolio import get_portfolio_metrics
 from core.utils.normalize import normalize_metrics_list
 from core.utils.pdf import export_radar_pdf
 
+import traceback
 
 def build_country_radar(countries, mode):
-    if not countries:
-        return None, pd.DataFrame(), pd.DataFrame()
+    try:
+        if not countries:
+            return None, pd.DataFrame(), pd.DataFrame()
 
-    rows = []
-    for c in countries:
-        macro = get_country_macro(c)  # dict mit BIP-Wachstum, Inflation, Zinsen, Arbeitslosenquote, ...
-        macro["country"] = c
-        rows.append(macro)
+        rows = []
+        for c in countries:
+            macro = get_country_macro(c)
+            macro["country"] = c
+            rows.append(macro)
 
-    rows = normalize_metrics_list(rows, scope="laender")
-    fig = plot_country_radar(rows, mode=mode)
-    lex = get_lexicon("laender", mode=mode)
+        rows = normalize_metrics_list(rows, scope="laender")
+        fig = plot_country_radar(rows, mode=mode)
+        lex = get_lexicon("laender", mode=mode)
 
-    return fig, pd.DataFrame(rows), pd.DataFrame(lex)
+        return fig, pd.DataFrame(rows), pd.DataFrame(lex)
+
+    except Exception as e:
+        print("Fehler in build_country_radar:", e)
+        return None, pd.DataFrame({"Fehler": [str(e)]}), pd.DataFrame()
 
 
 def build_etf_radar(etfs, mode):

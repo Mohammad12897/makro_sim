@@ -1,46 +1,47 @@
-#core/utils/pdf.py
+# core/utils/pdf.py
+
+from fpdf import FPDF
+import plotly.io as pio
 import io
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from plotly.io import to_image
+
+
+class PDF(FPDF):
+    def header(self):
+        self.set_font("Helvetica", "B", 16)
+        self.cell(0, 10, self.title, ln=True, align="L")
+        self.ln(5)
 
 
 def export_radar_pdf(fig, metrics: dict, title: str, mode: str):
     """
-    Erzeugt ein PDF mit:
-    - Titel
-    - Radar-Grafik
-    - Kennzahlen-Tabelle (kurz)
-    Gibt BytesIO zurück, das du direkt an gr.File geben kannst.
+    PDF-Export ohne Kaleido und ohne reportlab.
+    Nutzt:
+    - Plotly SVG Export (funktioniert ohne Kaleido)
+    - FPDF2 für PDF-Erzeugung
     """
 
-    buffer = io.BytesIO()
+    # 1) Radar als SVG exportieren
+    svg_bytes = fig.to_image(format="svg")
+    svg_stream = io.BytesIO(svg_bytes)
 
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+    # 2) PDF erzeugen
+    pdf = PDF()
+    pdf.set_title(f"Radar-Analyse: {title} ({mode})")
+    pdf.add_page()
 
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, height - 50, f"Radar-Analyse: {title} ({mode})")
+    # 3) SVG einfügen
+    pdf.image(svg_stream, x=10, y=30, w=180)
 
-    # Plotly-Figur als PNG
-    img_bytes = to_image(fig, format="png", width=800, height=600)
-    img_buffer = io.BytesIO(img_bytes)
+    # 4) Kennzahlen darunter
+    pdf.ln(120)
+    pdf.set_font("Helvetica", size=12)
+    pdf.cell(0, 10, "Kennzahlen:", ln=True)
 
-    # Bild einfügen
-    c.drawImage(img_buffer, 50, height - 650, width=500, height=500, preserveAspectRatio=True, mask='auto')
-
-    # Kennzahlen kurz darunter
-    c.setFont("Helvetica", 10)
-    y = height - 680
+    pdf.set_font("Helvetica", size=10)
     for k, v in metrics.items():
         if isinstance(v, (int, float, str)):
-            c.drawString(50, y, f"{k}: {v}")
-            y -= 12
-            if y < 50:
-                c.showPage()
-                y = height - 50
+            pdf.cell(0, 8, f"{k}: {v}", ln=True)
 
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    return buffer
+    # 5) PDF als Bytes zurückgeben
+    output = pdf.output(dest="S").encode("latin1")
+    return io.BytesIO(output)
