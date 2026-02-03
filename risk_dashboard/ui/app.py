@@ -246,90 +246,66 @@ def app():
             laender_table = gr.Dataframe(label="Makro-Daten", interactive=False)
             laender_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
 
-
-
-            def build_region_radar(selected):
-                if not selected:
-                    return None, pd.DataFrame(), pd.DataFrame()
-
-                db = load_etf_db()
-                rows = []
-
-                for r in selected:
-                    for t in region_map[r]:
-                        entry = next((e for e in db if e["ticker"] == t), None)
-                        if entry:
-                            m = get_metrics(entry)
-                            if m:
-                                m["Ticker"] = r
-                                rows.append(m)
-                            break
-                if not rows:
-                    return None, pd.DataFrame(), pd.DataFrame()
-
-                fig = plot_radar(rows)
-                lex = get_lexicon("laender")
-
-                return fig, pd.DataFrame(rows), pd.DataFrame(lex)
-
             laender_button.click(
                 build_country_radar,
                 inputs=[laender_input, laender_mode],
                 outputs=[laender_radar_plot, laender_table, laender_lexicon],
             )
 
+        with gr.Tab("Radar ETF"):
+
+            etf_input = gr.Dropdown(
+                choices=["SPY", "QQQ", "VT", "VEA", "VWO", "EWJ", "EEM"],
+                multiselect=True,
+                label="ETFs auswählen",
+                info="Mehrere ETFs möglich"
+            )
+
+            etf_mode = gr.Dropdown(
+                ["einsteiger", "experte"],
+                alue="einsteiger",
+                label="Modus"
+            )
+
+            etf_button = gr.Button("ETF-Radar erstellen")
+
+            etf_radar_plot = gr.Plot(label="ETF-Radar")
+            etf_table = gr.Dataframe(label="ETF-Daten", interactive=False)
+            etf_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
+
+            etf_button.click(
+                build_etf_radar,
+                inputs=[etf_input, etf_mode],
+                outputs=[etf_radar_plot, etf_table, etf_lexicon],
+            )
+
 
         with gr.Tab("Radar Portfolio"):
 
-            db = load_etf_db()
-            all_etfs = [e["ticker"] for e in db]
+            portfolio_name = gr.Textbox(
+                label="Portfolioname",
+                value="Mein Portfolio"
+            )
 
-            tickers = gr.CheckboxGroup(choices=all_etfs, label="Portfolio-ETFs")
-            weights = gr.Textbox(label="Gewichte (optional, z.B. 0.5,0.3,0.2)")
-            btn = gr.Button("Portfolio-Radar")
-            radar_plot = gr.Plot()
-            radar_table = gr.Dataframe(interactive=False)
-            lexikon_table = gr.Dataframe(interactive=False)
+            portfolio_mode = gr.Dropdown(
+                ["einsteiger", "experte"],
+                value="einsteiger",
+                label="Modus"
+            )
 
-            def build_portfolio_radar(sel, w_str):
-                import pandas as pd
+            portfolio_button = gr.Button("Portfolio-Radar erstellen")
 
-                if not sel:
-                    return None, pd.DataFrame(), pd.DataFrame()
+            portfolio_radar_plot = gr.Plot(label="Portfolio-Radar")
+            portfolio_table = gr.Dataframe(label="Portfolio-Daten", interactive=False)
+            portfolio_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
+            portfolio_pdf = gr.File(label="Radar-Analyse PDF")
 
-                # Auto-Gewichte
-                if not w_str.strip():
-                    ws = [1 / len(sel)] * len(sel)
-                else:
-                    try:
-                        ws = [float(x.strip()) for x in w_str.split(",") if x.strip()]
-                    except:
-                        return None, pd.DataFrame({"Fehler": ["Ungültige Gewichte"]}), pd.DataFrame()
+            portfolio_button.click(
+                build_portfolio_radar,
+                inputs=[portfolio_name, portfolio_mode],
+                utputs=[portfolio_radar_plot, portfolio_table, portfolio_lexicon, portfolio_pdf],
+            )
 
-                    if len(ws) != len(sel):
-                        ws = [1 / len(sel)] * len(sel)
-
-                s = sum(ws)
-                ws = [w / s for w in ws]
-
-                rows = []
-                for t in sel:
-                    entry = next((e for e in db if e["ticker"] == t), None)
-                    if entry:
-                        m = get_metrics(entry)
-                        if m:
-                            rows.append(m)
-
-                if not rows:
-                    return None, pd.DataFrame(), pd.DataFrame()
-
-                portfolio_row = aggregate_portfolio(rows, ws)
-                fig = plot_radar([portfolio_row])
-                lex = get_lexicon("portfolio")
-
-                return fig, pd.DataFrame([portfolio_row]), pd.DataFrame(lex)
-
-            btn.click(build_portfolio_radar, inputs=[tickers, weights], outputs=[radar_plot, radar_table, lexikon_table])
 
         with gr.Tab("Aktien Screener"):
             min_sharpe = gr.Slider(0, 2, value=0.5, label="Min Sharpe")
