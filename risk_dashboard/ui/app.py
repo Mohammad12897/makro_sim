@@ -227,19 +227,26 @@ def app():
             cluster_btn.click(run_cluster, inputs=[aktien], outputs=[cluster_table])
 
         with gr.Tab("Radar Länder"):
+            laender_input = gr.Dropdown(
+                choices=["USA", "Deutschland", "Japan", "UK", "Frankreich", "China", "Indien"],
+                multiselect=True,
+                label="Länder auswählen",
+                info="Mehrere Länder möglich"
+            )
 
-            region_map = {
-                "USA": ["SPY"],
-                "Europa": ["EUNA.DE"],
-                "Japan": ["EWJ"],
-                "China": ["FXI"],
-                "Emerging Markets": ["EEM"],
-            }
+            laender_mode = gr.Dropdown(
+                ["einsteiger", "experte"],
+                value="einsteiger",
+                label="Modus"
+            )
 
-            regions = gr.CheckboxGroup(choices=list(region_map.keys()), label="Regionen auswählen")
-            radar_plot = gr.Plot()
-            radar_table = gr.Dataframe(interactive=False)
-            lexikon_table = gr.Dataframe(interactive=False)
+            laender_button = gr.Button("Länder-Radar erstellen")
+
+            laender_radar_plot = gr.Plot(label="Länder-Radar")
+            laender_table = gr.Dataframe(label="Makro-Daten", interactive=False)
+            laender_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
+
+
 
             def build_region_radar(selected):
                 if not selected:
@@ -265,7 +272,12 @@ def app():
 
                 return fig, pd.DataFrame(rows), pd.DataFrame(lex)
 
-            regions.change(build_region_radar, inputs=[regions], outputs=[radar_plot, radar_table, lexikon_table])
+            laender_button.click(
+                build_country_radar,
+                inputs=[laender_input, laender_mode],
+                outputs=[laender_radar_plot, laender_table, laender_lexicon],
+            )
+
 
         with gr.Tab("Radar Portfolio"):
 
