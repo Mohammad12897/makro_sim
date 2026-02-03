@@ -171,6 +171,7 @@ def app():
                     country = map_ticker_to_country(t)
                     macro = get_country_macro(country)
                     metrics.update(macro)
+                    metrics["country"] = country
                     rows.append(metrics)
 
                 if benchmark_choice != "None":
@@ -181,6 +182,7 @@ def app():
 
                     country_bm = map_ticker_to_country(benchmark_choice)
                     bm.update(get_country_macro(country_bm))
+                    bm["country"] = country_bm   # ← WICHTIG
 
                     rows.append(bm)
 
@@ -207,6 +209,7 @@ def app():
                     country = map_ticker_to_country(t)
                     macro = get_country_macro(country)
                     metrics.update(macro)
+                    metrics["country"] = country
                     rows.append(metrics)
 
                 rows = normalize_metrics(rows)

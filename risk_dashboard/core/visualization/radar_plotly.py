@@ -22,9 +22,11 @@ def plot_radar_plotly(rows):
             r=values,
             theta=metrics,
             fill='toself',
-            name=r.get("name", r.get("ticker", "Unknown")),
+            #name=r.get("name", r.get("ticker", "Unknown")),
+            name=f"{r.get('name', r.get('ticker'))} ({r.get('country', '')})",
             hovertemplate="<b>%{text}</b><br>%{r}<extra></extra>",
-            text=[r.get("name", r.get("ticker", ""))] * len(metrics)
+            #text=[r.get("name", r.get("ticker", ""))] * len(metrics)
+            text=[f"{r.get('name', r.get('ticker'))} – {r.get('country', '')}"] * len(metrics)
         ))
 
     fig.update_layout(
