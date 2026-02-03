@@ -138,23 +138,30 @@ def app():
                 label="Aktien auswählen (beliebig viele)",
                 info="Autocomplete aktiviert"
             )
-            benchmark_choice = gr.Dropdown(
+            benchmark_dropdown = gr.Dropdown(
                 choices=["SPY", "QQQ", "VT", "None"],
                 value="None",
                 label="Benchmark auswählen"
             )
-            btn = gr.Button("Radar anzeigen")
+
+            mode_dropdown = gr.Dropdown(
+                choices=["einsteiger", "experte"],
+                value="einsteiger",
+                label="Modus",
+            )
+
+            stock_button = gr.Button("Radar erstellen")
 
             # Ausgabe
-            radar_plot = gr.Plot(label="Radar-Chart")
-            radar_table = gr.Dataframe(label="Kennzahlen", interactive=False)
-            lexikon_table = gr.Dataframe(label="Lexikon", interactive=False)
+            stock_radar_plot = gr.Plot(label="Radar-Chart")
+            stock_radar_table = gr.Dataframe(label="Daten")
+            stock_lexikon_table = gr.Dataframe(label="Lexikon")
 
             # --- Cluster Analyse UI ---
             cluster_btn = gr.Button("Cluster-Analyse")
             cluster_table = gr.Dataframe(label="Cluster-Ergebnis", interactive=False)
 
-            def build_stock_radar(tickers, benchmark_choice):
+            def build_stock_radar(tickers, benchmark_choice, mode):
 
                 if not tickers:
                     return None, pd.DataFrame(), pd.DataFrame()
@@ -188,8 +195,8 @@ def app():
 
                 rows = normalize_metrics(rows)
 
-                fig = plot_radar_plotly(rows)
-                lex = get_lexicon("aktien")
+                fig = plot_radar_plotly(rows, mode=mode)
+                lex = get_lexicon("aktien", mode=mode)
 
                 return fig, pd.DataFrame(rows), pd.DataFrame(lex)
 
@@ -216,7 +223,7 @@ def app():
                 df = cluster_stocks(rows)
                 return df
 
-            btn.click(build_stock_radar, inputs=[aktien, benchmark_choice], outputs=[radar_plot, radar_table, lexikon_table])
+            stock_button.click(build_stock_radar, inputs=[aktien, benchmark_dropdown, mode_dropdown], outputs=[stock_radar_plot, stock_radar_table, stock_lexikon_table])
             cluster_btn.click(run_cluster, inputs=[aktien], outputs=[cluster_table])
 
         with gr.Tab("Radar Länder"):
