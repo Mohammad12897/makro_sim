@@ -64,7 +64,8 @@ from core.analysis.stock_clusterin import cluster_stocks
 from core.analysis.normalize import normalize_metrics
 from core.data.ticker_country_map import map_ticker_to_country
 from core.data.country_macro import get_country_macro
-from  core.backend.radar_builder import build_country_radar
+from core.backend.radar_builder import build_country_radar, build_etf_radar, build_portfolio_radar
+
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
@@ -263,7 +264,7 @@ def app():
 
             etf_mode = gr.Dropdown(
                 ["einsteiger", "experte"],
-                alue="einsteiger",
+                value="einsteiger",
                 label="Modus"
             )
 
@@ -303,7 +304,7 @@ def app():
             portfolio_button.click(
                 build_portfolio_radar,
                 inputs=[portfolio_name, portfolio_mode],
-                utputs=[portfolio_radar_plot, portfolio_table, portfolio_lexicon, portfolio_pdf],
+                outputs=[portfolio_radar_plot, portfolio_table, portfolio_lexicon, portfolio_pdf],
             )
 
 
