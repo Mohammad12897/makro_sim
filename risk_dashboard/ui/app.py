@@ -64,7 +64,7 @@ from core.analysis.stock_clusterin import cluster_stocks
 from core.analysis.normalize import normalize_metrics
 from core.data.ticker_country_map import map_ticker_to_country
 from core.data.country_macro import get_country_macro
-
+from  core.backend.radar_builder import build_country_radar
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
