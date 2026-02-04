@@ -152,3 +152,12 @@ def get_lexicon(tab_type: str, mode: str = "einsteiger"):
 def get_tooltip_map_for_tab(tab_type: str, mode: str = "einsteiger"):
     lex = get_lexicon(tab_type, mode)
     return {entry["Kennzahl"]: entry["Erklärung"] for entry in lex}
+
+def get_bitcoin_lexicon():
+    return [
+        {"Kennzahl": "Volatilität", "Beschreibung": "Wie stark Bitcoin schwankt."},
+        {"Kennzahl": "Sharpe‑Ratio", "Beschreibung": "Rendite im Verhältnis zum Risiko."},
+        {"Kennzahl": "Max Drawdown", "Beschreibung": "Größter Verlust vom Hoch zum Tief."},
+        {"Kennzahl": "SMA50/SMA200", "Beschreibung": "Trendindikator (Golden Cross / Death Cross)."},
+        {"Kennzahl": "Korrelation", "Beschreibung": "Zusammenhang mit Aktien oder Gold."},
+    ]

@@ -64,7 +64,7 @@ from core.analysis.stock_clusterin import cluster_stocks
 from core.analysis.normalize import normalize_metrics
 from core.data.ticker_country_map import map_ticker_to_country
 from core.data.country_macro import get_country_macro
-from core.backend.radar_builder import build_country_radar, build_etf_radar, build_portfolio_radar
+from core.backend.radar_builder import build_country_radar, build_etf_radar, build_portfolio_radar, build_asset_radar, get_bitcoin_metrics
 
 
 print("Europa:", list_etf_by_region("Europa"))
@@ -350,7 +350,7 @@ def app():
                 outputs=[laender_radar_plot, laender_table, laender_lexicon],
             )
 
-        with gr.Tab("Radar ETF"):
+        with gr.Tab("Radar ETF / Assets"):
             gr.Markdown("""
             ## 📈 ETF‑Radar
             Das ETF‑Radar bewertet ETFs anhand von:
@@ -367,10 +367,16 @@ def app():
             """)
 
             etf_input = gr.Dropdown(
-                choices=["SPY", "QQQ", "VT", "VEA", "VWO", "EWJ", "EEM"],
+                choices=["SPY", "QQQ", "VT", "VEA", "VWO", "EWJ", "EEM", "BTC-USD"],
                 multiselect=True,
                 label="ETFs auswählen",
-                info="Wähle einen oder mehrere ETFs für die Risiko‑ und Performance‑Analyse."
+                info="Wähle ETFs, Aktien oder Bitcoin aus."
+            )
+
+            custom_symbol = gr.Textbox(
+                label="Eigenes Symbol eingeben (optional)",
+                placeholder="z. B. BMW.DE, TSLA, NESN.SW, ETH-USD",
+                info="Hier kannst du jedes beliebige Symbol eingeben."
             )
 
             etf_mode = gr.Dropdown(
@@ -381,14 +387,14 @@ def app():
             )
 
             etf_button = gr.Button("ETF-Radar erstellen")
-            etf_radar_plot = gr.Plot(label="ETF-Radar")
-            etf_table = gr.Dataframe(label="ETF-Daten", interactive=False)
+            etf_radar_plot = gr.Plot(label="Asset-Radar")
+            etf_table = gr.Dataframe(label="Asset-Daten", interactive=False)
             etf_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
 
 
             etf_button.click(
-                build_etf_radar,
-                inputs=[etf_input, etf_mode],
+                build_asset_radar,
+                inputs=[etf_input,  custom_symbol, etf_mode],
                 outputs=[etf_radar_plot, etf_table, etf_lexicon],
             )
 
