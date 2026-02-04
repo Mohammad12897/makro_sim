@@ -1,10 +1,29 @@
 #core/data/assets.py
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
 
 # ---------------------------------------------------------
-# Hilfsfunktionen
+# Hilfsfunktion: Wert in float umwandeln
+# ---------------------------------------------------------
+
+def to_float(x):
+    """Konvertiert Series/Array/Scalar in float oder None."""
+    if x is None:
+        return None
+    if isinstance(x, (list, tuple, np.ndarray)):
+        return float(x[0])
+    if isinstance(x, pd.Series):
+        return float(x.iloc[0])
+    try:
+        return float(x)
+    except:
+        return None
+
+
+# ---------------------------------------------------------
+# Kursdaten laden
 # ---------------------------------------------------------
 
 def fetch_price_history(symbol, period="5y"):
@@ -17,42 +36,45 @@ def fetch_price_history(symbol, period="5y"):
         return None
 
 
+# ---------------------------------------------------------
+# Kennzahlen
+# ---------------------------------------------------------
+
 def calc_return(series, days):
     if len(series) < days:
         return None
-    return (series.iloc[-1] / series.iloc[-days] - 1) * 100
+    return float((series.iloc[-1] / series.iloc[-days] - 1) * 100)
 
 
 def calc_volatility(series, days):
     if len(series) < days:
         return None
-    return series.pct_change().tail(days).std() * np.sqrt(252) * 100
+    vol = series.pct_change().tail(days).std() * np.sqrt(252) * 100
+    return to_float(vol)
 
 
 def calc_sharpe(series, risk_free_rate=0.02):
     daily = series.pct_change().dropna()
-
     if daily.empty:
         return None
 
-    # Falls mehrere Spalten vorhanden sind → nur die erste verwenden
     if isinstance(daily, pd.DataFrame):
         daily = daily.iloc[:, 0]
 
     excess = daily.mean() * 252 - risk_free_rate
     vol = daily.std() * np.sqrt(252)
 
-    if vol is None or vol == 0 or np.isnan(vol):
+    vol = to_float(vol)
+    if vol is None or vol == 0:
         return None
 
-    return excess / vol
-
+    return float(excess / vol)
 
 
 def calc_drawdown(series):
     roll_max = series.cummax()
     drawdown = (series - roll_max) / roll_max
-    return drawdown.min() * 100
+    return float(drawdown.min() * 100)
 
 
 def calc_sma_ratio(series, short=50, long=200):
@@ -60,7 +82,7 @@ def calc_sma_ratio(series, short=50, long=200):
         return None
     sma_short = series.rolling(short).mean().iloc[-1]
     sma_long = series.rolling(long).mean().iloc[-1]
-    return sma_short / sma_long
+    return to_float(sma_short / sma_long)
 
 
 def calc_correlation(series, benchmark_symbol):
@@ -70,7 +92,7 @@ def calc_correlation(series, benchmark_symbol):
     df = pd.concat([series.pct_change(), bench.pct_change()], axis=1).dropna()
     if df.empty:
         return None
-    return df.corr().iloc[0, 1]
+    return float(df.corr().iloc[0, 1])
 
 
 # ---------------------------------------------------------
@@ -84,19 +106,19 @@ def get_bitcoin_metrics():
 
     return {
         "symbol": "BTC-USD",
-        "performance_1y": calc_return(series, 252),
-        "performance_3y": calc_return(series, 252 * 3),
-        "volatility_90d": calc_volatility(series, 90),
-        "sharpe": calc_sharpe(series),
-        "max_drawdown": calc_drawdown(series),
-        "trend_sma_ratio": calc_sma_ratio(series, 50, 200),
-        "correlation_spy": calc_correlation(series, "SPY"),
-        "correlation_gold": calc_correlation(series, "GLD"),
+        "performance_1y": to_float(calc_return(series, 252)),
+        "performance_3y": to_float(calc_return(series, 252 * 3)),
+        "volatility_90d": to_float(calc_volatility(series, 90)),
+        "sharpe": to_float(calc_sharpe(series)),
+        "max_drawdown": to_float(calc_drawdown(series)),
+        "trend_sma_ratio": to_float(calc_sma_ratio(series, 50, 200)),
+        "correlation_spy": to_float(calc_correlation(series, "SPY")),
+        "correlation_gold": to_float(calc_correlation(series, "GLD")),
     }
 
 
 # ---------------------------------------------------------
-# Allgemeine Asset-Kennzahlen (Aktien, ETFs)
+# Allgemeine Asset-Kennzahlen
 # ---------------------------------------------------------
 
 def get_asset_metrics(symbol):
@@ -106,10 +128,11 @@ def get_asset_metrics(symbol):
 
     return {
         "symbol": symbol,
-        "performance_1y": calc_return(series, 252),
-        "performance_3y": calc_return(series, 252 * 3),
-        "volatility_90d": calc_volatility(series, 90),
-        "sharpe": calc_sharpe(series),
-        "max_drawdown": calc_drawdown(series),
-        "trend_sma_ratio": calc_sma_ratio(series, 50, 200),
+        "performance_1y": to_float(calc_return(series, 252)),
+        "performance_3y": to_float(calc_return(series, 252 * 3)),
+        "volatility_90d": to_float(calc_volatility(series, 90)),
+        "sharpe": to_float(calc_sharpe(series)),
+        "max_drawdown": to_float(calc_drawdown(series)),
+        "trend_sma_ratio": to_float(calc_sma_ratio(series, 50, 200)),
     }
+

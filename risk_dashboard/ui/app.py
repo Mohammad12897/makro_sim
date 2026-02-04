@@ -200,13 +200,60 @@ def app():
             ### Diversifikation
             Verteilung des Risikos über viele Anlagen.
 
+            ### 🪙 Bitcoin
+
+            Bitcoin ist die erste und größte Kryptowährung.  
+            Sie funktioniert ohne zentrale Instanz und basiert auf einem Netzwerk von Computern,
+            die gemeinsam die Blockchain betreiben.
+
+            **Begriffe im Zusammenhang mit Bitcoin:**
+
+            - **Blockchain** – öffentliches Register aller Transaktionen  
+            - **Halving** – Ereignis, bei dem die Blockbelohnung halbiert wird (alle ~4 Jahre)  
+            - **Mining** – Prozess, bei dem neue Bitcoins erzeugt werden  
+            - **Wallet** – digitale Geldbörse für Bitcoin  
+            - **Private Key** – kryptografischer Schlüssel, der den Besitz beweist  
+            - **On‑Chain / Off‑Chain** – Transaktionen auf oder außerhalb der Blockchain  
             ---
 
+
+            ## 🪙 Bitcoin vs. 📈 ETF – Was ist der Unterschied?
+
+            ### **Bitcoin**
+            - digitale Währung  
+            - keine Firma, kein Index, kein Fonds  
+            - extrem volatil  
+            - begrenzte Menge (21 Mio.)  
+            - keine Dividenden  
+            - keine TER oder Verwaltungskosten  
+            - basiert auf Blockchain‑Technologie  
+
+            ### **ETF**
+            - Fonds, der einen Index abbildet  
+            - enthält viele Aktien oder Anleihen  
+            - geringe Kosten (TER)  
+            - hohe Diversifikation  
+            - reguliert und überwacht  
+            - stabile, langfristige Struktur  
+
+            ### **Warum beide im Asset‑Radar?**
+
+            Weil das Radar **Risiko und Performance** vergleicht — unabhängig vom Asset‑Typ.
+
+            Das Radar beantwortet:
+            - Wie volatil ist Bitcoin im Vergleich zu ETFs?  
+            - Wie ist die Sharpe‑Ratio im Vergleich zu Aktien?  
+            - Wie korreliert Bitcoin mit SPY oder Gold?  
+            - Welche Rolle spielt Bitcoin im Portfolio‑Risiko?  
+
+            So entsteht ein **einheitliches Analyse‑Framework** für alle Vermögenswerte.
+
+
             # 🎯 Wie lese ich ein Radar?
-            - Große Fläche = stark  
-            - Kleine Fläche = schwach  
-            - Gleichmäßige Form = stabil  
-            - Verzerrte Form = Risiko oder Ungleichgewicht  
+            - Große Fläche = stark
+            - Kleine Fläche = schwach
+            - Gleichmäßige Form = stabil
+            - Verzerrte Form = Risiko oder Ungleichgewicht
 
             """)
 
@@ -313,14 +360,14 @@ def app():
             gr.Markdown("""
             ## 🌍 Länder‑Radar
             Das Länder‑Radar bewertet die wirtschaftliche Stärke eines Landes anhand von:
-            - BIP‑Wachstum  
-            - Inflation  
-            - Zinsen  
-            - Arbeitslosenquote  
-            - Staatsverschuldung  
-            - Währungsstärke  
+            - BIP‑Wachstum
+            - Inflation
+            - Zinsen
+            - Arbeitslosenquote
+            - Staatsverschuldung
+            - Währungsstärke
 
-            **Frage, die das Radar beantwortet:**  
+            **Frage, die das Radar beantwortet:**
             *Wie stabil, wachstumsstark und wirtschaftlich attraktiv ist ein Land?*
             """)
 
@@ -352,17 +399,48 @@ def app():
 
         with gr.Tab("Radar ETF / Assets"):
             gr.Markdown("""
+            ### 🪙 Was ist Bitcoin?
+
+            Bitcoin ist eine **digitale, dezentrale Währung**, die ohne Banken oder Staaten funktioniert.
+            Sie basiert auf der **Blockchain**, einem öffentlichen, unveränderbaren Register aller Transaktionen.
+
+            **Wesentliche Eigenschaften:**
+            - begrenzte Menge (max. 21 Millionen)
+            - hohe Volatilität
+            - wird oft als „digitales Gold“ bezeichnet
+            - kann weltweit in Sekunden übertragen werden
+            - keine zentrale Kontrolle
+
+            **Warum im Asset‑Radar?**  
+            Bitcoin ist kein ETF und keine Aktie — aber ein **Asset**, das wie andere Vermögenswerte
+            über Risiko‑ und Performance‑Kennzahlen analysiert werden kann.
+
+            ## 🪙 Bitcoin‑Radar
+            Bitcoin wird im Asset‑Radar wie ein eigenständiges Asset behandelt.  
+            Es besitzt eigene Kennzahlen, die sich von ETFs und Aktien unterscheiden:
+
+            - **Volatilität** – misst die Schwankungsintensität  
+            - **Sharpe‑Ratio** – Verhältnis von Rendite zu Risiko  
+            - **Max Drawdown** – größter Verlust vom Hoch zum Tief  
+            - **SMA‑Trend (50/200)** – zeigt langfristige Trendrichtung  
+            - **Korrelation zu SPY** – Zusammenhang mit dem Aktienmarkt  
+            - **Korrelation zu Gold** – Vergleich zu einem klassischen Wertspeicher  
+
+            **Warum ist Bitcoin im Radar?**  
+            Weil es ein global handelbares Asset ist, das in Portfolios eine wichtige Rolle spielt:
+            Diversifikation, Trendverhalten, Risiko‑Rendite‑Profil.
+
             ## 📈 ETF‑Radar
             Das ETF‑Radar bewertet ETFs anhand von:
-            - Performance (1Y, 5Y)  
-            - Volatilität  
-            - Sharpe‑Ratio  
-            - TER (Kosten)  
-            - Tracking Error  
-            - Fondsgröße (AUM)  
-            - Dividendenrendite  
+            - Performance (1Y, 5Y)
+            - Volatilität
+            - Sharpe‑Ratio
+            - TER (Kosten)
+            - Tracking Error
+            - Fondsgröße (AUM)
+            - Dividendenrendite
 
-            **Frage, die das Radar beantwortet:**  
+            **Frage, die das Radar beantwortet:**
             *Wie gut ist ein ETF im Verhältnis zu Risiko, Kosten und Performance?*
             """)
 
@@ -403,13 +481,13 @@ def app():
             gr.Markdown("""
             ## 💼 Portfolio‑Radar
             Das Portfolio‑Radar bewertet:
-            - gewichtete Sharpe‑Ratio  
-            - gewichtete Volatilität  
-            - Diversifikation  
-            - Regionen‑Exposure  
-            - Gesamt‑Performance  
+            - gewichtete Sharpe‑Ratio
+            - gewichtete Volatilität
+            - Diversifikation
+            - Regionen‑Exposure
+            - Gesamt‑Performance
 
-            **Frage, die das Radar beantwortet:**  
+            **Frage, die das Radar beantwortet:**
             *Wie stabil, diversifiziert und ausgewogen ist mein Portfolio?*
             """)
 
@@ -434,7 +512,7 @@ def app():
              # WICHTIG: type="filepath"
 
             portfolio_pdf = gr.File(label="Radar-Analyse PDF" , type="filepath")
-            
+
 
             portfolio_button.click(
                 build_portfolio_radar,
