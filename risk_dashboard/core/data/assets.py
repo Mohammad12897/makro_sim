@@ -31,13 +31,22 @@ def calc_volatility(series, days):
 
 def calc_sharpe(series, risk_free_rate=0.02):
     daily = series.pct_change().dropna()
+
     if daily.empty:
         return None
+
+    # Falls mehrere Spalten vorhanden sind → nur die erste verwenden
+    if isinstance(daily, pd.DataFrame):
+        daily = daily.iloc[:, 0]
+
     excess = daily.mean() * 252 - risk_free_rate
     vol = daily.std() * np.sqrt(252)
-    if vol == 0:
+
+    if vol is None or vol == 0 or np.isnan(vol):
         return None
+
     return excess / vol
+
 
 
 def calc_drawdown(series):
