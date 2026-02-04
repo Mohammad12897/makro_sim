@@ -131,14 +131,16 @@ def app():
         with gr.Tab("Was bedeuten die Radare?"):
 
             gr.Markdown("""
+            # ℹ️ Was bedeuten die Radare?
+
             ## 🌍 Länder‑Radar
             Das Länder‑Radar bewertet die wirtschaftliche Stärke eines Landes anhand von:
-            - BIP‑Wachstum  
-            - Inflation  
-            - Zinsen  
-            - Arbeitslosenquote  
-            - Staatsverschuldung  
-            - Währungsstärke  
+            - BIP‑Wachstum
+            - Inflation
+            - Zinsen
+            - Arbeitslosenquote
+            - Staatsverschuldung
+            - Währungsstärke
 
             Es beantwortet: **Wie stabil und attraktiv ist ein Land wirtschaftlich?**
 
@@ -146,13 +148,13 @@ def app():
 
             ## 📈 ETF‑Radar
             Das ETF‑Radar bewertet ETFs anhand von:
-            - Performance (1Y, 5Y)  
-            - Volatilität  
-            - Sharpe‑Ratio  
-            - TER (Kosten)  
-            - Tracking Error  
-            - Fondsgröße (AUM)  
-            - Dividendenrendite  
+            - Performance (1Y, 5Y)
+            - Volatilität
+            - Sharpe‑Ratio
+            - TER (Kosten)
+            - Tracking Error
+            - Fondsgröße (AUM)
+            - Dividendenrendite
 
             Es beantwortet: **Wie gut ist ein ETF im Verhältnis zu Risiko, Kosten und Performance?**
 
@@ -160,13 +162,13 @@ def app():
 
             ## 💼 Portfolio‑Radar
             Das Portfolio‑Radar bewertet:
-            - gewichtete Sharpe‑Ratio  
-            - gewichtete Volatilität  
-            - Diversifikation  
-            - Regionen‑Exposure  
-            - Gesamt‑Performance  
+            - gewichtete Sharpe‑Ratio
+            - gewichtete Volatilität
+            - Diversifikation
+            - Regionen‑Exposure
+            - Gesamt‑Performance
 
-            Es beantwortet: **Wie stabil, diversifiziert und ausgewogen ist mein Portfolio?**
+            Es beantwortet: **Wie stabil, diversifiziert und ausgewogen (Gesamtqualität) ist mein Portfolio?**
 
             ---
 
@@ -174,7 +176,40 @@ def app():
             Ein Fonds ist ein großer Geldtopf, in den viele Anleger einzahlen.
             Ein Manager investiert dieses Geld in viele Wertpapiere (Aktien, Anleihen, Immobilien).
             Ein ETF ist ein **börsengehandelter Fonds**, der einen Index nachbildet.
+
+            # 📘 Glossar
+
+            ### ETF
+            Ein ETF ist ein börsengehandelter Fonds, der einen Index nachbildet.
+
+            ### Fonds
+            Ein Fonds ist ein großer Geldtopf, der in viele Wertpapiere investiert wird.
+
+            ### Anleihe
+            Eine Anleihe ist ein Kredit, den du einem Staat oder Unternehmen gibst und dafür Zinsen erhältst.
+
+            ### Sharpe‑Ratio
+            Verhältnis von Rendite zu Risiko.
+
+            ### Volatilität
+            Schwankungsintensität eines Wertpapiers.
+
+            ### TER
+            Gesamtkostenquote eines ETFs.
+
+            ### Diversifikation
+            Verteilung des Risikos über viele Anlagen.
+
+            ---
+
+            # 🎯 Wie lese ich ein Radar?
+            - Große Fläche = stark  
+            - Kleine Fläche = schwach  
+            - Gleichmäßige Form = stabil  
+            - Verzerrte Form = Risiko oder Ungleichgewicht  
+
             """)
+
         with gr.Tab("Radar Aktien"):
             # Aktienliste laden
 
@@ -275,6 +310,20 @@ def app():
             cluster_btn.click(run_cluster, inputs=[aktien], outputs=[cluster_table])
 
         with gr.Tab("Radar Länder"):
+            gr.Markdown("""
+            ## 🌍 Länder‑Radar
+            Das Länder‑Radar bewertet die wirtschaftliche Stärke eines Landes anhand von:
+            - BIP‑Wachstum  
+            - Inflation  
+            - Zinsen  
+            - Arbeitslosenquote  
+            - Staatsverschuldung  
+            - Währungsstärke  
+
+            **Frage, die das Radar beantwortet:**  
+            *Wie stabil, wachstumsstark und wirtschaftlich attraktiv ist ein Land?*
+            """)
+
             laender_input = gr.Dropdown(
                 choices=["USA", "Deutschland", "Japan", "UK", "Frankreich", "China", "Indien"],
                 multiselect=True,
@@ -295,10 +344,6 @@ def app():
             laender_table = gr.Dataframe(label="Makro-Daten", interactive=False)
             laender_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
 
-            gr.Markdown("""
-### 🌍 Länder‑Radar
-Bewertet die wirtschaftliche Stärke eines Landes anhand von BIP, Inflation, Zinsen, Arbeitslosenquote, Staatsverschuldung und Währungsstärke.
-""")
             laender_button.click(
                 build_country_radar,
                 inputs=[laender_input, laender_mode],
@@ -306,12 +351,26 @@ Bewertet die wirtschaftliche Stärke eines Landes anhand von BIP, Inflation, Zin
             )
 
         with gr.Tab("Radar ETF"):
+            gr.Markdown("""
+            ## 📈 ETF‑Radar
+            Das ETF‑Radar bewertet ETFs anhand von:
+            - Performance (1Y, 5Y)  
+            - Volatilität  
+            - Sharpe‑Ratio  
+            - TER (Kosten)  
+            - Tracking Error  
+            - Fondsgröße (AUM)  
+            - Dividendenrendite  
+
+            **Frage, die das Radar beantwortet:**  
+            *Wie gut ist ein ETF im Verhältnis zu Risiko, Kosten und Performance?*
+            """)
 
             etf_input = gr.Dropdown(
                 choices=["SPY", "QQQ", "VT", "VEA", "VWO", "EWJ", "EEM"],
                 multiselect=True,
                 label="ETFs auswählen",
-                info="Wähle einen ETF für die Risiko‑ und Performance‑Analyse."
+                info="Wähle einen oder mehrere ETFs für die Risiko‑ und Performance‑Analyse."
             )
 
             etf_mode = gr.Dropdown(
@@ -322,22 +381,9 @@ Bewertet die wirtschaftliche Stärke eines Landes anhand von BIP, Inflation, Zin
             )
 
             etf_button = gr.Button("ETF-Radar erstellen")
-
             etf_radar_plot = gr.Plot(label="ETF-Radar")
             etf_table = gr.Dataframe(label="ETF-Daten", interactive=False)
             etf_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
-
-            gr.Markdown("""
-### 📈 ETF‑Radar
-Bewertet ETFs anhand von:
-- Performance (1Y, 5Y)  
-- Volatilität  
-- Sharpe‑Ratio  
-- TER (Kosten)  
-- Tracking Error  
-- Fondsgröße (AUM)  
-- Dividendenrendite  
-""")
 
 
             etf_button.click(
@@ -348,6 +394,18 @@ Bewertet ETFs anhand von:
 
 
         with gr.Tab("Radar Portfolio"):
+            gr.Markdown("""
+            ## 💼 Portfolio‑Radar
+            Das Portfolio‑Radar bewertet:
+            - gewichtete Sharpe‑Ratio  
+            - gewichtete Volatilität  
+            - Diversifikation  
+            - Regionen‑Exposure  
+            - Gesamt‑Performance  
+
+            **Frage, die das Radar beantwortet:**  
+            *Wie stabil, diversifiziert und ausgewogen ist mein Portfolio?*
+            """)
 
             portfolio_name = gr.Textbox(
                 label="Portfolioname",
@@ -370,15 +428,7 @@ Bewertet ETFs anhand von:
              # WICHTIG: type="filepath"
 
             portfolio_pdf = gr.File(label="Radar-Analyse PDF" , type="filepath")
-            gr.Markdown("""
-### 💼 Portfolio‑Radar
-Bewertet die Gesamtqualität eines Portfolios anhand von:
-- gewichteter Sharpe‑Ratio  
-- gewichteter Volatilität  
-- Diversifikation  
-- Regionen‑Exposure  
-- Gesamt‑Performance  
-""")
+            
 
             portfolio_button.click(
                 build_portfolio_radar,
