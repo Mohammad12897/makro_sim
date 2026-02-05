@@ -43,7 +43,8 @@ def fetch_price_history(symbol, period="5y"):
 def calc_return(series, days):
     if len(series) < days:
         return None
-    return float((series.iloc[-1] / series.iloc[-days] - 1) * 100)
+    value = (series.iloc[-1] / series.iloc[-days] - 1) * 100
+    return to_float(value)
 
 
 def calc_volatility(series, days):
@@ -74,7 +75,7 @@ def calc_sharpe(series, risk_free_rate=0.02):
 def calc_drawdown(series):
     roll_max = series.cummax()
     drawdown = (series - roll_max) / roll_max
-    return float(drawdown.min() * 100)
+    return to_float(drawdown.min() * 100)
 
 
 def calc_sma_ratio(series, short=50, long=200):

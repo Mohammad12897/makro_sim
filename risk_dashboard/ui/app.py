@@ -64,7 +64,15 @@ from core.analysis.stock_clusterin import cluster_stocks
 from core.analysis.normalize import normalize_metrics
 from core.data.ticker_country_map import map_ticker_to_country
 from core.data.country_macro import get_country_macro
-from core.backend.radar_builder import build_country_radar, build_etf_radar, build_portfolio_radar, build_asset_radar, get_bitcoin_metrics
+from core.backend.radar_builder import ( 
+    build_country_radar, 
+    build_etf_radar, 
+    build_portfolio_radar, 
+    build_asset_radar, 
+    get_bitcoin_metrics, 
+    scan_assets,
+    compute_ki_score,
+)
 
 
 print("Europa:", list_etf_by_region("Europa"))
@@ -511,7 +519,7 @@ def app():
             Weil es ein global handelbares Asset ist, das in Portfolios eine wichtige Rolle spielt:
             Diversifikation, Trendverhalten, Risiko‑Rendite‑Profil.
             """)
-            
+
             gr.Markdown("""
             ## 📈 ETF‑Radar
             Das ETF‑Radar bewertet ETFs anhand von:
@@ -603,6 +611,40 @@ def app():
                 outputs=[portfolio_radar_plot, portfolio_table, portfolio_lexicon, portfolio_pdf],
             )
 
+        with gr.Tab("KI-Asset‑Scanner"):
+
+            gr.Markdown("""
+            # 🤖 KI‑Asset‑Scanner
+            Die KI bewertet jedes Asset nach:
+            - Risiko
+            - Rendite
+            - Trend
+            - Sharpe‑Ratio
+            - Drawdown
+            - Diversifikation
+            """)
+
+            asset_list = gr.Textbox(
+                label="Assets eingeben (Komma‑getrennt)",
+                placeholder="z. B. SPY, QQQ, VTI, BTC-USD, AAPL, MSFT"
+            )
+
+            profile = gr.Dropdown(
+                label="KI‑Profil",
+                choices=["ki", "stabil", "momentum", "value", "growth", "diversifikation", "krypto", "etf"],
+                value="ki"
+            )
+
+            scan_button = gr.Button("KI-Scan starten")
+
+            scan_table = gr.Dataframe(label="KI‑Ranking", interactive=False)
+            scan_plot = gr.Plot(label="Radar‑Vergleich")
+
+            scan_button.click(
+                scan_assets,
+                inputs=[asset_list, profile],
+                outputs=[scan_table, scan_plot]
+            )
 
         with gr.Tab("Aktien Screener"):
             min_sharpe = gr.Slider(0, 2, value=0.5, label="Min Sharpe")
