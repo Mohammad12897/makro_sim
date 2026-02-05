@@ -228,8 +228,35 @@ def app():
             - nicht von einer zentralen Instanz kontrolliert  
 
             Sie bildet die Grundlage für Bitcoin und viele andere digitale Assets.
+            """)
 
+            gr.Markdown("""
+            ### 🔗 Was ist die Blockchain?
 
+            Die Blockchain ist ein **dezentrales, unveränderbares Register**, das alle Bitcoin‑Transaktionen speichert.
+            Statt einer zentralen Datenbank wird sie von tausenden Computern weltweit gemeinsam betrieben.
+            Jeder neue Block baut auf dem vorherigen auf – dadurch entsteht eine **fälschungssichere Kette**.
+
+            ## 🔗 Blockchain – Einsteiger‑Erklärung
+
+            Die Blockchain ist das technische Fundament von Bitcoin.  
+            Man kann sie sich wie ein **digitales Kassenbuch** vorstellen, das:
+
+            - **öffentlich einsehbar** ist  
+            - **nicht manipuliert** werden kann  
+            - **von tausenden Computern gleichzeitig geführt** wird  
+            - **jede Transaktion dauerhaft speichert**
+
+            Jeder Block enthält:
+            - eine Liste von Transaktionen  
+            - einen Zeitstempel  
+            - einen kryptografischen Fingerabdruck (Hash)  
+            - den Hash des vorherigen Blocks  
+
+            Durch diese Struktur entsteht eine **Kette von Blöcken**, die praktisch nicht gefälscht werden kann.
+            """)
+
+            gr.Markdown("""
             ## 🧩 Wie funktioniert eine Blockchain?
 
             Stell dir die Blockchain wie eine **Kette aus nummerierten Blöcken** vor:
@@ -483,32 +510,9 @@ def app():
             **Warum ist Bitcoin im Radar?**
             Weil es ein global handelbares Asset ist, das in Portfolios eine wichtige Rolle spielt:
             Diversifikation, Trendverhalten, Risiko‑Rendite‑Profil.
-
-            ### 🔗 Was ist die Blockchain?
-
-            Die Blockchain ist ein **dezentrales, unveränderbares Register**, das alle Bitcoin‑Transaktionen speichert.
-            Statt einer zentralen Datenbank wird sie von tausenden Computern weltweit gemeinsam betrieben.
-            Jeder neue Block baut auf dem vorherigen auf – dadurch entsteht eine **fälschungssichere Kette**.
-
-            ## 🔗 Blockchain – Einsteiger‑Erklärung
-
-            Die Blockchain ist das technische Fundament von Bitcoin.  
-            Man kann sie sich wie ein **digitales Kassenbuch** vorstellen, das:
-
-            - **öffentlich einsehbar** ist  
-            - **nicht manipuliert** werden kann  
-            - **von tausenden Computern gleichzeitig geführt** wird  
-            - **jede Transaktion dauerhaft speichert**
-
-            Jeder Block enthält:
-            - eine Liste von Transaktionen  
-            - einen Zeitstempel  
-            - einen kryptografischen Fingerabdruck (Hash)  
-            - den Hash des vorherigen Blocks  
-
-            Durch diese Struktur entsteht eine **Kette von Blöcken**, die praktisch nicht gefälscht werden kann.
-
-
+            """)
+            
+            gr.Markdown("""
             ## 📈 ETF‑Radar
             Das ETF‑Radar bewertet ETFs anhand von:
             - Performance (1Y, 5Y)
