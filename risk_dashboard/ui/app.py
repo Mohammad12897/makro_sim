@@ -202,49 +202,103 @@ def app():
 
             ### 🪙 Bitcoin
 
-            Bitcoin ist die erste und größte Kryptowährung.  
+            Bitcoin ist die erste und größte Kryptowährung.
             Sie funktioniert ohne zentrale Instanz und basiert auf einem Netzwerk von Computern,
             die gemeinsam die Blockchain betreiben.
 
             **Begriffe im Zusammenhang mit Bitcoin:**
 
-            - **Blockchain** – öffentliches Register aller Transaktionen  
-            - **Halving** – Ereignis, bei dem die Blockbelohnung halbiert wird (alle ~4 Jahre)  
-            - **Mining** – Prozess, bei dem neue Bitcoins erzeugt werden  
-            - **Wallet** – digitale Geldbörse für Bitcoin  
-            - **Private Key** – kryptografischer Schlüssel, der den Besitz beweist  
-            - **On‑Chain / Off‑Chain** – Transaktionen auf oder außerhalb der Blockchain  
+            - **Blockchain** – öffentliches Register aller Transaktionen
+            - **Halving** – Ereignis, bei dem die Blockbelohnung halbiert wird (alle ~4 Jahre)
+            - **Mining** – Prozess, bei dem neue Bitcoins erzeugt werden
+            - **Wallet** – digitale Geldbörse für Bitcoin
+            - **Private Key** – kryptografischer Schlüssel, der den Besitz beweist
+            - **On‑Chain / Off‑Chain** – Transaktionen auf oder außerhalb der Blockchain
             ---
+
+            ### 🔗 Blockchain
+
+            Eine Blockchain ist eine **dezentrale Datenstruktur**, die Transaktionen in einer
+            verketteten Reihe von Blöcken speichert.  
+            Sie ist:
+
+            - unveränderbar  
+            - transparent  
+            - kryptografisch gesichert  
+            - nicht von einer zentralen Instanz kontrolliert  
+
+            Sie bildet die Grundlage für Bitcoin und viele andere digitale Assets.
+
+
+            ## 🧩 Wie funktioniert eine Blockchain?
+
+            Stell dir die Blockchain wie eine **Kette aus nummerierten Blöcken** vor:
+
+            1. **Transaktionen sammeln**  
+               Neue Bitcoin‑Transaktionen werden gesammelt und zu einem Block zusammengefasst.
+
+            2. **Block erzeugen (Mining)**  
+               Miner lösen ein kryptografisches Puzzle.  
+               Wer es zuerst löst, darf den neuen Block an die Kette anhängen.
+
+            3. **Block enthält Hash + Vorgänger‑Hash**  
+               Jeder Block speichert:
+               - seinen eigenen Hash  
+               - den Hash des vorherigen Blocks  
+               Dadurch entsteht eine **fälschungssichere Kette**.
+
+            4. **Verteilung im Netzwerk**  
+               Der neue Block wird an tausende Computer verteilt.  
+               Alle aktualisieren ihre Kopie der Blockchain.
+
+            5. **Unveränderbarkeit**  
+               Wenn jemand einen alten Block ändern würde,  
+               müssten **alle folgenden Blöcke neu berechnet** werden – praktisch unmöglich.
+
+            So bleibt die Blockchain **transparent, sicher und dezentral**.
+
+            ## 📊 Blockchain vs. klassische Datenbank
+
+            | Merkmal | Blockchain | Klassische Datenbank |
+            |--------|------------|----------------------|
+            | **Kontrolle** | dezentral (viele Teilnehmer) | zentral (eine Organisation) |
+            | **Manipulation** | praktisch unmöglich | möglich durch Admins |
+            | **Transparenz** | öffentlich einsehbar | meist privat |
+            | **Datenstruktur** | verkettete Blöcke | Tabellen, Zeilen, Spalten |
+            | **Sicherheit** | kryptografisch gesichert | Zugriffskontrolle |
+            | **Geschwindigkeit** | langsamer (Konsens nötig) | sehr schnell |
+            | **Anwendungsfall** | Bitcoin, Smart Contracts | Firmen‑Datenbanken, Web‑Apps |
+            | **Verfügbarkeit** | global verteilt | abhängig vom Server |
 
 
             ## 🪙 Bitcoin vs. 📈 ETF – Was ist der Unterschied?
 
             ### **Bitcoin**
-            - digitale Währung  
-            - keine Firma, kein Index, kein Fonds  
-            - extrem volatil  
-            - begrenzte Menge (21 Mio.)  
-            - keine Dividenden  
-            - keine TER oder Verwaltungskosten  
-            - basiert auf Blockchain‑Technologie  
+            - digitale Währung
+            - keine Firma, kein Index, kein Fonds
+            - extrem volatil
+            - begrenzte Menge (21 Mio.)
+            - keine Dividenden
+            - keine TER oder Verwaltungskosten
+            - basiert auf Blockchain‑Technologie
 
             ### **ETF**
-            - Fonds, der einen Index abbildet  
-            - enthält viele Aktien oder Anleihen  
-            - geringe Kosten (TER)  
-            - hohe Diversifikation  
-            - reguliert und überwacht  
-            - stabile, langfristige Struktur  
+            - Fonds, der einen Index abbildet
+            - enthält viele Aktien oder Anleihen
+            - geringe Kosten (TER)
+            - hohe Diversifikation
+            - reguliert und überwacht
+            - stabile, langfristige Struktur
 
             ### **Warum beide im Asset‑Radar?**
 
             Weil das Radar **Risiko und Performance** vergleicht — unabhängig vom Asset‑Typ.
 
             Das Radar beantwortet:
-            - Wie volatil ist Bitcoin im Vergleich zu ETFs?  
-            - Wie ist die Sharpe‑Ratio im Vergleich zu Aktien?  
-            - Wie korreliert Bitcoin mit SPY oder Gold?  
-            - Welche Rolle spielt Bitcoin im Portfolio‑Risiko?  
+            - Wie volatil ist Bitcoin im Vergleich zu ETFs?
+            - Wie ist die Sharpe‑Ratio im Vergleich zu Aktien?
+            - Wie korreliert Bitcoin mit SPY oder Gold?
+            - Welche Rolle spielt Bitcoin im Portfolio‑Risiko?
 
             So entsteht ein **einheitliches Analyse‑Framework** für alle Vermögenswerte.
 
@@ -411,24 +465,49 @@ def app():
             - kann weltweit in Sekunden übertragen werden
             - keine zentrale Kontrolle
 
-            **Warum im Asset‑Radar?**  
+            **Warum im Asset‑Radar?**
             Bitcoin ist kein ETF und keine Aktie — aber ein **Asset**, das wie andere Vermögenswerte
             über Risiko‑ und Performance‑Kennzahlen analysiert werden kann.
 
             ## 🪙 Bitcoin‑Radar
-            Bitcoin wird im Asset‑Radar wie ein eigenständiges Asset behandelt.  
+            Bitcoin wird im Asset‑Radar wie ein eigenständiges Asset behandelt.
             Es besitzt eigene Kennzahlen, die sich von ETFs und Aktien unterscheiden:
 
-            - **Volatilität** – misst die Schwankungsintensität  
-            - **Sharpe‑Ratio** – Verhältnis von Rendite zu Risiko  
-            - **Max Drawdown** – größter Verlust vom Hoch zum Tief  
-            - **SMA‑Trend (50/200)** – zeigt langfristige Trendrichtung  
-            - **Korrelation zu SPY** – Zusammenhang mit dem Aktienmarkt  
-            - **Korrelation zu Gold** – Vergleich zu einem klassischen Wertspeicher  
+            - **Volatilität** – misst die Schwankungsintensität
+            - **Sharpe‑Ratio** – Verhältnis von Rendite zu Risiko
+            - **Max Drawdown** – größter Verlust vom Hoch zum Tief
+            - **SMA‑Trend (50/200)** – zeigt langfristige Trendrichtung
+            - **Korrelation zu SPY** – Zusammenhang mit dem Aktienmarkt
+            - **Korrelation zu Gold** – Vergleich zu einem klassischen Wertspeicher
 
-            **Warum ist Bitcoin im Radar?**  
+            **Warum ist Bitcoin im Radar?**
             Weil es ein global handelbares Asset ist, das in Portfolios eine wichtige Rolle spielt:
             Diversifikation, Trendverhalten, Risiko‑Rendite‑Profil.
+
+            ### 🔗 Was ist die Blockchain?
+
+            Die Blockchain ist ein **dezentrales, unveränderbares Register**, das alle Bitcoin‑Transaktionen speichert.
+            Statt einer zentralen Datenbank wird sie von tausenden Computern weltweit gemeinsam betrieben.
+            Jeder neue Block baut auf dem vorherigen auf – dadurch entsteht eine **fälschungssichere Kette**.
+
+            ## 🔗 Blockchain – Einsteiger‑Erklärung
+
+            Die Blockchain ist das technische Fundament von Bitcoin.  
+            Man kann sie sich wie ein **digitales Kassenbuch** vorstellen, das:
+
+            - **öffentlich einsehbar** ist  
+            - **nicht manipuliert** werden kann  
+            - **von tausenden Computern gleichzeitig geführt** wird  
+            - **jede Transaktion dauerhaft speichert**
+
+            Jeder Block enthält:
+            - eine Liste von Transaktionen  
+            - einen Zeitstempel  
+            - einen kryptografischen Fingerabdruck (Hash)  
+            - den Hash des vorherigen Blocks  
+
+            Durch diese Struktur entsteht eine **Kette von Blöcken**, die praktisch nicht gefälscht werden kann.
+
 
             ## 📈 ETF‑Radar
             Das ETF‑Radar bewertet ETFs anhand von:
