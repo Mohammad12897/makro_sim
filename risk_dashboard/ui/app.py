@@ -70,8 +70,9 @@ from core.backend.radar_builder import (
     build_portfolio_radar, 
     build_asset_radar, 
     get_bitcoin_metrics, 
+)
+from core.backend.ki_scanner import ( 
     scan_assets,
-    compute_ki_score,
 )
 
 
@@ -615,14 +616,18 @@ def app():
 
             gr.Markdown("""
             # 🤖 KI‑Asset‑Scanner
-            Die KI bewertet jedes Asset nach:
-            - Risiko
-            - Rendite
-            - Trend
-            - Sharpe‑Ratio
-            - Drawdown
-            - Diversifikation
+
+            - Wähle eine Region **oder** gib eigene Assets ein.
+            - Wähle ein KI‑Profil (z. B. stabil, momentum, growth).
+            - Die KI bewertet alle Assets nach Risiko, Rendite, Trend und Sharpe‑Ratio.
             """)
+
+
+            region = gr.Dropdown(
+                label="Region (optional)",
+                choices=["Keine", "Europa", "USA", "Global"],
+                value="Keine"
+            )
 
             asset_list = gr.Textbox(
                 label="Assets eingeben (Komma‑getrennt)",
@@ -631,7 +636,7 @@ def app():
 
             profile = gr.Dropdown(
                 label="KI‑Profil",
-                choices=["ki", "stabil", "momentum", "value", "growth", "diversifikation", "krypto", "etf"],
+                choices=["ki", "stabil", "momentum", "growth", "diversifikation", "krypto", "etf"],
                 value="ki"
             )
 
@@ -642,7 +647,7 @@ def app():
 
             scan_button.click(
                 scan_assets,
-                inputs=[asset_list, profile],
+                inputs=[asset_list, profile, region],
                 outputs=[scan_table, scan_plot]
             )
 
