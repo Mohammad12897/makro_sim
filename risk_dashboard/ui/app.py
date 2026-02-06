@@ -651,27 +651,116 @@ def app():
                 outputs=[scan_table, scan_plot]
             )
 
-        with gr.Tab("Aktien Screener"):
-            min_sharpe = gr.Slider(0, 2, value=0.5, label="Min Sharpe")
-            max_vol = gr.Slider(0, 50, value=25, label="Max Volatilität %")
-            max_kgv = gr.Slider(0, 60, value=30, label="Max KGV")
+        with gr.Tab("ETF‑Screener"):
+            gr.Markdown("""
+            # 📘 ETF‑Screener (justETF)
+            Gib eine Liste von ISINs ein oder lade eine Region.
+            Der Screener zeigt TER, Fondsgröße, Replikation und Tracking‑Differenz.
+            """)
 
-            btn_screen = gr.Button("Filtern")
-            screen_table = gr.Dataframe(label="Gefilterte Aktien")
+            etf_isins = gr.Textbox(
+                label="ETF‑ISINs (Komma‑getrennt)",
+                placeholder="z. B. IE00B4L5Y983, IE00B5BMR087"
+            )
 
-            def screen_stocks(min_sharpe, max_vol, max_kgv):
-                rows = []
-                for t in load_stock_list():
-                    m = get_metrics({"ticker": t})
-                    if not m:
-                        continue
+            etf_button = gr.Button("ETF‑Daten abrufen")
 
-                    if m["Sharpe"] >= min_sharpe and m["Volatilität %"] <= max_vol and m.get("KGV", 999) <= max_kgv:
-                        rows.append(m)
+            etf_table = gr.Dataframe(label="ETF‑Daten", interactive=False)
 
-                return pd.DataFrame(rows)
-            btn_screen.click(screen_stocks, inputs=[min_sharpe, max_vol, max_kgv], outputs=[screen_table])
+            etf_button.click(
+                fn=scan_etf_list,
+                inputs=[etf_isins],
+                outputs=[etf_table]
+            )
 
+        with gr.Tab("Aktien‑Screener"):
+            gr.Markdown("""
+            # 📊 Aktien‑Screener (Fundamentaldaten)
+            Der Screener lädt KGV, KUV, PEG, Verschuldung, Cashflow und Wachstum.
+            """)
+
+            stock_symbols = gr.Textbox(
+                label="Aktien‑Symbole (Komma‑getrennt)",
+                placeholder="z. B. AAPL, MSFT, AMZN, TSLA"
+            )
+
+            stock_button = gr.Button("Aktien‑Daten abrufen")
+
+            stock_table = gr.Dataframe(label="Fundamentaldaten", interactive=False)
+
+            stock_button.click(
+                fn=scan_stocks,
+                inputs=[stock_symbols],
+                outputs=[stock_table]
+            )
+
+        with gr.Tab("Portfolio‑Optimierer"):
+            gr.Markdown("""
+            # 🎯 Portfolio‑Optimierer
+            Wähle eine Optimierungsstrategie:
+            - Markowitz (Sharpe‑Maximierung)
+            - Risiko‑Parität
+            - KI‑Portfolio‑Score
+            """)
+
+            port_symbols = gr.Textbox(
+                label="Assets (Komma‑getrennt)",
+                placeholder="z. B. SPY, VTI, GLD, BTC-USD"
+            )
+
+            strategy = gr.Dropdown(
+                label="Optimierungs‑Methode",
+                choices=["Markowitz", "Risiko‑Parität", "KI‑Score"],
+                value="Markowitz"
+            )
+
+            port_button = gr.Button("Portfolio optimieren")
+
+            port_table = gr.Dataframe(label="Portfolio‑Gewichtung", interactive=False)
+
+            def run_optimizer(symbols, strategy):
+                symbols = [s.strip().upper() for s in symbols.split(",")]
+
+                if strategy == "Markowitz":
+                    return optimize_markowitz(symbols)
+                elif strategy == "Risiko‑Parität":
+                    return optimize_risk_parity(symbols)
+                else:
+                    # KI‑Score benötigt vorherigen KI‑Scan
+                    df = scan_assets(",".join(symbols), "ki", "Keine")[0]
+                    return optimize_ki_score(df)
+
+            port_button.click(
+                fn=run_optimizer,
+                inputs=[port_symbols, strategy],
+                outputs=[port_table]
+            )
+
+        with gr.Tab("Korrelation‑Heatmap"):
+            gr.Markdown("""
+            # 🔥 Korrelation‑Heatmap
+            Zeigt die Zusammenhänge zwischen Assets.
+            Ideal für Diversifikation und Risikoanalyse.
+            """)
+
+            heat_symbols = gr.Textbox(
+                label="Assets (Komma‑getrennt)",
+                placeholder="z. B. SPY, VTI, GLD, BTC-USD, AAPL"
+            )
+
+            heat_button = gr.Button("Heatmap erzeugen")
+
+            heat_plot = gr.Plot(label="Korrelation‑Matrix")
+
+            def run_heatmap(symbols):
+                symbols = [s.strip().upper() for s in symbols.split(",")]
+                return plot_correlation_heatmap(symbols)
+
+            heat_button.click(
+                fn=run_heatmap,
+                inputs=[heat_symbols],
+                outputs=[heat_plot]
+            )
 
         with gr.Tab("Radar-Overlay"):
             # Auswahl: mehrere Ticker
