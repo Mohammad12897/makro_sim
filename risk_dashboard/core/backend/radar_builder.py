@@ -15,62 +15,6 @@ from core.visualization.radar_plotly_assets import plot_asset_radar
 
 import traceback
 
-def scan_assets(asset_string, profile):
-
-    if not asset_string:
-        return pd.DataFrame({"Fehler": ["Keine Assets eingegeben"]}), None
-
-    symbols = [s.strip().upper() for s in asset_string.split(",")]
-
-    rows = []
-
-    for symbol in symbols:
-        if symbol == "BTC-USD":
-            metrics = get_bitcoin_metrics()
-        else:
-            metrics = get_asset_metrics(symbol)
-
-        if metrics is not None:
-            rows.append(metrics)
-
-    if not rows:
-        return pd.DataFrame({"Fehler": ["Keine gültigen Assets gefunden"]}), None
-
-    df = pd.DataFrame(rows)
-
-    # KI‑Score berechnen
-    df = compute_ki_score(df, profile)
-
-    df = df.sort_values("ki_score", ascending=False)
-
-    fig = plot_asset_radar(rows, mode="experte")
-
-    return df, fig
-
-
-def compute_ki_score(df, profile):
-
-    profiles = {
-        "stabil": {"sharpe": 0.40, "volatility_90d": -0.30, "max_drawdown": -0.20, "trend_sma_ratio": 0.10},
-        "momentum": {"trend_sma_ratio": 0.40, "performance_1y": 0.30, "performance_3y": 0.20, "sharpe": 0.10},
-        "value": {"sharpe": 0.20, "performance_3y": 0.10, "volatility_90d": -0.20, "max_drawdown": -0.20, "trend_sma_ratio": 0.10},
-        "growth": {"performance_1y": 0.40, "performance_3y": 0.30, "trend_sma_ratio": 0.20, "sharpe": 0.10},
-        "diversifikation": {"correlation_spy": -0.40, "correlation_gold": -0.40, "volatility_90d": -0.10, "sharpe": 0.10},
-        "krypto": {"trend_sma_ratio": 0.50, "performance_1y": 0.30, "volatility_90d": -0.20},
-        "etf": {"performance_3y": 0.30, "sharpe": 0.30, "volatility_90d": -0.20, "max_drawdown": -0.20},
-        "ki": {"sharpe": 0.35, "performance_1y": 0.20, "performance_3y": 0.10, "trend_sma_ratio": 0.15, "volatility_90d": -0.10, "max_drawdown": -0.10}
-    }
-
-    w = profiles.get(profile, profiles["ki"])
-
-    df["ki_score"] = 0
-
-    for key, weight in w.items():
-        if key in df.columns:
-            df["ki_score"] += df[key].fillna(0) * weight
-
-    return df
-
 def build_country_radar(countries, mode):
     try:
         if not countries:

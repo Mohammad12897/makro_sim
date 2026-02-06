@@ -64,14 +64,14 @@ from core.analysis.stock_clusterin import cluster_stocks
 from core.analysis.normalize import normalize_metrics
 from core.data.ticker_country_map import map_ticker_to_country
 from core.data.country_macro import get_country_macro
-from core.backend.radar_builder import ( 
-    build_country_radar, 
-    build_etf_radar, 
-    build_portfolio_radar, 
-    build_asset_radar, 
-    get_bitcoin_metrics, 
+from core.backend.radar_builder import (
+    build_country_radar,
+    build_etf_radar,
+    build_portfolio_radar,
+    build_asset_radar,
+    get_bitcoin_metrics,
 )
-from core.backend.ki_scanner import ( 
+from core.backend.ki_scanner import (
     scan_assets,
 )
 
@@ -228,13 +228,13 @@ def app():
             ### 🔗 Blockchain
 
             Eine Blockchain ist eine **dezentrale Datenstruktur**, die Transaktionen in einer
-            verketteten Reihe von Blöcken speichert.  
+            verketteten Reihe von Blöcken speichert.
             Sie ist:
 
-            - unveränderbar  
-            - transparent  
-            - kryptografisch gesichert  
-            - nicht von einer zentralen Instanz kontrolliert  
+            - unveränderbar
+            - transparent
+            - kryptografisch gesichert
+            - nicht von einer zentralen Instanz kontrolliert
 
             Sie bildet die Grundlage für Bitcoin und viele andere digitale Assets.
             """)
@@ -248,19 +248,19 @@ def app():
 
             ## 🔗 Blockchain – Einsteiger‑Erklärung
 
-            Die Blockchain ist das technische Fundament von Bitcoin.  
+            Die Blockchain ist das technische Fundament von Bitcoin.
             Man kann sie sich wie ein **digitales Kassenbuch** vorstellen, das:
 
-            - **öffentlich einsehbar** ist  
-            - **nicht manipuliert** werden kann  
-            - **von tausenden Computern gleichzeitig geführt** wird  
+            - **öffentlich einsehbar** ist
+            - **nicht manipuliert** werden kann
+            - **von tausenden Computern gleichzeitig geführt** wird
             - **jede Transaktion dauerhaft speichert**
 
             Jeder Block enthält:
-            - eine Liste von Transaktionen  
-            - einen Zeitstempel  
-            - einen kryptografischen Fingerabdruck (Hash)  
-            - den Hash des vorherigen Blocks  
+            - eine Liste von Transaktionen
+            - einen Zeitstempel
+            - einen kryptografischen Fingerabdruck (Hash)
+            - den Hash des vorherigen Blocks
 
             Durch diese Struktur entsteht eine **Kette von Blöcken**, die praktisch nicht gefälscht werden kann.
             """)
@@ -270,25 +270,25 @@ def app():
 
             Stell dir die Blockchain wie eine **Kette aus nummerierten Blöcken** vor:
 
-            1. **Transaktionen sammeln**  
+            1. **Transaktionen sammeln**
                Neue Bitcoin‑Transaktionen werden gesammelt und zu einem Block zusammengefasst.
 
-            2. **Block erzeugen (Mining)**  
-               Miner lösen ein kryptografisches Puzzle.  
+            2. **Block erzeugen (Mining)**
+               Miner lösen ein kryptografisches Puzzle.
                Wer es zuerst löst, darf den neuen Block an die Kette anhängen.
 
-            3. **Block enthält Hash + Vorgänger‑Hash**  
+            3. **Block enthält Hash + Vorgänger‑Hash**
                Jeder Block speichert:
-               - seinen eigenen Hash  
-               - den Hash des vorherigen Blocks  
+               - seinen eigenen Hash
+               - den Hash des vorherigen Blocks
                Dadurch entsteht eine **fälschungssichere Kette**.
 
-            4. **Verteilung im Netzwerk**  
-               Der neue Block wird an tausende Computer verteilt.  
+            4. **Verteilung im Netzwerk**
+               Der neue Block wird an tausende Computer verteilt.
                Alle aktualisieren ihre Kopie der Blockchain.
 
-            5. **Unveränderbarkeit**  
-               Wenn jemand einen alten Block ändern würde,  
+            5. **Unveränderbarkeit**
+               Wenn jemand einen alten Block ändern würde,
                müssten **alle folgenden Blöcke neu berechnet** werden – praktisch unmöglich.
 
             So bleibt die Blockchain **transparent, sicher und dezentral**.
