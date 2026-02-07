@@ -1,8 +1,7 @@
-#core/data/assets.py
-
-import yfinance as yf
+# core/data/assets.py
 import pandas as pd
 import numpy as np
+import yfinance as yf
 from .caching import cached_download
 from .logging import logger
 
@@ -18,16 +17,52 @@ def to_float(x):
     except Exception:
         return None
 
-def fetch_price_history(symbol, period="5y"):
-    try:
-        data = cached_download(symbol, period=period, auto_adjust=True)
-        if data is None or data.empty:
-            logger.warning(f"Empty data for {symbol}")
-            return None
+def sanitize_price_data(data):
+    """
+    Nimmt beliebige yfinance-Rückgaben (DataFrame/Series/MultiIndex)
+    und gibt eine saubere Series mit Preisen zurück.
+    """
+    if data is None or len(data) == 0:
+        return None
+
+    # MultiIndex-Case (z.B. Columns: ('Adj Close', 'GLD'))
+    if isinstance(data, pd.DataFrame) and isinstance(data.columns, pd.MultiIndex):
+        # Versuche 'Adj Close' oder 'Close'
+        for lvl0 in ["Adj Close", "Close"]:
+            if lvl0 in data.columns.get_level_values(0):
+                sub = data[lvl0]
+                if isinstance(sub, pd.DataFrame):
+                    # erste Spalte nehmen
+                    return sub.iloc[:, 0]
+                if isinstance(sub, pd.Series):
+                    return sub
+        # Fallback: erste Spalte
+        return data.iloc[:, 0]
+
+    # Normaler DataFrame
+    if isinstance(data, pd.DataFrame):
+        if "Adj Close" in data.columns:
+            return data["Adj Close"]
         if "Close" in data.columns:
             return data["Close"]
         # Fallback: erste Spalte
         return data.iloc[:, 0]
+
+    # Series
+    if isinstance(data, pd.Series):
+        return data
+
+    return None
+
+def fetch_price_history(symbol, period="5y"):
+    try:
+        logger.info(f"Downloading data for {symbol}, period={period}")
+        raw = yf.download(symbol, period=period, progress=False, auto_adjust=True)
+        series = sanitize_price_data(raw)
+        if series is None or series.empty:
+            logger.warning(f"Empty or invalid data for {symbol}")
+            return None
+        return series
     except Exception as e:
         logger.error(f"Error fetching {symbol}: {e}")
         return None
@@ -78,6 +113,18 @@ def calc_correlation(series, benchmark_symbol):
         return None
     return to_float(df.corr().iloc[0, 1])
 
+def safe_rename(series_or_df, name):
+    """
+    Benennt eine Series oder einen DataFrame zuverlässig in 'name' um.
+    Wird genutzt für Heatmap & Optimizer.
+    """
+    if isinstance(series_or_df, pd.Series):
+        return series_or_df.rename(name)
+    if isinstance(series_or_df, pd.DataFrame):
+        col = series_or_df.columns[0]
+        return series_or_df[col].rename(name)
+    return None
+
 def get_bitcoin_metrics():
     series = fetch_price_history("BTC-USD")
     if series is None:
@@ -107,4 +154,3 @@ def get_asset_metrics(symbol):
         "max_drawdown": calc_drawdown(series),
         "trend_sma_ratio": calc_sma_ratio(series, 50, 200),
     }
-

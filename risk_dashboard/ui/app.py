@@ -71,9 +71,13 @@ from core.backend.radar_builder import (
     build_asset_radar,
     get_bitcoin_metrics,
 )
-from core.backend.ki_scanner import (
-    scan_assets,
-)
+from core.backend.ki_scanner import scan_assets
+
+from core.backend.etf_scanner import scan_etf_list
+from core.backend.stock_scanner import scan_stocks
+from core.backend.portfolio_optimizer import optimize_markowitz, optimize_risk_parity, optimize_ki_score
+from core.backend.heatmap import plot_correlation_heatmap
+from core.data.logging import log_buffer
 
 
 print("Europa:", list_etf_by_region("Europa"))
@@ -761,6 +765,17 @@ def app():
                 inputs=[heat_symbols],
                 outputs=[heat_plot]
             )
+
+
+        with gr.Tab("Debug‑Log"):
+            gr.Markdown("### 🛠 Debug‑Log (letzte Meldungen)")
+            log_box = gr.Textbox(label="Log", lines=20)
+
+            def load_log():
+                return "\n".join(log_buffer[-100:])
+
+            refresh_btn = gr.Button("Log aktualisieren")
+            refresh_btn.click(load_log, inputs=None, outputs=log_box)
 
         with gr.Tab("Radar-Overlay"):
             # Auswahl: mehrere Ticker
