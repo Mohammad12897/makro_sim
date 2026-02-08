@@ -77,7 +77,14 @@ from core.backend.etf_scanner import scan_etf_list
 from core.backend.stock_scanner import scan_stocks
 from core.backend.portfolio_optimizer import optimize_markowitz, optimize_risk_parity, optimize_ki_score
 from core.backend.heatmap import plot_correlation_heatmap
+
+from core.backend.symbol_tools import suggest_symbols, validate_symbol, detect_symbol_type
+from core.backend.portfolio_manager import list_portfolios, save_portfolio, delete_portfolio, get_portfolio
+from core.backend.portfolio_radar import portfolio_radar
+from core.backend.portfolio_backtest import backtest_portfolio
+from core.backend.portfolio_compare import compare_two_portfolios
 from core.data.logging import log_buffer
+
 
 
 print("Europa:", list_etf_by_region("Europa"))
