@@ -231,3 +231,12 @@ makro_sim/
 │   └── __init__.py
 │
 └── __init__.py
+
+📂 Portfolio‑Studio
+   ├── Portfolio‑Manager
+   ├── Portfolio‑Radar
+   ├── Portfolio‑Backtest
+   ├── Portfolio‑Vergleich
+   ├── Portfolio‑Heatmap
+   ├── Symbol‑Tools
+   └── Debug‑Log
