@@ -4,7 +4,8 @@ from pathlib import Path
 import pandas as pd
 from core.data.logging import logger
 
-PORTFOLIO_FILE = Path("data/portfolios.json")
+# WICHTIG: genau dieser Pfad, damit Radar, Backtest, Vergleich alle dieselbe Datei sehen
+PORTFOLIO_FILE = Path("core/data/portfolios.json")
 
 def _load_all():
     if not PORTFOLIO_FILE.exists():
@@ -22,8 +23,7 @@ def _save_all(portfolios):
 def list_portfolios():
     return _load_all()
 
-def save_portfolio(name: str, symbols: list[str], weights: list[float], meta: dict | None = None):
-    portfolios = _load_all()
+def save_portfolio(name, symbols, weights, meta=None):
     weights = [float(w) for w in weights]
     total = sum(weights)
     if total == 0:
@@ -31,19 +31,18 @@ def save_portfolio(name: str, symbols: list[str], weights: list[float], meta: di
     else:
         weights = [w/total for w in weights]
 
-    new_port = {
+    portfolios = _load_all()
+    portfolios = [p for p in portfolios if p["name"] != name]
+    portfolios.append({
         "name": name,
         "symbols": symbols,
         "weights": weights,
         "meta": meta or {}
-    }
-
-    portfolios = [p for p in portfolios if p["name"] != name]
-    portfolios.append(new_port)
+    })
     _save_all(portfolios)
     return f"Portfolio '{name}' gespeichert."
 
-def delete_portfolio(name: str):
+def delete_portfolio(name):
     portfolios = _load_all()
     before = len(portfolios)
     portfolios = [p for p in portfolios if p["name"] != name]
@@ -52,10 +51,10 @@ def delete_portfolio(name: str):
         return f"Portfolio '{name}' gelöscht."
     return f"Portfolio '{name}' nicht gefunden."
 
-def get_portfolio(name: str):
+def get_portfolio(name):
     portfolios = _load_all()
     for p in portfolios:
         if p["name"] == name:
             df = pd.DataFrame({"symbol": p["symbols"], "weight": p["weights"]})
             return df, p
-    return pd.DataFrame({"Fehler": [f"Portfolio '{name}' nicht gefunden"]}), None
+    return None, None

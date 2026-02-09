@@ -14,16 +14,10 @@ def backtest_portfolio(symbols: list[str], weights: list[float], period="5y"):
         return None
 
     prices = pd.concat(frames, axis=1).dropna()
-
     norm = prices / prices.iloc[0]
 
     w = pd.Series(weights, index=symbols).reindex(norm.columns).fillna(0)
 
-    portfolio = (norm * w).sum(axis=1)
+    portfolio = (norm * w).sum(axis=1)  # Series mit DatetimeIndex
 
-    df = pd.DataFrame({
-        "Datum": portfolio.index,
-        "Portfolio": portfolio.values
-    })
-
-    return df
+    return portfolio  # Series

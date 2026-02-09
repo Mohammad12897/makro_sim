@@ -82,14 +82,18 @@ from core.backend.symbol_tools import (
     suggest_symbols,
     validate_symbol,
     detect_symbol_type,
-    is_isin,   # ← FEHLTE!
+    is_isin,
 )
-from core.backend.portfolio_manager import list_portfolios, save_portfolio, delete_portfolio, get_portfolio
+from core.backend.portfolio_manager import (
+    list_portfolios,
+    save_portfolio,
+    delete_portfolio,
+    get_portfolio,
+)
 from core.backend.portfolio_radar import portfolio_radar
 from core.backend.portfolio_backtest import backtest_portfolio
 from core.backend.portfolio_compare import compare_two_portfolios
 from core.data.logging import log_buffer
-
 
 
 print("Europa:", list_etf_by_region("Europa"))
@@ -139,6 +143,24 @@ def scenario_table_wrapper(land, we, wb, wg, yrs):
 
     df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
     return df
+
+def parse_weights(text, n):
+    if not text or not text.strip():
+        return [1 / n] * n
+    parts = [p.strip() for p in text.split(",") if p.strip()]
+    vals = []
+    for p in parts:
+        try:
+            vals.append(float(p))
+        except Exception:
+            vals.append(0.0)
+    if len(vals) < n:
+        vals += [0.0] * (n - len(vals))
+    vals = vals[:n]
+    s = sum(vals)
+    if s == 0:
+        return [1 / n] * n
+    return [v / s for v in vals]
 
 
 # ---------------------------------------------------------
@@ -782,35 +804,32 @@ def app():
         with gr.Tab("📂 Portfolio‑Studio"):
 
             with gr.Tab("Portfolio‑Manager"):
+                gr.Markdown("### Portfolios speichern, laden und verwalten")
+
                 port_name = gr.Textbox(label="Portfolioname")
-                port_symbols = gr.Textbox(label="Assets (Komma‑getrennt)")
-                port_weights = gr.Textbox(label="Gewichte (Komma‑getrennt, optional)")
+                port_symbols = gr.Textbox(
+                    label="Assets (Komma‑getrennt)",
+                    placeholder="z. B. SPY, EUNL.DE, BTC-USD",
+                )
+                port_weights = gr.Textbox(
+                    label="Gewichte (Komma‑getrennt, optional)",
+                    placeholder="z. B. 0.5, 0.3, 0.2",
+                )
 
                 save_btn = gr.Button("Portfolio speichern")
                 delete_btn = gr.Button("Portfolio löschen")
                 refresh_btn = gr.Button("Liste aktualisieren")
 
                 port_list = gr.Dataframe(label="Gespeicherte Portfolios", interactive=False)
-
-                def parse_weights(text, n):
-                    if not text.strip():
-                        return [1/n] * n
-                    parts = [p.strip() for p in text.split(",")]
-                    vals = [float(p) for p in parts]
-                    if len(vals) != n:
-                        vals = vals[:n] + [0] * max(0, n-len(vals))
-                    s = sum(vals)
-                    if s == 0:
-                        return [1/n] * n
-                    return [v/s for v in vals]
+                status_msg = gr.Markdown()
 
                 def ui_save_portfolio(name, symbols_text, weights_text):
                     symbols = [s.strip().upper() for s in symbols_text.split(",") if s.strip()]
                     if not symbols:
-                        return "Keine Symbole angegeben.", list_portfolios()
+                        return "❌ Keine Symbole angegeben.", list_portfolios()
                     weights = parse_weights(weights_text, len(symbols))
                     msg = save_portfolio(name, symbols, weights)
-                    return msg, list_portfolios()
+                    return f"✅ {msg}", list_portfolios()
 
                 def ui_delete_portfolio(name):
                     msg = delete_portfolio(name)
@@ -821,8 +840,6 @@ def app():
                     if not ports:
                         return []
                     return ports
-
-                status_msg = gr.Markdown()
 
                 save_btn.click(ui_save_portfolio,
                                inputs=[port_name, port_symbols, port_weights],
@@ -837,6 +854,7 @@ def app():
                                   outputs=port_list)
 
             with gr.Tab("Portfolio‑Radar"):
+                gr.Markdown("### Radar‑Ansicht für ein gespeichertes Portfolio")
                 sel_port_name = gr.Textbox(label="Portfolioname")
                 radar_btn = gr.Button("Radar anzeigen")
                 radar_plot = gr.Plot(label="Portfolio‑Radar")
@@ -852,68 +870,100 @@ def app():
                                 outputs=[radar_plot])
 
             with gr.Tab("Portfolio‑Backtest"):
+                gr.Markdown("### Historische Performance eines Portfolios")
                 bt_name = gr.Textbox(label="Portfolioname")
                 bt_btn = gr.Button("Backtest starten")
-                bt_plot = gr.LinePlot(
-                    label="Backtest‑Performance",
-                    x="Datum",
-                    y=["Portfolio"],
-                )
-
+                
+                bt_plot = gr.Plot(label="Backtest‑Performance")
 
                 def ui_backtest(name):
                     df, meta = get_portfolio(name)
                     if meta is None:
-                        return pd.DataFrame({"Datum": [], "Portfolio": []})
-                    res = backtest_portfolio(meta["symbols"], meta["weights"], period="5y")
-                    if res is None or res.empty:
-                        return pd.DataFrame({"Datum": [], "Portfolio": []})
-                    # Sicherstellen, dass Datum eine Spalte ist
-                    if "Datum" not in res.columns:
-                        res = res.reset_index().rename(columns={"index": "Datum"})
-                    return res
+                        fig, ax = plt.subplots()
+                        ax.text(0.5, 0.5, "Portfolio nicht gefunden", ha="center")
+                        ax.axis("off")
+                        return fig
+
+                    series = backtest_portfolio(meta["symbols"], meta["weights"], period="5y")
+                    if series is None or series.empty:
+                        fig, ax = plt.subplots()
+                        ax.text(0.5, 0.5, "Keine Daten für Backtest", ha="center")
+                        ax.axis("off")
+                        return fig
+
+                    fig, ax = plt.subplots()
+                    ax.plot(series.index, series.values, label=name)
+                    ax.set_title(f"Backtest: {name}")
+                    ax.set_xlabel("Datum")
+                    ax.set_ylabel("Wert (normiert)")
+                    ax.legend()
+                    fig.autofmt_xdate()
+                    return fig
+
 
                 bt_btn.click(ui_backtest,
                              inputs=[bt_name],
                              outputs=[bt_plot])
 
             with gr.Tab("Portfolio‑Vergleich"):
+                gr.Markdown("### Zwei Portfolios direkt vergleichen")
+
                 p1_name = gr.Textbox(label="Portfolio A")
                 p2_name = gr.Textbox(label="Portfolio B")
                 cmp_btn = gr.Button("Vergleichen")
-                cmp_plot = gr.LinePlot(label="Vergleich")
-
+                cmp_plot = gr.Plot(label="Vergleich")
+                
                 def ui_compare(a, b):
                     df1, meta1 = get_portfolio(a)
                     df2, meta2 = get_portfolio(b)
                     if meta1 is None or meta2 is None:
-                        return None
+                        fig, ax = plt.subplots()
+                        ax.text(0.5, 0.5, "Portfolio A oder B nicht gefunden", ha="center")
+                        ax.axis("off")
+                        return fig
+
                     joined = compare_two_portfolios(meta1, meta2, period="5y")
-                    if joined is None:
-                        return None
-                    joined = joined.reset_index().rename(columns={"index": "Datum"})
-                    return joined
+                    if joined is None or joined.empty:
+                        fig, ax = plt.subplots()
+                        ax.text(0.5, 0.5, "Keine Daten für Vergleich", ha="center")
+                        ax.axis("off")
+                        return fig
+
+                    fig, ax = plt.subplots()
+                    for col in joined.columns:
+                        ax.plot(joined.index, joined[col], label=col)
+                    ax.set_title(f"Vergleich: {a} vs. {b}")
+                    ax.set_xlabel("Datum")
+                    ax.set_ylabel("Wert (normiert)")
+                    ax.legend()
+                    fig.autofmt_xdate()
+                    return fig
 
                 cmp_btn.click(ui_compare,
                               inputs=[p1_name, p2_name],
                               outputs=[cmp_plot])
 
             with gr.Tab("Symbol‑Tools"):
+                gr.Markdown("### Symbole prüfen, Typ erkennen, Vorschläge anzeigen")
                 sym_input = gr.Textbox(label="Symbol oder ISIN",
                                        placeholder="z. B. QQQM, NFLX, GC=F, ETH-USD, IE00B4L5Y983")
                 sym_type = gr.Markdown()
                 sym_valid = gr.Markdown()
                 sym_suggest = gr.Dropdown(label="Vorschläge", choices=[], interactive=True)
+                check_btn = gr.Button("Symbol prüfen")
 
                 def ui_symbol_tools(text):
+                    if not text or text.strip() == "":
+                        return ("Typ: —", "Gültig: Nein", gr.update(choices=[]))
+
                     t = detect_symbol_type(text)
-                    ok = validate_symbol(text) if not is_isin(text) else True
+                    ok = True if is_isin(text) else validate_symbol(text)
                     sugg = suggest_symbols(text)
+
                     return (f"Typ: **{t}**",
                             f"Gültig: **{'Ja' if ok else 'Nein'}**",
                             gr.update(choices=sugg))
 
-                check_btn = gr.Button("Symbol prüfen")
                 check_btn.click(ui_symbol_tools,
                                 inputs=[sym_input],
                                 outputs=[sym_type, sym_valid, sym_suggest])
