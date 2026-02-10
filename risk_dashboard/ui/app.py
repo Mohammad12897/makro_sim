@@ -782,10 +782,25 @@ def app():
             # -----------------------------
             # 2. KI-SCORE (einfacher KI-Scan)
             # -----------------------------
-            gr.Markdown("### 🤖 KI‑Score (0–100) – Einzel-Scan")
+            gr.Markdown("""
+            ### 🤖 KI‑Score (0–100) – Einzel‑Scan
+
+            Der KI‑Score bewertet jedes Asset (Aktie, ETF, Krypto) anhand seiner Kursmuster der letzten Monate.  
+            Er kombiniert mehrere Faktoren wie Momentum, Volatilität, Trendstabilität, Drawdown und Sharpe‑Ratio zu einer einzigen Kennzahl.
+
+            **Was bedeutet der KI‑Score?**
+
+            - **80–100:** Sehr starke Muster, stabile Trends, attraktives Risiko‑Profil  
+            - **60–80:** Gute Qualität, solide Entwicklung  
+            - **40–60:** Neutral, weder besonders stark noch schwach  
+            - **20–40:** Schwache Muster, erhöhte Risiken  
+            - **0–20:** Chaotisch, instabil, hohe Verlustgefahr  
+
+            Der Einzel‑Scan eignet sich, wenn du **einfach nur wissen willst, wie gut ein Asset aktuell aussieht**, ohne Vergleich oder Profil‑Analyse.
+            """)
 
             ki_input = gr.Textbox(
-                abel="Ticker-Liste (Komma-getrennt)",
+                label="Ticker-Liste (Komma-getrennt)",
                 placeholder="z. B. AAPL, SPY, BTC-USD"
             )
             ki_btn = gr.Button("KI‑Score berechnen")
@@ -796,7 +811,34 @@ def app():
             # -----------------------------
             # 3. KI-PROFIL-SCAN (mit Radar)
             # -----------------------------
-            gr.Markdown("### 🧠 KI‑Profil‑Scan (mit Radar‑Vergleich)")
+            gr.Markdown("""
+            ### 🧠 KI‑Profil‑Scan (mit Radar‑Vergleich)
+
+            Der KI‑Profil‑Scan analysiert mehrere Assets gleichzeitig und bewertet sie nach einem ausgewählten Profil  
+            (z. B. *stabil*, *momentum*, *growth*, *diversifikation*, *krypto*, *etf*).
+
+            **Was macht der Profil‑Scan?**
+
+            1. Jedes Asset wird nach dem gewählten Profil bewertet  
+            2. Die Ergebnisse werden in einer Tabelle sortiert (bestes Asset oben)  
+            3. Zusätzlich wird ein **Radar‑Diagramm** erzeugt, das die wichtigsten Faktoren zeigt:
+               - Momentum  
+               - Volatilität  
+               - Drawdown  
+               - Trendstabilität  
+               - Sharpe‑Ratio  
+               - Diversifikation  
+
+            **Warum Radar?**  
+            Das Radar zeigt die **technischen Faktoren** auf einer Skala von **0–1**, damit du die Stärken und Schwächen eines Assets auf einen Blick erkennst.
+
+            **Unterschied zum KI‑Score:**
+
+            - **KI‑Score (0–100):** Gesamtbewertung eines einzelnen Assets  
+            - **KI‑Profil‑Scan:** Vergleich mehrerer Assets + Radar‑Visualisierung + Profil‑Logik  
+
+            Der Profil‑Scan ist ideal, wenn du **mehrere Assets vergleichen** oder **ein bestimmtes Anlagestil‑Profil** analysieren möchtest.
+            """)
 
             region = gr.Dropdown(
                 label="Region (optional)",
