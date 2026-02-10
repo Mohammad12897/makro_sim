@@ -96,6 +96,8 @@ from core.backend.portfolio_backtest import backtest_portfolio
 from core.backend.portfolio_compare import compare_two_portfolios
 from core.data.logging import log_buffer
 
+from core.backend.ki_score import compute_ki_score
+from core.data.assets import fetch_price_history
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
@@ -168,6 +170,24 @@ def ui_convert_isin(text):
     tickers = [t.strip() for t in text.split(",") if t.strip()]
     pairs = convert_tickers_to_isins(tickers)
     df = pd.DataFrame(pairs, columns=["Ticker", "ISIN"])
+    return df
+
+
+def ui_ki_scan(text):
+    tickers = [t.strip() for t in text.split(",") if t.strip()]
+    results = []
+
+    for t in tickers:
+        series = fetch_price_history(t, period="1y")
+        if series is None or len(series) < 120:
+            results.append([t, None, None])
+            continue
+
+        score = compute_ki_score(series)
+        results.append([t, score, series.iloc[-1]])
+
+    df = pd.DataFrame(results, columns=["Ticker", "KI-Score", "Letzter Preis"])
+    df = df.sort_values("KI-Score", ascending=False)
     return df
 
 #--------------------------------------------------------
@@ -747,6 +767,9 @@ def app():
             Der Scanner erkennt automatisch, ob eine ISIN existiert.
             """)
 
+            # -----------------------------
+            # 1. ISIN-KONVERTER
+            # -----------------------------
             isin_input = gr.Textbox(
                 label="Ticker-Liste (Komma-getrennt)",
                 placeholder="z. B. AAPL, SPY, EUNL.DE, BTC-USD"
@@ -756,15 +779,29 @@ def app():
 
             isin_btn.click(ui_convert_isin, inputs=[isin_input], outputs=[isin_table])
 
+            # -----------------------------
+            # 2. KI-SCORE (einfacher KI-Scan)
+            # -----------------------------
+            gr.Markdown("### 🤖 KI‑Score (0–100) – Einzel-Scan")
+
+            ki_input = gr.Textbox(
+                abel="Ticker-Liste (Komma-getrennt)",
+                placeholder="z. B. AAPL, SPY, BTC-USD"
+            )
+            ki_btn = gr.Button("KI‑Score berechnen")
+            ki_table = gr.Dataframe(label="KI‑Ranking", interactive=False)
+
+            ki_btn.click(ui_ki_scan, inputs=[ki_input], outputs=[ki_table])
+
+            # -----------------------------
+            # 3. KI-PROFIL-SCAN (mit Radar)
+            # -----------------------------
+            gr.Markdown("### 🧠 KI‑Profil‑Scan (mit Radar‑Vergleich)")
+
             region = gr.Dropdown(
                 label="Region (optional)",
                 choices=["Keine", "Europa", "USA", "Global"],
                 value="Keine"
-            )
-
-            asset_list = gr.Textbox(
-                label="Assets eingeben (Komma‑getrennt)",
-                placeholder="z. B. SPY, QQQ, VTI, BTC-USD, AAPL, MSFT"
             )
 
             profile = gr.Dropdown(
@@ -773,8 +810,12 @@ def app():
                 value="ki"
             )
 
-            scan_button = gr.Button("KI-Scan starten")
+            asset_list = gr.Textbox(
+                label="Assets eingeben (Komma‑getrennt)",
+                placeholder="z. B. SPY, QQQ, VTI, BTC-USD, AAPL, MSFT"
+            )
 
+            scan_button = gr.Button("KI‑Profil‑Scan starten")
             scan_table = gr.Dataframe(label="KI‑Ranking", interactive=False)
             scan_plot = gr.Plot(label="Radar‑Vergleich")
 

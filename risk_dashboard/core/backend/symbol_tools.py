@@ -4,6 +4,7 @@ import yfinance as yf
 from core.data.logging import logger
 import requests
 from core.backend.isin_database import ISIN_DATABASE
+from core.backend.isin_database import load_isin_db, save_isin_db
 
 COMMON_SYMBOLS = [
     "SPY", "VTI", "QQQ", "GLD", "IAU", "BTC-USD", "ETH-USD",
@@ -48,20 +49,8 @@ def detect_symbol_type(text: str) -> str:
     return "ticker"
 
 
-def yahoo_search_isin(ticker: str) -> str | None:
-    try:
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={ticker}"
-        data = requests.get(url, timeout=5).json()
-        if "quotes" in data:
-            for q in data["quotes"]:
-                if q.get("symbol", "").upper() == ticker.upper():
-                    return q.get("isin")
-    except Exception:
-        pass
-    return None
 
-
-def ticker_to_isin(ticker: str) -> str | None:
+def ticker_to_isin_old(ticker: str) -> str | None:
     t = ticker.strip().upper()
 
     # 1. Yahoo versuchen
@@ -76,6 +65,39 @@ def ticker_to_isin(ticker: str) -> str | None:
     # 3. Keine ISIN (z. B. Krypto)
     return None
 
+
+def yahoo_search_isin(ticker: str) -> str | None:
+    try:
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={ticker}"
+        data = requests.get(url, timeout=5).json()
+        if "quotes" in data:
+            for q in data["quotes"]:
+                if q.get("symbol", "").upper() == ticker.upper():
+                    return q.get("isin")
+    except Exception:
+        pass
+    return None
+
+
+def ticker_to_isin(ticker: str) -> str | None:
+    db = load_isin_db()
+    t = ticker.strip().upper()
+
+    # 1. Lokale DB
+    if t in db:
+        return db[t]
+
+    # 2. Yahoo versuchen
+    isin = yahoo_search_isin(t)
+    if isin:
+        db[t] = isin
+        save_isin_db(db)
+        return isin
+
+    # 3. Keine ISIN (z. B. Krypto)
+    db[t] = None
+    save_isin_db(db)
+    return None
 
 def convert_tickers_to_isins(tickers: list[str]):
     result = []

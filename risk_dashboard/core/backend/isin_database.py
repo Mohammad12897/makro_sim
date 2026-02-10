@@ -1,4 +1,33 @@
 # core/backend/isin_database.py
+import json
+from pathlib import Path
+
+ISIN_DB_FILE = Path("core/data/isin_database.json")
+
+INITIAL_DB = {
+    "AAPL": "US0378331005",
+    "MSFT": "US5949181045",
+    "GOOGL": "US02079K3059",
+    "AMZN": "US0231351067",
+    "TSLA": "US88160R1014",
+    "SPY": "US78462F1030",
+    "EUNL.DE": "IE00B4L5Y983",
+    "VWCE.DE": "IE00BK5BQT80",
+    "BMW.DE": "DE0005190003",
+    "SAP.DE": "DE0007164600",
+    "BTC-USD": None
+}
+
+def load_isin_db():
+    if not ISIN_DB_FILE.exists():
+        ISIN_DB_FILE.parent.mkdir(parents=True, exist_ok=True)
+        ISIN_DB_FILE.write_text(json.dumps(INITIAL_DB, indent=2))
+        return INITIAL_DB
+    return json.loads(ISIN_DB_FILE.read_text())
+
+def save_isin_db(db):
+    ISIN_DB_FILE.write_text(json.dumps(db, indent=2))
+    
 ISIN_DATABASE = {
 
     # -------------------------
