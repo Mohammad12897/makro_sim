@@ -2,6 +2,7 @@
 import re
 import yfinance as yf
 from core.data.logging import logger
+import requests
 
 COMMON_SYMBOLS = [
     "SPY", "VTI", "QQQ", "GLD", "IAU", "BTC-USD", "ETH-USD",
@@ -45,17 +46,36 @@ def detect_symbol_type(text: str) -> str:
         return "etf/aktie"
     return "ticker"
 
+  
 
 def ticker_to_isin(ticker: str) -> str | None:
     """
-    Holt die ISIN eines Tickers über Yahoo Finance.
+    Holt die ISIN eines Tickers über die OpenFIGI API.
+    Funktioniert für Aktien & ETFs.
     Gibt None zurück, wenn keine ISIN existiert (z. B. bei Krypto).
     """
+
+    url = "https://api.openfigi.com/v3/mapping"
+    headers = {"Content-Type": "application/json"}
+
+    payload = [{
+        "idType": "TICKER",
+        "idValue": ticker,
+        "exchCode": None
+    }]
+
     try:
-        info = yf.Ticker(ticker).info
-        return info.get("isin")
+        r = requests.post(url, json=payload, headers=headers, timeout=5)
+        data = r.json()
+
+        if isinstance(data, list) and len(data) > 0:
+            result = data[0].get("data")
+            if result and len(result) > 0:
+                return result[0].get("isin")
     except Exception:
-        return None
+        pass
+
+    return None
 
 
 def convert_tickers_to_isins(tickers: list[str]) -> list[tuple[str, str | None]]:

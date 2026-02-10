@@ -163,13 +163,14 @@ def parse_weights(text, n):
         return [1 / n] * n
     return [v / s for v in vals]
 
+
 def ui_convert_isin(text):
     tickers = [t.strip() for t in text.split(",") if t.strip()]
     pairs = convert_tickers_to_isins(tickers)
     df = pd.DataFrame(pairs, columns=["Ticker", "ISIN"])
     return df
 
-# ---------------------------------------------------------
+#--------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
 
@@ -740,7 +741,11 @@ def app():
             Der KI‑Asset‑Scanner kann dir diese Liste automatisch erzeugen.
             """)
 
-            gr.Markdown("### 🔄 Ticker → ISIN Konverter")
+            gr.Markdown("""
+            ### 📌 Ticker → ISIN Konverter
+            Gib einfach Ticker ein (z. B. AAPL, SPY, EUNL.DE, BTC-USD).  
+            Der Scanner erkennt automatisch, ob eine ISIN existiert.
+            """)
 
             isin_input = gr.Textbox(
                 label="Ticker-Liste (Komma-getrennt)",
