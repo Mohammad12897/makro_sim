@@ -3,6 +3,7 @@ import re
 import yfinance as yf
 from core.data.logging import logger
 import requests
+from core.backend.isin_database import ISIN_DATABASE
 
 COMMON_SYMBOLS = [
     "SPY", "VTI", "QQQ", "GLD", "IAU", "BTC-USD", "ETH-USD",
@@ -46,43 +47,37 @@ def detect_symbol_type(text: str) -> str:
         return "etf/aktie"
     return "ticker"
 
-  
 
-def ticker_to_isin(ticker: str) -> str | None:
-    """
-    Holt die ISIN eines Tickers über die OpenFIGI API.
-    Funktioniert für Aktien & ETFs.
-    Gibt None zurück, wenn keine ISIN existiert (z. B. bei Krypto).
-    """
-
-    url = "https://api.openfigi.com/v3/mapping"
-    headers = {"Content-Type": "application/json"}
-
-    payload = [{
-        "idType": "TICKER",
-        "idValue": ticker,
-        "exchCode": None
-    }]
-
+def yahoo_search_isin(ticker: str) -> str | None:
     try:
-        r = requests.post(url, json=payload, headers=headers, timeout=5)
-        data = r.json()
-
-        if isinstance(data, list) and len(data) > 0:
-            result = data[0].get("data")
-            if result and len(result) > 0:
-                return result[0].get("isin")
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={ticker}"
+        data = requests.get(url, timeout=5).json()
+        if "quotes" in data:
+            for q in data["quotes"]:
+                if q.get("symbol", "").upper() == ticker.upper():
+                    return q.get("isin")
     except Exception:
         pass
-
     return None
 
 
-def convert_tickers_to_isins(tickers: list[str]) -> list[tuple[str, str | None]]:
-    """
-    Konvertiert eine Liste von Ticker-Symbolen in ISINs.
-    Gibt eine Liste von (ticker, isin) zurück.
-    """
+def ticker_to_isin(ticker: str) -> str | None:
+    t = ticker.strip().upper()
+
+    # 1. Yahoo versuchen
+    isin = yahoo_search_isin(t)
+    if isin:
+        return isin
+
+    # 2. Lokale Datenbank
+    if t in ISIN_DATABASE:
+        return ISIN_DATABASE[t]
+
+    # 3. Keine ISIN (z. B. Krypto)
+    return None
+
+
+def convert_tickers_to_isins(tickers: list[str]):
     result = []
     for t in tickers:
         t_clean = t.strip().upper()
