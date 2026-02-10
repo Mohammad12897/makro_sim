@@ -44,3 +44,28 @@ def detect_symbol_type(text: str) -> str:
     if "." in t:
         return "etf/aktie"
     return "ticker"
+
+
+def ticker_to_isin(ticker: str) -> str | None:
+    """
+    Holt die ISIN eines Tickers über Yahoo Finance.
+    Gibt None zurück, wenn keine ISIN existiert (z. B. bei Krypto).
+    """
+    try:
+        info = yf.Ticker(ticker).info
+        return info.get("isin")
+    except Exception:
+        return None
+
+
+def convert_tickers_to_isins(tickers: list[str]) -> list[tuple[str, str | None]]:
+    """
+    Konvertiert eine Liste von Ticker-Symbolen in ISINs.
+    Gibt eine Liste von (ticker, isin) zurück.
+    """
+    result = []
+    for t in tickers:
+        t_clean = t.strip().upper()
+        isin = ticker_to_isin(t_clean)
+        result.append((t_clean, isin))
+    return result

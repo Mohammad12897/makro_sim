@@ -83,6 +83,7 @@ from core.backend.symbol_tools import (
     validate_symbol,
     detect_symbol_type,
     is_isin,
+    convert_tickers_to_isins,
 )
 from core.backend.portfolio_manager import (
     list_portfolios,
@@ -162,6 +163,11 @@ def parse_weights(text, n):
         return [1 / n] * n
     return [v / s for v in vals]
 
+def ui_convert_isin(text):
+    tickers = [t.strip() for t in text.split(",") if t.strip()]
+    pairs = convert_tickers_to_isins(tickers)
+    df = pd.DataFrame(pairs, columns=["Ticker", "ISIN"])
+    return df
 
 # ---------------------------------------------------------
 # Gradio App
@@ -650,16 +656,100 @@ def app():
                 outputs=[portfolio_radar_plot, portfolio_table, portfolio_lexicon, portfolio_pdf],
             )
 
-        with gr.Tab("KI-Asset‑Scanner"):
-
+        with gr.Tab("🤖 KI‑Asset‑Scanner"):
             gr.Markdown("""
-            # 🤖 KI‑Asset‑Scanner
+            ### 🤖 KI‑Asset‑Scanner – Erklärung & Lexikon
 
-            - Wähle eine Region **oder** gib eigene Assets ein.
-            - Wähle ein KI‑Profil (z. B. stabil, momentum, growth).
-            - Die KI bewertet alle Assets nach Risiko, Rendite, Trend und Sharpe‑Ratio.
+            Der KI‑Asset‑Scanner hilft dir dabei, Aktien, ETFs und Kryptowährungen schnell zu bewerten, zu filtern und nach einem KI‑Score zu sortieren.
+            Damit du genau weißt, was hier passiert, findest du hier die wichtigsten Begriffe:
+
+            ---
+
+            ## 📌 Was ist ein *Screener*?
+            Ein Screener ist ein **Filter‑Werkzeug**.
+            Du gibst Kriterien vor (z. B. Region, Branche, Risiko, KI‑Score), und der Scanner zeigt dir nur die passenden Assets.
+
+            Beispiele:
+            - „Zeige mir alle ETFs mit niedriger Volatilität“
+            - „Zeige mir Aktien mit hohem KI‑Score“
+            - „Zeige mir Kryptowährungen mit starkem Momentum“
+
+            ---
+
+            ## 📌 Was ist ein *Asset*?
+            Ein Asset ist ein **Anlageobjekt**, also etwas, in das man investieren kann.
+            Beispiele:
+            - Aktien (z. B. Apple, BMW)
+            - ETFs (z. B. MSCI World)
+            - Kryptowährungen (z. B. Bitcoin, Ethereum)
+            - Rohstoffe (z. B. Gold)
+
+            ---
+
+            ## 📌 Was bedeutet *KI‑Ranking*?
+            Die KI analysiert jedes Asset anhand verschiedener Merkmale:
+            - Trendstärke
+            - Volatilität
+            - Risiko
+            - Muster in der Kursentwicklung
+            - Korrelation zu anderen Assets
+            - Stabilität
+
+            Daraus entsteht ein **KI‑Score** (0–100).  
+            Der Scanner sortiert automatisch:
+
+            - **Oben (80–100):** Hohe Qualität, starke Muster  
+            - **Mitte (40–80):** Neutral bis solide  
+            - **Unten (0–40):** Schwache Muster, hohes Risiko  
+
+            ---
+
+            ## 📌 Was ist eine *ISIN*?
+            Die ISIN ist die **internationale Wertpapierkennnummer**.
+            Sie identifiziert ein Wertpapier eindeutig – wie ein Reisepass für Finanzprodukte.
+
+            Beispiele:
+            - Apple → **US0378331005**
+            - iShares MSCI World ETF → **IE00B4L5Y983**
+
+            ⚠️ **Wichtig:**
+            Kryptowährungen haben **keine ISIN** (Bitcoin, Ethereum, Solana usw.).
+
+            ---
+
+            ## 📌 Wie entsteht eine ISIN‑Liste?
+            Du gibst einfach Ticker ein, z. B.:
+            AAPL, SPY, EUNL.DE, BTC-USD
+
+            Der Scanner erkennt automatisch:
+            - Aktien → ISIN wird geholt  
+            - ETFs → ISIN wird geholt  
+            - Krypto → keine ISIN (wird übersprungen)
+
+            Ergebnis:
+            US0378331005 US78462F1030 IE00B4L5Y983
+
+            ---
+
+            ## 📌 Wozu brauche ich eine ISIN‑Liste?
+            - Für ETF‑Analysen  
+            - Für Portfolio‑Optimierung  
+            - Für Watchlists  
+            - Für Datenimporte in Excel oder Broker‑Tools  
+
+            Der KI‑Asset‑Scanner kann dir diese Liste automatisch erzeugen.
             """)
 
+            gr.Markdown("### 🔄 Ticker → ISIN Konverter")
+
+            isin_input = gr.Textbox(
+                label="Ticker-Liste (Komma-getrennt)",
+                placeholder="z. B. AAPL, SPY, EUNL.DE, BTC-USD"
+            )
+            isin_btn = gr.Button("ISIN-Liste erzeugen")
+            isin_table = gr.Dataframe(label="Ticker → ISIN", interactive=False)
+
+            isin_btn.click(ui_convert_isin, inputs=[isin_input], outputs=[isin_table])
 
             region = gr.Dropdown(
                 label="Region (optional)",
@@ -873,7 +963,7 @@ def app():
                 gr.Markdown("### Historische Performance eines Portfolios")
                 bt_name = gr.Textbox(label="Portfolioname")
                 bt_btn = gr.Button("Backtest starten")
-                
+
                 bt_plot = gr.Plot(label="Backtest‑Performance")
 
                 def ui_backtest(name):
@@ -912,7 +1002,7 @@ def app():
                 p2_name = gr.Textbox(label="Portfolio B")
                 cmp_btn = gr.Button("Vergleichen")
                 cmp_plot = gr.Plot(label="Vergleich")
-                
+
                 def ui_compare(a, b):
                     df1, meta1 = get_portfolio(a)
                     df2, meta2 = get_portfolio(b)
