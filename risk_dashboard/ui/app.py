@@ -380,33 +380,37 @@ def build_home():
     """)
 
 def ui_bond_analysis(ticker):
-    """
-    Analyse für Anleihen‑ETFs oder Bond‑Indizes.
-    """
-    try:
-        series = fetch_price_history(ticker, period="1y")
-        if series is None or len(series) < 120:
-            return pd.DataFrame([["Keine Daten"]], columns=["Info"]), None
+    series = fetch_price_history(ticker, period="1y")
 
-        # Kennzahlen
-        returns = series.pct_change().dropna()
-        yield_approx = returns.mean() * 252
-        vol = returns.std() * (252 ** 0.5)
-        dd = (series / series.cummax() - 1).min()
+    if not isinstance(series, pd.Series) or len(series) < 120:
+        return pd.DataFrame([["Keine Daten"]], columns=["Info"]), None
 
-        df = pd.DataFrame({
-            "Kennzahl": ["Yield (approx.)", "Volatilität", "Max Drawdown"],
-            "Wert": [yield_approx, vol, dd]
-        })
+    result = compute_ki_score(series, return_factors=True)
 
-        # Radar
-        score, factors = compute_ki_score(series, return_factors=True)
-        fig = plot_radar({ticker: factors})
+    # --- WICHTIG: Fehler abfangen ---
+    if not isinstance(result, tuple) or len(result) != 2:
+        return pd.DataFrame([["KI‑Score Fehler"]]), None
 
-        return df, fig
+    score, factors = result
 
-    except Exception as e:
-        return pd.DataFrame([["Fehler", str(e)]]), None
+    if not isinstance(factors, dict):
+        return pd.DataFrame([["Faktoren ungültig"]]), None
+
+    # Radar
+    fig = plot_radar({ticker: factors})
+
+    # Kennzahlen
+    returns = series.pct_change().dropna()
+    df = pd.DataFrame({
+        "Kennzahl": ["Yield (approx.)", "Volatilität", "Max Drawdown"],
+        "Wert": [
+            returns.mean() * 252,
+            returns.std() * (252 ** 0.5),
+            (series / series.cummax() - 1).min()
+        ]
+    })
+
+    return df, fig
 
 def build_bond_analysis():
     gr.Markdown("## 🧾 Anleihen‑Analyse")
@@ -433,31 +437,34 @@ def build_bond_analysis():
     )
 
 def ui_crypto_analysis(ticker):
-    """
-    Analyse für Kryptowährungen (BTC, ETH, etc.)
-    """
-    try:
-        series = fetch_price_history(ticker, period="1y")
-        if series is None or len(series) < 120:
-            return pd.DataFrame([["Keine Daten"]], columns=["Info"]), None
+    series = fetch_price_history(ticker, period="1y")
 
-        returns = series.pct_change().dropna()
-        vol = returns.std() * (252 ** 0.5)
-        sharpe = returns.mean() / (returns.std() + 1e-9)
+    if not isinstance(series, pd.Series) or len(series) < 120:
+        return pd.DataFrame([["Keine Daten"]], columns=["Info"]), None
 
-        df = pd.DataFrame({
-            "Kennzahl": ["Volatilität", "Sharpe‑Ratio"],
-            "Wert": [vol, sharpe]
-        })
+    result = compute_ki_score(series, return_factors=True)
 
-        score, factors = compute_ki_score(series, return_factors=True)
-        fig = plot_radar({ticker: factors})
+    if not isinstance(result, tuple) or len(result) != 2:
+        return pd.DataFrame([["KI‑Score Fehler"]]), None
 
-        return df, fig
+    score, factors = result
 
-    except Exception as e:
-        return pd.DataFrame([["Fehler", str(e)]]), None
+    if not isinstance(factors, dict):
+        return pd.DataFrame([["Faktoren ungültig"]]), None
 
+    fig = plot_radar({ticker: factors})
+
+    returns = series.pct_change().dropna()
+    df = pd.DataFrame({
+        "Kennzahl": ["Volatilität", "Sharpe‑Ratio"],
+        "Wert": [
+            returns.std() * (252 ** 0.5),
+            returns.mean() / (returns.std() + 1e-9)
+        ]
+    })
+
+    return df, fig
+    
 def build_crypto_analysis():
     gr.Markdown("## 🪙 Krypto‑Analyse")
 
@@ -476,38 +483,29 @@ def build_crypto_analysis():
 
 
 def ui_risk_dashboard(ticker_text):
-    """
-    Risiko‑Dashboard: Volatilität, Drawdowns, Korrelation‑Heatmap
-    """
-    try:
-        tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
-        data = {}
+    tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
+    data = {}
 
-        for t in tickers:
-            series = fetch_price_history(t, period="1y")
-            if series is not None:
-                data[t] = series
+    for t in tickers:
+        series = fetch_price_history(t, period="1y")
+        if isinstance(series, pd.Series):
+            data[t] = series
 
-        df = pd.DataFrame(data).dropna()
+    if not data:
+        return pd.DataFrame([["Keine gültigen Daten"]]), pd.DataFrame(), None
 
-        # Volatilität
-        vol = df.pct_change().std() * (252 ** 0.5)
-        vol_table = vol.reset_index()
-        vol_table.columns = ["Ticker", "Volatilität"]
+    df = pd.DataFrame(data).dropna()
+    returns = df.pct_change().dropna()
 
-        # Drawdowns
-        dd = (df / df.cummax() - 1).min()
-        dd_table = dd.reset_index()
-        dd_table.columns = ["Ticker", "Max Drawdown"]
+    vol_table = returns.std().reset_index()
+    vol_table.columns = ["Ticker", "Volatilität"]
 
-        # Korrelation
-        corr = df.pct_change().corr()
-        fig = plot_correlation_heatmap(corr)
+    dd_table = (df / df.cummax() - 1).min().reset_index()
+    dd_table.columns = ["Ticker", "Max Drawdown"]
 
-        return vol_table, dd_table, fig
+    fig = plot_correlation_heatmap(returns.corr())
 
-    except Exception as e:
-        return pd.DataFrame([["Fehler", str(e)]]), pd.DataFrame(), None
+    return vol_table, dd_table, fig
 
 def build_risk_dashboard():
     gr.Markdown("## ⚠️ Risiko‑Dashboard")
