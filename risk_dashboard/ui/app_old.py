@@ -414,6 +414,271 @@ def app():
 
             """)
 
+        with gr.Tab("Radar Aktien"):
+            # Aktienliste laden
+
+            stock_list = load_stock_list()
+            # Eingabe
+            aktien = gr.Dropdown(
+                choices=stock_list,
+                multiselect=True,
+                label="Aktien auswählen (beliebig viele)",
+                info="Autocomplete aktiviert"
+            )
+            benchmark_dropdown = gr.Dropdown(
+                choices=["SPY", "QQQ", "VT", "None"],
+                value="None",
+                label="Benchmark auswählen"
+            )
+
+            mode_dropdown = gr.Dropdown(
+                choices=["einsteiger", "experte"],
+                value="einsteiger",
+                label="Modus",
+            )
+
+            stock_button = gr.Button("Radar erstellen")
+
+            # Ausgabe
+            stock_radar_plot = gr.Plot(label="Radar-Chart")
+            stock_radar_table = gr.Dataframe(label="Daten")
+            stock_lexikon_table = gr.Dataframe(label="Lexikon")
+
+            # --- Cluster Analyse UI ---
+            cluster_btn = gr.Button("Cluster-Analyse")
+            cluster_table = gr.Dataframe(label="Cluster-Ergebnis", interactive=False)
+
+            def build_stock_radar(tickers, benchmark_choice, mode):
+
+                if not tickers:
+                    return None, pd.DataFrame(), pd.DataFrame()
+
+                rows = []
+                for t in tickers:
+                    entry = {"ticker": t, "name": t}
+                    metrics = get_metrics(entry)
+                    if metrics is None:
+                        continue
+                    fund = get_fundamentals(t)
+                    metrics.update(fund)
+
+                    country = map_ticker_to_country(t)
+                    macro = get_country_macro(country)
+                    metrics.update(macro)
+                    metrics["country"] = country
+                    rows.append(metrics)
+
+                if benchmark_choice != "None":
+                    entry = {"ticker": benchmark_choice, "name": benchmark_choice}
+                    bm = get_metrics(entry)
+                    fund_bm = get_fundamentals(benchmark_choice)
+                    bm.update(fund_bm)
+
+                    country_bm = map_ticker_to_country(benchmark_choice)
+                    bm.update(get_country_macro(country_bm))
+                    bm["country"] = country_bm   # ← WICHTIG
+
+                    rows.append(bm)
+
+                rows = normalize_metrics(rows)
+
+                fig = plot_radar_plotly(rows, mode=mode)
+                lex = get_lexicon("aktien", mode=mode)
+
+                return fig, pd.DataFrame(rows), pd.DataFrame(lex)
+
+
+            def run_cluster(tickers):
+                if not tickers:
+                    return pd.DataFrame({"Fehler": ["Bitte mindestens eine Aktie auswählen"]})
+
+                rows = []
+                for t in tickers:
+                    entry = {"ticker": t, "name": t}
+                    metrics = get_metrics(entry)
+                    if metrics is None:
+                        continue
+                    fund = get_fundamentals(t)
+                    metrics.update(fund)
+                    country = map_ticker_to_country(t)
+                    macro = get_country_macro(country)
+                    metrics.update(macro)
+                    metrics["country"] = country
+                    rows.append(metrics)
+
+                rows = normalize_metrics(rows)
+                df = cluster_stocks(rows)
+                return df
+
+            stock_button.click(build_stock_radar, inputs=[aktien, benchmark_dropdown, mode_dropdown], outputs=[stock_radar_plot, stock_radar_table, stock_lexikon_table])
+            cluster_btn.click(run_cluster, inputs=[aktien], outputs=[cluster_table])
+
+        with gr.Tab("Radar Länder"):
+            gr.Markdown("""
+            ## 🌍 Länder‑Radar
+            Das Länder‑Radar bewertet die wirtschaftliche Stärke eines Landes anhand von:
+            - BIP‑Wachstum
+            - Inflation
+            - Zinsen
+            - Arbeitslosenquote
+            - Staatsverschuldung
+            - Währungsstärke
+
+            **Frage, die das Radar beantwortet:**
+            *Wie stabil, wachstumsstark und wirtschaftlich attraktiv ist ein Land?*
+            """)
+
+            laender_input = gr.Dropdown(
+                choices=["USA", "Deutschland", "Japan", "UK", "Frankreich", "China", "Indien"],
+                multiselect=True,
+                label="Länder auswählen",
+                info="Mehrere Länder möglich"
+            )
+
+            laender_mode = gr.Dropdown(
+                ["einsteiger", "experte"],
+                value="einsteiger",
+                label="Modus",
+                info = "Das Länder‑Radar zeigt die wirtschaftliche Stärke eines Landes anhand zentraler Makro‑Kennzahlen."
+            )
+
+            laender_button = gr.Button("Länder-Radar erstellen")
+
+            laender_radar_plot = gr.Plot(label="Länder-Radar")
+            laender_table = gr.Dataframe(label="Makro-Daten", interactive=False)
+            laender_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
+
+            laender_button.click(
+                build_country_radar,
+                inputs=[laender_input, laender_mode],
+                outputs=[laender_radar_plot, laender_table, laender_lexicon],
+            )
+
+        with gr.Tab("Radar ETF / Assets"):
+            gr.Markdown("""
+            ### 🪙 Was ist Bitcoin?
+
+            Bitcoin ist eine **digitale, dezentrale Währung**, die ohne Banken oder Staaten funktioniert.
+            Sie basiert auf der **Blockchain**, einem öffentlichen, unveränderbaren Register aller Transaktionen.
+
+            **Wesentliche Eigenschaften:**
+            - begrenzte Menge (max. 21 Millionen)
+            - hohe Volatilität
+            - wird oft als „digitales Gold“ bezeichnet
+            - kann weltweit in Sekunden übertragen werden
+            - keine zentrale Kontrolle
+
+            **Warum im Asset‑Radar?**
+            Bitcoin ist kein ETF und keine Aktie — aber ein **Asset**, das wie andere Vermögenswerte
+            über Risiko‑ und Performance‑Kennzahlen analysiert werden kann.
+
+            ## 🪙 Bitcoin‑Radar
+            Bitcoin wird im Asset‑Radar wie ein eigenständiges Asset behandelt.
+            Es besitzt eigene Kennzahlen, die sich von ETFs und Aktien unterscheiden:
+
+            - **Volatilität** – misst die Schwankungsintensität
+            - **Sharpe‑Ratio** – Verhältnis von Rendite zu Risiko
+            - **Max Drawdown** – größter Verlust vom Hoch zum Tief
+            - **SMA‑Trend (50/200)** – zeigt langfristige Trendrichtung
+            - **Korrelation zu SPY** – Zusammenhang mit dem Aktienmarkt
+            - **Korrelation zu Gold** – Vergleich zu einem klassischen Wertspeicher
+
+            **Warum ist Bitcoin im Radar?**
+            Weil es ein global handelbares Asset ist, das in Portfolios eine wichtige Rolle spielt:
+            Diversifikation, Trendverhalten, Risiko‑Rendite‑Profil.
+            """)
+
+            gr.Markdown("""
+            ## 📈 ETF‑Radar
+            Das ETF‑Radar bewertet ETFs anhand von:
+            - Performance (1Y, 5Y)
+            - Volatilität
+            - Sharpe‑Ratio
+            - TER (Kosten)
+            - Tracking Error
+            - Fondsgröße (AUM)
+            - Dividendenrendite
+
+            **Frage, die das Radar beantwortet:**
+            *Wie gut ist ein ETF im Verhältnis zu Risiko, Kosten und Performance?*
+            """)
+
+            etf_input = gr.Dropdown(
+                choices=["SPY", "QQQ", "VT", "VEA", "VWO", "EWJ", "EEM", "BTC-USD"],
+                multiselect=True,
+                label="ETFs auswählen",
+                info="Wähle ETFs, Aktien oder Bitcoin aus."
+            )
+
+            custom_symbol = gr.Textbox(
+                label="Eigenes Symbol eingeben (optional)",
+                placeholder="z. B. BMW.DE, TSLA, NESN.SW, ETH-USD",
+                info="Hier kannst du jedes beliebige Symbol eingeben."
+            )
+
+            etf_mode = gr.Dropdown(
+                ["einsteiger", "experte"],
+                value="einsteiger",
+                label="Modus",
+                info="Einsteiger = einfache Darstellung, Experte = detaillierte Analyse."
+            )
+
+            etf_button = gr.Button("ETF-Radar erstellen")
+            etf_radar_plot = gr.Plot(label="Asset-Radar")
+            etf_table = gr.Dataframe(label="Asset-Daten", interactive=False)
+            etf_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
+
+
+            etf_button.click(
+                build_asset_radar,
+                inputs=[etf_input,  custom_symbol, etf_mode],
+                outputs=[etf_radar_plot, etf_table, etf_lexicon],
+            )
+
+
+        with gr.Tab("Radar Portfolio"):
+            gr.Markdown("""
+            ## 💼 Portfolio‑Radar
+            Das Portfolio‑Radar bewertet:
+            - gewichtete Sharpe‑Ratio
+            - gewichtete Volatilität
+            - Diversifikation
+            - Regionen‑Exposure
+            - Gesamt‑Performance
+
+            **Frage, die das Radar beantwortet:**
+            *Wie stabil, diversifiziert und ausgewogen ist mein Portfolio?*
+            """)
+
+            portfolio_name = gr.Textbox(
+                label="Portfolioname",
+                value="Mein Portfolio",
+                info="Name des Portfolios, das analysiert werden soll."
+            )
+
+            portfolio_mode = gr.Dropdown(
+                ["einsteiger", "experte"],
+                value="einsteiger",
+                label="Modus",
+                info="Einsteiger = einfache Darstellung, Experte = detaillierte Analyse."
+            )
+
+            portfolio_button = gr.Button("Portfolio-Radar erstellen")
+
+            portfolio_radar_plot = gr.Plot(label="Portfolio-Radar")
+            portfolio_table = gr.Dataframe(label="Portfolio-Daten", interactive=False)
+            portfolio_lexicon = gr.Dataframe(label="Lexikon", interactive=False)
+             # WICHTIG: type="filepath"
+
+            portfolio_pdf = gr.File(label="Radar-Analyse PDF" , type="filepath")
+
+
+            portfolio_button.click(
+                build_portfolio_radar,
+                inputs=[portfolio_name, portfolio_mode],
+                outputs=[portfolio_radar_plot, portfolio_table, portfolio_lexicon, portfolio_pdf],
+            )
+
         with gr.Tab("🤖 KI‑Asset‑Scanner"):
             gr.Markdown("""
             ### 🤖 KI‑Asset‑Scanner – Erklärung & Lexikon
