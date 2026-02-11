@@ -98,6 +98,7 @@ from core.data.logging import log_buffer
 
 from core.backend.ki_score import compute_ki_score, explain_ki_score
 from core.data.assets import fetch_price_history
+from core.backend.plots import plot_efficient_frontier
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
@@ -192,6 +193,441 @@ def ui_ki_scan(text):
     df = pd.DataFrame(results, columns=["Ticker", "KI‑Score"])
     return df, "\n\n---\n\n".join(explanations)
 
+
+def build_home():
+    gr.Markdown("""
+    # 📘 Willkommen im MakroSim Dashboard
+
+    Dieser Bereich erklärt die wichtigsten Begriffe, Radar‑Faktoren, KI‑Scores und Asset‑Typen.
+
+    ## 📊 Was bedeuten die Radare?
+    Ein Radar zeigt die technische Qualität eines Assets anhand von:
+    - Momentum
+    - Volatilität
+    - Drawdown
+    - Trendstabilität
+    - Sharpe‑Ratio
+    - Diversifikation
+
+    Große Fläche = stark  
+    Kleine Fläche = schwach  
+    Gleichmäßig = stabil  
+    Verzerrt = Risiko  
+
+    ---
+    ## 📘 Was ist ein Fonds?
+            Ein Fonds ist ein großer Geldtopf, in den viele Anleger einzahlen.
+            Ein Manager investiert dieses Geld in viele Wertpapiere (Aktien, Anleihen, Immobilien).
+            Ein ETF ist ein **börsengehandelter Fonds**, der einen Index nachbildet.
+
+    # 📘 Glossar
+
+    ### ETF
+    Ein ETF ist ein börsengehandelter Fonds, der einen Index nachbildet.
+
+    ### Fonds
+    Ein Fonds ist ein großer Geldtopf, der in viele Wertpapiere investiert wird.
+
+    ### Anleihe
+    Eine Anleihe ist ein Kredit an Staat oder Unternehmen.
+
+    ### Sharpe‑Ratio
+    Verhältnis von Rendite zu Risiko.
+
+    ### Volatilität
+    Schwankungsintensität eines Wertpapiers.
+
+    ### TER
+    Gesamtkostenquote eines ETFs.
+
+    ### Diversifikation
+    Risikoverteilung über viele Anlagen.
+
+    ### 🪙 Bitcoin
+    Bitcoin ist die erste und größte Kryptowährung.
+    Sie funktioniert ohne zentrale Instanz und basiert auf einem Netzwerk von Computern,
+    die gemeinsam die Blockchain betreiben.
+
+    **Begriffe im Zusammenhang mit Bitcoin:**
+
+    - **Blockchain** – öffentliches Register aller Transaktionen
+    - **Halving** – Ereignis, bei dem die Blockbelohnung halbiert wird (alle ~4 Jahre)
+    - **Mining** – Prozess, bei dem neue Bitcoins erzeugt werden
+    - **Wallet** – digitale Geldbörse für Bitcoin
+    - **Private Key** – kryptografischer Schlüssel, der den Besitz beweist
+    - **On‑Chain / Off‑Chain** – Transaktionen auf oder außerhalb der Blockchain
+    ---
+
+    ### 🔗 Blockchain
+
+    Eine Blockchain ist eine **dezentrale Datenstruktur**, die Transaktionen in einer
+    verketteten Reihe von Blöcken speichert.
+    Sie ist:
+
+    - unveränderbar
+    - transparent
+    - kryptografisch gesichert
+    - nicht von einer zentralen Instanz kontrolliert
+
+    Sie bildet die Grundlage für Bitcoin und viele andere digitale Assets.
+    """)
+
+    gr.Markdown("""
+    ### 🔗 Was ist die Blockchain?
+
+    Die Blockchain ist ein **dezentrales, unveränderbares Register**, das alle Bitcoin‑Transaktionen speichert.
+    Statt einer zentralen Datenbank wird sie von tausenden Computern weltweit gemeinsam betrieben.
+    Jeder neue Block baut auf dem vorherigen auf – dadurch entsteht eine **fälschungssichere Kette**.
+
+    ## 🔗 Blockchain – Einsteiger‑Erklärung
+
+    Die Blockchain ist das technische Fundament von Bitcoin.
+    Man kann sie sich wie ein **digitales Kassenbuch** vorstellen, das:
+
+    - **öffentlich einsehbar** ist
+    - **nicht manipuliert** werden kann
+    - **von tausenden Computern gleichzeitig geführt** wird
+    - **jede Transaktion dauerhaft speichert**
+
+    Jeder Block enthält:
+    - eine Liste von Transaktionen
+    - einen Zeitstempel
+    - einen kryptografischen Fingerabdruck (Hash)
+    - den Hash des vorherigen Blocks
+
+    Durch diese Struktur entsteht eine **Kette von Blöcken**, die praktisch nicht gefälscht werden kann.
+    """)
+
+    gr.Markdown("""
+    ## 🧩 Wie funktioniert eine Blockchain?
+
+    Stell dir die Blockchain wie eine **Kette aus nummerierten Blöcken** vor:
+
+    1. **Transaktionen sammeln**
+        Neue Bitcoin‑Transaktionen werden gesammelt und zu einem Block zusammengefasst.
+
+    2. **Block erzeugen (Mining)**
+        Miner lösen ein kryptografisches Puzzle.
+        Wer es zuerst löst, darf den neuen Block an die Kette anhängen.
+
+    3. **Block enthält Hash + Vorgänger‑Hash**
+        Jeder Block speichert:
+        - seinen eigenen Hash
+        - den Hash des vorherigen Blocks
+        Dadurch entsteht eine **fälschungssichere Kette**.
+
+    4. **Verteilung im Netzwerk**
+        Der neue Block wird an tausende Computer verteilt.
+        Alle aktualisieren ihre Kopie der Blockchain.
+
+    5. **Unveränderbarkeit**
+        Wenn jemand einen alten Block ändern würde,
+        müssten **alle folgenden Blöcke neu berechnet** werden – praktisch unmöglich.
+
+    So bleibt die Blockchain **transparent, sicher und dezentral**.
+
+    ## 📊 Blockchain vs. klassische Datenbank
+
+    | Merkmal | Blockchain | Klassische Datenbank |
+    |--------|------------|----------------------|
+    | **Kontrolle** | dezentral (viele Teilnehmer) | zentral (eine Organisation) |
+    | **Manipulation** | praktisch unmöglich | möglich durch Admins |
+    | **Transparenz** | öffentlich einsehbar | meist privat |
+    | **Datenstruktur** | verkettete Blöcke | Tabellen, Zeilen, Spalten |
+    | **Sicherheit** | kryptografisch gesichert | Zugriffskontrolle |
+    | **Geschwindigkeit** | langsamer (Konsens nötig) | sehr schnell |
+    | **Anwendungsfall** | Bitcoin, Smart Contracts | Firmen‑Datenbanken, Web‑Apps |
+    | **Verfügbarkeit** | global verteilt | abhängig vom Server |
+
+
+    ## 🪙 Bitcoin vs. 📈 ETF – Was ist der Unterschied?
+
+    ### **Bitcoin**
+    - digitale Währung
+    - keine Firma, kein Index, kein Fonds
+    - extrem volatil
+    - begrenzte Menge (21 Mio.)
+    - keine Dividenden
+    - keine TER oder Verwaltungskosten
+    - basiert auf Blockchain‑Technologie
+
+    ### **ETF**
+    - Fonds, der einen Index abbildet
+    - enthält viele Aktien oder Anleihen
+    - geringe Kosten (TER)
+    - hohe Diversifikation
+    - reguliert und überwacht
+    - stabile, langfristige Struktur
+
+    ### **Warum beide im Asset‑Radar?**
+
+    Weil das Radar **Risiko und Performance** vergleicht — unabhängig vom Asset‑Typ.
+
+    Das Radar beantwortet:
+    - Wie volatil ist Bitcoin im Vergleich zu ETFs?
+    - Wie ist die Sharpe‑Ratio im Vergleich zu Aktien?
+    - Wie korreliert Bitcoin mit SPY oder Gold?
+    - Welche Rolle spielt Bitcoin im Portfolio‑Risiko?
+
+    So entsteht ein **einheitliches Analyse‑Framework** für alle Vermögenswerte.
+
+
+    # 🎯 Wie lese ich ein Radar?
+    - Große Fläche = stark
+    - Kleine Fläche = schwach
+    - Gleichmäßige Form = stabil
+    - Verzerrte Form = Risiko oder Ungleichgewicht
+    """)
+
+def ui_bond_analysis(ticker):
+    """
+    Analyse für Anleihen‑ETFs oder Bond‑Indizes.
+    """
+    try:
+        series = fetch_price_history(ticker, period="1y")
+        if series is None or len(series) < 120:
+            return pd.DataFrame([["Keine Daten"]], columns=["Info"]), None
+
+        # Kennzahlen
+        returns = series.pct_change().dropna()
+        yield_approx = returns.mean() * 252
+        vol = returns.std() * (252 ** 0.5)
+        dd = (series / series.cummax() - 1).min()
+
+        df = pd.DataFrame({
+            "Kennzahl": ["Yield (approx.)", "Volatilität", "Max Drawdown"],
+            "Wert": [yield_approx, vol, dd]
+        })
+
+        # Radar
+        score, factors = compute_ki_score(series, return_factors=True)
+        fig = plot_radar({ticker: factors})
+
+        return df, fig
+
+    except Exception as e:
+        return pd.DataFrame([["Fehler", str(e)]]), None
+
+def build_bond_analysis():
+    gr.Markdown("## 🧾 Anleihen‑Analyse")
+
+    gr.Markdown("""
+    Dieser Bereich wird später erweitert:
+    - Rendite (Yield)
+    - Duration
+    - Spread‑Analyse
+    - Risiko‑Radar
+    """)
+
+    with gr.Row():
+        bond_input = gr.Textbox(label="Anleihe‑Ticker", placeholder="z. B. IEF, TLT, BND")
+        btn = gr.Button("Analysieren")
+
+    table = gr.Dataframe(label="Anleihe‑Daten")
+    radar = gr.Plot(label="Radar‑Analyse")
+
+    btn.click(
+        ui_bond_analysis,
+        inputs=[bond_input],
+        outputs=[table, radar]
+    )
+
+def ui_crypto_analysis(ticker):
+    """
+    Analyse für Kryptowährungen (BTC, ETH, etc.)
+    """
+    try:
+        series = fetch_price_history(ticker, period="1y")
+        if series is None or len(series) < 120:
+            return pd.DataFrame([["Keine Daten"]], columns=["Info"]), None
+
+        returns = series.pct_change().dropna()
+        vol = returns.std() * (252 ** 0.5)
+        sharpe = returns.mean() / (returns.std() + 1e-9)
+
+        df = pd.DataFrame({
+            "Kennzahl": ["Volatilität", "Sharpe‑Ratio"],
+            "Wert": [vol, sharpe]
+        })
+
+        score, factors = compute_ki_score(series, return_factors=True)
+        fig = plot_radar({ticker: factors})
+
+        return df, fig
+
+    except Exception as e:
+        return pd.DataFrame([["Fehler", str(e)]]), None
+
+def build_crypto_analysis():
+    gr.Markdown("## 🪙 Krypto‑Analyse")
+
+    with gr.Row():
+        crypto_input = gr.Textbox(label="Krypto‑Ticker", placeholder="BTC-USD, ETH-USD")
+        btn = gr.Button("Analysieren")
+
+    table = gr.Dataframe(label="Krypto‑Daten")
+    radar = gr.Plot(label="Radar‑Analyse")
+
+    btn.click(
+        ui_crypto_analysis,
+        inputs=[crypto_input],
+        outputs=[table, radar]
+    )
+
+
+def ui_risk_dashboard(ticker_text):
+    """
+    Risiko‑Dashboard: Volatilität, Drawdowns, Korrelation‑Heatmap
+    """
+    try:
+        tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
+        data = {}
+
+        for t in tickers:
+            series = fetch_price_history(t, period="1y")
+            if series is not None:
+                data[t] = series
+
+        df = pd.DataFrame(data).dropna()
+
+        # Volatilität
+        vol = df.pct_change().std() * (252 ** 0.5)
+        vol_table = vol.reset_index()
+        vol_table.columns = ["Ticker", "Volatilität"]
+
+        # Drawdowns
+        dd = (df / df.cummax() - 1).min()
+        dd_table = dd.reset_index()
+        dd_table.columns = ["Ticker", "Max Drawdown"]
+
+        # Korrelation
+        corr = df.pct_change().corr()
+        fig = plot_correlation_heatmap(corr)
+
+        return vol_table, dd_table, fig
+
+    except Exception as e:
+        return pd.DataFrame([["Fehler", str(e)]]), pd.DataFrame(), None
+
+def build_risk_dashboard():
+    gr.Markdown("## ⚠️ Risiko‑Dashboard")
+
+    with gr.Row():
+        tickers = gr.Textbox(label="Ticker‑Liste", placeholder="AAPL, SPY, BTC-USD")
+        btn = gr.Button("Risiko analysieren")
+
+    vol_table = gr.Dataframe(label="Volatilität")
+    dd_table = gr.Dataframe(label="Drawdowns")
+    corr_plot = gr.Plot(label="Korrelation‑Heatmap")
+
+    btn.click(
+        ui_risk_dashboard,
+        inputs=[tickers],
+        outputs=[vol_table, dd_table, corr_plot]
+    )
+
+def ui_portfolio_optimizer(ticker_text):
+    """
+    Portfolio‑Optimierung (Mean‑Variance)
+    """
+    try:
+        tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
+        data = {}
+
+        for t in tickers:
+            series = fetch_price_history(t, period="1y")
+            if series is not None:
+                data[t] = series
+
+        df = pd.DataFrame(data).dropna()
+        returns = df.pct_change().dropna()
+
+        # Kovarianzmatrix
+        cov = returns.cov() * 252
+        mean_ret = returns.mean() * 252
+
+        # Optimierung (Minimum Variance)
+        inv_cov = np.linalg.inv(cov)
+        weights = inv_cov.sum(axis=1) / inv_cov.sum().sum()
+
+        weight_df = pd.DataFrame({
+            "Ticker": tickers,
+            "Gewichtung": weights
+        })
+
+        fig = plot_efficient_frontier(mean_ret, cov)
+
+        return weight_df, fig
+
+    except Exception as e:
+        return pd.DataFrame([["Fehler", str(e)]]), None
+
+def ui_scenario_comparison(ticker_text, scenario):
+    """
+    Szenario‑Vergleich: Rezession, Inflation, Zinsanstieg, Ölkrise
+    """
+    try:
+        tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
+        shock_map = {
+            "Rezession": -0.15,
+            "Inflation": -0.10,
+            "Zinsanstieg": -0.20,
+            "Ölkrise": -0.12
+        }
+
+        shock = shock_map.get(scenario, 0)
+
+        rows = []
+        for t in tickers:
+            series = fetch_price_history(t, period="1y")
+            if series is None:
+                rows.append([t, "Keine Daten"])
+                continue
+
+            last = series.iloc[-1]
+            shocked = last * (1 + shock)
+            rows.append([t, last, shocked])
+
+        df = pd.DataFrame(rows, columns=["Ticker", "Aktuell", "Nach Szenario"])
+
+        return df
+
+    except Exception as e:
+        return pd.DataFrame([["Fehler", str(e)]])
+
+def ui_show_isin_db():
+    db = load_isin_db()
+    rows = [(k, v) for k, v in db.items()]
+    return pd.DataFrame(rows, columns=["Ticker", "ISIN"])
+
+
+def ui_clear_cache():
+    try:
+        clear_cache()
+        return "Cache erfolgreich gelöscht."
+    except Exception as e:
+        return f"Fehler: {e}"
+
+def build_settings_tab():
+    gr.Markdown("## ⚙️ Einstellungen / Daten / ISIN‑DB")
+
+    with gr.Row():
+        btn_load = gr.Button("ISIN‑Datenbank anzeigen")
+        btn_clear = gr.Button("Cache leeren")
+
+    isin_table = gr.Dataframe(label="ISIN‑Datenbank")
+
+    btn_load.click(
+        ui_show_isin_db,
+        inputs=[],
+        outputs=[isin_table]
+    )
+
+    btn_clear.click(
+        ui_clear_cache,
+        inputs=[],
+        outputs=[]
+    )  
 #--------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
@@ -201,218 +637,11 @@ def app():
     presets_all = load_presets()
     countries = list(presets_all.keys())  # <-- dynamisch aus JSON
 
-    with gr.Blocks() as demo:
+    with gr.Blocks(theme=theme, title="MakroSim Dashboard") as demo:
 
         # ---------------- Radar Overlay ----------------
-        with gr.Tab("Was bedeuten die Radare?"):
-
-            gr.Markdown("""
-            # ℹ️ Was bedeuten die Radare?
-
-            ## 🌍 Länder‑Radar
-            Das Länder‑Radar bewertet die wirtschaftliche Stärke eines Landes anhand von:
-            - BIP‑Wachstum
-            - Inflation
-            - Zinsen
-            - Arbeitslosenquote
-            - Staatsverschuldung
-            - Währungsstärke
-
-            Es beantwortet: **Wie stabil und attraktiv ist ein Land wirtschaftlich?**
-
-            ---
-
-            ## 📈 ETF‑Radar
-            Das ETF‑Radar bewertet ETFs anhand von:
-            - Performance (1Y, 5Y)
-            - Volatilität
-            - Sharpe‑Ratio
-            - TER (Kosten)
-            - Tracking Error
-            - Fondsgröße (AUM)
-            - Dividendenrendite
-
-            Es beantwortet: **Wie gut ist ein ETF im Verhältnis zu Risiko, Kosten und Performance?**
-
-            ---
-
-            ## 💼 Portfolio‑Radar
-            Das Portfolio‑Radar bewertet:
-            - gewichtete Sharpe‑Ratio
-            - gewichtete Volatilität
-            - Diversifikation
-            - Regionen‑Exposure
-            - Gesamt‑Performance
-
-            Es beantwortet: **Wie stabil, diversifiziert und ausgewogen (Gesamtqualität) ist mein Portfolio?**
-
-            ---
-
-            ## 📘 Was ist ein Fonds?
-            Ein Fonds ist ein großer Geldtopf, in den viele Anleger einzahlen.
-            Ein Manager investiert dieses Geld in viele Wertpapiere (Aktien, Anleihen, Immobilien).
-            Ein ETF ist ein **börsengehandelter Fonds**, der einen Index nachbildet.
-
-            # 📘 Glossar
-
-            ### ETF
-            Ein ETF ist ein börsengehandelter Fonds, der einen Index nachbildet.
-
-            ### Fonds
-            Ein Fonds ist ein großer Geldtopf, der in viele Wertpapiere investiert wird.
-
-            ### Anleihe
-            Eine Anleihe ist ein Kredit, den du einem Staat oder Unternehmen gibst und dafür Zinsen erhältst.
-
-            ### Sharpe‑Ratio
-            Verhältnis von Rendite zu Risiko.
-
-            ### Volatilität
-            Schwankungsintensität eines Wertpapiers.
-
-            ### TER
-            Gesamtkostenquote eines ETFs.
-
-            ### Diversifikation
-            Verteilung des Risikos über viele Anlagen.
-
-            ### 🪙 Bitcoin
-
-            Bitcoin ist die erste und größte Kryptowährung.
-            Sie funktioniert ohne zentrale Instanz und basiert auf einem Netzwerk von Computern,
-            die gemeinsam die Blockchain betreiben.
-
-            **Begriffe im Zusammenhang mit Bitcoin:**
-
-            - **Blockchain** – öffentliches Register aller Transaktionen
-            - **Halving** – Ereignis, bei dem die Blockbelohnung halbiert wird (alle ~4 Jahre)
-            - **Mining** – Prozess, bei dem neue Bitcoins erzeugt werden
-            - **Wallet** – digitale Geldbörse für Bitcoin
-            - **Private Key** – kryptografischer Schlüssel, der den Besitz beweist
-            - **On‑Chain / Off‑Chain** – Transaktionen auf oder außerhalb der Blockchain
-            ---
-
-            ### 🔗 Blockchain
-
-            Eine Blockchain ist eine **dezentrale Datenstruktur**, die Transaktionen in einer
-            verketteten Reihe von Blöcken speichert.
-            Sie ist:
-
-            - unveränderbar
-            - transparent
-            - kryptografisch gesichert
-            - nicht von einer zentralen Instanz kontrolliert
-
-            Sie bildet die Grundlage für Bitcoin und viele andere digitale Assets.
-            """)
-
-            gr.Markdown("""
-            ### 🔗 Was ist die Blockchain?
-
-            Die Blockchain ist ein **dezentrales, unveränderbares Register**, das alle Bitcoin‑Transaktionen speichert.
-            Statt einer zentralen Datenbank wird sie von tausenden Computern weltweit gemeinsam betrieben.
-            Jeder neue Block baut auf dem vorherigen auf – dadurch entsteht eine **fälschungssichere Kette**.
-
-            ## 🔗 Blockchain – Einsteiger‑Erklärung
-
-            Die Blockchain ist das technische Fundament von Bitcoin.
-            Man kann sie sich wie ein **digitales Kassenbuch** vorstellen, das:
-
-            - **öffentlich einsehbar** ist
-            - **nicht manipuliert** werden kann
-            - **von tausenden Computern gleichzeitig geführt** wird
-            - **jede Transaktion dauerhaft speichert**
-
-            Jeder Block enthält:
-            - eine Liste von Transaktionen
-            - einen Zeitstempel
-            - einen kryptografischen Fingerabdruck (Hash)
-            - den Hash des vorherigen Blocks
-
-            Durch diese Struktur entsteht eine **Kette von Blöcken**, die praktisch nicht gefälscht werden kann.
-            """)
-
-            gr.Markdown("""
-            ## 🧩 Wie funktioniert eine Blockchain?
-
-            Stell dir die Blockchain wie eine **Kette aus nummerierten Blöcken** vor:
-
-            1. **Transaktionen sammeln**
-               Neue Bitcoin‑Transaktionen werden gesammelt und zu einem Block zusammengefasst.
-
-            2. **Block erzeugen (Mining)**
-               Miner lösen ein kryptografisches Puzzle.
-               Wer es zuerst löst, darf den neuen Block an die Kette anhängen.
-
-            3. **Block enthält Hash + Vorgänger‑Hash**
-               Jeder Block speichert:
-               - seinen eigenen Hash
-               - den Hash des vorherigen Blocks
-               Dadurch entsteht eine **fälschungssichere Kette**.
-
-            4. **Verteilung im Netzwerk**
-               Der neue Block wird an tausende Computer verteilt.
-               Alle aktualisieren ihre Kopie der Blockchain.
-
-            5. **Unveränderbarkeit**
-               Wenn jemand einen alten Block ändern würde,
-               müssten **alle folgenden Blöcke neu berechnet** werden – praktisch unmöglich.
-
-            So bleibt die Blockchain **transparent, sicher und dezentral**.
-
-            ## 📊 Blockchain vs. klassische Datenbank
-
-            | Merkmal | Blockchain | Klassische Datenbank |
-            |--------|------------|----------------------|
-            | **Kontrolle** | dezentral (viele Teilnehmer) | zentral (eine Organisation) |
-            | **Manipulation** | praktisch unmöglich | möglich durch Admins |
-            | **Transparenz** | öffentlich einsehbar | meist privat |
-            | **Datenstruktur** | verkettete Blöcke | Tabellen, Zeilen, Spalten |
-            | **Sicherheit** | kryptografisch gesichert | Zugriffskontrolle |
-            | **Geschwindigkeit** | langsamer (Konsens nötig) | sehr schnell |
-            | **Anwendungsfall** | Bitcoin, Smart Contracts | Firmen‑Datenbanken, Web‑Apps |
-            | **Verfügbarkeit** | global verteilt | abhängig vom Server |
-
-
-            ## 🪙 Bitcoin vs. 📈 ETF – Was ist der Unterschied?
-
-            ### **Bitcoin**
-            - digitale Währung
-            - keine Firma, kein Index, kein Fonds
-            - extrem volatil
-            - begrenzte Menge (21 Mio.)
-            - keine Dividenden
-            - keine TER oder Verwaltungskosten
-            - basiert auf Blockchain‑Technologie
-
-            ### **ETF**
-            - Fonds, der einen Index abbildet
-            - enthält viele Aktien oder Anleihen
-            - geringe Kosten (TER)
-            - hohe Diversifikation
-            - reguliert und überwacht
-            - stabile, langfristige Struktur
-
-            ### **Warum beide im Asset‑Radar?**
-
-            Weil das Radar **Risiko und Performance** vergleicht — unabhängig vom Asset‑Typ.
-
-            Das Radar beantwortet:
-            - Wie volatil ist Bitcoin im Vergleich zu ETFs?
-            - Wie ist die Sharpe‑Ratio im Vergleich zu Aktien?
-            - Wie korreliert Bitcoin mit SPY oder Gold?
-            - Welche Rolle spielt Bitcoin im Portfolio‑Risiko?
-
-            So entsteht ein **einheitliches Analyse‑Framework** für alle Vermögenswerte.
-
-
-            # 🎯 Wie lese ich ein Radar?
-            - Große Fläche = stark
-            - Kleine Fläche = schwach
-            - Gleichmäßige Form = stabil
-            - Verzerrte Form = Risiko oder Ungleichgewicht
-
-            """)
+        with gr.Tab("Home / Was bedeuten die Radare?"):
+            build_home()
 
         with gr.Tab("🤖 KI‑Asset‑Scanner"):
             gr.Markdown("""
@@ -729,6 +958,15 @@ def app():
                 outputs=[stock_table]
             )
 
+        with gr.Tab("🧾 Anleihen‑Analyse"):
+            build_bond_analysis()   # Platzhalter für später
+
+        with gr.Tab("🪙 Krypto‑Analyse"):
+            build_crypto_analysis()   # KI‑Score + Radar funktionieren bereits
+
+        with gr.Tab("⚠️ Risiko‑Dashboard"):
+            build_risk_dashboard()   # Korrelation‑Heatmap wird hier integriert
+
         with gr.Tab("Portfolio‑Optimierer"):
             gr.Markdown("""
             # 🎯 Portfolio‑Optimierer
@@ -769,32 +1007,6 @@ def app():
                 fn=run_optimizer,
                 inputs=[port_symbols, strategy],
                 outputs=[port_table]
-            )
-
-        with gr.Tab("Korrelation‑Heatmap"):
-            gr.Markdown("""
-            # 🔥 Korrelation‑Heatmap
-            Zeigt die Zusammenhänge zwischen Assets.
-            Ideal für Diversifikation und Risikoanalyse.
-            """)
-
-            heat_symbols = gr.Textbox(
-                label="Assets (Komma‑getrennt)",
-                placeholder="z. B. SPY, VTI, GLD, BTC-USD, AAPL"
-            )
-
-            heat_button = gr.Button("Heatmap erzeugen")
-
-            heat_plot = gr.Plot(label="Korrelation‑Matrix")
-
-            def run_heatmap(symbols):
-                symbols = [s.strip().upper() for s in symbols.split(",")]
-                return plot_correlation_heatmap(symbols)
-
-            heat_button.click(
-                fn=run_heatmap,
-                inputs=[heat_symbols],
-                outputs=[heat_plot]
             )
 
 
@@ -850,22 +1062,7 @@ def app():
                                   inputs=None,
                                   outputs=port_list)
 
-            with gr.Tab("Portfolio‑Radar"):
-                gr.Markdown("### Radar‑Ansicht für ein gespeichertes Portfolio")
-                sel_port_name = gr.Textbox(label="Portfolioname")
-                radar_btn = gr.Button("Radar anzeigen")
-                radar_plot = gr.Plot(label="Portfolio‑Radar")
-
-                def ui_portfolio_radar(name):
-                    df, meta = get_portfolio(name)
-                    if meta is None:
-                        return None
-                    return portfolio_radar(meta["symbols"], meta["weights"])
-
-                radar_btn.click(ui_portfolio_radar,
-                                inputs=[sel_port_name],
-                                outputs=[radar_plot])
-
+                
             with gr.Tab("Portfolio‑Backtest"):
                 gr.Markdown("### Historische Performance eines Portfolios")
                 bt_name = gr.Textbox(label="Portfolioname")
@@ -975,92 +1172,6 @@ def app():
                 refresh_btn = gr.Button("Log aktualisieren")
                 refresh_btn.click(load_log, inputs=None, outputs=log_box)
 
-        with gr.Tab("Radar-Overlay"):
-            # Auswahl: mehrere Ticker
-            all_etfs = [e["ticker"] for e in load_etf_db()]
-            tickers_multi = gr.CheckboxGroup(
-                choices=all_etfs,
-                label="ETFs/Aktien für Radar-Overlay auswählen",
-                value=all_etfs[:3]  # Default: erste 3
-            )
-
-            radar_plot = gr.Plot()
-            radar_table = gr.Dataframe(interactive=False, label="Kennzahlen (Rohwerte)")
-
-            def build_radar(selected):
-                db = load_etf_db()
-                rows = []
-                for e in db:
-                    if e["ticker"] in selected:
-                        m = get_metrics(e)
-                        if m:
-                            rows.append(m)
-                if not rows:
-                    return None, pd.DataFrame()
-                fig = plot_radar(rows)
-
-                return fig, pd.DataFrame(rows)
-
-            tickers_multi.change(build_radar, inputs=[tickers_multi], outputs=[radar_plot, radar_table])
-
-            gr.Markdown("""
-### Interpretation des Radar-Overlays
-
-- **Rendite 1Y / 5Y:** weiter außen = höhere Rendite
-- **Volatilität:** weiter außen = höheres Risiko (wird intern so skaliert, dass "besser" außen liegt)
-- **Sharpe Ratio:** weiter außen = bessere risikobereinigte Rendite
-- **Max Drawdown:** weiter außen = geringerer maximaler Verlust
-- **Beta:** weiter außen = näher an 1 (marktähnliches Verhalten)
-
-Die Tabelle darunter zeigt die **exakten Werte** der Kennzahlen.
-
-## 📘 Finanzkennzahlen – Lexikon
-
-### Rendite (1Y, 5Y)
-Wie stark der Wert gestiegen ist.
-- **1Y** = letztes Jahr
-- **5Y** = letzte fünf Jahre
-
----
-
-### Volatilität
-Wie stark der Kurs schwankt.
-- Hohe Volatilität = hohes Risiko
-- Niedrige Volatilität = stabiler
-
----
-
-### Sharpe Ratio
-Rendite pro Risiko.
-- **1.0 = gut**
-- **2.0 = sehr gut**
-
----
-
-### Max Drawdown
-Größter Verlust vom letzten Hoch.
-Zeigt, wie schlimm ein Crash war.
-
----
-
-### Beta
-Sensitivität zum Markt.
-- **1.0 = bewegt sich wie der Markt**
-- **> 1.0 = aggressiver**
-- **< 1.0 = defensiver**
-
----
-
-### Korrelation
-Wie ähnlich sich zwei Werte bewegen.
-- **1.0 = identisch**
-- **0.0 = unabhängig**
-- **−1.0 = gegensätzlich**
-""")
-
-            pdf_button = gr.Button("Portfolio als PDF exportieren")
-            pdf_file = gr.File()
-
         # ---------------- Szenario-Vergleich ----------------
         with gr.Tab("Szenario-Vergleich"):
             scen_country = gr.Dropdown(choices=countries, label="Land")
@@ -1078,306 +1189,8 @@ Wie ähnlich sich zwei Werte bewegen.
                 scen_table,
             )
 
-        with gr.Tab("Ländervergleich"):
-
-            country_list = get_country_choices()
-            countries = gr.CheckboxGroup(country_list, label="Länder/Indizes auswählen")
-            run_button = gr.Button("Vergleich starten")
-
-            table_output = gr.Dataframe()
-            story_output = gr.Markdown()
-
-            def run_country_compare(selected):
-                if not selected:
-                    return None, "Bitte mindestens ein Land auswählen."
-
-
-                tickers = [resolve_country(c) for c in selected]
-                df = compare_countries(tickers)
-                story = generate_country_storyline(df)
-
-                return df, story
-
-            run_button.click(
-                run_country_compare,
-                [countries],
-                [table_output, story_output]
-            )
-
-        with gr.Tab("ETF-Tabelle"):
-            def build_table():
-                rows = []
-                for e in load_etf_db():
-                    m = get_metrics(e)
-                    if m:
-                        rows.append(m)
-                return pd.DataFrame(rows)
-
-            etf_df = gr.Dataframe(
-                value=build_table,
-                interactive=True,
-                label="ETF-Kennzahlen (sortierbar)",
-                row_count=20,     # erlaubt
-                col_count=None    # erlaubt
-
-            )
-
-            gr.Markdown("""
-### 📘 Finanzkennzahlen – Lexikon
-
-**Rendite (1Y, 5Y)** – Wertentwicklung über 1 bzw. 5 Jahre
-**Volatilität** – Schwankungsbreite (Risiko)
-**Sharpe Ratio** – Rendite pro Risiko
-**Max Drawdown** – Größter Verlust vom Hoch
-**Beta** – Sensitivität zum Markt
-**TER** – Kostenquote des ETFs
-""")
-
-        with gr.Tab("Aktienvergleich"):
-
-            t1 = gr.Textbox(label="Ticker 1", value="AAPL")
-            t2 = gr.Textbox(label="Ticker 2", value="MSFT")
-            btn = gr.Button("Vergleichen")
-            out = gr.Markdown()
-
-            btn.click(stock_compare, inputs=[t1, t2], outputs=out)
-
-        with gr.Tab("Länderauswahl"):
-            country = gr.Dropdown(
-                choices=get_all_countries(),
-                label="Land auswählen"
-            )
-
-            gr.Markdown("Dieses Dropdown enthält **alle Länder der Welt**.")
-
-        with gr.Tab("ETF Länder-Check"):
-            country_input = gr.Textbox(
-                value="Deutschland (DAX), USA (S&P 500), Frankreich, UK, Japan",
-                label="Länder (Komma-getrennt)"
-            )
-            check_btn = gr.Button("Prüfen")
-            result_md = gr.Markdown("Ergebnis erscheint hier")
-
-            def run_country_check(text):
-                countries = [c.strip() for c in text.split(",") if c.strip()]
-                res = countries_with_etfs(countries)
-                lines = ["**Länder → Region → Anzahl ETFs → Ticker**\n"]
-                for c in countries:
-                    info = res.get(c, {"tickers": [], "count": 0, "region": "Unbekannt"})
-                    if info["count"]:
-                        lines.append(f"- **{c}** ({info['region']}): {info['count']} → {', '.join(info['tickers'])}")
-                    else:
-                        lines.append(f"- **{c}** ({info['region']}): _keine ETFs in der DB_")
-                return "\n\n".join(lines)
-
-            check_btn.click(run_country_check, inputs=[country_input], outputs=[result_md])
-
-        with gr.Tab("ETF-Auswahl"):
-
-            # 1. Länder-Dropdown (mit lesbaren Namen)
-            country_dropdown = gr.Dropdown(
-                choices=get_country_choices(),
-                label="Land auswählen"
-            )
-
-            # 2. ETF-Liste (zunächst leer)
-            etf_assets = gr.CheckboxGroup(
-                choices=[],
-                label="Verfügbare ETFs"
-            )
-
-            # 3. Update-Funktion
-            def update_etf_list(country):
-                # Debug-Log (erscheint im Server-Log)
-                print(f"[DEBUG] update_etf_list called with country={country}")
-                region = (
-                    "Europa" if country == "Deutschland (DAX)" else
-                    "USA" if country == "USA (S&P 500)" else
-                    "Global"
-                )
-                tickers = list_etf_by_region(region)
-                print(f"[DEBUG] list_etf_by_region({region}) -> {tickers}")
-
-                # WICHTIG: gib ein gr.update zurück, damit Gradio die CheckboxGroup sofort neu rendert
-                return gr.update(choices=tickers, value=None, interactive=True)
-
-            # 4. Gradio-Verknüpfung
-            country_dropdown.change(
-                update_etf_list,
-                inputs=[country_dropdown],
-                outputs=[etf_assets]
-            )
-
-            # Initialbefüllung beim Laden der App
-            def init_etf():
-                return gr.update(
-                    choices=list_etf_by_region("Global"),
-                    value=None,
-                    interactive=True
-                )
-
-            demo.load(init_etf, inputs=None, outputs=[etf_assets])
-
-        with gr.Tab("Portfolio-Simulator"):
-            asset_list = [
-                "AAPL", "MSFT", "AMZN", "GOOGL", "META",
-                "SPY", "VTI", "EUNL.DE", "EUNA.DE",
-                "GLD", "SGLN.L", "4GLD.DE", "AGG"
-            ] + list_etf_tickers()
-            portfolio_assets = gr.CheckboxGroup(asset_list, label="Assets auswählen")
-            weights = gr.Slider(0, 1, step=0.05, label="Gewicht pro Asset", value=0.2)
-            run_button = gr.Button("Portfolio simulieren")
-
-
-            plot_output = gr.Plot(label="Buy & Hold")
-            plot_output_rb = gr.Plot(label="Rebalancing")
-            stats_output = gr.Dataframe()
-            story_output = gr.Markdown()
-
-            def run_portfolio_simulation(assets_selected, weight):
-                if not assets_selected:
-                    return None, None, None, "Bitte mindestens ein Asset auswählen."
-
-                # automatische Asset-Erkennung + ETF-Korrektur
-                tickers = [validate_or_fix_ticker(resolve_asset(t)) for t in assets_selected]
-
-                # ungültige Ticker herausfiltern
-                invalid = [t for t in tickers if t is None]
-                if invalid:
-                    return None, None, None, f"Folgende ETFs sind ungültig oder delisted: {invalid}"
-
-                tickers = [t for t in tickers if t is not None]
-
-                # Gewichte normalisieren
-                w = {t: weight for t in tickers}
-                s = sum(w.values())
-                w = {k: v/s for k, v in w.items()}
-
-                # Daten laden
-                data = {t: load_asset_series(t) for t in tickers}
-
-                # Simulationen
-                result = simulate_portfolio(data, w)
-                result_rb = simulate_portfolio_with_rebalancing(data, w, freq="M")
-                # Plots
-                fig = plot_portfolio(result["portfolio"])
-                fig_rb = plot_portfolio(result_rb["portfolio_rebal"])
-
-                # Kennzahlen
-                stats = portfolio_stats(result["portfolio"])
-
-                # Storyline
-                story = generate_portfolio_storyline(w, stats)
-
-                return fig, fig_rb, pd.DataFrame([stats]), story
-
-            run_button.click(
-                run_portfolio_simulation,
-                [portfolio_assets, weights],
-                [plot_output, plot_output_rb, stats_output, story_output]
-            )
-
-            # PDF-Export nur hier!
-            pdf_button = gr.Button("Portfolio als PDF exportieren")
-            pdf_file = gr.File()
-
-            def export_portfolio_pdf(tickers, weight):
-                if not tickers:
-                    return None
-
-                tickers = [resolve_asset(t) for t in tickers]
-
-                w = {t: weight for t in tickers}
-                s = sum(w.values())
-                w = {k: v/s for k, v in w.items()}
-
-                data = {t: load_asset_series(t) for t in tickers}
-                result = simulate_portfolio(data, w)
-                stats = portfolio_stats(result["portfolio"])
-                fig = plot_portfolio(result["portfolio"])
-
-                stats_df = pd.DataFrame([stats])
-                filename = "/tmp/portfolio_report.pdf"
-                with PdfPages(filename) as pdf:
-                    draw_portfolio_page(pdf, fig, stats_df, w)
-
-                return filename
-
-            pdf_button.click(
-                export_portfolio_pdf,
-                [portfolio_assets, weights],
-                pdf_file
-            )
-
-        with gr.Tab("Heatmap & Cluster"):
-            h_button = gr.Button("Analyse starten")
-            h_plot = gr.Plot()
-            h_table = gr.Dataframe()
-
-            def run_heatmap_cluster():
-                presets_all = load_presets()
-                heatmap = plot_risk_heatmap(presets_all)
-                clusters = compute_clusters(presets_all)
-                return heatmap, clusters
-
-            h_button.click(run_heatmap_cluster, None, [h_plot, h_table])
-
-
-            pdf_button = gr.Button("Portfolio als PDF exportieren")
-            pdf_file = gr.File()
-
-            def export_portfolio_pdf(assets_selected, weight):
-                if not assets_selected:
-                    return None
-
-                # gleiche Logik wie run_portfolio_sim
-                w = {a: weight for a in assets_selected}
-                s = sum(w.values())
-                w = {k: v/s for k, v in w.items()}
-
-                data = {a: load_asset_series(a) for a in assets_selected}
-                result = simulate_portfolio(data, w)
-                stats = portfolio_stats(result["portfolio"])
-                fig = plot_portfolio(result["portfolio"])
-
-                stats_df = pd.DataFrame([stats])
-
-                filename = "/tmp/portfolio_report.pdf"
-                with PdfPages(filename) as pdf:
-                    draw_portfolio_page(pdf, fig, stats_df, w)
-
-                return filename
-
-            pdf_button.click(
-                export_portfolio_pdf,
-                [portfolio_assets, weights],
-                pdf_file
-            )
-
-            # --- ETF Länder-Check (automatisch eingefügt) ---
-            with gr.Tab("ETF Länder-Check"):
-                country_input = gr.Textbox(
-                    value="Deutschland (DAX), USA (S&P 500), Frankreich, UK, Japan",
-                    label="Länder (Komma-getrennt)"
-                )
-                check_btn = gr.Button("Prüfen")
-                result_md = gr.Markdown("Ergebnis erscheint hier")
-
-                def run_country_check(text):
-                    countries = [c.strip() for c in text.split(",") if c.strip()]
-                    from core.ui_helpers import countries_with_etfs
-                    res = countries_with_etfs(countries)
-                    lines = ["**Länder → Region → Anzahl ETFs → Ticker**\n"]
-                    for c in countries:
-                        info = res.get(c, {"tickers": [], "count": 0, "region": "Unbekannt"})
-                        if info["count"]:
-                            lines.append(f"- **{c}** ({info['region']}): {info['count']} → {', '.join(info['tickers'])}")
-                        else:
-                            lines.append(f"- **{c}** ({info['region']}): _keine ETFs in der DB_")
-                    return "\n\n".join(lines)
-
-                check_btn.click(run_country_check, inputs=[country_input], outputs=[result_md])
-            # --- Ende ETF Länder-Check ---
+        with gr.Tab("⚙️ Einstellungen / Daten / ISIN‑DB"):
+            build_settings_tab()   # ISIN‑DB, Cache, Logs, API‑Status
 
 
     return demo
