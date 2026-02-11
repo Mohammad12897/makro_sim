@@ -9,9 +9,10 @@ def normalize(value, min_val, max_val):
     return (value - min_val) / (max_val - min_val)
 
 
-def compute_ki_score(price_series: pd.Series) -> float:
+def compute_ki_score(price_series: pd.Series, return_factors=False):
     """
     Berechnet einen KI-Score (0–100) aus einer Preiszeitreihe.
+    Wenn return_factors=True, werden zusätzlich die normierten Faktoren zurückgegeben.
     """
 
     # 1. Renditen
@@ -34,7 +35,7 @@ def compute_ki_score(price_series: pd.Series) -> float:
     drawdown = ((price_series - roll_max) / roll_max).min()
     drawdown_norm = normalize(abs(drawdown), 0, 0.5)
 
-    # 6. Trendstabilität (R² der linearen Regression)
+    # 6. Trendstabilität (R²)
     x = np.arange(len(price_series))
     y = price_series.values
     slope, intercept = np.polyfit(x, y, 1)
@@ -51,4 +52,95 @@ def compute_ki_score(price_series: pd.Series) -> float:
         0.15 * (1 - vol_norm)
     ) * 100
 
-    return float(np.clip(score, 0, 100))
+    score = float(np.clip(score, 0, 100))
+
+    if return_factors:
+        return score, {
+            "momentum": momentum_norm,
+            "volatility": vol_norm,
+            "drawdown": drawdown_norm,
+            "sharpe": sharpe_norm,
+            "trend_stability": trend_stability_norm
+        }
+
+    return score
+
+def explain_ki_score(ticker, score, factors):
+    """
+    Erzeugt eine verständliche Erklärung für den KI‑Score eines Assets.
+    'factors' ist ein Dict mit normierten Werten (0–1):
+        momentum, volatility, drawdown, sharpe, trend_stability
+    """
+
+    momentum = factors["momentum"]
+    volatility = factors["volatility"]
+    drawdown = factors["drawdown"]
+    sharpe = factors["sharpe"]
+    stability = factors["trend_stability"]
+
+    return f"""
+### 📊 KI‑Score Erklärung für **{ticker}**
+
+Der KI‑Score von **{ticker}** beträgt **{score:.1f} / 100**.  
+Er basiert auf einer kombinierten Analyse der letzten Monate und bewertet die Musterqualität des Assets.
+
+---
+
+## 🔍 Einzel‑Faktoren
+
+**Momentum:** {momentum:.2f}  
+→ Wie stark der Trend zuletzt war.  
+- Hoher Wert = starkes Aufwärtsmomentum  
+- Niedriger Wert = schwacher oder negativer Trend  
+
+**Volatilität:** {volatility:.2f}  
+→ Wie stark das Asset schwankt.  
+- Hoher Wert = riskant  
+- Niedriger Wert = stabil  
+
+**Drawdown:** {drawdown:.2f}  
+→ Wie tief das Asset zuletzt gefallen ist.  
+- Hoher Wert = starke Rückschläge  
+- Niedriger Wert = geringe Verluste  
+
+**Sharpe Ratio:** {sharpe:.2f}  
+→ Risiko‑angepasste Rendite.  
+- Hoher Wert = gute Rendite bei geringem Risiko  
+- Niedriger Wert = schlechte Risiko‑Rendite‑Relation  
+
+**Trendstabilität:** {stability:.2f}  
+→ Wie „ruhig“ und konsistent der Trend ist.  
+- Hoher Wert = sauberer Trend  
+- Niedriger Wert = chaotische Bewegungen  
+
+---
+
+## 🧠 Gesamtinterpretation
+
+Der KI‑Score kombiniert alle Faktoren zu einer einzigen Kennzahl:
+
+- **80–100:** Sehr starke Muster, attraktives Risiko‑Profil  
+- **60–80:** Gute Qualität, solide Entwicklung  
+- **40–60:** Neutral, weder besonders stark noch schwach  
+- **20–40:** Schwache Muster, erhöhte Risiken  
+- **0–20:** Chaotisch, instabil, hohe Verlustgefahr  
+
+---
+
+## 📝 Fazit für {ticker}
+
+Basierend auf den Faktoren zeigt **{ticker}**:
+
+- Momentum: {'hoch' if momentum > 0.6 else 'mittel' if momentum > 0.3 else 'schwach'}  
+- Risiko: {'niedrig' if volatility < 0.3 else 'mittel' if volatility < 0.6 else 'hoch'}  
+- Trendqualität: {'stabil' if stability > 0.6 else 'durchwachsen' if stability > 0.3 else 'instabil'}  
+
+**Gesamtbewertung:**  
+→ Der KI‑Score von **{score:.1f}** zeigt, dass {ticker} aktuell **{
+    'ein sehr starkes Muster hat' if score >= 80 else
+    'eine solide Entwicklung zeigt' if score >= 60 else
+    'neutral wirkt' if score >= 40 else
+    'Schwächen aufweist' if score >= 20 else
+    'sehr riskant erscheint'
+}**.
+"""

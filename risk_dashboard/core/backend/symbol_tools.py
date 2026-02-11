@@ -50,22 +50,6 @@ def detect_symbol_type(text: str) -> str:
 
 
 
-def ticker_to_isin_old(ticker: str) -> str | None:
-    t = ticker.strip().upper()
-
-    # 1. Yahoo versuchen
-    isin = yahoo_search_isin(t)
-    if isin:
-        return isin
-
-    # 2. Lokale Datenbank
-    if t in ISIN_DATABASE:
-        return ISIN_DATABASE[t]
-
-    # 3. Keine ISIN (z. B. Krypto)
-    return None
-
-
 def yahoo_search_isin(ticker: str) -> str | None:
     try:
         url = f"https://query2.finance.yahoo.com/v1/finance/search?q={ticker}"

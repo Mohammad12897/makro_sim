@@ -96,7 +96,7 @@ from core.backend.portfolio_backtest import backtest_portfolio
 from core.backend.portfolio_compare import compare_two_portfolios
 from core.data.logging import log_buffer
 
-from core.backend.ki_score import compute_ki_score
+from core.backend.ki_score import compute_ki_score, explain_ki_score
 from core.data.assets import fetch_price_history
 
 print("Europa:", list_etf_by_region("Europa"))
@@ -176,19 +176,21 @@ def ui_convert_isin(text):
 def ui_ki_scan(text):
     tickers = [t.strip() for t in text.split(",") if t.strip()]
     results = []
+    explanations = []
 
     for t in tickers:
         series = fetch_price_history(t, period="1y")
         if series is None or len(series) < 120:
-            results.append([t, None, None])
+            results.append([t, None])
+            explanations.append(f"Keine ausreichenden Daten für {t}.")
             continue
 
-        score = compute_ki_score(series)
-        results.append([t, score, series.iloc[-1]])
+        score, factors = compute_ki_score(series, return_factors=True)
+        results.append([t, score])
+        explanations.append(explain_ki_score(t, score, factors))
 
-    df = pd.DataFrame(results, columns=["Ticker", "KI-Score", "Letzter Preis"])
-    df = df.sort_values("KI-Score", ascending=False)
-    return df
+    df = pd.DataFrame(results, columns=["Ticker", "KI‑Score"])
+    return df, "\n\n---\n\n".join(explanations)
 
 #--------------------------------------------------------
 # Gradio App
@@ -716,12 +718,12 @@ def app():
             - Korrelation zu anderen Assets
             - Stabilität
 
-            Daraus entsteht ein **KI‑Score** (0–100).  
+            Daraus entsteht ein **KI‑Score** (0–100).
             Der Scanner sortiert automatisch:
 
-            - **Oben (80–100):** Hohe Qualität, starke Muster  
-            - **Mitte (40–80):** Neutral bis solide  
-            - **Unten (0–40):** Schwache Muster, hohes Risiko  
+            - **Oben (80–100):** Hohe Qualität, starke Muster
+            - **Mitte (40–80):** Neutral bis solide
+            - **Unten (0–40):** Schwache Muster, hohes Risiko
 
             ---
 
@@ -743,8 +745,8 @@ def app():
             AAPL, SPY, EUNL.DE, BTC-USD
 
             Der Scanner erkennt automatisch:
-            - Aktien → ISIN wird geholt  
-            - ETFs → ISIN wird geholt  
+            - Aktien → ISIN wird geholt
+            - ETFs → ISIN wird geholt
             - Krypto → keine ISIN (wird übersprungen)
 
             Ergebnis:
@@ -753,17 +755,17 @@ def app():
             ---
 
             ## 📌 Wozu brauche ich eine ISIN‑Liste?
-            - Für ETF‑Analysen  
-            - Für Portfolio‑Optimierung  
-            - Für Watchlists  
-            - Für Datenimporte in Excel oder Broker‑Tools  
+            - Für ETF‑Analysen
+            - Für Portfolio‑Optimierung
+            - Für Watchlists
+            - Für Datenimporte in Excel oder Broker‑Tools
 
             Der KI‑Asset‑Scanner kann dir diese Liste automatisch erzeugen.
             """)
 
             gr.Markdown("""
             ### 📌 Ticker → ISIN Konverter
-            Gib einfach Ticker ein (z. B. AAPL, SPY, EUNL.DE, BTC-USD).  
+            Gib einfach Ticker ein (z. B. AAPL, SPY, EUNL.DE, BTC-USD).
             Der Scanner erkennt automatisch, ob eine ISIN existiert.
             """)
 
@@ -785,16 +787,16 @@ def app():
             gr.Markdown("""
             ### 🤖 KI‑Score (0–100) – Einzel‑Scan
 
-            Der KI‑Score bewertet jedes Asset (Aktie, ETF, Krypto) anhand seiner Kursmuster der letzten Monate.  
+            Der KI‑Score bewertet jedes Asset (Aktie, ETF, Krypto) anhand seiner Kursmuster der letzten Monate.
             Er kombiniert mehrere Faktoren wie Momentum, Volatilität, Trendstabilität, Drawdown und Sharpe‑Ratio zu einer einzigen Kennzahl.
 
             **Was bedeutet der KI‑Score?**
 
-            - **80–100:** Sehr starke Muster, stabile Trends, attraktives Risiko‑Profil  
-            - **60–80:** Gute Qualität, solide Entwicklung  
-            - **40–60:** Neutral, weder besonders stark noch schwach  
-            - **20–40:** Schwache Muster, erhöhte Risiken  
-            - **0–20:** Chaotisch, instabil, hohe Verlustgefahr  
+            - **80–100:** Sehr starke Muster, stabile Trends, attraktives Risiko‑Profil
+            - **60–80:** Gute Qualität, solide Entwicklung
+            - **40–60:** Neutral, weder besonders stark noch schwach
+            - **20–40:** Schwache Muster, erhöhte Risiken
+            - **0–20:** Chaotisch, instabil, hohe Verlustgefahr
 
             Der Einzel‑Scan eignet sich, wenn du **einfach nur wissen willst, wie gut ein Asset aktuell aussieht**, ohne Vergleich oder Profil‑Analyse.
             """)
@@ -804,9 +806,10 @@ def app():
                 placeholder="z. B. AAPL, SPY, BTC-USD"
             )
             ki_btn = gr.Button("KI‑Score berechnen")
-            ki_table = gr.Dataframe(label="KI‑Ranking", interactive=False)
-
-            ki_btn.click(ui_ki_scan, inputs=[ki_input], outputs=[ki_table])
+          
+            ki_table = gr.Dataframe(label="KI‑Ranking")
+            ki_explain = gr.Markdown()
+            ki_btn.click(ui_ki_scan, inputs=[ki_input], outputs=[ki_table, ki_explain])
 
             # -----------------------------
             # 3. KI-PROFIL-SCAN (mit Radar)
@@ -814,28 +817,28 @@ def app():
             gr.Markdown("""
             ### 🧠 KI‑Profil‑Scan (mit Radar‑Vergleich)
 
-            Der KI‑Profil‑Scan analysiert mehrere Assets gleichzeitig und bewertet sie nach einem ausgewählten Profil  
+            Der KI‑Profil‑Scan analysiert mehrere Assets gleichzeitig und bewertet sie nach einem ausgewählten Profil
             (z. B. *stabil*, *momentum*, *growth*, *diversifikation*, *krypto*, *etf*).
 
             **Was macht der Profil‑Scan?**
 
-            1. Jedes Asset wird nach dem gewählten Profil bewertet  
-            2. Die Ergebnisse werden in einer Tabelle sortiert (bestes Asset oben)  
+            1. Jedes Asset wird nach dem gewählten Profil bewertet
+            2. Die Ergebnisse werden in einer Tabelle sortiert (bestes Asset oben)
             3. Zusätzlich wird ein **Radar‑Diagramm** erzeugt, das die wichtigsten Faktoren zeigt:
-               - Momentum  
-               - Volatilität  
-               - Drawdown  
-               - Trendstabilität  
-               - Sharpe‑Ratio  
-               - Diversifikation  
+               - Momentum
+               - Volatilität
+               - Drawdown
+               - Trendstabilität
+               - Sharpe‑Ratio
+               - Diversifikation
 
-            **Warum Radar?**  
+            **Warum Radar?**
             Das Radar zeigt die **technischen Faktoren** auf einer Skala von **0–1**, damit du die Stärken und Schwächen eines Assets auf einen Blick erkennst.
 
             **Unterschied zum KI‑Score:**
 
-            - **KI‑Score (0–100):** Gesamtbewertung eines einzelnen Assets  
-            - **KI‑Profil‑Scan:** Vergleich mehrerer Assets + Radar‑Visualisierung + Profil‑Logik  
+            - **KI‑Score (0–100):** Gesamtbewertung eines einzelnen Assets
+            - **KI‑Profil‑Scan:** Vergleich mehrerer Assets + Radar‑Visualisierung + Profil‑Logik
 
             Der Profil‑Scan ist ideal, wenn du **mehrere Assets vergleichen** oder **ein bestimmtes Anlagestil‑Profil** analysieren möchtest.
             """)
@@ -845,6 +848,87 @@ def app():
                 choices=["Keine", "Europa", "USA", "Global"],
                 value="Keine"
             )
+            gr.Markdown("""
+            ### 🧠 KI‑Profil‑Erklärungen
+
+            Jedes KI‑Profil bewertet Assets nach einem bestimmten Anlagestil.  
+            Die KI passt Gewichtungen, Faktoren und Prioritäten automatisch an.
+
+            ---
+
+            ## 🔹 Profil: **ki** (Standard)
+            Das Standard‑Profil kombiniert alle Faktoren ausgewogen:
+            - Momentum  
+            - Volatilität  
+            - Trendstabilität  
+            - Drawdown  
+            - Sharpe Ratio  
+            - Diversifikation  
+
+            **Ziel:** Ein möglichst objektiver Gesamt‑Score (0–100).
+
+            ---
+
+            ## 🔹 Profil: **stabil**
+            Bevorzugt stabile, risikoarme Assets:
+            - niedrige Volatilität  
+            - geringer Drawdown  
+            - hohe Trendstabilität  
+
+            **Ideal für:** defensive Anleger, langfristige Strategien.
+
+            ---
+
+            ## 🔹 Profil: **momentum**
+            Bevorzugt starke Trends:
+            - hohes Momentum  
+            - hohe Trendstärke  
+            - klare Aufwärtsbewegungen  
+
+            **Ideal für:** Trendfolger, kurzfristige Chancen.
+
+            ---
+
+            ## 🔹 Profil: **growth**
+            Bevorzugt wachstumsorientierte Assets:
+            - hohe Trenddynamik  
+            - starke Kursbeschleunigung  
+            - überdurchschnittliche Performance  
+
+            **Ideal für:** wachstumsorientierte Strategien.
+
+            ---
+
+            ## 🔹 Profil: **diversifikation**
+            Bevorzugt Assets, die gut kombinierbar sind:
+            - niedrige Korrelation  
+            - stabilisierende Eigenschaften  
+            - risikoausgleichende Faktoren  
+
+            **Ideal für:** Portfolio‑Optimierung.
+
+            ---
+
+            ## 🔹 Profil: **krypto**
+            Bevorzugt starke Muster in volatilen Märkten:
+            - Momentum  
+            - Trendstabilität  
+            - Risikoanpassung für hohe Volatilität  
+
+            **Ideal für:** Krypto‑Trader.
+
+            ---
+
+            ## 🔹 Profil: **etf**
+            Bevorzugt ETFs mit:
+            - stabilen Trends  
+            - niedriger Volatilität  
+            - guter Diversifikation  
+
+            **Ideal für:** langfristige ETF‑Investoren.
+            """)
+
+
 
             profile = gr.Dropdown(
                 label="KI‑Profil",
