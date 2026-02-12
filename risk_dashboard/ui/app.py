@@ -209,10 +209,10 @@ def build_home():
     - Sharpe‑Ratio
     - Diversifikation
 
-    Große Fläche = stark  
-    Kleine Fläche = schwach  
-    Gleichmäßig = stabil  
-    Verzerrt = Risiko  
+    Große Fläche = stark
+    Kleine Fläche = schwach
+    Gleichmäßig = stabil
+    Verzerrt = Risiko
 
     ---
     ## 📘 Was ist ein Fonds?
@@ -464,7 +464,7 @@ def ui_crypto_analysis(ticker):
     })
 
     return df, fig
-    
+
 def build_crypto_analysis():
     gr.Markdown("## 🪙 Krypto‑Analyse")
 
@@ -593,6 +593,26 @@ def ui_scenario_comparison(ticker_text, scenario):
     except Exception as e:
         return pd.DataFrame([["Fehler", str(e)]])
 
+
+
+def build_scenario_comparison():
+    gr.Markdown("## 📈 Szenario‑Vergleich")
+    with gr.Tab():
+        scen_country = gr.Dropdown(choices=countries, label="Land")
+        scen_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
+        scen_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
+        scen_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
+        scen_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
+
+        scen_button = gr.Button("Szenarien vergleichen")
+        scen_table = gr.Dataframe()
+
+        scen_button.click(
+            scenario_table_wrapper,
+            [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
+            scen_table,
+        )
+
 def ui_show_isin_db():
     db = load_isin_db()
     rows = [(k, v) for k, v in db.items()]
@@ -625,7 +645,9 @@ def build_settings_tab():
         ui_clear_cache,
         inputs=[],
         outputs=[]
-    )  
+    )
+
+
 #--------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
@@ -635,9 +657,8 @@ def app():
     presets_all = load_presets()
     countries = list(presets_all.keys())  # <-- dynamisch aus JSON
 
-    with gr.Blocks(theme=theme, title="MakroSim Dashboard") as demo:
+    with gr.Blocks(title="MakroSim Dashboard") as demo:
 
-        # ---------------- Radar Overlay ----------------
         with gr.Tab("Home / Was bedeuten die Radare?"):
             build_home()
 
@@ -1060,7 +1081,7 @@ def app():
                                   inputs=None,
                                   outputs=port_list)
 
-                
+
             with gr.Tab("Portfolio‑Backtest"):
                 gr.Markdown("### Historische Performance eines Portfolios")
                 bt_name = gr.Textbox(label="Portfolioname")
@@ -1171,23 +1192,8 @@ def app():
                 refresh_btn.click(load_log, inputs=None, outputs=log_box)
 
         # ---------------- Szenario-Vergleich ----------------
-        with gr.Tab("Szenario-Vergleich"):
-            scen_country = gr.Dropdown(choices=countries, label="Land")
-            scen_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
-            scen_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
-            scen_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
-            scen_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
-
-            scen_button = gr.Button("Szenarien vergleichen")
-            scen_table = gr.Dataframe()
-
-            scen_button.click(
-                scenario_table_wrapper,
-                [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
-                scen_table,
-            )
-
-        with gr.Tab("⚙️ Einstellungen / Daten / ISIN‑DB"):
+        
+            build_scenario_comparison()
             build_settings_tab()   # ISIN‑DB, Cache, Logs, API‑Status
 
 
