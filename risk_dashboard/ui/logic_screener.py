@@ -1,5 +1,7 @@
+#ui/logic_screener.py
 import pandas as pd
 from core.data.db_assets import ETF_DB, STOCK_DB
+
 
 def ui_etf_screener(region, category):
     df = pd.DataFrame(ETF_DB)
@@ -15,8 +17,17 @@ def ui_etf_screener(region, category):
 
     df = df.sort_values("Volumen", ascending=False)
 
-    return df[["ISIN", "Name", "Region", "Kategorie", "TER", "Volumen", "Replikation", "TD"]]
-
+    return df[[
+        "ISIN",
+        "Name",
+        "Beschreibung",
+        "Region",
+        "Kategorie",
+        "TER",
+        "Volumen",
+        "Replikation",
+        "TD"
+    ]]
 
 def ui_stock_screener(sector, country):
     df = pd.DataFrame(STOCK_DB)

@@ -8,6 +8,19 @@ ETF_DB = [
     {"ISIN": "IE00B3XXRP09", "Name": "iShares S&P 500", "Region": "USA", "Kategorie": "Aktien", "TER": 0.07, "Volumen": 45000, "Replikation": "Physisch", "TD": -0.05},
     {"ISIN": "IE00B4WXJJ64", "Name": "iShares MSCI Europe", "Region": "Europa", "Kategorie": "Aktien", "TER": 0.12, "Volumen": 12000, "Replikation": "Physisch", "TD": -0.18},
     {"ISIN": "IE00B5M4WH52", "Name": "iShares EM IMI", "Region": "Emerging Markets", "Kategorie": "Aktien", "TER": 0.18, "Volumen": 9000, "Replikation": "Physisch", "TD": -0.25},
+    {
+    "Ticker": "EIMI",
+    "ISIN": "IE00BKM4GZ66",
+    "Name": "iShares Core MSCI EM IMI",
+    "Beschreibung": "Breit gestreuter Emerging-Markets-ETF mit physischer Replikation.",
+    "Region": "Emerging Markets",
+    "Kategorie": "Aktien",
+    "TER": 0.18,
+    "Volumen": 9000,
+    "Replikation": "Physisch",
+    "TD": -0.25
+  },
+
 ]
 
 STOCK_DB = [

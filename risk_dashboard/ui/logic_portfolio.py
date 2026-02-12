@@ -1,20 +1,16 @@
+#ui/logic_portfolio.py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
+from core.data.fetch import fetch_price_history
+from ui.logic_ki import get_ki_score
 
 def ui_portfolio_studio(ticker_text):
-    # -----------------------------
-    # 1. Ticker-Liste parsen
-    # -----------------------------
     tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
 
     if not tickers:
         return plt.figure(), pd.DataFrame([["Keine Ticker angegeben"]], columns=["Info"])
 
-    # -----------------------------
-    # 2. Kursdaten laden
-    # -----------------------------
     price_data = {}
     for t in tickers:
         series = fetch_price_history(t, period="1y")
@@ -23,26 +19,16 @@ def ui_portfolio_studio(ticker_text):
         price_data[t] = series
 
     df = pd.DataFrame(price_data)
-
-    # -----------------------------
-    # 3. Performance berechnen
-    # -----------------------------
-    perf = df / df.iloc[0]  # normiert auf 1
-
-    # -----------------------------
-    # 4. Kennzahlen berechnen
-    # -----------------------------
+    perf = df / df.iloc[0]
     returns = df.pct_change().dropna()
 
     stats = pd.DataFrame({
         "Rendite (p.a.)": returns.mean() * 252,
         "Volatilität (p.a.)": returns.std() * np.sqrt(252),
-        "Max Drawdown": (perf / perf.cummax() - 1).min()
+        "Max Drawdown": (perf / perf.cummax() - 1).min(),
+        "KI‑Score": [get_ki_score(t) for t in tickers]
     })
 
-    # -----------------------------
-    # 5. Performance-Plot
-    # -----------------------------
     fig, ax = plt.subplots(figsize=(7, 4))
     perf.plot(ax=ax)
     ax.set_title("Portfolio‑Performance (normiert)")
@@ -50,6 +36,7 @@ def ui_portfolio_studio(ticker_text):
     ax.grid(True)
 
     return fig, stats
+        
 
 def ui_portfolio_optimizer(ticker_text):
     """
