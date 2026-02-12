@@ -427,39 +427,6 @@ def build_stock_screener():
     )
 
 
-def ui_bond_analysis(ticker):
-    series = fetch_price_history(ticker, period="1y")
-
-    if not isinstance(series, pd.Series) or len(series) < 120:
-        return pd.DataFrame([["Keine Daten"]], columns=["Info"]), None
-
-    result = compute_ki_score(series, return_factors=True)
-
-    # --- WICHTIG: Fehler abfangen ---
-    if not isinstance(result, tuple) or len(result) != 2:
-        return pd.DataFrame([["KI‑Score Fehler"]]), None
-
-    score, factors = result
-
-    if not isinstance(factors, dict):
-        return pd.DataFrame([["Faktoren ungültig"]]), None
-
-    # Radar
-    fig = plot_radar({ticker: factors})
-
-    # Kennzahlen
-    returns = series.pct_change().dropna()
-    df = pd.DataFrame({
-        "Kennzahl": ["Yield (approx.)", "Volatilität", "Max Drawdown"],
-        "Wert": [
-            returns.mean() * 252,
-            returns.std() * (252 ** 0.5),
-            (series / series.cummax() - 1).min()
-        ]
-    })
-
-    return df, fig
-
 def build_bond_analysis():
     gr.Markdown("## 🧾 Anleihen‑Analyse")
 
@@ -484,34 +451,6 @@ def build_bond_analysis():
         outputs=[table, radar]
     )
 
-def ui_crypto_analysis(ticker):
-    series = fetch_price_history(ticker, period="1y")
-
-    if not isinstance(series, pd.Series) or len(series) < 120:
-        return pd.DataFrame([["Keine Daten"]], columns=["Info"]), None
-
-    result = compute_ki_score(series, return_factors=True)
-
-    if not isinstance(result, tuple) or len(result) != 2:
-        return pd.DataFrame([["KI‑Score Fehler"]]), None
-
-    score, factors = result
-
-    if not isinstance(factors, dict):
-        return pd.DataFrame([["Faktoren ungültig"]]), None
-
-    fig = plot_radar({ticker: factors})
-
-    returns = series.pct_change().dropna()
-    df = pd.DataFrame({
-        "Kennzahl": ["Volatilität", "Sharpe‑Ratio"],
-        "Wert": [
-            returns.std() * (252 ** 0.5),
-            returns.mean() / (returns.std() + 1e-9)
-        ]
-    })
-
-    return df, fig
 
 def build_crypto_analysis():
     gr.Markdown("## 🪙 Krypto‑Analyse")
@@ -530,31 +469,6 @@ def build_crypto_analysis():
     )
 
 
-def ui_risk_dashboard(ticker_text):
-    tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
-    data = {}
-
-    for t in tickers:
-        series = fetch_price_history(t, period="1y")
-        if isinstance(series, pd.Series):
-            data[t] = series
-
-    if not data:
-        return pd.DataFrame([["Keine gültigen Daten"]]), pd.DataFrame(), None
-
-    df = pd.DataFrame(data).dropna()
-    returns = df.pct_change().dropna()
-
-    vol_table = returns.std().reset_index()
-    vol_table.columns = ["Ticker", "Volatilität"]
-
-    dd_table = (df / df.cummax() - 1).min().reset_index()
-    dd_table.columns = ["Ticker", "Max Drawdown"]
-
-    fig = plot_correlation_heatmap(returns.corr())
-
-    return vol_table, dd_table, fig
-
 def build_risk_dashboard():
     gr.Markdown("## ⚠️ Risiko‑Dashboard")
 
@@ -571,43 +485,6 @@ def build_risk_dashboard():
         inputs=[tickers],
         outputs=[vol_table, dd_table, corr_plot]
     )
-
-
-def ui_portfolio_optimizer(ticker_text):
-    """
-    Portfolio‑Optimierung (Mean‑Variance)
-    """
-    try:
-        tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
-        data = {}
-
-        for t in tickers:
-            series = fetch_price_history(t, period="1y")
-            if series is not None:
-                data[t] = series
-
-        df = pd.DataFrame(data).dropna()
-        returns = df.pct_change().dropna()
-
-        # Kovarianzmatrix
-        cov = returns.cov() * 252
-        mean_ret = returns.mean() * 252
-
-        # Optimierung (Minimum Variance)
-        inv_cov = np.linalg.inv(cov)
-        weights = inv_cov.sum(axis=1) / inv_cov.sum().sum()
-
-        weight_df = pd.DataFrame({
-            "Ticker": tickers,
-            "Gewichtung": weights
-        })
-
-        fig = plot_efficient_frontier(mean_ret, cov)
-
-        return weight_df, fig
-
-    except Exception as e:
-        return pd.DataFrame([["Fehler", str(e)]]), None
 
 
 def build_portfolio_optimizer():
@@ -641,69 +518,6 @@ def build_portfolio_studio():
         inputs=[tickers],
         outputs=[perf_plot, stats_table]
     )
-
-def ui_scenario_comparison(ticker_text, scenario):
-    """
-    Szenario‑Vergleich: Rezession, Inflation, Zinsanstieg, Ölkrise
-    """
-    try:
-        tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
-        shock_map = {
-            "Rezession": -0.15,
-            "Inflation": -0.10,
-            "Zinsanstieg": -0.20,
-            "Ölkrise": -0.12
-        }
-
-        shock = shock_map.get(scenario, 0)
-
-        rows = []
-        for t in tickers:
-            series = fetch_price_history(t, period="1y")
-            if series is None:
-                rows.append([t, "Keine Daten"])
-                continue
-
-            last = series.iloc[-1]
-            shocked = last * (1 + shock)
-            rows.append([t, last, shocked])
-
-        df = pd.DataFrame(rows, columns=["Ticker", "Aktuell", "Nach Szenario"])
-
-        return df
-
-    except Exception as e:
-        return pd.DataFrame([["Fehler", str(e)]])
-
-
-def ui_scenario_comparison(ticker_text, scenario):
-    shock_map = {
-        "Rezession": -0.15,
-        "Inflation": -0.10,
-        "Zinsanstieg": -0.20,
-        "Ölkrise": -0.12
-    }
-
-    # Szenario-Schock bestimmen
-    shock = shock_map.get(scenario, 0)
-
-    # Ticker-Liste aufsplitten
-    tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
-
-    rows = []
-    for t in tickers:
-        series = fetch_price_history(t, period="1y")
-
-        if series is None or len(series) == 0:
-            rows.append([t, "Keine Daten", "Keine Daten"])
-            continue
-
-        last = series.iloc[-1]
-        shocked = last * (1 + shock)
-
-        rows.append([t, last, shocked])
-
-    return pd.DataFrame(rows, columns=["Ticker", "Aktuell", "Nach Szenario"])
 
 def build_scenario_comparison():
     gr.Markdown("## 📈 Szenario‑Vergleich")

@@ -51,7 +51,7 @@ def ui_portfolio_studio(ticker_text):
 
     return fig, stats
 
-    def ui_portfolio_optimizer(ticker_text):
+def ui_portfolio_optimizer(ticker_text):
     """
     Portfolio‑Optimierung (Mean‑Variance)
     """
