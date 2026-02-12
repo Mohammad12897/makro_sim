@@ -1,4 +1,4 @@
-#ui/logic_portfolio.py
+# ui/logic_portfolio.py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,7 +36,6 @@ def ui_portfolio_studio(ticker_text):
     ax.grid(True)
 
     return fig, stats
-        
 
 def ui_portfolio_optimizer(ticker_text):
     """
