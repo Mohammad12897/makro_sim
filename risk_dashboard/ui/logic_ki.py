@@ -46,7 +46,7 @@ def get_ki_score_for_etf(ticker):
     """
 
     # ETF in Datenbank suchen
-    etf = next((e for e in ETF_DB if e["Ticker"] == ticker or e["ISIN"] == ticker), None)
+    etf = next((e for e in ETF_DB if e.get("Ticker") == ticker or e.get("ISIN") == ticker),None)
     if etf is None:
         return None
 

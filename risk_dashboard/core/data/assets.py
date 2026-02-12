@@ -4,6 +4,8 @@ import numpy as np
 import yfinance as yf
 from .caching import cached_download
 from .logging import logger
+from core.data.db_assets import ETF_DB
+
 
 def to_float(x):
     if x is None:
@@ -55,18 +57,32 @@ def sanitize_price_data(data):
     return None
 
 def fetch_price_history(symbol, period="5y"):
+    """
+    Lädt historische Kursdaten.
+    Nutzt ETF_DB, um Ticker wie 'EIMI' → 'EIMI.L' zu korrigieren.
+    """
     try:
-        logger.info(f"Downloading data for {symbol}, period={period}")
-        raw = yf.download(symbol, period=period, progress=False, auto_adjust=True)
-        series = sanitize_price_data(raw)
-        if series is None or series.empty:
-            logger.warning(f"Empty or invalid data for {symbol}")
-            return None
-        return series
-    except Exception as e:
-        logger.error(f"Error fetching {symbol}: {e}")
-        return None
+        # 1. Symbol normalisieren
+        symbol = symbol.strip().upper()
 
+        # 2. ETF_DB prüfen: falls Nutzer "EIMI" eingibt → "EIMI.L" verwenden
+        for etf in ETF_DB:
+            if etf.get("Ticker") == symbol or etf.get("ISIN") == symbol:
+                symbol = etf["Yahoo"]
+                break
+
+        # 3. Download
+        raw = yf.download(symbol, period=period, progress=False, auto_adjust=True)
+
+        if raw is None or raw.empty:
+            return None
+
+        # 4. Nur Schlusskurse zurückgeben
+        return raw["Close"].dropna()
+
+    except Exception as e:
+        print(f"Error fetching {symbol}: {e}")
+        return None
 def calc_return(series, days):
     if len(series) < days:
         return None

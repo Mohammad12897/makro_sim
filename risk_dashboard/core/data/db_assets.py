@@ -9,17 +9,44 @@ ETF_DB = [
     {"ISIN": "IE00B4WXJJ64", "Name": "iShares MSCI Europe", "Region": "Europa", "Kategorie": "Aktien", "TER": 0.12, "Volumen": 12000, "Replikation": "Physisch", "TD": -0.18},
     {"ISIN": "IE00B5M4WH52", "Name": "iShares EM IMI", "Region": "Emerging Markets", "Kategorie": "Aktien", "TER": 0.18, "Volumen": 9000, "Replikation": "Physisch", "TD": -0.25},
     {
-    "Ticker": "EIMI",
-    "ISIN": "IE00BKM4GZ66",
-    "Name": "iShares Core MSCI EM IMI",
-    "Beschreibung": "Breit gestreuter Emerging-Markets-ETF mit physischer Replikation.",
-    "Region": "Emerging Markets",
-    "Kategorie": "Aktien",
-    "TER": 0.18,
-    "Volumen": 9000,
-    "Replikation": "Physisch",
-    "TD": -0.25
+      "Ticker": "EIMI",
+      "Yahoo": "EIMI.L",
+      "ISIN": "IE00BKM4GZ66",
+      "Name": "iShares Core MSCI EM IMI",
+      "Beschreibung": "Breit gestreuter Emerging-Markets-ETF mit physischer Replikation.",
+      "Region": "Emerging Markets",
+      "Kategorie": "Aktien",
+      "TER": 0.18,
+      "Volumen": 9000,
+      "Replikation": "Physisch",
+      "TD": -0.25
   },
+  {
+      "Ticker": "VWCE",
+      "Yahoo": "VWCE.DE",
+      "ISIN": "IE00BK5BQT80",
+      "Name": "Vanguard FTSE All-World UCITS ETF",
+      "Beschreibung": "Globaler ETF mit über 3500 Aktien weltweit.",
+      "Region": "Global",
+      "Kategorie": "Aktien",
+      "TER": 0.22,
+      "Volumen": 12000,
+      "Replikation": "Physisch",
+      "TD": -0.15
+  },
+  {
+      "Ticker": "CSPX",
+      "Yahoo": "CSPX.L",
+      "ISIN": "IE00B5BMR087",
+      "Name": "iShares Core S&P 500 UCITS ETF",
+      "Beschreibung": "S&P 500 ETF mit physischer Replikation.",
+      "Region": "USA",
+      "Kategorie": "Aktien",
+      "TER": 0.07,
+      "Volumen": 35000,
+      "Replikation": "Physisch",
+      "TD": -0.05
+  }
 
 ]
 

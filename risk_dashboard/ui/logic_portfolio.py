@@ -2,7 +2,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from core.data.fetch import fetch_price_history
+from core.data.assets import fetch_price_history
 from ui.logic_ki import get_ki_score
 
 def ui_portfolio_studio(ticker_text):
