@@ -99,6 +99,8 @@ from core.data.logging import log_buffer
 from core.backend.ki_score import compute_ki_score, explain_ki_score
 from core.data.assets import fetch_price_history
 from core.backend.plots import plot_efficient_frontier
+from core.backend.data_utils import clear_cache, load_isin_db
+from ui.logic_screener import ui_etf_screener, ui_stock_screener
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
@@ -379,6 +381,47 @@ def build_home():
     - Verzerrte Form = Risiko oder Ungleichgewicht
     """)
 
+
+def build_etf_screener():
+    gr.Markdown("""
+    # 📊  ETF‑Screener (justETF)
+    Gib eine Liste von ISINs ein oder lade eine Region.
+    Der Screener zeigt TER, Fondsgröße, Replikation und Tracking‑Differenz.
+    """)
+
+    with gr.Row():
+        region = gr.Dropdown(["Global", "USA", "Europa", "Emerging Markets"], label="Region")
+        category = gr.Dropdown(["Aktien", "Anleihen", "Sektoren", "Themen"], label="Kategorie")
+        btn = gr.Button("Screener starten")
+
+    table = gr.Dataframe(label="ETF‑Ergebnisse")
+
+    btn.click(
+        ui_etf_screener,
+        inputs=[region, category],
+        outputs=[table]
+    )
+
+def build_stock_screener():
+    gr.Markdown("""
+    # 📈  Aktien‑Screener (Fundamentaldaten)
+    Der Screener lädt KGV, KUV, PEG, Verschuldung, Cashflow und Wachstum.
+    """)
+
+    with gr.Row():
+        sector = gr.Dropdown(["Alle", "Tech", "Finanzen", "Industrie", "Gesundheit"], label="Sektor")
+        country = gr.Dropdown(["USA", "Deutschland", "Europa", "Global"], label="Land")
+        btn = gr.Button("Screener starten")
+
+    table = gr.Dataframe(label="Aktien‑Ergebnisse")
+
+    btn.click(
+        ui_stock_screener,
+        inputs=[sector, country],
+        outputs=[table]
+    )
+
+
 def ui_bond_analysis(ticker):
     series = fetch_price_history(ticker, period="1y")
 
@@ -594,24 +637,50 @@ def ui_scenario_comparison(ticker_text, scenario):
         return pd.DataFrame([["Fehler", str(e)]])
 
 
+def ui_scenario_comparison(ticker_text, scenario):
+    shock_map = {
+        "Rezession": -0.15,
+        "Inflation": -0.10,
+        "Zinsanstieg": -0.20,
+        "Ölkrise": -0.12
+    }
+
+    # Szenario-Schock bestimmen
+    shock = shock_map.get(scenario, 0)
+
+    # Ticker-Liste aufsplitten
+    tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
+
+    rows = []
+    for t in tickers:
+        series = fetch_price_history(t, period="1y")
+
+        if series is None or len(series) == 0:
+            rows.append([t, "Keine Daten", "Keine Daten"])
+            continue
+
+        last = series.iloc[-1]
+        shocked = last * (1 + shock)
+
+        rows.append([t, last, shocked])
+
+    return pd.DataFrame(rows, columns=["Ticker", "Aktuell", "Nach Szenario"])
 
 def build_scenario_comparison():
     gr.Markdown("## 📈 Szenario‑Vergleich")
-    with gr.Tab():
-        scen_country = gr.Dropdown(choices=countries, label="Land")
-        scen_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
-        scen_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
-        scen_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
-        scen_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
+    with gr.Row():
+        tickers = gr.Textbox(label="Assets", placeholder="AAPL, SPY, BTC-USD")
+        scenario = gr.Dropdown(["Rezession", "Inflation", "Zinsanstieg", "Ölkrise"], label="Szenario")
+        btn = gr.Button("Simulieren")
 
-        scen_button = gr.Button("Szenarien vergleichen")
-        scen_table = gr.Dataframe()
+    result = gr.Dataframe(label="Szenario‑Ergebnisse")
 
-        scen_button.click(
-            scenario_table_wrapper,
-            [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
-            scen_table,
-        )
+    btn.click(
+        ui_scenario_comparison,
+        inputs=[tickers, scenario],
+        outputs=[result]
+    )
+
 
 def ui_show_isin_db():
     db = load_isin_db()
@@ -935,47 +1004,10 @@ def app():
             )
 
         with gr.Tab("ETF‑Screener"):
-            gr.Markdown("""
-            # 📘 ETF‑Screener (justETF)
-            Gib eine Liste von ISINs ein oder lade eine Region.
-            Der Screener zeigt TER, Fondsgröße, Replikation und Tracking‑Differenz.
-            """)
-
-            etf_isins = gr.Textbox(
-                label="ETF‑ISINs (Komma‑getrennt)",
-                placeholder="z. B. IE00B4L5Y983, IE00B5BMR087"
-            )
-
-            etf_button = gr.Button("ETF‑Daten abrufen")
-
-            etf_table = gr.Dataframe(label="ETF‑Daten", interactive=False)
-
-            etf_button.click(
-                fn=scan_etf_list,
-                inputs=[etf_isins],
-                outputs=[etf_table]
-            )
+            build_etf_screener()
 
         with gr.Tab("Aktien‑Screener"):
-            gr.Markdown("""
-            # 📊 Aktien‑Screener (Fundamentaldaten)
-            Der Screener lädt KGV, KUV, PEG, Verschuldung, Cashflow und Wachstum.
-            """)
-
-            stock_symbols = gr.Textbox(
-                label="Aktien‑Symbole (Komma‑getrennt)",
-                placeholder="z. B. AAPL, MSFT, AMZN, TSLA"
-            )
-
-            stock_button = gr.Button("Aktien‑Daten abrufen")
-
-            stock_table = gr.Dataframe(label="Fundamentaldaten", interactive=False)
-
-            stock_button.click(
-                fn=scan_stocks,
-                inputs=[stock_symbols],
-                outputs=[stock_table]
-            )
+            build_stock_screener()
 
         with gr.Tab("🧾 Anleihen‑Analyse"):
             build_bond_analysis()   # Platzhalter für später
@@ -1193,8 +1225,75 @@ def app():
 
         # ---------------- Szenario-Vergleich ----------------
         
+        with gr.Tab("## 📈 Szenario‑Vergleich"):
             build_scenario_comparison()
+
+        with gr.Tab("## ⚙️ Einstellungen / Daten / ISIN‑DB"):    
             build_settings_tab()   # ISIN‑DB, Cache, Logs, API‑Status
+
+        with gr.Tab("## ⚙️ Pro Tools"):    
+        
+            with gr.Tab("ETF‑Screener"):
+                gr.Markdown("""
+                # 📘 ETF‑Screener (justETF)
+                Gib eine Liste von ISINs ein oder lade eine Region.
+                Der Screener zeigt TER, Fondsgröße, Replikation und Tracking‑Differenz.
+                """)
+
+                etf_isins = gr.Textbox(
+                    label="ETF‑ISINs (Komma‑getrennt)",
+                    placeholder="z. B. IE00B4L5Y983, IE00B5BMR087"
+                )
+
+                etf_button = gr.Button("ETF‑Daten abrufen")
+
+                etf_table = gr.Dataframe(label="ETF‑Daten", interactive=False)
+
+                etf_button.click(
+                    fn=scan_etf_list,
+                    inputs=[etf_isins],
+                    outputs=[etf_table]
+                )
+
+            with gr.Tab("Aktien‑Screener"):
+                build_stock_screener()
+
+                gr.Markdown("""
+                # 📊 Aktien‑Screener (Fundamentaldaten)
+                Der Screener lädt KGV, KUV, PEG, Verschuldung, Cashflow und Wachstum.
+                """)
+
+                stock_symbols = gr.Textbox(
+                    label="Aktien‑Symbole (Komma‑getrennt)",
+                    placeholder="z. B. AAPL, MSFT, AMZN, TSLA"
+                )
+
+                stock_button = gr.Button("Aktien‑Daten abrufen")
+
+                stock_table = gr.Dataframe(label="Fundamentaldaten", interactive=False)
+
+                stock_button.click(
+                    fn=scan_stocks,
+                    inputs=[stock_symbols],
+                    outputs=[stock_table]
+                )
+
+            with gr.Tab("## 📈 Szenario‑Vergleich"):
+                gr.Markdown("## 📈 Szenario‑Vergleich")                                                                                                                               alte Version : gr.Markdown("## 📈 Szenario‑Vergleich
+                scen_country = gr.Dropdown(choices=countries, label="Land")
+                scen_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
+                scen_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
+                scen_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
+                scen_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
+
+                scen_button = gr.Button("Szenarien vergleichen")
+                scen_table = gr.Dataframe()
+
+                scen_button.click(
+                    scenario_table_wrapper,
+                    [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
+                    scen_table,
+                )
 
 
     return demo
