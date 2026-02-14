@@ -238,7 +238,6 @@ ETF_DB = [
     }
 ]
 
-]
 
 STOCK_DB = [
     {"Ticker": "AAPL", "Name": "Apple", "Sektor": "Tech", "Land": "USA", "KGV": 28, "KUV": 7, "PEG": 2.1, "Debt/Equity": 1.5, "Cashflow": 110e9, "Wachstum": 0.08},
