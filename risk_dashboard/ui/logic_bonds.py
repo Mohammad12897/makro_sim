@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from core.data.assets import fetch_price_history
 
 def ui_bond_analysis(ticker):
     series = fetch_price_history(ticker, period="1y")

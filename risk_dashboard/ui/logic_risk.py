@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from core.data.assets import fetch_price_history
 
 def ui_risk_dashboard(ticker_text):
     tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]

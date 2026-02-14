@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from core.data.assets import fetch_price_history
 
 def ui_scenario_comparison(ticker_text, scenario):
     shock_map = {
