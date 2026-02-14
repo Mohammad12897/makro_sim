@@ -67,80 +67,98 @@ def compute_ki_score(price_series: pd.Series, return_factors=False):
 
 def explain_ki_score(ticker, score, factors):
     """
-    Erzeugt eine verständliche Erklärung für den KI‑Score eines Assets.
-    'factors' ist ein Dict mit normierten Werten (0–1):
+    Erzeugt eine ausführliche, verständliche Erklärung für den KI‑Score eines Assets.
+    'factors' enthält normierte Werte (0–1):
         momentum, volatility, drawdown, sharpe, trend_stability
     """
 
-    momentum = factors["momentum"]
-    volatility = factors["volatility"]
-    drawdown = factors["drawdown"]
-    sharpe = factors["sharpe"]
-    stability = factors["trend_stability"]
+    # Alle Werte sicher in float umwandeln
+    momentum = float(factors["momentum"])
+    volatility = float(factors["volatility"])
+    drawdown = float(factors["drawdown"])
+    sharpe = float(factors["sharpe"])
+    stability = float(factors["trend_stability"])
+
+    # Ampel-Logik
+    def amp(value):
+        if value >= 0.66:
+            return "🟢"
+        elif value >= 0.33:
+            return "🟡"
+        else:
+            return "🔴"
+
+    # Risiko-Profil
+    risiko_level = (
+        "niedrig" if volatility < 0.3 else
+        "mittel" if volatility < 0.6 else
+        "hoch"
+    )
+
+    # Trend-Profil
+    trend_level = (
+        "stark" if momentum > 0.6 else
+        "neutral" if momentum > 0.3 else
+        "schwach"
+    )
+
+    # Gesamtbewertung
+    if score >= 80:
+        summary = "ein sehr starkes Muster zeigt"
+    elif score >= 60:
+        summary = "eine solide Entwicklung aufweist"
+    elif score >= 40:
+        summary = "aktuell neutral wirkt"
+    elif score >= 20:
+        summary = "deutliche Schwächen zeigt"
+    else:
+        summary = "ein sehr hohes Risiko aufweist"
 
     return f"""
-### 📊 KI‑Score Erklärung für **{ticker}**
+### 📊 KI‑Score Analyse für **{ticker}**
 
 Der KI‑Score von **{ticker}** beträgt **{score:.1f} / 100**.  
-Er basiert auf einer kombinierten Analyse der letzten Monate und bewertet die Musterqualität des Assets.
+Er basiert auf einer kombinierten Analyse von Trend, Risiko, Stabilität und Renditequalität.
 
 ---
 
-## 🔍 Einzel‑Faktoren
+## 🔍 Einzel‑Faktoren (mit Ampel‑Bewertung)
 
-**Momentum:** {momentum:.2f}  
-→ Wie stark der Trend zuletzt war.  
-- Hoher Wert = starkes Aufwärtsmomentum  
-- Niedriger Wert = schwacher oder negativer Trend  
+**Momentum:** {momentum:.2f} {amp(momentum)}  
+→ Stärke des kurzfristigen Trends.
 
-**Volatilität:** {volatility:.2f}  
-→ Wie stark das Asset schwankt.  
-- Hoher Wert = riskant  
-- Niedriger Wert = stabil  
+**Volatilität:** {volatility:.2f} {amp(1 - volatility)}  
+→ Schwankungsintensität (je niedriger, desto besser).
 
-**Drawdown:** {drawdown:.2f}  
-→ Wie tief das Asset zuletzt gefallen ist.  
-- Hoher Wert = starke Rückschläge  
-- Niedriger Wert = geringe Verluste  
+**Drawdown:** {drawdown:.2f} {amp(1 - drawdown)}  
+→ Rückschlagsrisiko der letzten Monate.
 
-**Sharpe Ratio:** {sharpe:.2f}  
-→ Risiko‑angepasste Rendite.  
-- Hoher Wert = gute Rendite bei geringem Risiko  
-- Niedriger Wert = schlechte Risiko‑Rendite‑Relation  
+**Sharpe Ratio:** {sharpe:.2f} {amp(sharpe)}  
+→ Risiko‑angepasste Renditequalität.
 
-**Trendstabilität:** {stability:.2f}  
-→ Wie „ruhig“ und konsistent der Trend ist.  
-- Hoher Wert = sauberer Trend  
-- Niedriger Wert = chaotische Bewegungen  
+**Trendstabilität:** {stability:.2f} {amp(stability)}  
+→ Wie sauber und konsistent der Trend verläuft.
 
 ---
 
 ## 🧠 Gesamtinterpretation
 
-Der KI‑Score kombiniert alle Faktoren zu einer einzigen Kennzahl:
+- **Momentum:** {trend_level}  
+- **Risiko:** {risiko_level}  
+- **Trendqualität:** {'stabil' if stability > 0.6 else 'durchwachsen' if stability > 0.3 else 'instabil'}
+
+Der KI‑Score kombiniert alle Faktoren zu einer Gesamtbewertung:
 
 - **80–100:** Sehr starke Muster, attraktives Risiko‑Profil  
 - **60–80:** Gute Qualität, solide Entwicklung  
-- **40–60:** Neutral, weder besonders stark noch schwach  
-- **20–40:** Schwache Muster, erhöhte Risiken  
-- **0–20:** Chaotisch, instabil, hohe Verlustgefahr  
+- **40–60:** Neutral, ausgewogen  
+- **20–40:** Schwach, erhöhte Risiken  
+- **0–20:** Sehr instabil, hohe Verlustgefahr  
 
 ---
 
 ## 📝 Fazit für {ticker}
 
-Basierend auf den Faktoren zeigt **{ticker}**:
-
-- Momentum: {'hoch' if momentum > 0.6 else 'mittel' if momentum > 0.3 else 'schwach'}  
-- Risiko: {'niedrig' if volatility < 0.3 else 'mittel' if volatility < 0.6 else 'hoch'}  
-- Trendqualität: {'stabil' if stability > 0.6 else 'durchwachsen' if stability > 0.3 else 'instabil'}  
-
-**Gesamtbewertung:**  
-→ Der KI‑Score von **{score:.1f}** zeigt, dass {ticker} aktuell **{
-    'ein sehr starkes Muster hat' if score >= 80 else
-    'eine solide Entwicklung zeigt' if score >= 60 else
-    'neutral wirkt' if score >= 40 else
-    'Schwächen aufweist' if score >= 20 else
-    'sehr riskant erscheint'
-}**.
+Zusammengefasst zeigt **{ticker}**, dass es aktuell **{summary}**.  
+Diese Einschätzung basiert auf Trendstärke, Risiko, Stabilität und Renditequalität.
 """

@@ -56,6 +56,36 @@ def sanitize_price_data(data):
 
     return None
 
+
+def fetch_price_history(symbol, period="5y"):
+    """
+    Lädt historische Kursdaten.
+    Nutzt ETF_DB, um Ticker wie 'EIMI' → 'EIMI.L' zu korrigieren.
+    """
+    try:
+        # 1. Symbol normalisieren
+        symbol = symbol.strip().upper()
+
+        # 2. ETF_DB prüfen: falls Nutzer "EIMI" eingibt → "EIMI.L" verwenden
+        for etf in ETF_DB:
+            if etf.get("Ticker") == symbol or etf.get("ISIN") == symbol:
+                symbol = etf["Yahoo"]
+                break
+
+        # 3. Download
+        raw = yf.download(symbol, period=period, progress=False, auto_adjust=True)
+
+        if raw is None or raw.empty:
+            return None
+
+        # 4. Nur Schlusskurse zurückgeben
+        return raw["Close"].dropna()
+
+    except Exception as e:
+        print(f"Error fetching {symbol}: {e}")
+        return None
+
+
 def calc_return(series, days):
     if len(series) < days:
         return None
@@ -143,31 +173,3 @@ def get_asset_metrics(symbol):
         "max_drawdown": calc_drawdown(series),
         "trend_sma_ratio": calc_sma_ratio(series, 50, 200),
     }
-
-def fetch_price_history(symbol, period="5y"):
-    """
-    Lädt historische Kursdaten.
-    Nutzt ETF_DB, um Ticker wie 'EIMI' → 'EIMI.L' zu korrigieren.
-    """
-    try:
-        # 1. Symbol normalisieren
-        symbol = symbol.strip().upper()
-
-        # 2. ETF_DB prüfen: falls Nutzer "EIMI" eingibt → "EIMI.L" verwenden
-        for etf in ETF_DB:
-            if etf.get("Ticker") == symbol or etf.get("ISIN") == symbol:
-                symbol = etf["Yahoo"]
-                break
-
-        # 3. Download
-        raw = yf.download(symbol, period=period, progress=False, auto_adjust=True)
-
-        if raw is None or raw.empty:
-            return None
-
-        # 4. Nur Schlusskurse zurückgeben
-        return raw["Close"].dropna()
-
-    except Exception as e:
-        print(f"Error fetching {symbol}: {e}")
-        return None
