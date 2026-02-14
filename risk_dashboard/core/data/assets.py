@@ -144,7 +144,7 @@ def get_asset_metrics(symbol):
         "trend_sma_ratio": calc_sma_ratio(series, 50, 200),
     }
 
-    def fetch_price_history(symbol, period="5y"):
+def fetch_price_history(symbol, period="5y"):
     """
     Lädt historische Kursdaten.
     Nutzt ETF_DB, um Ticker wie 'EIMI' → 'EIMI.L' zu korrigieren.
