@@ -239,14 +239,87 @@ ETF_DB = [
 ]
 
 
-STOCK_DB = [
-    {"Ticker": "AAPL", "Name": "Apple", "Sektor": "Tech", "Land": "USA", "KGV": 28, "KUV": 7, "PEG": 2.1, "Debt/Equity": 1.5, "Cashflow": 110e9, "Wachstum": 0.08},
-    {"Ticker": "MSFT", "Name": "Microsoft", "Sektor": "Tech", "Land": "USA", "KGV": 32, "KUV": 10, "PEG": 2.3, "Debt/Equity": 0.6, "Cashflow": 95e9, "Wachstum": 0.10},
-    {"Ticker": "SAP", "Name": "SAP", "Sektor": "Tech", "Land": "Deutschland", "KGV": 22, "KUV": 4, "PEG": 1.8, "Debt/Equity": 0.4, "Cashflow": 6e9, "Wachstum": 0.06},
-    {"Ticker": "BAS", "Name": "BASF", "Sektor": "Industrie", "Land": "Deutschland", "KGV": 12, "KUV": 0.8, "PEG": 1.2, "Debt/Equity": 0.9, "Cashflow": 4e9, "Wachstum": 0.03},
-    {"Ticker": "JNJ", "Name": "Johnson & Johnson", "Sektor": "Gesundheit", "Land": "USA", "KGV": 17, "KUV": 5, "PEG": 1.5, "Debt/Equity": 0.5, "Cashflow": 20e9, "Wachstum": 0.04},
-]
 
+STOCK_DB = [
+    {
+        "Ticker": "AAPL",
+        "ISIN": "US0378331005",
+        "Name": "Apple",
+        "Sektor": "Tech",
+        "Land": "USA",
+        "KGV": 28,
+        "KUV": 7,
+        "PEG": 2.1,
+        "Debt/Equity": 1.5,
+        "Cashflow": 110e9,
+        "Wachstum": 0.08
+    },
+    {
+        "Ticker": "MSFT",
+        "ISIN": "US5949181045",
+        "Name": "Microsoft",
+        "Sektor": "Tech",
+        "Land": "USA",
+        "KGV": 32,
+        "KUV": 10,
+        "PEG": 2.3,
+        "Debt/Equity": 0.6,
+        "Cashflow": 95e9,
+        "Wachstum": 0.10
+    },
+    {
+        "Ticker": "SAP",
+        "ISIN": "DE0007164600",
+        "Name": "SAP",
+        "Sektor": "Tech",
+        "Land": "Deutschland",
+        "KGV": 22,
+        "KUV": 4,
+        "PEG": 1.8,
+        "Debt/Equity": 0.4,
+        "Cashflow": 6e9,
+        "Wachstum": 0.06
+    },
+    {
+        "Ticker": "BAS",
+        "ISIN": "DE000BASF111",
+        "Name": "BASF",
+        "Sektor": "Industrie",
+        "Land": "Deutschland",
+        "KGV": 12,
+        "KUV": 0.8,
+        "PEG": 1.2,
+        "Debt/Equity": 0.9,
+        "Cashflow": 4e9,
+        "Wachstum": 0.03
+    },
+    {
+        "Ticker": "JNJ",
+        "ISIN": "US4781601046",
+        "Name": "Johnson & Johnson",
+        "Sektor": "Gesundheit",
+        "Land": "USA",
+        "KGV": 17,
+        "KUV": 5,
+        "PEG": 1.5,
+        "Debt/Equity": 0.5,
+        "Cashflow": 20e9,
+        "Wachstum": 0.04
+    },
+    {
+        "Ticker": "SPY",
+        "ISIN": "US78462F1030",
+        "Name": "SPDR S&P 500 ETF Trust",
+        "Sektor": "Index",
+        "Land": "USA",
+        "KGV": None,
+        "KUV": None,
+        "PEG": None,
+        "Debt/Equity": None,
+        "Cashflow": None,
+        "Wachstum": None
+    }
+]
 
 def find_asset(identifier):
     """Sucht in ETF_DB und STOCK_DB nach Ticker, ISIN oder Yahoo."""

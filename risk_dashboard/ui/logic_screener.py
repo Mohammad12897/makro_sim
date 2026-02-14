@@ -1,6 +1,6 @@
 #ui/logic_screener.py
+from core.data.db_assets import ETF_DB, STOCK_DB, find_asset
 import pandas as pd
-from core.data.db_assets import ETF_DB, STOCK_DB
 from ui.logic_ki import get_ki_score
 
 

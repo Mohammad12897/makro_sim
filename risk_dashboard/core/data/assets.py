@@ -4,7 +4,8 @@ import numpy as np
 import yfinance as yf
 from .caching import cached_download
 from .logging import logger
-from core.data.db_assets import ETF_DB
+from core.data.db_assets import ETF_DB, STOCK_DB, find_asset
+import pandas as pd
 
 
 def to_float(x):

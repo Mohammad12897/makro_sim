@@ -5,6 +5,8 @@ from core.data.logging import logger
 import requests
 from core.backend.isin_database import ISIN_DATABASE
 from core.backend.isin_database import load_isin_db, save_isin_db
+from core.data.db_assets import ETF_DB, STOCK_DB, find_asset
+import pandas as pd
 
 COMMON_SYMBOLS = [
     "SPY", "VTI", "QQQ", "GLD", "IAU", "BTC-USD", "ETH-USD",
@@ -83,10 +85,22 @@ def ticker_to_isin(ticker: str) -> str | None:
     save_isin_db(db)
     return None
 
-def convert_tickers_to_isins(tickers: list[str]):
+def convert_tickers_to_isins_OLD(tickers: list[str]):
     result = []
     for t in tickers:
         t_clean = t.strip().upper()
         isin = ticker_to_isin(t_clean)
         result.append((t_clean, isin))
     return result
+
+def ui_convert_isin_Aktuell(text: str):
+    tickers = [t.strip() for t in text.split(",") if t.strip()]
+    pairs = []
+
+    for t in tickers:
+        asset = find_asset(t)
+        isin = asset.get("ISIN") if asset else None
+        pairs.append([t, isin])
+
+    df = pd.DataFrame(pairs, columns=["Ticker", "ISIN"])
+    return df

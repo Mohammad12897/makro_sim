@@ -83,7 +83,6 @@ from core.backend.symbol_tools import (
     validate_symbol,
     detect_symbol_type,
     is_isin,
-    convert_tickers_to_isins,
 )
 from core.backend.portfolio_manager import (
     list_portfolios,
@@ -106,6 +105,9 @@ from ui.logic_crypto import ui_crypto_analysis
 from ui.logic_risk import ui_risk_dashboard
 from ui.logic_portfolio import ui_portfolio_optimizer, ui_portfolio_studio
 from ui.logic_scenario import ui_scenario_comparison
+from core.data.db_assets import ETF_DB, STOCK_DB, find_asset
+import pandas as pd
+
 
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
@@ -174,12 +176,17 @@ def parse_weights(text, n):
     return [v / s for v in vals]
 
 
-def ui_convert_isin(text):
+def ui_convert_isin(text: str):
     tickers = [t.strip() for t in text.split(",") if t.strip()]
-    pairs = convert_tickers_to_isins(tickers)
+    pairs = []
+
+    for t in tickers:
+        asset = find_asset(t)
+        isin = asset.get("ISIN") if asset else None
+        pairs.append([t, isin])
+
     df = pd.DataFrame(pairs, columns=["Ticker", "ISIN"])
     return df
-
 
 def ui_ki_scan(text):
     tickers = [t.strip() for t in text.split(",") if t.strip()]
@@ -187,19 +194,35 @@ def ui_ki_scan(text):
     explanations = []
 
     for t in tickers:
-        series = fetch_price_history(t, period="1y")
+
+        # 🔥 1. Asset lookup (Ticker → ETF oder Aktie)
+        asset = find_asset(t)
+
+        if not asset:
+            results.append([t, None])
+            explanations.append(f"Unbekanntes Asset: {t}")
+            continue
+
+        # 🔥 2. Yahoo‑Ticker bestimmen
+        yahoo = asset.get("Yahoo", t)
+
+        # 🔥 3. Kursdaten laden
+        series = fetch_price_history(yahoo, period="1y")
+
         if series is None or len(series) < 120:
             results.append([t, None])
             explanations.append(f"Keine ausreichenden Daten für {t}.")
             continue
 
+        # 🔥 4. KI‑Score berechnen
         score, factors = compute_ki_score(series, return_factors=True)
+
+        # 🔥 5. Erklärung erzeugen
         results.append([t, score])
         explanations.append(explain_ki_score(t, score, factors))
 
     df = pd.DataFrame(results, columns=["Ticker", "KI‑Score"])
     return df, "\n\n---\n\n".join(explanations)
-
 
 def build_home():
     gr.Markdown("""
@@ -501,7 +524,7 @@ def build_portfolio_optimizer():
         ui_portfolio_optimizer,
         inputs=[tickers],
         outputs=[weights, frontier]
-    )    
+    )
 
 def build_portfolio_studio():
     gr.Markdown("## 📂 Portfolio‑Studio")
@@ -876,16 +899,15 @@ def app():
 
         with gr.Tab("📂 Portfolio‑Studio"):
             build_portfolio_studio()
-           
-        # ---------------- Szenario-Vergleich ----------------
-        
+
+
         with gr.Tab("## 📈 Szenario‑Vergleich"):
             build_scenario_comparison()
 
-        with gr.Tab("## ⚙️ Einstellungen / Daten / ISIN‑DB"):    
+        with gr.Tab("## ⚙️ Einstellungen / Daten / ISIN‑DB"):
             build_settings_tab()   # ISIN‑DB, Cache, Logs, API‑Status
 
-        with gr.Tab("## ⚙️ Pro Tools"):    
+        with gr.Tab("## ⚙️ Pro Tools"):
             with gr.Tab("ETF‑Screener"):
                 gr.Markdown("""
                 # 📘 ETF‑Screener (justETF)
@@ -943,7 +965,7 @@ def app():
                     scenario_table_wrapper,
                     [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
                     scen_table,
-                ) 
+                )
 
 
             with gr.Tab("Portfolio‑Optimierer"):
@@ -986,7 +1008,7 @@ def app():
                     fn=run_optimizer,
                     inputs=[port_symbols, strategy],
                     outputs=[port_table]
-                )  
+                )
 
             with gr.Tab("📂 Portfolio‑Studio"):
 
@@ -1149,7 +1171,7 @@ def app():
 
                     refresh_btn = gr.Button("Log aktualisieren")
                     refresh_btn.click(load_log, inputs=None, outputs=log_box)
-      
+
 
 
     return demo

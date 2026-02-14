@@ -1,9 +1,8 @@
 #ui/logic_ki.py
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
-from core.data.db_assets import ETF_DB, STOCK_DB
+from core.data.db_assets import ETF_DB, STOCK_DB, find_asset
+import pandas as pd
 
 def get_ki_score_for_stock(ticker):
     """
