@@ -3,17 +3,102 @@
 import pandas as pd
 
 ETF_DB = [
-    {"ISIN": "IE00B4L5Y983", "Name": "iShares Core MSCI World", "Region": "Global", "Kategorie": "Aktien", "TER": 0.20, "Volumen": 55000, "Replikation": "Physisch", "TD": -0.12},
-    {"ISIN": "IE00B5BMR087", "Name": "Vanguard FTSE All-World", "Region": "Global", "Kategorie": "Aktien", "TER": 0.22, "Volumen": 110000, "Replikation": "Physisch", "TD": -0.10},
-    {"ISIN": "IE00B3XXRP09", "Name": "iShares S&P 500", "Region": "USA", "Kategorie": "Aktien", "TER": 0.07, "Volumen": 45000, "Replikation": "Physisch", "TD": -0.05},
-    {"ISIN": "IE00B4WXJJ64", "Name": "iShares MSCI Europe", "Region": "Europa", "Kategorie": "Aktien", "TER": 0.12, "Volumen": 12000, "Replikation": "Physisch", "TD": -0.18},
-    {"ISIN": "IE00B5M4WH52", "Name": "iShares EM IMI", "Region": "Emerging Markets", "Kategorie": "Aktien", "TER": 0.18, "Volumen": 9000, "Replikation": "Physisch", "TD": -0.25},
+    # --- Global / World ---
+    {
+        "Ticker": "IWDA",
+        "Yahoo": "IWDA.AS",
+        "ISIN": "IE00B4L5Y983",
+        "Name": "iShares Core MSCI World",
+        "Region": "Global",
+        "Kategorie": "Aktien",
+        "TER": 0.20,
+        "Volumen": 55000,
+        "Replikation": "Physisch",
+        "TD": -0.12
+    },
+    {
+        "Ticker": "VWCE",
+        "Yahoo": "VWCE.DE",
+        "ISIN": "IE00BK5BQT80",
+        "Name": "Vanguard FTSE All-World UCITS ETF",
+        "Region": "Global",
+        "Kategorie": "Aktien",
+        "TER": 0.22,
+        "Volumen": 120000,
+        "Replikation": "Physisch",
+        "TD": -0.10
+    },
+    {
+        "Ticker": "SSAC",
+        "Yahoo": "SSAC.L",
+        "ISIN": "IE00B8KGV557",
+        "Name": "iShares MSCI ACWI UCITS ETF",
+        "Region": "Global",
+        "Kategorie": "Aktien",
+        "TER": 0.20,
+        "Volumen": 18000,
+        "Replikation": "Physisch",
+        "TD": -0.15
+    },
+
+    # --- USA ---
+    {
+        "Ticker": "CSPX",
+        "Yahoo": "CSPX.L",
+        "ISIN": "IE00B5BMR087",
+        "Name": "iShares Core S&P 500 UCITS ETF",
+        "Region": "USA",
+        "Kategorie": "Aktien",
+        "TER": 0.07,
+        "Volumen": 35000,
+        "Replikation": "Physisch",
+        "TD": -0.05
+    },
+    {
+        "Ticker": "VUSA",
+        "Yahoo": "VUSA.L",
+        "ISIN": "IE00B3XXRP09",
+        "Name": "Vanguard S&P 500 UCITS ETF",
+        "Region": "USA",
+        "Kategorie": "Aktien",
+        "TER": 0.07,
+        "Volumen": 45000,
+        "Replikation": "Physisch",
+        "TD": -0.04
+    },
+
+    # --- Europe ---
+    {
+        "Ticker": "IMEU",
+        "Yahoo": "IMEU.L",
+        "ISIN": "IE00B4K48X80",
+        "Name": "iShares MSCI Europe UCITS ETF",
+        "Region": "Europa",
+        "Kategorie": "Aktien",
+        "TER": 0.12,
+        "Volumen": 12000,
+        "Replikation": "Physisch",
+        "TD": -0.18
+    },
+    {
+        "Ticker": "VEVE",
+        "Yahoo": "VEVE.L",
+        "ISIN": "IE00BQQP9H09",
+        "Name": "Vanguard FTSE Developed Europe UCITS ETF",
+        "Region": "Europa",
+        "Kategorie": "Aktien",
+        "TER": 0.10,
+        "Volumen": 9000,
+        "Replikation": "Physisch",
+        "TD": -0.12
+    },
+
+    # --- Emerging Markets ---
     {
         "Ticker": "EIMI",
         "Yahoo": "EIMI.L",
         "ISIN": "IE00BKM4GZ66",
         "Name": "iShares Core MSCI EM IMI",
-        "Beschreibung": "Breit gestreuter Emerging-Markets-ETF mit physischer Replikation.",
         "Region": "Emerging Markets",
         "Kategorie": "Aktien",
         "TER": 0.18,
@@ -22,31 +107,136 @@ ETF_DB = [
         "TD": -0.25
     },
     {
-        "Ticker": "VWCE",
-        "Yahoo": "VWCE.DE",
-        "ISIN": "IE00BK5BQT80",
-        "Name": "Vanguard FTSE All-World UCITS ETF",
-        "Beschreibung": "Globaler ETF mit über 3500 Aktien weltweit.",
-        "Region": "Global",
+        "Ticker": "VFEM",
+        "Yahoo": "VFEM.L",
+        "ISIN": "IE00B3VVMM84",
+        "Name": "Vanguard FTSE Emerging Markets UCITS ETF",
+        "Region": "Emerging Markets",
         "Kategorie": "Aktien",
         "TER": 0.22,
-        "Volumen": 12000,
+        "Volumen": 15000,
+        "Replikation": "Physisch",
+        "TD": -0.20
+    },
+
+    # --- Asia / Pacific ---
+    {
+        "Ticker": "IAPD",
+        "Yahoo": "IAPD.L",
+        "ISIN": "IE00B14X4T88",
+        "Name": "iShares Asia Pacific Dividend UCITS ETF",
+        "Region": "Asien-Pazifik",
+        "Kategorie": "Aktien",
+        "TER": 0.59,
+        "Volumen": 3000,
+        "Replikation": "Physisch",
+        "TD": -0.30
+    },
+
+    # --- Sector ETFs ---
+    {
+        "Ticker": "EXXT",
+        "Yahoo": "EXXT.DE",
+        "ISIN": "IE00B3WJKG14",
+        "Name": "iShares STOXX Europe 600 Technology",
+        "Region": "Europa",
+        "Kategorie": "Tech",
+        "TER": 0.46,
+        "Volumen": 2500,
+        "Replikation": "Physisch",
+        "TD": -0.22
+    },
+    {
+        "Ticker": "XLK",
+        "Yahoo": "XLK",
+        "ISIN": "US81369Y8030",
+        "Name": "Technology Select Sector SPDR",
+        "Region": "USA",
+        "Kategorie": "Tech",
+        "TER": 0.10,
+        "Volumen": 50000,
+        "Replikation": "Physisch",
+        "TD": -0.03
+    },
+
+    # --- Bonds ---
+    {
+        "Ticker": "AGGH",
+        "Yahoo": "AGGH.L",
+        "ISIN": "IE00BYZ28V50",
+        "Name": "iShares Core Global Aggregate Bond",
+        "Region": "Global",
+        "Kategorie": "Anleihen",
+        "TER": 0.10,
+        "Volumen": 8000,
+        "Replikation": "Physisch",
+        "TD": -0.12
+    },
+    {
+        "Ticker": "VAGF",
+        "Yahoo": "VAGF.L",
+        "ISIN": "IE00BG47KH54",
+        "Name": "Vanguard Global Aggregate Bond UCITS ETF",
+        "Region": "Global",
+        "Kategorie": "Anleihen",
+        "TER": 0.10,
+        "Volumen": 6000,
+        "Replikation": "Physisch",
+        "TD": -0.10
+    },
+
+    # --- Dividenden ETFs ---
+    {
+        "Ticker": "HDV",
+        "Yahoo": "HDV",
+        "ISIN": "US46429B6633",
+        "Name": "iShares Core High Dividend ETF",
+        "Region": "USA",
+        "Kategorie": "Dividende",
+        "TER": 0.08,
+        "Volumen": 9000,
+        "Replikation": "Physisch",
+        "TD": -0.05
+    },
+    {
+        "Ticker": "VIG",
+        "Yahoo": "VIG",
+        "ISIN": "US9219088443",
+        "Name": "Vanguard Dividend Appreciation ETF",
+        "Region": "USA",
+        "Kategorie": "Dividende",
+        "TER": 0.06,
+        "Volumen": 70000,
+        "Replikation": "Physisch",
+        "TD": -0.02
+    },
+
+    # --- Immobilien ETFs ---
+    {
+        "Ticker": "IYR",
+        "Yahoo": "IYR",
+        "ISIN": "US4642877397",
+        "Name": "iShares U.S. Real Estate ETF",
+        "Region": "USA",
+        "Kategorie": "Immobilien",
+        "TER": 0.40,
+        "Volumen": 5000,
         "Replikation": "Physisch",
         "TD": -0.15
     },
     {
-        "Ticker": "CSPX",
-        "Yahoo": "CSPX.L",
-        "ISIN": "IE00B5BMR087",
-        "Name": "iShares Core S&P 500 UCITS ETF",
-        "Beschreibung": "S&P 500 ETF mit physischer Replikation.",
+        "Ticker": "VNQ",
+        "Yahoo": "VNQ",
+        "ISIN": "US9229085538",
+        "Name": "Vanguard Real Estate ETF",
         "Region": "USA",
-        "Kategorie": "Aktien",
-        "TER": 0.07,
+        "Kategorie": "Immobilien",
+        "TER": 0.12,
         "Volumen": 35000,
         "Replikation": "Physisch",
-        "TD": -0.05
+        "TD": -0.10
     }
+]
 
 ]
 
