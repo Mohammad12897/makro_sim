@@ -246,3 +246,26 @@ STOCK_DB = [
     {"Ticker": "BAS", "Name": "BASF", "Sektor": "Industrie", "Land": "Deutschland", "KGV": 12, "KUV": 0.8, "PEG": 1.2, "Debt/Equity": 0.9, "Cashflow": 4e9, "Wachstum": 0.03},
     {"Ticker": "JNJ", "Name": "Johnson & Johnson", "Sektor": "Gesundheit", "Land": "USA", "KGV": 17, "KUV": 5, "PEG": 1.5, "Debt/Equity": 0.5, "Cashflow": 20e9, "Wachstum": 0.04},
 ]
+
+
+def find_asset(identifier):
+    """Sucht in ETF_DB und STOCK_DB nach Ticker, ISIN oder Yahoo."""
+    identifier = identifier.upper().strip()
+
+    # 1. ETFs durchsuchen
+    for etf in ETF_DB:
+        if etf.get("Ticker", "").upper() == identifier:
+            return etf
+        if etf.get("ISIN", "").upper() == identifier:
+            return etf
+        if etf.get("Yahoo", "").upper() == identifier:
+            return etf
+
+    # 2. Aktien durchsuchen
+    for stock in STOCK_DB:
+        if stock.get("Ticker", "").upper() == identifier:
+            return stock
+        if stock.get("ISIN", "").upper() == identifier:
+            return stock
+
+    return None
