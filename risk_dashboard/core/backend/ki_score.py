@@ -4,9 +4,29 @@ import numpy as np
 import pandas as pd
 
 def normalize(value, min_val, max_val):
+    # Series → float
+    if isinstance(value, pd.Series):
+        value = float(value.iloc[0])
+
+    # NaN → 0
+    if value is None or np.isnan(value):
+        return 0.0
+
+    # Division durch 0 vermeiden
     if max_val - min_val == 0:
         return 0.5
-    return (value - min_val) / (max_val - min_val)
+
+    # Normierung
+    norm = (value - min_val) / (max_val - min_val)
+
+    # Clipping auf 0–1
+    return max(0.0, min(1.0, float(norm)))
+    
+def to_float(x):
+    """Konvertiert Series oder numpy-Werte sicher in float."""
+    if isinstance(x, pd.Series):
+        return float(x.iloc[0])
+    return float(x)
 
 
 def compute_ki_score(price_series: pd.Series, return_factors=False):
@@ -15,24 +35,37 @@ def compute_ki_score(price_series: pd.Series, return_factors=False):
     Wenn return_factors=True, werden zusätzlich die normierten Faktoren zurückgegeben.
     """
 
+    # Sicherheitscheck: mindestens 120 Datenpunkte
+    if len(price_series) < 120:
+        return 0 if not return_factors else (0, {
+            "momentum": 0,
+            "volatility": 0,
+            "drawdown": 0,
+            "sharpe": 0,
+            "trend_stability": 0
+        })
+
     # 1. Renditen
     returns = price_series.pct_change().dropna()
 
     # 2. Momentum (letzte 90 Tage)
-    momentum = price_series.iloc[-1] / price_series.iloc[-90] - 1
-    momentum_norm = normalize(momentum, -0.2, 0.3)
+    try:
+        momentum = price_series.iloc[-1] / price_series.iloc[-90] - 1
+    except Exception:
+        momentum = 0
+    momentum_norm = normalize(to_float(momentum), -0.2, 0.3)
 
     # 3. Volatilität
-    vol = returns.std()
+    vol = to_float(returns.std())
     vol_norm = normalize(vol, 0.005, 0.05)
 
     # 4. Sharpe Ratio
-    sharpe = returns.mean() / (returns.std() + 1e-9)
+    sharpe = to_float(returns.mean()) / (to_float(returns.std()) + 1e-9)
     sharpe_norm = normalize(sharpe, -1, 2)
 
     # 5. Max Drawdown
     roll_max = price_series.cummax()
-    drawdown = ((price_series - roll_max) / roll_max).min()
+    drawdown = to_float(((price_series - roll_max) / roll_max).min())
     drawdown_norm = normalize(abs(drawdown), 0, 0.5)
 
     # 6. Trendstabilität (R²)
@@ -41,26 +74,26 @@ def compute_ki_score(price_series: pd.Series, return_factors=False):
     slope, intercept = np.polyfit(x, y, 1)
     y_pred = slope * x + intercept
     r2 = 1 - np.sum((y - y_pred)**2) / np.sum((y - y.mean())**2)
-    trend_stability_norm = normalize(r2, 0, 1)
+    trend_stability_norm = normalize(to_float(r2), 0, 1)
 
-    # 7. KI-Score
+    # 7. KI-Score (robust)
     score = (
-        0.25 * momentum_norm +
-        0.20 * sharpe_norm +
-        0.20 * trend_stability_norm +
-        0.20 * (1 - drawdown_norm) +
-        0.15 * (1 - vol_norm)
-    ) * 100
+        to_float(momentum_norm) * 25 +
+        (1 - to_float(vol_norm)) * 20 +
+        (1 - to_float(drawdown_norm)) * 20 +
+        to_float(sharpe_norm) * 20 +
+        to_float(trend_stability_norm) * 15
+    )
 
-    score = float(np.clip(score, 0, 100))
+    score = max(0, min(100, float(score)))
 
     if return_factors:
         return score, {
-            "momentum": momentum_norm,
-            "volatility": vol_norm,
-            "drawdown": drawdown_norm,
-            "sharpe": sharpe_norm,
-            "trend_stability": trend_stability_norm
+            "momentum": float(momentum_norm),
+            "volatility": float(vol_norm),
+            "drawdown": float(drawdown_norm),
+            "sharpe": float(sharpe_norm),
+            "trend_stability": float(trend_stability_norm)
         }
 
     return score
@@ -73,11 +106,11 @@ def explain_ki_score(ticker, score, factors):
     """
 
     # Alle Werte sicher in float umwandeln
-    momentum = float(factors["momentum"])
-    volatility = float(factors["volatility"])
-    drawdown = float(factors["drawdown"])
-    sharpe = float(factors["sharpe"])
-    stability = float(factors["trend_stability"])
+    momentum = to_float(factors["momentum"])
+    volatility = to_float(factors["volatility"])
+    drawdown = to_float(factors["drawdown"])
+    sharpe = to_float(factors["sharpe"])
+    stability = to_float(factors["trend_stability"])
 
     # Ampel-Logik
     def amp(value):
@@ -102,6 +135,13 @@ def explain_ki_score(ticker, score, factors):
         "schwach"
     )
 
+    # Sharpe-Interpretation
+    sharpe_level = (
+        "sehr gut" if sharpe > 0.66 else
+        "solide" if sharpe > 0.33 else
+        "schwach"
+    )
+
     # Gesamtbewertung
     if score >= 80:
         summary = "ein sehr starkes Muster zeigt"
@@ -113,6 +153,33 @@ def explain_ki_score(ticker, score, factors):
         summary = "deutliche Schwächen zeigt"
     else:
         summary = "ein sehr hohes Risiko aufweist"
+
+    # Stärken/Schwächen
+    strengths = []
+    weaknesses = []
+
+    if momentum > 0.5:
+        strengths.append("positives Momentum")
+    else:
+        weaknesses.append("schwaches Momentum")
+
+    if volatility < 0.4:
+        strengths.append("günstiges Risiko‑Profil")
+    else:
+        weaknesses.append("erhöhte Volatilität")
+
+    if sharpe > 0.5:
+        strengths.append("gute Risiko‑Rendite‑Relation")
+    else:
+        weaknesses.append("schwache Sharpe‑Ratio")
+
+    if stability > 0.5:
+        strengths.append("stabiler Trend")
+    else:
+        weaknesses.append("instabiler Trendverlauf")
+
+    strengths_text = ", ".join(strengths) if strengths else "keine ausgeprägten Stärken"
+    weaknesses_text = ", ".join(weaknesses) if weaknesses else "keine wesentlichen Schwächen"
 
     return f"""
 ### 📊 KI‑Score Analyse für **{ticker}**
@@ -145,15 +212,18 @@ Er basiert auf einer kombinierten Analyse von Trend, Risiko, Stabilität und Ren
 
 - **Momentum:** {trend_level}  
 - **Risiko:** {risiko_level}  
+- **Sharpe‑Profil:** {sharpe_level}  
 - **Trendqualität:** {'stabil' if stability > 0.6 else 'durchwachsen' if stability > 0.3 else 'instabil'}
 
-Der KI‑Score kombiniert alle Faktoren zu einer Gesamtbewertung:
+---
 
-- **80–100:** Sehr starke Muster, attraktives Risiko‑Profil  
-- **60–80:** Gute Qualität, solide Entwicklung  
-- **40–60:** Neutral, ausgewogen  
-- **20–40:** Schwach, erhöhte Risiken  
-- **0–20:** Sehr instabil, hohe Verlustgefahr  
+## 💡 Stärken & Schwächen
+
+**Stärken:**  
+- {strengths_text}
+
+**Schwächen:**  
+- {weaknesses_text}
 
 ---
 
