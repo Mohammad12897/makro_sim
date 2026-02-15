@@ -1,15 +1,21 @@
 #core/engine/assets.py
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timedelta
 import numpy as np
 
 
-# Optional: falls du B auch wirklich nutzen willst
-# from pandas_datareader import data as pdr
-# yf.pdr_override()
-
-def fetch_prices(ticker: str, days: int = 365) -> pd.DataFrame | None:
+# -------------------------------------------------------------------
+# Kursdaten laden
+# -------------------------------------------------------------------
+def fetch_prices(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
+    """
+    Lädt historische Kursdaten über yfinance.
+    """
     if not ticker:
         return None
 
@@ -21,11 +27,15 @@ def fetch_prices(ticker: str, days: int = 365) -> pd.DataFrame | None:
         data = yf.download(ticker, start=start, end=end, progress=False)
         if data is None or data.empty:
             return None
-        return data  # Index: Datum, Spalten: Open, High, Low, Close, Adj Close, Volume
+        return data
     except Exception as e:
         print(f"[fetch_prices] Fehler beim Laden von {ticker}: {e}")
         return None
 
+
+# -------------------------------------------------------------------
+# KI-Score aus Kursdaten
+# -------------------------------------------------------------------
 def compute_ki_score_from_prices(prices: pd.DataFrame | None) -> float | None:
     if prices is None or len(prices) < 60:
         return None
@@ -40,7 +50,8 @@ def compute_ki_score_from_prices(prices: pd.DataFrame | None) -> float | None:
 
     # 1) Momentum (6 Monate)
     try:
-        momentum = float((close.iloc[-1] / close.iloc[max(0, len(close) - 126)]) - 1)
+        mom_raw = (close.iloc[-1] / close.iloc[max(0, len(close) - 126)]) - 1
+        momentum = float(mom_raw.item() if hasattr(mom_raw, "item") else mom_raw)
     except Exception:
         momentum = None
 
@@ -53,15 +64,17 @@ def compute_ki_score_from_prices(prices: pd.DataFrame | None) -> float | None:
 
     # 3) Max Drawdown
     roll_max = close.cummax()
-    drawdown = float((close / roll_max - 1).min())
+    dd_raw = (close / roll_max - 1).min()
+    drawdown = float(dd_raw.item() if hasattr(dd_raw, "item") else dd_raw)
     dd_score = 1 + drawdown
 
     # 4) Sharpe-Proxy
-    mean_ret = float(returns.mean())
+    mean_raw = returns.mean()
+    mean_ret = float(mean_raw.item() if hasattr(mean_raw, "item") else mean_raw)
     sharpe = mean_ret / vol if (vol is not None and vol > 0) else 0
 
     # Normierung
-    def norm(x, a, b):
+    def norm(x: Any, a: float, b: float) -> Optional[float]:
         try:
             x = float(x)
         except Exception:
@@ -82,16 +95,20 @@ def compute_ki_score_from_prices(prices: pd.DataFrame | None) -> float | None:
 
     return round(ki * 100, 2)
 
-def compute_radar_data(asset: dict, prices: pd.DataFrame | None, typ: str) -> dict:
+
+# -------------------------------------------------------------------
+# Radar-Daten aus Asset + Kursen
+# -------------------------------------------------------------------
+def compute_radar_data(asset: Dict[str, Any],
+                       prices: pd.DataFrame | None,
+                       typ: str) -> Dict[str, Optional[float]]:
     """
     Gibt ein Dict zurück: {achse: wert_0_100, ...}
     """
-    radar = {}
+    radar: Dict[str, Optional[float]] = {}
 
-    # -----------------------------
     # Hilfsfunktion: Normierung 0–100
-    # -----------------------------
-    def scale(x, a, b):
+    def scale(x: Any, a: float, b: float) -> Optional[float]:
         try:
             x = float(x)
         except Exception:
@@ -99,9 +116,7 @@ def compute_radar_data(asset: dict, prices: pd.DataFrame | None, typ: str) -> di
         x = max(min(x, b), a)
         return round((x - a) / (b - a) * 100, 1)
 
-    # -----------------------------
     # Kursbasis
-    # -----------------------------
     close = None
     returns = None
 
@@ -109,43 +124,40 @@ def compute_radar_data(asset: dict, prices: pd.DataFrame | None, typ: str) -> di
         close = prices["Adj Close"] if "Adj Close" in prices.columns else prices["Close"]
         returns = close.pct_change().dropna()
 
-    # -----------------------------
     # Gemeinsame Kennzahlen
-    # -----------------------------
-    momentum = None
-    vol = None
-    dd = None
+    momentum: Optional[float] = None
+    vol: Optional[float] = None
+    dd: Optional[float] = None
 
     # Momentum
     if close is not None and len(close) > 30:
         try:
-            momentum = float((close.iloc[-1] / close.iloc[max(0, len(close) - 126)]) - 1)
+            mom_raw = (close.iloc[-1] / close.iloc[max(0, len(close) - 126)]) - 1
+            momentum = float(mom_raw.item() if hasattr(mom_raw, "item") else mom_raw)
         except Exception:
             momentum = None
 
     # Volatilität (immer Float!)
     if returns is not None and len(returns) > 0:
-        vol = returns.std()
-        if hasattr(vol, "mean"):
-            vol = float(vol.mean())
+        vol_tmp = returns.std()
+        if hasattr(vol_tmp, "mean"):
+            vol = float(vol_tmp.mean())
+        else:
+            vol = float(vol_tmp)
 
     # Drawdown
     if close is not None and len(close) > 0:
         roll_max = close.cummax()
         try:
-            dd = float((close / roll_max - 1).min())
+            dd_raw = (close / roll_max - 1).min()
+            dd = float(dd_raw.item() if hasattr(dd_raw, "item") else dd_raw)
         except Exception:
             dd = None
 
-    # -----------------------------
     # Typ normalisieren
-    # -----------------------------
     typ = (typ or "Unknown").capitalize()
 
-    # -----------------------------
     # Radar je nach Asset-Typ
-    # -----------------------------
-
     if typ == "Stock":
         radar["Momentum"] = scale(momentum, -0.5, 0.5)
         radar["Volatilität (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
@@ -200,11 +212,20 @@ def compute_radar_data(asset: dict, prices: pd.DataFrame | None, typ: str) -> di
         radar["Volatilität (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
 
     return radar
-   
-def render_type_html(typ_text: str, color: str) -> str:
-    return f"""
-    <div style='padding:10px;border-radius:8px;background:{color};
-                color:white;font-weight:bold;font-size:18px;'>
-        {typ_text}
-    </div>
+
+
+# -------------------------------------------------------------------
+# Typ-Rendering für UI
+# -------------------------------------------------------------------
+def render_type_html(label: str, color: str) -> str:
     """
+    Gibt ein HTML-Badge zurück, z. B. für ETF, Aktie, Krypto usw.
+    """
+    label = label or "Unbekannt"
+    color = color or "#6b7280"
+
+    return (
+        f"<span style='display:inline-block;padding:2px 6px;border-radius:4px;"
+        f"background:{color};color:white;font-size:11px;font-weight:600;'>"
+        f"{label}</span>"
+    )
