@@ -2,6 +2,42 @@
 
 import pandas as pd
 
+ASSET_TEMPLATE = {
+    "Ticker": None,
+    "Yahoo": None,
+    "ISIN": None,
+    "Name": None,
+    "Typ": None,
+    "Region": None,
+    "Sektor": None,
+    "Land": None,
+
+    # ETF-spezifisch
+    "TER": None,
+    "Volumen": None,
+    "Replikation": None,
+    "TD": None,
+
+    # Aktien-spezifisch
+    "KGV": None,
+    "KUV": None,
+    "PEG": None,
+    "Debt/Equity": None,
+    "Cashflow": None,
+    "Wachstum": None,
+}
+
+def normalize_asset(asset, typ):
+    normalized = ASSET_TEMPLATE.copy()
+    normalized.update(asset)
+
+    # WICHTIG: Yahoo fallback
+    if not normalized.get("Yahoo"):
+        normalized["Yahoo"] = normalized.get("Ticker")
+
+    normalized["Typ"] = typ
+    return normalized
+
 ETF_DB = [
     # --- Global / World ---
     {
@@ -320,6 +356,10 @@ STOCK_DB = [
         "Wachstum": None
     }
 ]
+
+
+STOCK_DB = [normalize_asset(a, "Stock") for a in STOCK_DB]
+ETF_DB   = [normalize_asset(a, "ETF")   for a in ETF_DB]
 
 def find_asset(identifier):
     """Sucht in ETF_DB und STOCK_DB nach Ticker, ISIN oder Yahoo."""

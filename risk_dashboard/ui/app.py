@@ -715,8 +715,9 @@ def app():
             gr.Markdown("""
             ### 🤖 KI‑Score (0–100) – Einzel‑Scan
 
-            Der KI‑Score bewertet jedes Asset (Aktie, ETF, Krypto) anhand seiner Kursmuster der letzten Monate.
-            Er kombiniert mehrere Faktoren wie Momentum, Volatilität, Trendstabilität, Drawdown und Sharpe‑Ratio zu einer einzigen Kennzahl.
+            Der KI‑Score bewertet jedes Asset (Aktie, ETF, Krypto) anhand seines Kursverhaltens der letzten Monate.
+            Er kombiniert Momentum, Trendstabilität, Volatilität, Drawdown, Sharpe‑Ratio und weitere technische Faktoren zu einer einzigen Kennzahl zwischen 0 und 100.
+            Ein hoher Score bedeutet ein starkes, stabiles Trendmuster; ein niedriger Score deutet auf Schwäche oder hohe Unsicherheit hin.
 
             **Was bedeutet der KI‑Score?**
 
