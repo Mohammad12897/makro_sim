@@ -382,3 +382,112 @@ def find_asset(identifier):
             return stock
 
     return None
+
+def detect_asset_type(identifier):
+    identifier = identifier.upper().strip()
+
+    # 1. ETFs
+    for etf in ETF_DB:
+        if identifier in [etf.get("Ticker", "").upper(),
+                          etf.get("Yahoo", "").upper(),
+                          etf.get("ISIN", "").upper()]:
+            return "ETF"
+
+    # 2. Stocks
+    for stock in STOCK_DB:
+        if identifier in [stock.get("Ticker", "").upper(),
+                          stock.get("Yahoo", "").upper(),
+                          stock.get("ISIN", "").upper()]:
+            return "Stock"
+
+    return None
+
+CRYPTO_SYMBOLS = ["BTC", "ETH", "SOL", "ADA", "XRP"]
+
+def detect_crypto(identifier):
+    if identifier.upper() in CRYPTO_SYMBOLS:
+        return "Crypto"
+    return None
+
+INDEX_SYMBOLS = ["^GSPC", "^NDX", "^DJI", "^STOXX50E"]
+
+def detect_index(identifier):
+    if identifier.upper() in INDEX_SYMBOLS:
+        return "Index"
+    return None
+
+COMMODITY_SYMBOLS = ["GC=F", "CL=F", "SI=F"]
+
+def detect_commodity(identifier):
+    if identifier.upper() in COMMODITY_SYMBOLS:
+        return "Commodity"
+    return None
+
+
+TYPE_ICONS = {
+    "Stock": "📈 Aktie",
+    "ETF": "🌍 ETF",
+    "Crypto": "🪙 Krypto",
+    "Index": "📊 Index",
+    "Commodity": "⛏️ Rohstoff",
+    "Unknown": "❓ Unbekannt"
+}
+
+TYPE_COLORS = {
+    "Stock": "#4CAF50",      # Grün
+    "ETF": "#2196F3",        # Blau
+    "Crypto": "#FFC107",     # Gelb
+    "Index": "#9C27B0",      # Lila
+    "Commodity": "#FF5722",  # Orange
+    "Unknown": "#9E9E9E"     # Grau
+}
+
+CRYPTO = {"BTC", "ETH", "SOL", "ADA", "XRP"}
+INDICES = {"^GSPC", "^NDX", "^DJI", "^STOXX50E"}
+COMMODITIES = {"GC=F", "CL=F", "SI=F"}
+
+def detect_type(identifier):
+    identifier = identifier.upper().strip()
+
+    # 1. In ETF_DB?
+    for etf in ETF_DB:
+        if identifier in {etf.get("Ticker", "").upper(),
+                          etf.get("Yahoo", "").upper(),
+                          etf.get("ISIN", "").upper()}:
+            return "ETF"
+
+    # 2. In STOCK_DB?
+    for stock in STOCK_DB:
+        if identifier in {stock.get("Ticker", "").upper(),
+                          stock.get("Yahoo", "").upper(),
+                          stock.get("ISIN", "").upper()}:
+            return "Stock"
+
+    # 3. Crypto?
+    if identifier in CRYPTO:
+        return "Crypto"
+
+    # 4. Index?
+    if identifier in INDICES:
+        return "Index"
+
+    # 5. Commodity?
+    if identifier in COMMODITIES:
+        return "Commodity"
+
+    return "Unknown"
+
+
+def process_asset_input(ticker):
+    if not ticker:
+        return "❓ Unbekannt", TYPE_COLORS["Unknown"], {"Fehler": "Keine Eingabe"}
+
+    ticker = ticker.strip().upper()
+    asset = find_asset(ticker)
+    typ = detect_type(ticker)
+
+    # Wenn Asset nicht in DB ist → trotzdem Typ anzeigen
+    if not asset:
+        return TYPE_ICONS[typ], TYPE_COLORS[typ], {"Hinweis": "Asset nicht in Datenbank"}
+
+    return TYPE_ICONS[typ], TYPE_COLORS[typ], asset
