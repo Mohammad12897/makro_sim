@@ -1,4 +1,5 @@
 # core/data/db_assets.py
+from core.engine.assets import render_type_html,fetch_prices,compute_ki_score_from_prices,compute_radar_data
 
 import pandas as pd
 
@@ -446,17 +447,18 @@ CRYPTO = {"BTC", "ETH", "SOL", "ADA", "XRP"}
 INDICES = {"^GSPC", "^NDX", "^DJI", "^STOXX50E"}
 COMMODITIES = {"GC=F", "CL=F", "SI=F"}
 
+
 def detect_type(identifier):
     identifier = identifier.upper().strip()
 
-    # 1. In ETF_DB?
+    # 1. ETF?
     for etf in ETF_DB:
         if identifier in {etf.get("Ticker", "").upper(),
                           etf.get("Yahoo", "").upper(),
                           etf.get("ISIN", "").upper()}:
             return "ETF"
 
-    # 2. In STOCK_DB?
+    # 2. Stock?
     for stock in STOCK_DB:
         if identifier in {stock.get("Ticker", "").upper(),
                           stock.get("Yahoo", "").upper(),
@@ -476,18 +478,57 @@ def detect_type(identifier):
         return "Commodity"
 
     return "Unknown"
+ 
+
+def get_asset_full_profile(identifier: str) -> dict:
+    identifier = (identifier or "").upper().strip()
+    if not identifier:
+        return {
+            "Identifier": "",
+            "Typ": "Unknown",
+            "Asset": {},
+            "Yahoo": None,
+            "Kurse": None,
+            "KI-Score": None,
+            "Radar": {},
+        }
+
+    typ = detect_type(identifier)
+    asset = find_asset(identifier) or {}
+
+    yahoo = asset.get("Yahoo") or asset.get("Ticker") or identifier
+
+    prices = fetch_prices(yahoo)
+    ki_score = compute_ki_score_from_prices(prices)
+    radar = compute_radar_data(asset, prices, typ)
+
+    return {
+        "Identifier": identifier,
+        "Typ": typ,
+        "Asset": asset,
+        "Yahoo": yahoo,
+        "Kurse": prices,
+        "KI-Score": ki_score,
+        "Radar": radar,
+    }
+
+def process_asset_input(ticker: str):
+    profile = get_asset_full_profile(ticker)
+
+    typ_key = profile["Typ"].capitalize()
+    if typ_key not in TYPE_ICONS:
+        typ_key = "Unknown"
+
+    typ_text = TYPE_ICONS[typ_key]
+    color = TYPE_COLORS[typ_key]
+    asset = profile["Asset"]
+    ki_score = profile["KI-Score"]
+    radar = profile["Radar"]
+
+    return typ_text, color, asset, ki_score, radar
 
 
-def process_asset_input(ticker):
-    if not ticker:
-        return "❓ Unbekannt", TYPE_COLORS["Unknown"], {"Fehler": "Keine Eingabe"}
-
-    ticker = ticker.strip().upper()
-    asset = find_asset(ticker)
-    typ = detect_type(ticker)
-
-    # Wenn Asset nicht in DB ist → trotzdem Typ anzeigen
-    if not asset:
-        return TYPE_ICONS[typ], TYPE_COLORS[typ], {"Hinweis": "Asset nicht in Datenbank"}
-
-    return TYPE_ICONS[typ], TYPE_COLORS[typ], asset
+def ui_wrapper(ticker: str):
+    typ_text, color, asset, ki_score, radar = process_asset_input(ticker)
+    html = render_type_html(typ_text, color)
+    return html, asset, ki_score, radar

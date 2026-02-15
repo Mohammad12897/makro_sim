@@ -105,7 +105,7 @@ from ui.logic_crypto import ui_crypto_analysis
 from ui.logic_risk import ui_risk_dashboard
 from ui.logic_portfolio import ui_portfolio_optimizer, ui_portfolio_studio
 from ui.logic_scenario import ui_scenario_comparison
-from core.data.db_assets import ETF_DB, STOCK_DB, find_asset, process_asset_input
+from core.data.db_assets import ETF_DB, STOCK_DB, find_asset, ui_wrapper
 import pandas as pd
 
 
@@ -603,31 +603,16 @@ def app():
     countries = list(presets_all.keys())  # <-- dynamisch aus JSON
 
     with gr.Blocks(title="MakroSim Dashboard") as demo:
-        gr.Markdown("## 🔍 Asset‑Analyse")
-
         ticker_input = gr.Textbox(label="Asset eingeben (z.B. AAPL, SPY, EIMI, BTC)")
-
-        asset_type_output = gr.HTML(label="Asset‑Typ")
-        asset_type_color = gr.Textbox(visible=False)  # interne Farbe
-        asset_info_output = gr.JSON(label="Asset‑Daten")
-
-        def render_type_html(typ_text, color):
-            return f"""
-            <div style='padding:10px;border-radius:8px;background:{color};
-                        color:white;font-weight:bold;font-size:18px;'>
-                {typ_text}
-            </div>
-            """
-
-        def ui_wrapper(ticker):
-            typ_text, color, asset = process_asset_input(ticker)
-            html = render_type_html(typ_text, color)
-            return html, color, asset
+        asset_type_output = gr.HTML(label="Asset-Typ")
+        asset_info_output = gr.JSON(label="Asset-Daten")
+        ki_output = gr.Number(label="KI-Score", precision=2)
+        radar_output = gr.JSON(label="Radar-Daten")  # später durch Plot ersetzen
 
         ticker_input.change(
             fn=ui_wrapper,
             inputs=ticker_input,
-            outputs=[asset_type_output, asset_type_color, asset_info_output]
+            outputs=[asset_type_output, asset_info_output, ki_output, radar_output],
         )
 
         with gr.Tab("Home / Was bedeuten die Radare?"):
