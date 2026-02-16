@@ -1,7 +1,16 @@
 # core/data/db_assets.py
-from core.engine.assets import render_type_html,fetch_prices,compute_ki_score_from_prices,compute_radar_data
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
+
+from core.engine.assets import (
+    fetch_prices,
+    compute_ki_score_from_prices,
+    compute_radar_data,
+    render_type_html,
+)
 
 ASSET_TEMPLATE = {
     "Ticker": None,
@@ -39,7 +48,7 @@ def normalize_asset(asset, typ):
     normalized["Typ"] = typ
     return normalized
 
-ETF_DB = [
+ETF_DB: List[Dict[str, Any]] = [
     # --- Global / World ---
     {
         "Ticker": "IWDA",
@@ -48,6 +57,7 @@ ETF_DB = [
         "Name": "iShares Core MSCI World",
         "Region": "Global",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.20,
         "Volumen": 55000,
         "Replikation": "Physisch",
@@ -60,6 +70,7 @@ ETF_DB = [
         "Name": "Vanguard FTSE All-World UCITS ETF",
         "Region": "Global",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.22,
         "Volumen": 120000,
         "Replikation": "Physisch",
@@ -72,6 +83,7 @@ ETF_DB = [
         "Name": "iShares MSCI ACWI UCITS ETF",
         "Region": "Global",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.20,
         "Volumen": 18000,
         "Replikation": "Physisch",
@@ -86,6 +98,7 @@ ETF_DB = [
         "Name": "iShares Core S&P 500 UCITS ETF",
         "Region": "USA",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.07,
         "Volumen": 35000,
         "Replikation": "Physisch",
@@ -98,6 +111,7 @@ ETF_DB = [
         "Name": "Vanguard S&P 500 UCITS ETF",
         "Region": "USA",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.07,
         "Volumen": 45000,
         "Replikation": "Physisch",
@@ -112,6 +126,7 @@ ETF_DB = [
         "Name": "iShares MSCI Europe UCITS ETF",
         "Region": "Europa",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.12,
         "Volumen": 12000,
         "Replikation": "Physisch",
@@ -124,6 +139,7 @@ ETF_DB = [
         "Name": "Vanguard FTSE Developed Europe UCITS ETF",
         "Region": "Europa",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.10,
         "Volumen": 9000,
         "Replikation": "Physisch",
@@ -138,6 +154,7 @@ ETF_DB = [
         "Name": "iShares Core MSCI EM IMI",
         "Region": "Emerging Markets",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.18,
         "Volumen": 9000,
         "Replikation": "Physisch",
@@ -150,6 +167,7 @@ ETF_DB = [
         "Name": "Vanguard FTSE Emerging Markets UCITS ETF",
         "Region": "Emerging Markets",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.22,
         "Volumen": 15000,
         "Replikation": "Physisch",
@@ -164,6 +182,7 @@ ETF_DB = [
         "Name": "iShares Asia Pacific Dividend UCITS ETF",
         "Region": "Asien-Pazifik",
         "Kategorie": "Aktien",
+        "Typ": "ETF",
         "TER": 0.59,
         "Volumen": 3000,
         "Replikation": "Physisch",
@@ -178,6 +197,7 @@ ETF_DB = [
         "Name": "iShares STOXX Europe 600 Technology",
         "Region": "Europa",
         "Kategorie": "Tech",
+        "Typ": "ETF",
         "TER": 0.46,
         "Volumen": 2500,
         "Replikation": "Physisch",
@@ -190,6 +210,7 @@ ETF_DB = [
         "Name": "Technology Select Sector SPDR",
         "Region": "USA",
         "Kategorie": "Tech",
+        "Typ": "ETF",
         "TER": 0.10,
         "Volumen": 50000,
         "Replikation": "Physisch",
@@ -204,6 +225,7 @@ ETF_DB = [
         "Name": "iShares Core Global Aggregate Bond",
         "Region": "Global",
         "Kategorie": "Anleihen",
+        "Typ": "ETF",
         "TER": 0.10,
         "Volumen": 8000,
         "Replikation": "Physisch",
@@ -216,6 +238,7 @@ ETF_DB = [
         "Name": "Vanguard Global Aggregate Bond UCITS ETF",
         "Region": "Global",
         "Kategorie": "Anleihen",
+        "Typ": "ETF",
         "TER": 0.10,
         "Volumen": 6000,
         "Replikation": "Physisch",
@@ -230,6 +253,7 @@ ETF_DB = [
         "Name": "iShares Core High Dividend ETF",
         "Region": "USA",
         "Kategorie": "Dividende",
+        "Typ": "ETF",
         "TER": 0.08,
         "Volumen": 9000,
         "Replikation": "Physisch",
@@ -242,6 +266,7 @@ ETF_DB = [
         "Name": "Vanguard Dividend Appreciation ETF",
         "Region": "USA",
         "Kategorie": "Dividende",
+        "Typ": "ETF",
         "TER": 0.06,
         "Volumen": 70000,
         "Replikation": "Physisch",
@@ -256,6 +281,7 @@ ETF_DB = [
         "Name": "iShares U.S. Real Estate ETF",
         "Region": "USA",
         "Kategorie": "Immobilien",
+        "Typ": "ETF",
         "TER": 0.40,
         "Volumen": 5000,
         "Replikation": "Physisch",
@@ -268,6 +294,7 @@ ETF_DB = [
         "Name": "Vanguard Real Estate ETF",
         "Region": "USA",
         "Kategorie": "Immobilien",
+        "Typ": "ETF",
         "TER": 0.12,
         "Volumen": 35000,
         "Replikation": "Physisch",
@@ -277,9 +304,10 @@ ETF_DB = [
 
 
 
-STOCK_DB = [
+STOCK_DB: List[Dict[str, Any]] = [
     {
         "Ticker": "AAPL",
+        "Yahoo": "AAPL",
         "ISIN": "US0378331005",
         "Name": "Apple",
         "Sektor": "Tech",
@@ -293,6 +321,7 @@ STOCK_DB = [
     },
     {
         "Ticker": "MSFT",
+        "Yahoo": "MSFT",
         "ISIN": "US5949181045",
         "Name": "Microsoft",
         "Sektor": "Tech",
@@ -306,6 +335,7 @@ STOCK_DB = [
     },
     {
         "Ticker": "SAP",
+        "Yahoo": "SAP",
         "ISIN": "DE0007164600",
         "Name": "SAP",
         "Sektor": "Tech",
@@ -319,6 +349,7 @@ STOCK_DB = [
     },
     {
         "Ticker": "BAS",
+        "Yahoo": "BAS",
         "ISIN": "DE000BASF111",
         "Name": "BASF",
         "Sektor": "Industrie",
@@ -332,6 +363,7 @@ STOCK_DB = [
     },
     {
         "Ticker": "JNJ",
+        "Yahoo": "JNJ",
         "ISIN": "US4781601046",
         "Name": "Johnson & Johnson",
         "Sektor": "Gesundheit",
@@ -345,6 +377,7 @@ STOCK_DB = [
     },
     {
         "Ticker": "SPY",
+        "Yahoo": "SPY",
         "ISIN": "US78462F1030",
         "Name": "SPDR S&P 500 ETF Trust",
         "Sektor": "Index",
@@ -362,27 +395,6 @@ STOCK_DB = [
 STOCK_DB = [normalize_asset(a, "Stock") for a in STOCK_DB]
 ETF_DB   = [normalize_asset(a, "ETF")   for a in ETF_DB]
 
-def find_asset(identifier):
-    """Sucht in ETF_DB und STOCK_DB nach Ticker, ISIN oder Yahoo."""
-    identifier = identifier.upper().strip()
-
-    # 1. ETFs durchsuchen
-    for etf in ETF_DB:
-        if etf.get("Ticker", "").upper() == identifier:
-            return etf
-        if etf.get("ISIN", "").upper() == identifier:
-            return etf
-        if etf.get("Yahoo", "").upper() == identifier:
-            return etf
-
-    # 2. Aktien durchsuchen
-    for stock in STOCK_DB:
-        if stock.get("Ticker", "").upper() == identifier:
-            return stock
-        if stock.get("ISIN", "").upper() == identifier:
-            return stock
-
-    return None
 
 def detect_asset_type(identifier):
     identifier = identifier.upper().strip()
@@ -448,87 +460,123 @@ INDICES = {"^GSPC", "^NDX", "^DJI", "^STOXX50E"}
 COMMODITIES = {"GC=F", "CL=F", "SI=F"}
 
 
-def detect_type(identifier):
-    identifier = identifier.upper().strip()
+def _find_in_db(ticker: str, db: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    t = ticker.strip().upper()
+    for row in db:
+        if row.get("Ticker", "").upper() == t:
+            return row
+    return None
 
-    # 1. ETF?
-    for etf in ETF_DB:
-        if identifier in {etf.get("Ticker", "").upper(),
-                          etf.get("Yahoo", "").upper(),
-                          etf.get("ISIN", "").upper()}:
-            return "ETF"
 
-    # 2. Stock?
-    for stock in STOCK_DB:
-        if identifier in {stock.get("Ticker", "").upper(),
-                          stock.get("Yahoo", "").upper(),
-                          stock.get("ISIN", "").upper()}:
-            return "Stock"
-
-    # 3. Crypto?
-    if identifier in CRYPTO:
-        return "Crypto"
-
-    # 4. Index?
-    if identifier in INDICES:
-        return "Index"
-
-    # 5. Commodity?
-    if identifier in COMMODITIES:
-        return "Commodity"
-
+def detect_type(asset: Dict[str, Any]) -> str:
+    t = (asset.get("Typ") or "").strip().lower()
+    if t in {"etf", "stock", "crypto", "index"}:
+        return t.capitalize()
+    # Fallback: aus Kategorie ableiten
+    kat = (asset.get("Kategorie") or "").strip().lower()
+    if kat == "aktien":
+        return "Stock"
     return "Unknown"
- 
 
-def get_asset_full_profile(identifier: str) -> dict:
-    identifier = (identifier or "").upper().strip()
-    if not identifier:
-        return {
-            "Identifier": "",
-            "Typ": "Unknown",
-            "Asset": {},
-            "Yahoo": None,
-            "Kurse": None,
-            "KI-Score": None,
-            "Radar": {},
-        }
+def type_color(typ: str) -> Tuple[str, str]:
+    t = (typ or "Unknown").strip().lower()
+    mapping = {
+        "etf": ("ETF", "#2563eb"),
+        "stock": ("Aktie", "#16a34a"),
+        "crypto": ("Krypto", "#f97316"),
+        "index": ("Index", "#7c3aed"),
+    }
+    return mapping.get(t, ("Unbekannt", "#6b7280"))
 
-    typ = detect_type(identifier)
-    asset = find_asset(identifier) or {}
+def find_asset(ticker: str):
+    """
+    Sucht ein Asset in ETF_DB / STOCK_DB.
+    Gibt (asset_dict, typ_string) zurück.
+    """
+    asset = _find_in_db(ticker, ETF_DB)
+    if asset is not None:
+        return asset, "ETF"
 
-    yahoo = asset.get("Yahoo") or asset.get("Ticker") or identifier
+    asset = _find_in_db(ticker, STOCK_DB)
+    if asset is not None:
+        return asset, "Stock"
+
+    # Fallback: Minimal-Asset
+    return {"Ticker": ticker, "Name": ticker, "Typ": "Unknown"}, "Unknown"
+
+
+def get_ki_score(ticker: str):
+    """
+    Wrapper für Screener: lädt Kurse und berechnet KI-Score.
+    """
+    prices = fetch_prices(ticker)
+    if prices is None:
+        return None
+    return compute_ki_score_from_prices(prices)
+
+def get_asset_full_profile(ticker: str) -> Dict[str, Any]:
+    """
+    Liefert ein vollständiges Profil:
+    - Stammdaten (aus DB)
+    - Preise
+    - KI-Score
+    - Radar-Daten
+    """
+    asset, typ = find_asset(ticker)
+    yahoo = asset.get("Yahoo", asset.get("Ticker", ticker))
 
     prices = fetch_prices(yahoo)
-    ki_score = compute_ki_score_from_prices(prices)
+    ki_score = compute_ki_score_from_prices(prices) if prices is not None else None
     radar = compute_radar_data(asset, prices, typ)
 
-    return {
-        "Identifier": identifier,
-        "Typ": typ,
-        "Asset": asset,
-        "Yahoo": yahoo,
-        "Kurse": prices,
-        "KI-Score": ki_score,
-        "Radar": radar,
+    profile: Dict[str, Any] = {
+        "asset": asset,
+        "typ": typ,
+        "yahoo": yahoo,
+        "prices": prices,
+        "ki_score": ki_score,
+        "radar": radar,
     }
+    return profile
 
-def process_asset_input(ticker: str):
+
+def process_asset_input(ticker: str) -> Tuple[str, str, Dict[str, Any], Optional[float], Dict[str, Optional[float]]]:
+    """
+    Nimmt einen Ticker entgegen und gibt zurück:
+    - typ_text (z. B. 'ETF')
+    - color (Hex)
+    - asset (dict)
+    - ki_score (float | None)
+    - radar (dict)
+    """
     profile = get_asset_full_profile(ticker)
+    asset = profile["asset"]
+    typ = detect_type(asset)
+    typ_text, color = type_color(typ)
 
-    typ_key = profile["Typ"].capitalize()
-    if typ_key not in TYPE_ICONS:
-        typ_key = "Unknown"
+    return typ_text, color, asset, profile["ki_score"], profile["radar"]
 
-    typ_text = TYPE_ICONS[typ_key]
-    color = TYPE_COLORS[typ_key]
-    asset = profile["Asset"]
-    ki_score = profile["KI-Score"]
-    radar = profile["Radar"]
-
-    return typ_text, color, asset, ki_score, radar
 
 
 def ui_wrapper(ticker: str):
+    """
+    Wrapper für Gradio:
+    Gibt zurück:
+    - HTML-Badge
+    - Asset-Daten (dict)
+    - KI-Score
+    - Radar-Daten
+    """
+    ticker = (ticker or "").strip()
+    if not ticker:
+        return (
+            "<span style='color:#6b7280;'>Bitte einen Ticker eingeben.</span>",
+            {},
+            None,
+            {}
+        )
+
     typ_text, color, asset, ki_score, radar = process_asset_input(ticker)
     html = render_type_html(typ_text, color)
+
     return html, asset, ki_score, radar

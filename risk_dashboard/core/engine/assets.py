@@ -24,7 +24,15 @@ def fetch_prices(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
     start = end - timedelta(days=days)
 
     try:
-        data = yf.download(ticker, start=start, end=end, progress=False)
+        data = yf.download(
+            ticker,
+            start=start,
+            end=end,
+            progress=False,
+            auto_adjust=True,
+            threads=False
+        )
+
         if data is None or data.empty:
             return None
         return data

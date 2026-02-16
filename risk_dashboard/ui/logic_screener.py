@@ -24,7 +24,6 @@ def ui_etf_screener(region, category):
     return df[[
         "ISIN",
         "Name",
-        "Beschreibung",
         "Region",
         "Kategorie",
         "TER",

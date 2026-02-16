@@ -1,68 +1,47 @@
 #ui/logic_ki.py
-import numpy as np
-import matplotlib.pyplot as plt
-from core.data.db_assets import ETF_DB, STOCK_DB, find_asset
+from __future__ import annotations
+
 import pandas as pd
 
-def get_ki_score_for_stock(ticker):
-    """
-    KI‑Score für Aktien basierend auf:
-    - Bewertung (KGV, KUV, PEG)
-    - Verschuldung (Debt/Equity)
-    - Cashflow
-    - Wachstum
-    """
+from core.engine.assets import (
+    fetch_prices,
+    compute_ki_score_from_prices,
+)
+from core.data.db_assets import ETF_DB, STOCK_DB, find_asset
 
-    stock = next((s for s in STOCK_DB if s["Ticker"] == ticker), None)
-    if stock is None:
+def get_ki_score(ticker: str):
+    """
+    Einheitlicher KI‑Score für alle Assets (ETF, Aktien, Krypto, Index).
+    Berechnet auf Basis von Kursdaten:
+    - Momentum (6 Monate)
+    - Volatilität
+    - Max Drawdown
+    - Sharpe‑Proxy
+    """
+    if not ticker:
         return None
 
-    # Bewertung: niedriger = besser
-    val_score = (
-        max(0, 1 - stock["KGV"] / 40) * 20 +
-        max(0, 1 - stock["KUV"] / 10) * 20 +
-        max(0, 1 - stock["PEG"] / 3) * 20
-    )
+    # Asset in DB suchen (liefert auch Yahoo‑Symbol)
+    #asset, _ = find_asset(ticker)
+    #yahoo = asset.get("Yahoo", ticker)
 
-    # Verschuldung: niedriger = besser
-    debt_score = max(0, 1 - stock["Debt/Equity"]) * 20
-
-    # Cashflow: höher = besser
-    cashflow_score = min(stock["Cashflow"] / 50e9, 1) * 20
-
-    # Wachstum: höher = besser
-    growth_score = min(stock["Wachstum"] / 0.15, 1) * 20
-
-    score = val_score + debt_score + cashflow_score + growth_score
-    return round(score, 3)
-
-def get_ki_score_for_etf(ticker):
-    """
-    KI‑Score für ETFs basierend auf:
-    - Fondsgröße (Volumen)
-    - Tracking‑Differenz (TD)
-    - TER
-    """
-
-    # ETF in Datenbank suchen
-    etf = next((e for e in ETF_DB if e.get("Ticker") == ticker or e.get("ISIN") == ticker),None)
-    if etf is None:
+    # Kursdaten laden
+    prices = fetch_prices(ticker)
+    if prices is None:
         return None
 
-    # Normalisierung
-    vol_score = min(etf["Volumen"] / 20000, 1) * 40      # große Fonds = stabil
-    td_score = max(0, 1 - abs(etf["TD"])) * 30           # geringe TD = gut
-    ter_score = max(0, 1 - etf["TER"]) * 30              # niedrige TER = gut
+    # KI‑Score berechnen
+    return compute_ki_score_from_prices(prices)
 
-    score = vol_score + td_score + ter_score
-    return round(score, 3)
+def build_ki_table(assets: list[dict]) -> pd.DataFrame:
+    """
+    Baut eine Tabelle mit KI‑Scores für Screener.
+    """
+    df = pd.DataFrame(assets)
 
-def get_ki_score(ticker):
-    if ticker in STOCK_DB:
-        return get_ki_score_for_stock(ticker)
+    if df.empty:
+        return pd.DataFrame([["Keine Ergebnisse"]], columns=["Info"])
 
-    etf_score = get_ki_score_for_etf(ticker)
-    if etf_score is not None:
-        return etf_score
+    df["KI‑Score"] = df["Ticker"].apply(get_ki_score)
 
-    return None
+    return df.sort_values("KI‑Score", ascending=False)

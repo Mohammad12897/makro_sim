@@ -175,18 +175,18 @@ def parse_weights(text, n):
         return [1 / n] * n
     return [v / s for v in vals]
 
+def ui_convert_isin(ticker: str):
+    ticker = (ticker or "").strip()
+    if not ticker:
+        return pd.DataFrame([["Bitte Ticker eingeben."]], columns=["Info"])
 
-def ui_convert_isin(text: str):
-    tickers = [t.strip() for t in text.split(",") if t.strip()]
-    pairs = []
+    asset, typ = find_asset(ticker)
 
-    for t in tickers:
-        asset = find_asset(t)
-        isin = asset.get("ISIN") if asset else None
-        pairs.append([t, isin])
+    isin = asset.get("ISIN")
+    if not isin:
+        return pd.DataFrame([[f"Keine ISIN für {ticker} gefunden."]], columns=["Info"])
 
-    df = pd.DataFrame(pairs, columns=["Ticker", "ISIN"])
-    return df
+    return pd.DataFrame([[isin]], columns=["ISIN"])
 
 def ui_ki_scan(text):
     tickers = [t.strip() for t in text.split(",") if t.strip()]
@@ -196,7 +196,7 @@ def ui_ki_scan(text):
     for t in tickers:
 
         # 🔥 1. Asset lookup (Ticker → ETF oder Aktie)
-        asset = find_asset(t)
+        asset, typ = find_asset(t)
 
         if not asset:
             results.append([t, None])
