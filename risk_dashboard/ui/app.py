@@ -598,7 +598,288 @@ def build_settings_tab():
         outputs=[]
     )
 
+def build_eft_lexikon():
+    gr.Markdown("""
+    # 📘 ETF‑Lexikon
 
+    ## TER (Total Expense Ratio)
+    Gesamtkostenquote eines ETFs pro Jahr.
+
+    ## Replikation
+    Wie der ETF den Index nachbildet:
+    - physisch
+    - optimiert
+    - synthetisch
+
+    ## Tracking‑Differenz
+    Abweichung zwischen ETF‑Performance und Index‑Performance.
+
+    ## Fondsvolumen
+    Größe des ETF – wichtig für Liquidität und Stabilität.
+
+    ## Diversifikation
+    Verteilung des Risikos über viele Positionen.
+
+    ## Volatilität
+    Schwankungsintensität eines ETFs.
+
+    ## Sharpe‑Ratio
+    Rendite im Verhältnis zum Risiko.
+
+    ## ISIN
+    Internationale Wertpapierkennnummer.
+    """)
+
+def build_eft_goal_setting():
+    gr.Markdown("""
+    # 🎯 Ziel‑Setzung für ETF‑Auswahl
+
+    ## 1. Anlagehorizont
+    - Kurzfristig (0–2 Jahre)
+    - Mittelfristig (2–7 Jahre)
+    - Langfristig (7+ Jahre)
+
+    ## 2. Risikoprofil
+    - Defensiv
+    - Ausgewogen
+    - Wachstum
+    - Spekulativ
+
+    ## 3. Ziele
+    - Vermögensaufbau
+    - Kapitalerhalt
+    - Altersvorsorge
+    - Zusatzeinkommen
+
+    ## 4. ETF‑Empfehlungslogik
+    - Defensiv → Anleihen‑ETFs, Minimum‑Volatility‑ETFs
+    - Ausgewogen → Welt‑ETFs, Qualitätsaktien‑ETFs
+    - Wachstum → Tech‑ETFs, Emerging Markets
+    - Spekulativ → Themen‑ETFs, Small Caps
+
+    ## 5. Verbindung zum Dashboard
+    - ETF‑Screener zeigt passende ETFs
+    - Portfolio‑Optimierer nutzt dein Zielprofil
+    - Risiko‑Dashboard zeigt Risiken passend zu deinem Profil
+    """) 
+
+def build_stock_lexikon():
+    gr.Markdown("""
+    # 📘 Aktien‑Lexikon
+
+    ## KGV (Kurs‑Gewinn‑Verhältnis)
+    Wie viele Jahre der Gewinn benötigt, um den Aktienpreis zu decken.
+    Niedrig = günstig, Hoch = teuer.
+
+    ## KUV (Kurs‑Umsatz‑Verhältnis)
+    Verhältnis von Umsatz zu Marktkapitalisierung.
+    Gut für Wachstumsunternehmen.
+
+    ## PEG‑Ratio
+    KGV im Verhältnis zum Gewinnwachstum.
+    < 1 gilt oft als attraktiv.
+
+    ## Verschuldung (Debt/Equity)
+    Verhältnis von Schulden zu Eigenkapital.
+    Niedrig = stabiler.
+
+    ## Cashflow
+    Wie viel Geld das Unternehmen tatsächlich erwirtschaftet.
+    Wichtiger als Gewinn.
+
+    ## Wachstum
+    Umsatz‑ und Gewinnwachstum über mehrere Jahre.
+
+    ## Dividendenrendite
+    Verhältnis von Dividende zu Aktienkurs.
+
+    ## Beta
+    Maß für die Schwankung im Vergleich zum Gesamtmarkt.
+    > 1 = volatil, < 1 = defensiv.
+    """)
+
+def build_stock_goal_setting():
+    gr.Markdown("""
+    # 🎯 Ziel‑Setzung für Aktien‑Auswahl
+
+    ## 1. Anlagestrategien
+
+    ### 🔹 Value
+    - günstige Bewertung (niedriges KGV/KUV)
+    - stabile Cashflows
+    - solide Dividenden
+
+    ### 🔹 Growth
+    - hohes Umsatz‑ und Gewinnwachstum
+    - hohe KUV/KGV normal
+    - Fokus auf Zukunftsmärkte
+
+    ### 🔹 Quality
+    - starke Bilanz
+    - hohe Profitabilität
+    - stabile Margen
+
+    ### 🔹 Dividende
+    - hohe Dividendenrendite
+    - stabile Ausschüttungen
+    - defensive Branchen
+
+    ## 2. Risikoprofil
+
+    - Defensiv → Quality, Dividende
+    - Ausgewogen → Mix aus Value & Quality
+    - Wachstum → Growth‑Aktien
+    - Spekulativ → Small Caps, Tech, Emerging Markets
+
+    ## 3. Verbindung zum Dashboard
+
+    - Aktien‑Screener zeigt passende Kennzahlen
+    - Risiko‑Dashboard zeigt Volatilität & Drawdown
+    - Portfolio‑Optimierer nutzt dein Zielprofil
+    """)
+
+def build_risk_lexikon():
+    gr.Markdown("""
+    # 📘 Risiko‑Lexikon
+
+    Dieses Lexikon erklärt alle wichtigen Risikobegriffe, die im Dashboard verwendet werden.
+
+    ## 📉 Volatilität
+    Maß für die Schwankungsintensität eines Assets.  
+    Hohe Volatilität = starke Ausschläge, niedrige Volatilität = stabile Kurse.
+
+    ## 📉 Standardabweichung
+    Mathematische Grundlage der Volatilität.  
+    Misst, wie stark tägliche Renditen vom Durchschnitt abweichen.
+
+    ## 📉 Drawdown
+    Verlust vom letzten Hochpunkt bis zum Tiefpunkt.  
+    Beispiel: 100 → 70 = −30 % Drawdown.
+
+    ## 📉 Maximum Drawdown (MDD)
+    Größter historischer Drawdown über den gesamten Zeitraum.  
+    Zeigt, wie schlimm ein Crash für ein Asset war.
+
+    ## 📊 Beta
+    Wie stark ein Asset im Vergleich zum Gesamtmarkt schwankt.  
+    - > 1 = stärker als der Markt  
+    - < 1 = defensiver  
+    - = 1 = bewegt sich wie der Markt
+
+    ## 🔗 Korrelation
+    Wie stark zwei Assets gemeinsam steigen oder fallen.  
+    - +1 = identisch  
+    - 0 = unabhängig  
+    - −1 = gegensätzlich  
+
+    ## 📉 Value‑at‑Risk (VaR)
+    Maximaler Verlust mit einer bestimmten Wahrscheinlichkeit.  
+    Beispiel: „Mit 95 % Wahrscheinlichkeit verlierst du nicht mehr als 5 % pro Tag.“
+
+    ## 📈 Sharpe‑Ratio
+    Rendite im Verhältnis zum Risiko.  
+    Höher = besser.
+
+    ## 📈 Sortino‑Ratio
+    Wie Sharpe, aber bestraft nur negative Schwankungen.
+
+    ## ⚠️ Tail‑Risk
+    Risiko extremer Verluste („schwarze Schwäne“).  
+    Besonders relevant bei Krypto, Small Caps, Hebelprodukten.
+
+    ## 🧮 Risikobeitrag (Risk Contribution)
+    Wie viel jedes Asset zum Gesamtrisiko des Portfolios beiträgt.
+
+    ## ⚖️ Risikoparität (Risk Parity)
+    Strategie, bei der jedes Asset denselben Risikobeitrag liefert.
+
+    ## 🎯 Volatility Targeting
+    Portfolio passt Positionsgrößen an, um eine feste Ziel‑Volatilität zu halten.
+
+    ## 🧪 Stress‑Test
+    Simulation extremer Marktbedingungen (z. B. 2008, Corona‑Crash).
+    """)
+
+def build_risk_profile():
+    gr.Markdown("""
+    # 🎯 Risikoprofil – Welcher Anlegertyp bist du?
+
+    Das Risikoprofil hilft dir, dein Portfolio und deine ETF‑/Aktienauswahl
+    an deine persönliche Risikobereitschaft anzupassen.
+
+    ---
+
+    ## 🟩 1. Defensiv (Sicherheitsorientiert)
+
+    **Ziel:** Kapitalerhalt, geringe Schwankungen  
+    **Typische Assets:**  
+    - Staatsanleihen  
+    - Geldmarkt  
+    - Gold  
+    - Minimum‑Volatility‑ETFs  
+    - Dividendenaktien  
+
+    **Risiko:** niedrig  
+    **Erwartete Rendite:** niedrig bis moderat  
+    **Drawdowns:** gering  
+
+    ---
+
+    ## 🟦 2. Ausgewogen (Balanced)
+
+    **Ziel:** Mischung aus Wachstum und Stabilität  
+    **Typische Assets:**  
+    - Welt‑ETFs (MSCI World, ACWI)  
+    - Qualitätsaktien  
+    - Unternehmensanleihen  
+    - Rohstoffe  
+
+    **Risiko:** moderat  
+    **Erwartete Rendite:** moderat  
+    **Drawdowns:** mittel  
+
+    ---
+
+    ## 🟧 3. Wachstum (Growth)
+
+    **Ziel:** langfristiger Vermögensaufbau  
+    **Typische Assets:**  
+    - Tech‑Aktien  
+    - Emerging Markets  
+    - Themen‑ETFs  
+    - Small Caps  
+
+    **Risiko:** hoch  
+    **Erwartete Rendite:** hoch  
+    **Drawdowns:** groß  
+
+    ---
+
+    ## 🟥 4. Spekulativ (Aggressiv)
+
+    **Ziel:** maximale Rendite, akzeptiert hohe Verluste  
+    **Typische Assets:**  
+    - Kryptowährungen  
+    - Hebelprodukte  
+    - Biotech  
+    - Penny Stocks  
+    - Frontier Markets  
+
+    **Risiko:** sehr hoch  
+    **Erwartete Rendite:** sehr hoch  
+    **Drawdowns:** extrem  
+
+    ---
+
+    ## 🔗 Verbindung zum Dashboard
+
+    - **Portfolio‑Optimierer** nutzt dein Risikoprofil für Gewichtungen  
+    - **ETF‑Screener** zeigt passende Kategorien  
+    - **Aktien‑Screener** filtert nach Value/Growth/Quality  
+    - **Risiko‑Dashboard** zeigt Warnungen bei zu hohem Risiko  
+    - **Portfolio‑Studio** bewertet, ob dein Portfolio zu deinem Profil passt  
+    - **Szenario‑Vergleich** zeigt, wie dein Profil in Krisen reagiert  
+    """)
 #--------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
@@ -606,7 +887,6 @@ def build_settings_tab():
 def app():
 
     presets_all = load_presets()
-    #countries = list(presets_all.keys())  # <-- dynamisch aus JSON
 
     with gr.Blocks(title="MakroSim Dashboard") as demo:
         # -------------------------------------------------
@@ -932,10 +1212,28 @@ def app():
             )
 
         with gr.Tab("ETF‑Screener"):
-            build_etf_screener()
+            with gr.Tabs():
+
+                with gr.Tab("Screener"):
+                    build_etf_screener()
+
+                with gr.Tab("Lexikon"):
+                    build_etf_lexikon()
+
+                with gr.Tab("Ziel‑Setzung"):
+                    build_etf_goal_setting()
 
         with gr.Tab("Aktien‑Screener"):
-            build_stock_screener()
+          with gr.Tabs():
+
+              with gr.Tab("Screener"):
+                  build_stock_screener()
+
+              with gr.Tab("Lexikon"):
+                  build_stock_lexikon()
+
+              with gr.Tab("Ziel‑Setzung"):
+                  build_stock_goal_setting()
 
         with gr.Tab("🧾 Anleihen‑Analyse"):
             build_bond_analysis()   # Platzhalter für später
@@ -945,19 +1243,69 @@ def app():
 
         with gr.Tab("⚠️ Risiko‑Dashboard"):
             build_risk_dashboard()   # Korrelation‑Heatmap wird hier integriert
+            with gr.Tabs():
+
+                with gr.Tab("Analyse"):
+                    build_risk_dashboard()
+
+                with gr.Tab("Lexikon"):
+                    build_risk_lexikon()
+
+                with gr.Tab("Risikoprofil"):
+                    build_risk_profile()
+
 
         with gr.Tab("Portfolio‑Optimierer"):
-            build_portfolio_optimizer()
+            with gr.Tabs():
+
+                with gr.Tab("Optimierer"):
+                    build_portfolio_optimizer()
+
+                with gr.Tab("Ziel‑Setzung"):
+                    build_portfolio_goal_setting()
+
+                with gr.Tab("Lexikon"):
+                    build_portfolio_lexikon()
 
         with gr.Tab("📂 Portfolio‑Studio"):
             build_portfolio_studio()
+            with gr.Tabs():
 
+                with gr.Tab("Backtest"):
+                    build_portfolio_studio()
+
+                with gr.Tab("Kennzahlen"):
+                    build_portfolio_stats()
+
+                with gr.Tab("Interpretation"):
+                    build_portfolio_story()
 
         with gr.Tab("## 📈 Szenario‑Vergleich"):
-            build_scenario_comparison()
+          with gr.Tabs():
+
+              with gr.Tab("Simulation"):
+                  build_scenario_comparison()
+
+              with gr.Tab("Radar"):
+                  build_scenario_radar()
+
+              with gr.Tab("Storyline"):
+                  build_scenario_story()
 
         with gr.Tab("## ⚙️ Einstellungen / Daten / ISIN‑DB"):
-            build_settings_tab()   # ISIN‑DB, Cache, Logs, API‑Status           
 
+            with gr.Tabs():
+                with gr.Tab("ISIN‑DB"):
+                    build_settings_tab()
+
+                with gr.Tab("Cache"):
+                    build_cache_tools()
+
+                with gr.Tab("Logs"):
+                    build_log_viewer()
+
+                with gr.Tab("System"):
+                    build_system_info()
+        
 
     return demo

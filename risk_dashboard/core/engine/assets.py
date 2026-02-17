@@ -221,12 +221,3 @@ def compute_radar_data(asset: Dict[str, Any],
 
     return radar
 
-
-# -------------------------------------------------------------------
-# Typ-Rendering für UI
-# -------------------------------------------------------------------
-def render_type_html_OLD(typ_text: str, color: str) -> str:
-    return (
-        f"<span style='display:inline-block;padding:2px 6px;border-radius:4px;"
-        f"background:{color};color:white;font-size:11px;font-weight:600;'>{typ_text}</span>"
-    )
