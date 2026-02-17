@@ -880,6 +880,141 @@ def build_risk_profile():
     - **Portfolio‑Studio** bewertet, ob dein Portfolio zu deinem Profil passt  
     - **Szenario‑Vergleich** zeigt, wie dein Profil in Krisen reagiert  
     """)
+
+def build_portfolio_lexikon():
+    gr.Markdown("""
+    # 📘 Portfolio‑Lexikon
+
+    Dieses Lexikon erklärt alle wichtigen Begriffe, die bei der Portfolio‑Analyse,
+    Optimierung und Bewertung verwendet werden.
+
+    ---
+
+    ## 📈 Rendite
+    Durchschnittliche jährliche Wertentwicklung eines Portfolios oder Assets.
+
+    ## 📉 Volatilität
+    Schwankungsintensität der Renditen.  
+    Hohe Volatilität = hohes Risiko.
+
+    ## 📉 Maximum Drawdown (MDD)
+    Größter historischer Verlust vom letzten Hochpunkt.  
+    Zeigt, wie schlimm ein Crash für das Portfolio war.
+
+    ## 📊 Sharpe‑Ratio
+    Rendite im Verhältnis zum Risiko.  
+    Höher = besser.
+
+    ## 📊 Sortino‑Ratio
+    Wie Sharpe, aber bestraft nur negative Schwankungen.
+
+    ## 🔗 Korrelation
+    Wie stark zwei Assets gemeinsam steigen oder fallen.  
+    Wichtig für Diversifikation.
+
+    ## ⚖️ Risikobeitrag (Risk Contribution)
+    Wie viel jedes Asset zum Gesamtrisiko beiträgt.
+
+    ## ⚖️ Risikoparität (Risk Parity)
+    Strategie, bei der jedes Asset denselben Risikobeitrag liefert.
+
+    ## 🎯 Markowitz‑Optimierung
+    Klassische Portfolio‑Optimierung:  
+    Maximiert Rendite bei minimalem Risiko.
+
+    ## 🎯 Effizienzkurve (Efficient Frontier)
+    Zeigt alle optimalen Portfolios für verschiedene Risikoniveaus.
+
+    ## 🧮 Rebalancing
+    Regelmäßiges Anpassen der Gewichte, um das Zielportfolio zu halten.
+
+    ## 🧪 Backtest
+    Historische Simulation eines Portfolios, um Performance und Risiko zu bewerten.
+
+    ## 🧩 Diversifikation
+    Verteilung des Risikos über verschiedene Anlageklassen.
+
+    ## 🪙 Asset Allocation
+    Aufteilung des Portfolios auf verschiedene Asset‑Typen (Aktien, ETFs, Anleihen, Krypto).
+    """)
+
+def build_portfolio_goal_setting():
+    gr.Markdown("""
+    # 🎯 Ziel‑Setzung für Portfolios
+
+    Die Ziel‑Setzung hilft dir, dein Portfolio an deine persönlichen Ziele
+    und deine Risikobereitschaft anzupassen.
+
+    ---
+
+    ## 🟩 1. Defensiv (Sicherheitsorientiert)
+
+    **Ziel:** Kapitalerhalt, geringe Schwankungen  
+    **Typische Portfolio‑Struktur:**  
+    - 60–80 % Anleihen  
+    - 10–20 % Aktien  
+    - 10–20 % Gold / Rohstoffe  
+    - kaum Krypto  
+
+    **Geeignet für:**  
+    - kurze Anlagehorizonte  
+    - risikoaverse Anleger  
+
+    ---
+
+    ## 🟦 2. Ausgewogen (Balanced)
+
+    **Ziel:** Stabilität + Wachstum  
+    **Typische Portfolio‑Struktur:**  
+    - 40–60 % Aktien  
+    - 20–40 % Anleihen  
+    - 10–20 % Rohstoffe / Gold  
+    - 0–5 % Krypto  
+
+    **Geeignet für:**  
+    - langfristige Anleger  
+    - moderates Risiko  
+
+    ---
+
+    ## 🟧 3. Wachstum (Growth)
+
+    **Ziel:** langfristiger Vermögensaufbau  
+    **Typische Portfolio‑Struktur:**  
+    - 60–80 % Aktien  
+    - 10–20 % Emerging Markets  
+    - 0–10 % Krypto  
+    - 10–20 % Anleihen / Gold  
+
+    **Geeignet für:**  
+    - hohe Risikobereitschaft  
+    - langer Anlagehorizont  
+
+    ---
+
+    ## 🟥 4. Spekulativ (Aggressiv)
+
+    **Ziel:** maximale Rendite  
+    **Typische Portfolio‑Struktur:**  
+    - 70–90 % Aktien  
+    - 10–20 % Krypto  
+    - 0–10 % Rohstoffe  
+    - kaum Anleihen  
+
+    **Geeignet für:**  
+    - sehr risikofreudige Anleger  
+    - spekulative Strategien  
+
+    ---
+
+    ## 🔗 Verbindung zum Dashboard
+
+    - **Portfolio‑Optimierer** nutzt dein Zielprofil für die Gewichtung  
+    - **Portfolio‑Studio** bewertet, ob dein Portfolio zu deinem Profil passt  
+    - **ETF‑Screener** zeigt passende ETFs  
+    - **Risiko‑Dashboard** zeigt Warnungen bei zu hohem Risiko  
+    - **Szenario‑Vergleich** zeigt, wie dein Profil in Krisen reagiert  
+    """)
 #--------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
