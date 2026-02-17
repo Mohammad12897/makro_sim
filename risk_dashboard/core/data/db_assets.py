@@ -9,7 +9,6 @@ from core.engine.assets import (
     fetch_prices,
     compute_ki_score_from_prices,
     compute_radar_data,
-    render_type_html,
 )
 
 ASSET_TEMPLATE = {
@@ -504,15 +503,15 @@ def find_asset(ticker: str):
     # Fallback: Minimal-Asset
     return {"Ticker": ticker, "Name": ticker, "Typ": "Unknown"}, "Unknown"
 
-
 def get_ki_score(ticker: str):
-    """
-    Wrapper für Screener: lädt Kurse und berechnet KI-Score.
-    """
+    ticker = (ticker or "").strip()
+    if not ticker:
+        return None
     prices = fetch_prices(ticker)
     if prices is None:
         return None
     return compute_ki_score_from_prices(prices)
+
 
 def get_asset_full_profile(ticker: str) -> Dict[str, Any]:
     """
@@ -540,25 +539,29 @@ def get_asset_full_profile(ticker: str) -> Dict[str, Any]:
     return profile
 
 
-def process_asset_input(ticker: str) -> Tuple[str, str, Dict[str, Any], Optional[float], Dict[str, Optional[float]]]:
-    """
-    Nimmt einen Ticker entgegen und gibt zurück:
-    - typ_text (z. B. 'ETF')
-    - color (Hex)
-    - asset (dict)
-    - ki_score (float | None)
-    - radar (dict)
-    """
+def process_asset_input_OLD(ticker: str):
+    ticker = (ticker or "").strip()
+    if not ticker:
+        return "Unbekannt", "#6b7280", {}, None, {}
+
     profile = get_asset_full_profile(ticker)
-    asset = profile["asset"]
-    typ = detect_type(asset)
-    typ_text, color = type_color(typ)
+    asset = profile.get("asset", {}) or {}
+    ki_score = profile.get("ki_score")
+    radar = profile.get("radar", {})
 
-    return typ_text, color, asset, profile["ki_score"], profile["radar"]
+    typ = asset.get("Typ", "Unbekannt")
+    color = "#6b7280"
+    if typ == "ETF":
+        color = "#2563eb"
+    elif typ == "Stock":
+        color = "#16a34a"
+    elif typ == "Krypto":
+        color = "#f97316"
+
+    return typ, color, asset, ki_score, radar
 
 
-
-def ui_wrapper(ticker: str):
+def ui_wrapper_OLD(ticker: str):
     """
     Wrapper für Gradio:
     Gibt zurück:

@@ -1,33 +1,42 @@
 # ui/app.py
-
 import gradio as gr
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from core.reporting.pdf_report import create_pdf_report
+# ---------------------------------------------------------
+# KORREKTE IMPORTS (bereinigt)
+# ---------------------------------------------------------
+
+from core.engine.assets import (
+    fetch_prices,
+    compute_ki_score_from_prices,
+    compute_radar_data,
+)
+
 from core.storyline_engine import (
     generate_storyline,
     generate_executive_summary,
     compute_risk_score,
     risk_color,
 )
+
 from core.plots.risk_plots import plot_scenario_radar_overlay
-from core.plots.heatmap_plots import plot_risk_heatmap  # falls du Heatmap im PDF willst
+from core.plots.heatmap_plots import plot_risk_heatmap
 
 from core.presets import load_presets
 from core.scenario_engine import scenario_radar_overlay
 from core.portfolio_sim.scenario_compare import run_scenario_comparison
-from core.plots.risk_plots import plot_scenario_radar_overlay
 from core.risk_ampel import compute_risk_score, risk_color
-from core.plots.heatmap_plots import plot_risk_heatmap
 from core.cluster_engine import compute_clusters
+
 from core.data.market_data import (
     load_asset_series,
     get_etf,
     get_gold,
     get_bond,
 )
+
 from core.portfolio.portfolio_engine import (
     max_drawdown,
     simulate_portfolio,
@@ -36,11 +45,15 @@ from core.portfolio.portfolio_engine import (
     portfolio_performance,
     simulate_portfolio_with_rebalancing,
 )
+
 from core.plots.portfolio_plots import plot_portfolio
 from core.portfolio.portfolio_storyline import generate_portfolio_storyline
+
 from core.country.country_compare import compare_countries, compute_country_metrics
 from core.country.country_storyline import generate_country_storyline
+
 from core.reporting.pdf_report import create_pdf_report, draw_portfolio_page
+
 from core.data.etf_db import list_etf_tickers
 from core.data.asset_map import resolve_asset
 from core.data.etf_db_loader import list_etf_tickers, list_etf_by_region
@@ -64,6 +77,7 @@ from core.analysis.stock_clusterin import cluster_stocks
 from core.analysis.normalize import normalize_metrics
 from core.data.ticker_country_map import map_ticker_to_country
 from core.data.country_macro import get_country_macro
+
 from core.backend.radar_builder import (
     build_country_radar,
     build_etf_radar,
@@ -71,11 +85,16 @@ from core.backend.radar_builder import (
     build_asset_radar,
     get_bitcoin_metrics,
 )
-from core.backend.ki_scanner import scan_assets
 
+from core.backend.ki_scanner import scan_assets
 from core.backend.etf_scanner import scan_etf_list
 from core.backend.stock_scanner import scan_stocks
-from core.backend.portfolio_optimizer import optimize_markowitz, optimize_risk_parity, optimize_ki_score
+from core.backend.portfolio_optimizer import (
+    optimize_markowitz,
+    optimize_risk_parity,
+    optimize_ki_score,
+)
+
 from core.backend.heatmap import plot_correlation_heatmap
 
 from core.backend.symbol_tools import (
@@ -84,145 +103,132 @@ from core.backend.symbol_tools import (
     detect_symbol_type,
     is_isin,
 )
+
 from core.backend.portfolio_manager import (
     list_portfolios,
     save_portfolio,
     delete_portfolio,
     get_portfolio,
 )
+
 from core.backend.portfolio_radar import portfolio_radar
 from core.backend.portfolio_backtest import backtest_portfolio
 from core.backend.portfolio_compare import compare_two_portfolios
+
 from core.data.logging import log_buffer
 
 from core.backend.ki_score import compute_ki_score, explain_ki_score
 from core.data.assets import fetch_price_history
 from core.backend.plots import plot_efficient_frontier
 from core.backend.data_utils import clear_cache, load_isin_db
+
 from ui.logic_screener import ui_etf_screener, ui_stock_screener
 from ui.logic_bonds import ui_bond_analysis
 from ui.logic_crypto import ui_crypto_analysis
 from ui.logic_risk import ui_risk_dashboard
 from ui.logic_portfolio import ui_portfolio_optimizer, ui_portfolio_studio
 from ui.logic_scenario import ui_scenario_comparison
-from core.data.db_assets import ETF_DB, STOCK_DB, find_asset, ui_wrapper
-import pandas as pd
 
+# ---------------------------------------------------------
+# WICHTIG: Nur diese Funktionen aus db_assets importieren!
+# ---------------------------------------------------------
 
+from core.data.db_assets import (
+    ETF_DB,
+    STOCK_DB,
+    find_asset,
+    get_asset_full_profile,
+)
 print("Europa:", list_etf_by_region("Europa"))
 print("USA:", list_etf_by_region("USA"))
 print("Global:", list_etf_by_region("Global"))
 
 
 # ---------------------------------------------------------
-# Theme
+# NEUE, MODERNE UI-FUNKTIONEN (ersetzen alte Wrapper)
 # ---------------------------------------------------------
 
-theme = gr.themes.Soft()
-
-# ---------------------------------------------------------
-# Radar Overlay
-# ---------------------------------------------------------
-
-def compute_radar_overlay(land, we, wb, wg, yrs):
-    presets_all = load_presets()
-    base_scores = presets_all[land]
-
-    score = compute_risk_score(base_scores)
-    ampel = risk_color(score)
-
-    metrics = scenario_radar_overlay(base_scores)
-    fig = plot_scenario_radar_overlay(metrics)
-
-    story = generate_storyline(base_scores)
-    return ampel, fig, story
+def render_type_html(typ_text: str, color: str) -> str:
+    return (
+        f"<span style='display:inline-block;padding:2px 6px;border-radius:4px;"
+        f"background:{color};color:white;font-size:11px;font-weight:600;'>{typ_text}</span>"
+    )
 
 
-# ---------------------------------------------------------
-# Szenario-Vergleich (Tabelle)
-# ---------------------------------------------------------
-
-def scenario_table_wrapper(land, we, wb, wg, yrs):
-    presets_all = load_presets()
-    base_scores = presets_all[land]
-
-    results = run_scenario_comparison(land, base_scores, [we, wb, wg], yrs)
-
-    rows = []
-    for scen_name, scores in results.items():
-        for key, val in scores.items():
-            if isinstance(val, (int, float)):
-                rows.append([scen_name, key, val])
-
-    df = pd.DataFrame(rows, columns=["Szenario", "Indikator", "Wert"])
-    return df
-
-def parse_weights(text, n):
-    if not text or not text.strip():
-        return [1 / n] * n
-    parts = [p.strip() for p in text.split(",") if p.strip()]
-    vals = []
-    for p in parts:
-        try:
-            vals.append(float(p))
-        except Exception:
-            vals.append(0.0)
-    if len(vals) < n:
-        vals += [0.0] * (n - len(vals))
-    vals = vals[:n]
-    s = sum(vals)
-    if s == 0:
-        return [1 / n] * n
-    return [v / s for v in vals]
-
-def ui_convert_isin(ticker: str):
+def process_asset_input(ticker: str):
     ticker = (ticker or "").strip()
     if not ticker:
-        return pd.DataFrame([["Bitte Ticker eingeben."]], columns=["Info"])
+        return "Unbekannt", "#6b7280", {}, None, {}
 
-    asset, typ = find_asset(ticker)
+    profile = get_asset_full_profile(ticker)
+    asset = profile.get("asset", {}) or {}
+    ki_score = profile.get("ki_score")
+    radar = profile.get("radar", {})
+    typ = profile.get("typ", "Unbekannt")
 
-    isin = asset.get("ISIN")
-    if not isin:
-        return pd.DataFrame([[f"Keine ISIN für {ticker} gefunden."]], columns=["Info"])
+    color = "#6b7280"
+    if typ == "ETF":
+        color = "#2563eb"
+    elif typ == "Stock":
+        color = "#16a34a"
+    elif typ == "Krypto":
+        color = "#f97316"
 
-    return pd.DataFrame([[isin]], columns=["ISIN"])
+    return typ, color, asset, ki_score, radar
 
-def ui_ki_scan(text):
-    tickers = [t.strip() for t in text.split(",") if t.strip()]
+
+def ui_asset_wrapper(ticker: str):
+    typ_text, color, asset, ki_score, radar = process_asset_input(ticker)
+    html = render_type_html(typ_text, color)
+    return html, asset, ki_score, radar
+
+
+def ui_convert_isin(text: str):
+    tickers = [t.strip() for t in (text or "").split(",") if t.strip()]
+    results = []
+
+    for t in tickers:
+        asset, typ = find_asset(t)
+        isin = asset.get("ISIN")
+        if isin:
+            results.append([t, isin])
+        else:
+            results.append([t, f"Keine ISIN für {t} gefunden."])
+
+    return pd.DataFrame(results, columns=["Ticker", "ISIN"])
+
+
+def ui_ki_scan(text: str):
+    tickers = [t.strip() for t in (text or "").split(",") if t.strip()]
     results = []
     explanations = []
 
     for t in tickers:
-
-        # 🔥 1. Asset lookup (Ticker → ETF oder Aktie)
         asset, typ = find_asset(t)
-
-        if not asset:
-            results.append([t, None])
-            explanations.append(f"Unbekanntes Asset: {t}")
-            continue
-
-        # 🔥 2. Yahoo‑Ticker bestimmen
         yahoo = asset.get("Yahoo", t)
 
-        # 🔥 3. Kursdaten laden
-        series = fetch_price_history(yahoo, period="1y")
-
-        if series is None or len(series) < 120:
+        prices = fetch_prices(yahoo)
+        if prices is None or len(prices) < 120:
             results.append([t, None])
             explanations.append(f"Keine ausreichenden Daten für {t}.")
             continue
 
-        # 🔥 4. KI‑Score berechnen
-        score, factors = compute_ki_score(series, return_factors=True)
-
-        # 🔥 5. Erklärung erzeugen
+        score = compute_ki_score_from_prices(prices)
         results.append([t, score])
-        explanations.append(explain_ki_score(t, score, factors))
+        explanations.append(f"{t}: KI‑Score = {round(score, 2)}")
 
     df = pd.DataFrame(results, columns=["Ticker", "KI‑Score"])
     return df, "\n\n---\n\n".join(explanations)
+
+# ---------------------------------------------------------
+# ALLE build_* FUNKTIONEN (unverändert)
+# ---------------------------------------------------------
+
+# (Hier fügst du einfach deine build_home(), build_etf_screener(),
+#  build_stock_screener(), build_bond_analysis(), build_crypto_analysis(),
+#  build_risk_dashboard(), build_portfolio_optimizer(), build_portfolio_studio(),
+#  build_scenario_comparison(), build_settings_tab() ein — exakt wie du sie hast.)
+
 
 def build_home():
     gr.Markdown("""
@@ -600,20 +606,54 @@ def build_settings_tab():
 def app():
 
     presets_all = load_presets()
-    countries = list(presets_all.keys())  # <-- dynamisch aus JSON
+    #countries = list(presets_all.keys())  # <-- dynamisch aus JSON
 
     with gr.Blocks(title="MakroSim Dashboard") as demo:
-        ticker_input = gr.Textbox(label="Asset eingeben (z.B. AAPL, SPY, EIMI, BTC)")
-        asset_type_output = gr.HTML(label="Asset-Typ")
-        asset_info_output = gr.JSON(label="Asset-Daten")
-        ki_output = gr.Number(label="KI-Score", precision=2)
-        radar_output = gr.JSON(label="Radar-Daten")  # später durch Plot ersetzen
+        # -------------------------------------------------
+        # TAB: Asset‑Analyse
+        # -------------------------------------------------
+        with gr.Tab("Asset‑Analyse"):
+            asset_input = gr.Textbox(label="Ticker", placeholder="z. B. AAPL")
+            asset_btn = gr.Button("Analysieren")
+            asset_type_html = gr.HTML()
+            asset_json = gr.JSON()
+            asset_ki = gr.Number()
+            asset_radar = gr.JSON()
 
-        ticker_input.change(
-            fn=ui_wrapper,
-            inputs=ticker_input,
-            outputs=[asset_type_output, asset_info_output, ki_output, radar_output],
-        )
+            asset_btn.click(
+                ui_asset_wrapper,
+                inputs=[asset_input],
+                outputs=[asset_type_html, asset_json, asset_ki, asset_radar],
+            )
+
+        # -------------------------------------------------
+        # TAB: KI‑Ranking
+        # -------------------------------------------------
+        with gr.Tab("KI‑Ranking"):
+            ki_input = gr.Textbox(label="Ticker‑Liste", placeholder="AAPL, SPY, EIMI")
+            ki_btn = gr.Button("Scannen")
+            ki_table = gr.Dataframe(label="KI‑Ranking")
+            ki_explain = gr.Markdown()
+
+            ki_btn.click(
+                ui_ki_scan,
+                inputs=[ki_input],
+                outputs=[ki_table, ki_explain],
+            )
+
+        # -------------------------------------------------
+        # TAB: Ticker → ISIN
+        # -------------------------------------------------
+        with gr.Tab("Ticker → ISIN"):
+            isin_input = gr.Textbox(label="Ticker", placeholder="AAPL")
+            isin_btn = gr.Button("Konvertieren")
+            isin_table = gr.Dataframe(label="Ticker → ISIN")
+
+            isin_btn.click(
+                ui_convert_isin,
+                inputs=[isin_input],
+                outputs=[isin_table],
+            )
 
         with gr.Tab("Home / Was bedeuten die Radare?"):
             build_home()
@@ -917,273 +957,7 @@ def app():
             build_scenario_comparison()
 
         with gr.Tab("## ⚙️ Einstellungen / Daten / ISIN‑DB"):
-            build_settings_tab()   # ISIN‑DB, Cache, Logs, API‑Status
-
-        with gr.Tab("## ⚙️ Pro Tools"):
-            with gr.Tab("ETF‑Screener"):
-                gr.Markdown("""
-                # 📘 ETF‑Screener (justETF)
-                Gib eine Liste von ISINs ein oder lade eine Region.
-                Der Screener zeigt TER, Fondsgröße, Replikation und Tracking‑Differenz.
-                """)
-
-                etf_isins = gr.Textbox(
-                    label="ETF‑ISINs (Komma‑getrennt)",
-                    placeholder="z. B. IE00B4L5Y983, IE00B5BMR087"
-                )
-
-                etf_button = gr.Button("ETF‑Daten abrufen")
-
-                etf_table = gr.Dataframe(label="ETF‑Daten", interactive=False)
-
-                etf_button.click(
-                    fn=scan_etf_list,
-                    inputs=[etf_isins],
-                    outputs=[etf_table]
-                )
-
-            with gr.Tab("Aktien‑Screener"):
-                gr.Markdown("""
-                # 📊 Aktien‑Screener (Fundamentaldaten)
-                Der Screener lädt KGV, KUV, PEG, Verschuldung, Cashflow und Wachstum.
-                """)
-
-                stock_symbols = gr.Textbox(
-                    label="Aktien‑Symbole (Komma‑getrennt)",
-                    placeholder="z. B. AAPL, MSFT, AMZN, TSLA"
-                )
-
-                stock_button = gr.Button("Aktien‑Daten abrufen")
-
-                stock_table = gr.Dataframe(label="Fundamentaldaten", interactive=False)
-
-                stock_button.click(
-                    fn=scan_stocks,
-                    inputs=[stock_symbols],
-                    outputs=[stock_table]
-                )
-
-            with gr.Tab("## 📈 Szenario‑Vergleich"):
-                gr.Markdown("## 📈 Szenario‑Vergleich")
-                scen_country = gr.Dropdown(choices=countries, label="Land")
-                scen_w_equity = gr.Slider(0, 100, value=50, label="Equity (%)")
-                scen_w_bond = gr.Slider(0, 100, value=30, label="Bonds (%)")
-                scen_w_gold = gr.Slider(0, 100, value=20, label="Gold (%)")
-                scen_years = gr.Slider(1, 20, value=10, step=1, label="Jahre")
-                scen_button = gr.Button("Szenarien vergleichen")
-                scen_table = gr.Dataframe()
-
-                scen_button.click(
-                    scenario_table_wrapper,
-                    [scen_country, scen_w_equity, scen_w_bond, scen_w_gold, scen_years],
-                    scen_table,
-                )
-
-
-            with gr.Tab("Portfolio‑Optimierer"):
-                gr.Markdown("""
-                # 🎯 Portfolio‑Optimierer
-                Wähle eine Optimierungsstrategie:
-                - Markowitz (Sharpe‑Maximierung)
-                - Risiko‑Parität
-                - KI‑Portfolio‑Score
-                """)
-
-                port_symbols = gr.Textbox(
-                    label="Assets (Komma‑getrennt)",
-                    placeholder="z. B. SPY, VTI, GLD, BTC-USD"
-                )
-
-                strategy = gr.Dropdown(
-                    label="Optimierungs‑Methode",
-                    choices=["Markowitz", "Risiko‑Parität", "KI‑Score"],
-                    value="Markowitz"
-                )
-
-                port_button = gr.Button("Portfolio optimieren")
-
-                port_table = gr.Dataframe(label="Portfolio‑Gewichtung", interactive=False)
-
-                def run_optimizer(symbols, strategy):
-                    symbols = [s.strip().upper() for s in symbols.split(",")]
-
-                    if strategy == "Markowitz":
-                        return optimize_markowitz(symbols)
-                    elif strategy == "Risiko‑Parität":
-                        return optimize_risk_parity(symbols)
-                    else:
-                        # KI‑Score benötigt vorherigen KI‑Scan
-                        df = scan_assets(",".join(symbols), "ki", "Keine")[0]
-                        return optimize_ki_score(df)
-
-                port_button.click(
-                    fn=run_optimizer,
-                    inputs=[port_symbols, strategy],
-                    outputs=[port_table]
-                )
-
-            with gr.Tab("📂 Portfolio‑Studio"):
-
-                with gr.Tab("Portfolio‑Manager"):
-                    gr.Markdown("### Portfolios speichern, laden und verwalten")
-
-                    port_name = gr.Textbox(label="Portfolioname")
-                    port_symbols = gr.Textbox(
-                        label="Assets (Komma‑getrennt)",
-                        placeholder="z. B. SPY, EUNL.DE, BTC-USD",
-                    )
-                    port_weights = gr.Textbox(
-                        label="Gewichte (Komma‑getrennt, optional)",
-                        placeholder="z. B. 0.5, 0.3, 0.2",
-                    )
-
-                    save_btn = gr.Button("Portfolio speichern")
-                    delete_btn = gr.Button("Portfolio löschen")
-                    refresh_btn = gr.Button("Liste aktualisieren")
-
-                    port_list = gr.Dataframe(label="Gespeicherte Portfolios", interactive=False)
-                    status_msg = gr.Markdown()
-
-                    def ui_save_portfolio(name, symbols_text, weights_text):
-                        symbols = [s.strip().upper() for s in symbols_text.split(",") if s.strip()]
-                        if not symbols:
-                            return "❌ Keine Symbole angegeben.", list_portfolios()
-                        weights = parse_weights(weights_text, len(symbols))
-                        msg = save_portfolio(name, symbols, weights)
-                        return f"✅ {msg}", list_portfolios()
-
-                    def ui_delete_portfolio(name):
-                        msg = delete_portfolio(name)
-                        return msg, list_portfolios()
-
-                    def ui_list_portfolios():
-                        ports = list_portfolios()
-                        if not ports:
-                            return []
-                        return ports
-
-                    save_btn.click(ui_save_portfolio,
-                                  inputs=[port_name, port_symbols, port_weights],
-                                  outputs=[status_msg, port_list])
-
-                    delete_btn.click(ui_delete_portfolio,
-                                    inputs=[port_name],
-                                    outputs=[status_msg, port_list])
-
-                    refresh_btn.click(ui_list_portfolios,
-                                      inputs=None,
-                                      outputs=port_list)
-
-
-                with gr.Tab("Portfolio‑Backtest"):
-                    gr.Markdown("### Historische Performance eines Portfolios")
-                    bt_name = gr.Textbox(label="Portfolioname")
-                    bt_btn = gr.Button("Backtest starten")
-
-                    bt_plot = gr.Plot(label="Backtest‑Performance")
-
-                    def ui_backtest(name):
-                        df, meta = get_portfolio(name)
-                        if meta is None:
-                            fig, ax = plt.subplots()
-                            ax.text(0.5, 0.5, "Portfolio nicht gefunden", ha="center")
-                            ax.axis("off")
-                            return fig
-
-                        series = backtest_portfolio(meta["symbols"], meta["weights"], period="5y")
-                        if series is None or series.empty:
-                            fig, ax = plt.subplots()
-                            ax.text(0.5, 0.5, "Keine Daten für Backtest", ha="center")
-                            ax.axis("off")
-                            return fig
-
-                        fig, ax = plt.subplots()
-                        ax.plot(series.index, series.values, label=name)
-                        ax.set_title(f"Backtest: {name}")
-                        ax.set_xlabel("Datum")
-                        ax.set_ylabel("Wert (normiert)")
-                        ax.legend()
-                        fig.autofmt_xdate()
-                        return fig
-
-
-                    bt_btn.click(ui_backtest,
-                                inputs=[bt_name],
-                                outputs=[bt_plot])
-
-                with gr.Tab("Portfolio‑Vergleich"):
-                    gr.Markdown("### Zwei Portfolios direkt vergleichen")
-
-                    p1_name = gr.Textbox(label="Portfolio A")
-                    p2_name = gr.Textbox(label="Portfolio B")
-                    cmp_btn = gr.Button("Vergleichen")
-                    cmp_plot = gr.Plot(label="Vergleich")
-
-                    def ui_compare(a, b):
-                        df1, meta1 = get_portfolio(a)
-                        df2, meta2 = get_portfolio(b)
-                        if meta1 is None or meta2 is None:
-                            fig, ax = plt.subplots()
-                            ax.text(0.5, 0.5, "Portfolio A oder B nicht gefunden", ha="center")
-                            ax.axis("off")
-                            return fig
-
-                        joined = compare_two_portfolios(meta1, meta2, period="5y")
-                        if joined is None or joined.empty:
-                            fig, ax = plt.subplots()
-                            ax.text(0.5, 0.5, "Keine Daten für Vergleich", ha="center")
-                            ax.axis("off")
-                            return fig
-
-                        fig, ax = plt.subplots()
-                        for col in joined.columns:
-                            ax.plot(joined.index, joined[col], label=col)
-                        ax.set_title(f"Vergleich: {a} vs. {b}")
-                        ax.set_xlabel("Datum")
-                        ax.set_ylabel("Wert (normiert)")
-                        ax.legend()
-                        fig.autofmt_xdate()
-                        return fig
-
-                    cmp_btn.click(ui_compare,
-                                  inputs=[p1_name, p2_name],
-                                  outputs=[cmp_plot])
-
-                with gr.Tab("Symbol‑Tools"):
-                    gr.Markdown("### Symbole prüfen, Typ erkennen, Vorschläge anzeigen")
-                    sym_input = gr.Textbox(label="Symbol oder ISIN",
-                                          placeholder="z. B. QQQM, NFLX, GC=F, ETH-USD, IE00B4L5Y983")
-                    sym_type = gr.Markdown()
-                    sym_valid = gr.Markdown()
-                    sym_suggest = gr.Dropdown(label="Vorschläge", choices=[], interactive=True)
-                    check_btn = gr.Button("Symbol prüfen")
-
-                    def ui_symbol_tools(text):
-                        if not text or text.strip() == "":
-                            return ("Typ: —", "Gültig: Nein", gr.update(choices=[]))
-
-                        t = detect_symbol_type(text)
-                        ok = True if is_isin(text) else validate_symbol(text)
-                        sugg = suggest_symbols(text)
-
-                        return (f"Typ: **{t}**",
-                                f"Gültig: **{'Ja' if ok else 'Nein'}**",
-                                gr.update(choices=sugg))
-
-                    check_btn.click(ui_symbol_tools,
-                                    inputs=[sym_input],
-                                    outputs=[sym_type, sym_valid, sym_suggest])
-
-                with gr.Tab("Debug‑Log"):
-                    gr.Markdown("### 🛠 Debug‑Log (letzte Meldungen)")
-                    log_box = gr.Textbox(label="Log", lines=20)
-
-                    def load_log():
-                        return "\n".join(log_buffer[-100:])
-
-                    refresh_btn = gr.Button("Log aktualisieren")
-                    refresh_btn.click(load_log, inputs=None, outputs=log_box)
-
+            build_settings_tab()   # ISIN‑DB, Cache, Logs, API‑Status           
 
 
     return demo
