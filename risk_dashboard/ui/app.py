@@ -598,7 +598,7 @@ def build_settings_tab():
         outputs=[]
     )
 
-def build_eft_lexikon():
+def build_etf_lexikon():
     gr.Markdown("""
     # 📘 ETF‑Lexikon
 
@@ -630,7 +630,7 @@ def build_eft_lexikon():
     Internationale Wertpapierkennnummer.
     """)
 
-def build_eft_goal_setting():
+def build_etf_goal_setting():
     gr.Markdown("""
     # 🎯 Ziel‑Setzung für ETF‑Auswahl
 
@@ -1015,6 +1015,277 @@ def build_portfolio_goal_setting():
     - **Risiko‑Dashboard** zeigt Warnungen bei zu hohem Risiko  
     - **Szenario‑Vergleich** zeigt, wie dein Profil in Krisen reagiert  
     """)
+
+def build_portfolio_stats():
+    gr.Markdown("""
+    # 📊 Portfolio‑Kennzahlen
+
+    Dieser Bereich zeigt alle wichtigen quantitativen Kennzahlen deines Portfolios.
+
+    ## Enthaltene Kennzahlen:
+
+    ### 📈 Rendite
+    Durchschnittliche jährliche Wertentwicklung des Portfolios.
+
+    ### 📉 Volatilität
+    Schwankungsintensität der täglichen oder monatlichen Renditen.
+
+    ### 📉 Maximum Drawdown (MDD)
+    Größter historischer Verlust vom letzten Hochpunkt.
+
+    ### 📊 Sharpe‑Ratio
+    Rendite im Verhältnis zum Risiko.  
+    Höher = besser.
+
+    ### 📊 Sortino‑Ratio
+    Wie Sharpe, aber bestraft nur negative Schwankungen.
+
+    ### 🔗 Korrelationen
+    Wie stark die einzelnen Assets miteinander zusammenhängen.
+
+    ### ⚖️ Risikobeiträge
+    Wie viel jedes Asset zum Gesamtrisiko beiträgt.
+
+    ### 🧮 Effizienzkurve
+    Position des Portfolios im Vergleich zur Efficient Frontier.
+
+    ## Hinweis
+    Die Kennzahlen werden automatisch berechnet, sobald du im Portfolio‑Studio
+    ein Portfolio geladen oder erstellt hast.
+    """)
+
+def build_portfolio_story():
+    gr.Markdown("""
+    # 🧠 Portfolio‑Interpretation (Storyline)
+
+    Dieser Bereich liefert eine qualitative Analyse deines Portfolios:
+    Stärken, Schwächen, Chancen, Risiken und strategische Einordnung.
+
+    ## Enthaltene Elemente:
+
+    ### ⭐ Stärken
+    - Welche Bereiche gut performen  
+    - Welche Assets stabilisieren das Portfolio  
+    - Welche Diversifikationseffekte wirken  
+
+    ### ⚠️ Schwächen
+    - Klumpenrisiken  
+    - Übergewichtungen  
+    - hohe Volatilität oder Drawdowns  
+
+    ### 📈 Chancen
+    - Wachstumstreiber  
+    - Trend‑ oder Momentum‑Signale  
+    - Makro‑ oder Sektor‑Vorteile  
+
+    ### 📉 Risiken
+    - Marktrisiken  
+    - Zinsrisiken  
+    - Währungsrisiken  
+    - Tail‑Risks  
+
+    ### 🎯 Abgleich mit deinem Risikoprofil
+    - Passt das Portfolio zu deinem Profil?  
+    - Ist es zu riskant oder zu defensiv?  
+    - Welche Anpassungen wären sinnvoll?  
+
+    ### 🧭 Handlungsempfehlungen
+    - mögliche Rebalancing‑Strategien  
+    - Optimierungsideen  
+    - Diversifikationsvorschläge  
+
+    ## Hinweis
+    Die Storyline wird automatisch generiert, sobald du im Portfolio‑Studio
+    ein Portfolio analysierst.
+    """)
+
+def build_scenario_radar():
+    gr.Markdown("""
+    # 📊 Szenario‑Radar
+
+    Das Szenario‑Radar zeigt die Unterschiede zwischen zwei Markt‑ oder Portfolio‑Szenarien
+    in einer klaren, visuellen Form. Es hilft dir zu verstehen, wie sich verschiedene
+    Faktoren unter unterschiedlichen Bedingungen verändern.
+
+    ## Was zeigt das Radar?
+
+    ### 🔹 Risiko
+    Wie stark das Portfolio im jeweiligen Szenario schwankt.
+
+    ### 🔹 Rendite
+    Erwartete oder simulierte Performance.
+
+    ### 🔹 Drawdown
+    Wie tief das Portfolio im Stressfall fallen könnte.
+
+    ### 🔹 Momentum
+    Trendstärke im jeweiligen Szenario.
+
+    ### 🔹 Volatilität
+    Schwankungsintensität der Renditen.
+
+    ### 🔹 Diversifikation
+    Wie gut das Portfolio im Szenario diversifiziert ist.
+
+    ## Wie wird das Radar berechnet?
+
+    Das Radar basiert auf:
+    - historischen Daten  
+    - simulierten Szenarien  
+    - KI‑basierten Risikomodellen  
+    - Portfolio‑Kennzahlen  
+
+    ## Hinweis
+    Das Radar wird automatisch generiert, sobald du im Szenario‑Vergleich
+    zwei Szenarien auswählst und vergleichst.
+    """)
+
+def build_scenario_story():
+    gr.Markdown("""
+    # 🧠 Szenario‑Interpretation (Storyline)
+
+    Dieses Modul liefert eine qualitative Analyse der beiden Szenarien,
+    die du im Szenario‑Vergleich ausgewählt hast.
+
+    ## Enthaltene Elemente:
+
+    ### ⭐ Stärken des Szenarios
+    - Welche Faktoren positiv wirken  
+    - Welche Marktbedingungen vorteilhaft sind  
+    - Welche Asset‑Klassen profitieren  
+
+    ### ⚠️ Schwächen des Szenarios
+    - Risiken und Unsicherheiten  
+    - mögliche Drawdowns  
+    - erhöhte Volatilität  
+
+    ### 📈 Chancen
+    - Wachstumstreiber  
+    - Momentum‑Signale  
+    - Sektor‑ oder Länder‑Vorteile  
+
+    ### 📉 Risiken
+    - Marktrisiken  
+    - Zinsrisiken  
+    - Währungsrisiken  
+    - Tail‑Risks  
+
+    ### 🔄 Vergleich der beiden Szenarien
+    - Welches Szenario ist defensiver?  
+    - Welches bietet mehr Wachstum?  
+    - Wo liegen die größten Unterschiede?  
+
+    ### 🎯 Strategische Einordnung
+    - Welche Strategie passt zu welchem Szenario?  
+    - Wie könnte ein Portfolio angepasst werden?  
+    - Welche Asset‑Klassen sind sinnvoll?  
+
+    ## Hinweis
+    Die Storyline wird automatisch generiert, sobald du im Szenario‑Vergleich
+    zwei Szenarien analysierst.
+    """)
+
+def build_cache_tools():
+    gr.Markdown("""
+    # 🧹 Cache‑Verwaltung
+
+    Hier kannst du den internen Cache des Dashboards verwalten.
+    Der Cache speichert:
+    - Preis‑Daten
+    - Radar‑Daten
+    - KI‑Scores
+    - Portfolio‑Berechnungen
+    - Szenario‑Simulationen
+
+    ## Warum Cache leeren?
+
+    - Wenn Daten veraltet wirken  
+    - Wenn du neue Datenquellen geladen hast  
+    - Wenn du Fehler beheben möchtest  
+    - Wenn du Speicher freigeben willst  
+
+    ## Hinweis
+    Das Leeren des Caches kann die Performance kurzzeitig beeinflussen,
+    da Daten neu geladen werden müssen.
+    """)
+
+    clear_btn = gr.Button("Cache leeren")
+    output = gr.Markdown("")
+
+    def _clear():
+        clear_cache()
+        return "✅ Cache wurde erfolgreich geleert."
+
+    clear_btn.click(_clear, outputs=output) 
+
+def build_log_viewer():
+    gr.Markdown("""
+    # 📜 Log‑Viewer
+
+    Hier kannst du die internen Logs des Systems einsehen.
+    Die Logs enthalten:
+    - Fehler
+    - Warnungen
+    - Debug‑Informationen
+    - Backend‑Meldungen
+
+    Dies ist besonders hilfreich für:
+    - Fehlersuche
+    - Datenvalidierung
+    - Performance‑Analyse
+    """)
+
+    log_output = gr.Textbox(label="System‑Logs", lines=20)
+
+    def _load_logs():
+        return "\n".join(log_buffer[-500:]) if log_buffer else "Keine Logs vorhanden."
+
+    refresh_btn = gr.Button("Logs aktualisieren")
+    refresh_btn.click(_load_logs, outputs=log_output)
+
+def build_system_info():
+    gr.Markdown("""
+    # 🖥 System‑Informationen
+
+    Dieser Bereich zeigt technische Informationen über das Dashboard,
+    Datenquellen und Systemstatus.
+
+    ## Enthaltene Informationen:
+    - Version des Dashboards
+    - Anzahl geladener ETFs und Aktien
+    - Status der ISIN‑Datenbank
+    - Cache‑Status
+    - Datenquellen
+    - Backend‑Module
+    """)
+
+    info_box = gr.JSON(label="System‑Status")
+
+    def _system_info():
+        return {
+            "Dashboard-Version": "1.0.0",
+            "ETFs geladen": len(ETF_DB),
+            "Aktien geladen": len(STOCK_DB),
+            "ISIN‑DB geladen": bool(load_isin_db()),
+            "Cache‑Status": "aktiv",
+            "Datenquellen": [
+                "Yahoo Finance",
+                "Interne ETF‑DB",
+                "Interne Aktien‑DB",
+                "ISIN‑Datenbank"
+            ],
+            "Module": [
+                "KI‑Scanner",
+                "Portfolio‑Engine",
+                "Radar‑Engine",
+                "Szenario‑Engine"
+            ]
+        }
+
+    refresh_btn = gr.Button("Systeminfo aktualisieren")
+    refresh_btn.click(_system_info, outputs=info_box)
+
+
 #--------------------------------------------------------
 # Gradio App
 # ---------------------------------------------------------
@@ -1070,7 +1341,7 @@ def app():
                 outputs=[isin_table],
             )
 
-        with gr.Tab("Home / Was bedeuten die Radare?"):
+        with gr.Tab("Home"):
             build_home()
 
         with gr.Tab("🤖 KI‑Asset‑Scanner"):
