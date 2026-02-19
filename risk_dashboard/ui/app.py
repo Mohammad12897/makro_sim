@@ -661,7 +661,7 @@ def build_etf_goal_setting():
     - ETF‑Screener zeigt passende ETFs
     - Portfolio‑Optimierer nutzt dein Zielprofil
     - Risiko‑Dashboard zeigt Risiken passend zu deinem Profil
-    """) 
+    """)
 
 def build_stock_lexikon():
     gr.Markdown("""
@@ -745,46 +745,46 @@ def build_risk_lexikon():
     Dieses Lexikon erklärt alle wichtigen Risikobegriffe, die im Dashboard verwendet werden.
 
     ## 📉 Volatilität
-    Maß für die Schwankungsintensität eines Assets.  
+    Maß für die Schwankungsintensität eines Assets.
     Hohe Volatilität = starke Ausschläge, niedrige Volatilität = stabile Kurse.
 
     ## 📉 Standardabweichung
-    Mathematische Grundlage der Volatilität.  
+    Mathematische Grundlage der Volatilität.
     Misst, wie stark tägliche Renditen vom Durchschnitt abweichen.
 
     ## 📉 Drawdown
-    Verlust vom letzten Hochpunkt bis zum Tiefpunkt.  
+    Verlust vom letzten Hochpunkt bis zum Tiefpunkt.
     Beispiel: 100 → 70 = −30 % Drawdown.
 
     ## 📉 Maximum Drawdown (MDD)
-    Größter historischer Drawdown über den gesamten Zeitraum.  
+    Größter historischer Drawdown über den gesamten Zeitraum.
     Zeigt, wie schlimm ein Crash für ein Asset war.
 
     ## 📊 Beta
-    Wie stark ein Asset im Vergleich zum Gesamtmarkt schwankt.  
-    - > 1 = stärker als der Markt  
-    - < 1 = defensiver  
+    Wie stark ein Asset im Vergleich zum Gesamtmarkt schwankt.
+    - > 1 = stärker als der Markt
+    - < 1 = defensiver
     - = 1 = bewegt sich wie der Markt
 
     ## 🔗 Korrelation
-    Wie stark zwei Assets gemeinsam steigen oder fallen.  
-    - +1 = identisch  
-    - 0 = unabhängig  
-    - −1 = gegensätzlich  
+    Wie stark zwei Assets gemeinsam steigen oder fallen.
+    - +1 = identisch
+    - 0 = unabhängig
+    - −1 = gegensätzlich
 
     ## 📉 Value‑at‑Risk (VaR)
-    Maximaler Verlust mit einer bestimmten Wahrscheinlichkeit.  
+    Maximaler Verlust mit einer bestimmten Wahrscheinlichkeit.
     Beispiel: „Mit 95 % Wahrscheinlichkeit verlierst du nicht mehr als 5 % pro Tag.“
 
     ## 📈 Sharpe‑Ratio
-    Rendite im Verhältnis zum Risiko.  
+    Rendite im Verhältnis zum Risiko.
     Höher = besser.
 
     ## 📈 Sortino‑Ratio
     Wie Sharpe, aber bestraft nur negative Schwankungen.
 
     ## ⚠️ Tail‑Risk
-    Risiko extremer Verluste („schwarze Schwäne“).  
+    Risiko extremer Verluste („schwarze Schwäne“).
     Besonders relevant bei Krypto, Small Caps, Hebelprodukten.
 
     ## 🧮 Risikobeitrag (Risk Contribution)
@@ -811,74 +811,74 @@ def build_risk_profile():
 
     ## 🟩 1. Defensiv (Sicherheitsorientiert)
 
-    **Ziel:** Kapitalerhalt, geringe Schwankungen  
-    **Typische Assets:**  
-    - Staatsanleihen  
-    - Geldmarkt  
-    - Gold  
-    - Minimum‑Volatility‑ETFs  
-    - Dividendenaktien  
+    **Ziel:** Kapitalerhalt, geringe Schwankungen
+    **Typische Assets:**
+    - Staatsanleihen
+    - Geldmarkt
+    - Gold
+    - Minimum‑Volatility‑ETFs
+    - Dividendenaktien
 
-    **Risiko:** niedrig  
-    **Erwartete Rendite:** niedrig bis moderat  
-    **Drawdowns:** gering  
+    **Risiko:** niedrig
+    **Erwartete Rendite:** niedrig bis moderat
+    **Drawdowns:** gering
 
     ---
 
     ## 🟦 2. Ausgewogen (Balanced)
 
-    **Ziel:** Mischung aus Wachstum und Stabilität  
-    **Typische Assets:**  
-    - Welt‑ETFs (MSCI World, ACWI)  
-    - Qualitätsaktien  
-    - Unternehmensanleihen  
-    - Rohstoffe  
+    **Ziel:** Mischung aus Wachstum und Stabilität
+    **Typische Assets:**
+    - Welt‑ETFs (MSCI World, ACWI)
+    - Qualitätsaktien
+    - Unternehmensanleihen
+    - Rohstoffe
 
-    **Risiko:** moderat  
-    **Erwartete Rendite:** moderat  
-    **Drawdowns:** mittel  
+    **Risiko:** moderat
+    **Erwartete Rendite:** moderat
+    **Drawdowns:** mittel
 
     ---
 
     ## 🟧 3. Wachstum (Growth)
 
-    **Ziel:** langfristiger Vermögensaufbau  
-    **Typische Assets:**  
-    - Tech‑Aktien  
-    - Emerging Markets  
-    - Themen‑ETFs  
-    - Small Caps  
+    **Ziel:** langfristiger Vermögensaufbau
+    **Typische Assets:**
+    - Tech‑Aktien
+    - Emerging Markets
+    - Themen‑ETFs
+    - Small Caps
 
-    **Risiko:** hoch  
-    **Erwartete Rendite:** hoch  
-    **Drawdowns:** groß  
+    **Risiko:** hoch
+    **Erwartete Rendite:** hoch
+    **Drawdowns:** groß
 
     ---
 
     ## 🟥 4. Spekulativ (Aggressiv)
 
-    **Ziel:** maximale Rendite, akzeptiert hohe Verluste  
-    **Typische Assets:**  
-    - Kryptowährungen  
-    - Hebelprodukte  
-    - Biotech  
-    - Penny Stocks  
-    - Frontier Markets  
+    **Ziel:** maximale Rendite, akzeptiert hohe Verluste
+    **Typische Assets:**
+    - Kryptowährungen
+    - Hebelprodukte
+    - Biotech
+    - Penny Stocks
+    - Frontier Markets
 
-    **Risiko:** sehr hoch  
-    **Erwartete Rendite:** sehr hoch  
-    **Drawdowns:** extrem  
+    **Risiko:** sehr hoch
+    **Erwartete Rendite:** sehr hoch
+    **Drawdowns:** extrem
 
     ---
 
     ## 🔗 Verbindung zum Dashboard
 
-    - **Portfolio‑Optimierer** nutzt dein Risikoprofil für Gewichtungen  
-    - **ETF‑Screener** zeigt passende Kategorien  
-    - **Aktien‑Screener** filtert nach Value/Growth/Quality  
-    - **Risiko‑Dashboard** zeigt Warnungen bei zu hohem Risiko  
-    - **Portfolio‑Studio** bewertet, ob dein Portfolio zu deinem Profil passt  
-    - **Szenario‑Vergleich** zeigt, wie dein Profil in Krisen reagiert  
+    - **Portfolio‑Optimierer** nutzt dein Risikoprofil für Gewichtungen
+    - **ETF‑Screener** zeigt passende Kategorien
+    - **Aktien‑Screener** filtert nach Value/Growth/Quality
+    - **Risiko‑Dashboard** zeigt Warnungen bei zu hohem Risiko
+    - **Portfolio‑Studio** bewertet, ob dein Portfolio zu deinem Profil passt
+    - **Szenario‑Vergleich** zeigt, wie dein Profil in Krisen reagiert
     """)
 
 def build_portfolio_lexikon():
@@ -894,22 +894,22 @@ def build_portfolio_lexikon():
     Durchschnittliche jährliche Wertentwicklung eines Portfolios oder Assets.
 
     ## 📉 Volatilität
-    Schwankungsintensität der Renditen.  
+    Schwankungsintensität der Renditen.
     Hohe Volatilität = hohes Risiko.
 
     ## 📉 Maximum Drawdown (MDD)
-    Größter historischer Verlust vom letzten Hochpunkt.  
+    Größter historischer Verlust vom letzten Hochpunkt.
     Zeigt, wie schlimm ein Crash für das Portfolio war.
 
     ## 📊 Sharpe‑Ratio
-    Rendite im Verhältnis zum Risiko.  
+    Rendite im Verhältnis zum Risiko.
     Höher = besser.
 
     ## 📊 Sortino‑Ratio
     Wie Sharpe, aber bestraft nur negative Schwankungen.
 
     ## 🔗 Korrelation
-    Wie stark zwei Assets gemeinsam steigen oder fallen.  
+    Wie stark zwei Assets gemeinsam steigen oder fallen.
     Wichtig für Diversifikation.
 
     ## ⚖️ Risikobeitrag (Risk Contribution)
@@ -919,7 +919,7 @@ def build_portfolio_lexikon():
     Strategie, bei der jedes Asset denselben Risikobeitrag liefert.
 
     ## 🎯 Markowitz‑Optimierung
-    Klassische Portfolio‑Optimierung:  
+    Klassische Portfolio‑Optimierung:
     Maximiert Rendite bei minimalem Risiko.
 
     ## 🎯 Effizienzkurve (Efficient Frontier)
@@ -949,71 +949,71 @@ def build_portfolio_goal_setting():
 
     ## 🟩 1. Defensiv (Sicherheitsorientiert)
 
-    **Ziel:** Kapitalerhalt, geringe Schwankungen  
-    **Typische Portfolio‑Struktur:**  
-    - 60–80 % Anleihen  
-    - 10–20 % Aktien  
-    - 10–20 % Gold / Rohstoffe  
-    - kaum Krypto  
+    **Ziel:** Kapitalerhalt, geringe Schwankungen
+    **Typische Portfolio‑Struktur:**
+    - 60–80 % Anleihen
+    - 10–20 % Aktien
+    - 10–20 % Gold / Rohstoffe
+    - kaum Krypto
 
-    **Geeignet für:**  
-    - kurze Anlagehorizonte  
-    - risikoaverse Anleger  
+    **Geeignet für:**
+    - kurze Anlagehorizonte
+    - risikoaverse Anleger
 
     ---
 
     ## 🟦 2. Ausgewogen (Balanced)
 
-    **Ziel:** Stabilität + Wachstum  
-    **Typische Portfolio‑Struktur:**  
-    - 40–60 % Aktien  
-    - 20–40 % Anleihen  
-    - 10–20 % Rohstoffe / Gold  
-    - 0–5 % Krypto  
+    **Ziel:** Stabilität + Wachstum
+    **Typische Portfolio‑Struktur:**
+    - 40–60 % Aktien
+    - 20–40 % Anleihen
+    - 10–20 % Rohstoffe / Gold
+    - 0–5 % Krypto
 
-    **Geeignet für:**  
-    - langfristige Anleger  
-    - moderates Risiko  
+    **Geeignet für:**
+    - langfristige Anleger
+    - moderates Risiko
 
     ---
 
     ## 🟧 3. Wachstum (Growth)
 
-    **Ziel:** langfristiger Vermögensaufbau  
-    **Typische Portfolio‑Struktur:**  
-    - 60–80 % Aktien  
-    - 10–20 % Emerging Markets  
-    - 0–10 % Krypto  
-    - 10–20 % Anleihen / Gold  
+    **Ziel:** langfristiger Vermögensaufbau
+    **Typische Portfolio‑Struktur:**
+    - 60–80 % Aktien
+    - 10–20 % Emerging Markets
+    - 0–10 % Krypto
+    - 10–20 % Anleihen / Gold
 
-    **Geeignet für:**  
-    - hohe Risikobereitschaft  
-    - langer Anlagehorizont  
+    **Geeignet für:**
+    - hohe Risikobereitschaft
+    - langer Anlagehorizont
 
     ---
 
     ## 🟥 4. Spekulativ (Aggressiv)
 
-    **Ziel:** maximale Rendite  
-    **Typische Portfolio‑Struktur:**  
-    - 70–90 % Aktien  
-    - 10–20 % Krypto  
-    - 0–10 % Rohstoffe  
-    - kaum Anleihen  
+    **Ziel:** maximale Rendite
+    **Typische Portfolio‑Struktur:**
+    - 70–90 % Aktien
+    - 10–20 % Krypto
+    - 0–10 % Rohstoffe
+    - kaum Anleihen
 
-    **Geeignet für:**  
-    - sehr risikofreudige Anleger  
-    - spekulative Strategien  
+    **Geeignet für:**
+    - sehr risikofreudige Anleger
+    - spekulative Strategien
 
     ---
 
     ## 🔗 Verbindung zum Dashboard
 
-    - **Portfolio‑Optimierer** nutzt dein Zielprofil für die Gewichtung  
-    - **Portfolio‑Studio** bewertet, ob dein Portfolio zu deinem Profil passt  
-    - **ETF‑Screener** zeigt passende ETFs  
-    - **Risiko‑Dashboard** zeigt Warnungen bei zu hohem Risiko  
-    - **Szenario‑Vergleich** zeigt, wie dein Profil in Krisen reagiert  
+    - **Portfolio‑Optimierer** nutzt dein Zielprofil für die Gewichtung
+    - **Portfolio‑Studio** bewertet, ob dein Portfolio zu deinem Profil passt
+    - **ETF‑Screener** zeigt passende ETFs
+    - **Risiko‑Dashboard** zeigt Warnungen bei zu hohem Risiko
+    - **Szenario‑Vergleich** zeigt, wie dein Profil in Krisen reagiert
     """)
 
 def build_portfolio_stats():
@@ -1034,7 +1034,7 @@ def build_portfolio_stats():
     Größter historischer Verlust vom letzten Hochpunkt.
 
     ### 📊 Sharpe‑Ratio
-    Rendite im Verhältnis zum Risiko.  
+    Rendite im Verhältnis zum Risiko.
     Höher = besser.
 
     ### 📊 Sortino‑Ratio
@@ -1064,35 +1064,35 @@ def build_portfolio_story():
     ## Enthaltene Elemente:
 
     ### ⭐ Stärken
-    - Welche Bereiche gut performen  
-    - Welche Assets stabilisieren das Portfolio  
-    - Welche Diversifikationseffekte wirken  
+    - Welche Bereiche gut performen
+    - Welche Assets stabilisieren das Portfolio
+    - Welche Diversifikationseffekte wirken
 
     ### ⚠️ Schwächen
-    - Klumpenrisiken  
-    - Übergewichtungen  
-    - hohe Volatilität oder Drawdowns  
+    - Klumpenrisiken
+    - Übergewichtungen
+    - hohe Volatilität oder Drawdowns
 
     ### 📈 Chancen
-    - Wachstumstreiber  
-    - Trend‑ oder Momentum‑Signale  
-    - Makro‑ oder Sektor‑Vorteile  
+    - Wachstumstreiber
+    - Trend‑ oder Momentum‑Signale
+    - Makro‑ oder Sektor‑Vorteile
 
     ### 📉 Risiken
-    - Marktrisiken  
-    - Zinsrisiken  
-    - Währungsrisiken  
-    - Tail‑Risks  
+    - Marktrisiken
+    - Zinsrisiken
+    - Währungsrisiken
+    - Tail‑Risks
 
     ### 🎯 Abgleich mit deinem Risikoprofil
-    - Passt das Portfolio zu deinem Profil?  
-    - Ist es zu riskant oder zu defensiv?  
-    - Welche Anpassungen wären sinnvoll?  
+    - Passt das Portfolio zu deinem Profil?
+    - Ist es zu riskant oder zu defensiv?
+    - Welche Anpassungen wären sinnvoll?
 
     ### 🧭 Handlungsempfehlungen
-    - mögliche Rebalancing‑Strategien  
-    - Optimierungsideen  
-    - Diversifikationsvorschläge  
+    - mögliche Rebalancing‑Strategien
+    - Optimierungsideen
+    - Diversifikationsvorschläge
 
     ## Hinweis
     Die Storyline wird automatisch generiert, sobald du im Portfolio‑Studio
@@ -1130,10 +1130,10 @@ def build_scenario_radar():
     ## Wie wird das Radar berechnet?
 
     Das Radar basiert auf:
-    - historischen Daten  
-    - simulierten Szenarien  
-    - KI‑basierten Risikomodellen  
-    - Portfolio‑Kennzahlen  
+    - historischen Daten
+    - simulierten Szenarien
+    - KI‑basierten Risikomodellen
+    - Portfolio‑Kennzahlen
 
     ## Hinweis
     Das Radar wird automatisch generiert, sobald du im Szenario‑Vergleich
@@ -1150,35 +1150,35 @@ def build_scenario_story():
     ## Enthaltene Elemente:
 
     ### ⭐ Stärken des Szenarios
-    - Welche Faktoren positiv wirken  
-    - Welche Marktbedingungen vorteilhaft sind  
-    - Welche Asset‑Klassen profitieren  
+    - Welche Faktoren positiv wirken
+    - Welche Marktbedingungen vorteilhaft sind
+    - Welche Asset‑Klassen profitieren
 
     ### ⚠️ Schwächen des Szenarios
-    - Risiken und Unsicherheiten  
-    - mögliche Drawdowns  
-    - erhöhte Volatilität  
+    - Risiken und Unsicherheiten
+    - mögliche Drawdowns
+    - erhöhte Volatilität
 
     ### 📈 Chancen
-    - Wachstumstreiber  
-    - Momentum‑Signale  
-    - Sektor‑ oder Länder‑Vorteile  
+    - Wachstumstreiber
+    - Momentum‑Signale
+    - Sektor‑ oder Länder‑Vorteile
 
     ### 📉 Risiken
-    - Marktrisiken  
-    - Zinsrisiken  
-    - Währungsrisiken  
-    - Tail‑Risks  
+    - Marktrisiken
+    - Zinsrisiken
+    - Währungsrisiken
+    - Tail‑Risks
 
     ### 🔄 Vergleich der beiden Szenarien
-    - Welches Szenario ist defensiver?  
-    - Welches bietet mehr Wachstum?  
-    - Wo liegen die größten Unterschiede?  
+    - Welches Szenario ist defensiver?
+    - Welches bietet mehr Wachstum?
+    - Wo liegen die größten Unterschiede?
 
     ### 🎯 Strategische Einordnung
-    - Welche Strategie passt zu welchem Szenario?  
-    - Wie könnte ein Portfolio angepasst werden?  
-    - Welche Asset‑Klassen sind sinnvoll?  
+    - Welche Strategie passt zu welchem Szenario?
+    - Wie könnte ein Portfolio angepasst werden?
+    - Welche Asset‑Klassen sind sinnvoll?
 
     ## Hinweis
     Die Storyline wird automatisch generiert, sobald du im Szenario‑Vergleich
@@ -1199,10 +1199,10 @@ def build_cache_tools():
 
     ## Warum Cache leeren?
 
-    - Wenn Daten veraltet wirken  
-    - Wenn du neue Datenquellen geladen hast  
-    - Wenn du Fehler beheben möchtest  
-    - Wenn du Speicher freigeben willst  
+    - Wenn Daten veraltet wirken
+    - Wenn du neue Datenquellen geladen hast
+    - Wenn du Fehler beheben möchtest
+    - Wenn du Speicher freigeben willst
 
     ## Hinweis
     Das Leeren des Caches kann die Performance kurzzeitig beeinflussen,
@@ -1216,7 +1216,7 @@ def build_cache_tools():
         clear_cache()
         return "✅ Cache wurde erfolgreich geleert."
 
-    clear_btn.click(_clear, outputs=output) 
+    clear_btn.click(_clear, outputs=output)
 
 def build_log_viewer():
     gr.Markdown("""
@@ -1326,6 +1326,325 @@ def app():
                 inputs=[ki_input],
                 outputs=[ki_table, ki_explain],
             )
+            gr.Markdown("""
+            ### GLOBAL WÄHRUNGS-RANKING (BEISPIEL)
+
+            1. CHF – Schweizer Franken – Score 92
+            2. SGD – Singapur Dollar – Score 90
+            3. AED – UAE Dirham – Score 88
+            4. NOK – Norwegische Krone – Score 86
+            5. SAR – Saudi Riyal – Score 84
+            6. QAR – Katar Riyal – Score 82
+            7. OMR – Oman Rial – Score 78
+            8. USD – US Dollar – Score 76
+            9. EUR – Euro – Score 74
+            10. GBP – Britisches Pfund – Score 72
+
+            ---
+
+            ## GOLF-WÄHRUNGEN – VERGLEICH (OMR, SAR, AED, QAR)
+
+            Oman – OMR (Rial Omani)
+            - Sehr stabiler USD-Peg
+            - Kleine Wirtschaft, hohe Öl-Abhängigkeit
+            - Moderate Devisenreserven
+            - Niedrige Inflation
+            - Weniger diversifiziert als UAE/Saudi
+
+            Saudi-Arabien – SAR (Saudi Riyal)
+            - Größte Volkswirtschaft im GCC
+            - Sehr hohe Ölreserven und Staatsfonds (PIF)
+            - Starker USD-Peg, hohe Glaubwürdigkeit
+            - Moderate Inflation
+            - Politisch und wirtschaftlich systemrelevant
+
+            UAE – AED (Dirham)
+            - Sehr diversifizierte Wirtschaft (Finanzen, Tourismus, Handel)
+            - Hohe Devisenreserven
+            - Sehr stabiler USD-Peg
+            - Geringe Inflation
+            - Starke internationale Integration
+
+            Katar – QAR (Qatari Riyal)
+            - Extrem hohe Pro-Kopf-Einkommen
+            - Gasreich, LNG-Dominanz
+            - Starker USD-Peg
+            - Politische Risiken (Blockade 2017)
+            - Sehr hohe Reserven und Staatsfonds (QIA)
+
+            ---
+
+            ## RISIKO-RANKING GOLF-WÄHRUNGEN (0 = sehr stabil, 100 = sehr riskant)
+
+            1. UAE – AED → Score ~ 12
+              - Höchste Diversifizierung
+              - Sehr starke Reserven
+              - Extrem stabiler Peg
+
+            2. Saudi-Arabien – SAR → Score ~ 16
+              - Größte Wirtschaft im GCC
+              - Hohe Ölreserven, großer Staatsfonds
+              - Politisch stabil
+
+            3. Katar – QAR → Score ~ 18
+              - Sehr reich, gasbasiert
+              - Politische Spannungen als Risikofaktor
+
+            4. Oman – OMR → Score ~ 22
+              - Stabiler Peg, aber kleinere Wirtschaft
+              - Höhere Verwundbarkeit bei Ölpreis-Schocks
+
+            ---
+
+            ## GOLF-WÄHRUNGEN-DASHBOARD – UI-MOCKUP
+
+            ## [HEADER – VERGLEICH]
+
+            | Land | Währung | Peg | Inflation | Rating | Score |
+            | ----| --------| ----| ----------| -------| ------|
+            | **Oman** | OMR | USD | 1.2% | A | 78  |
+            | **Saudi**| SAR | USD | 2.0% | A+ | 84 |
+            | **UAE**  | AED | USD | 1.5% | AA | 88 |
+            | **Katar**| QAR | USD | 1.8% | AA- | 82 |
+
+
+            [SEKTION 1 – RISIKO-RADAR]
+            Tabs: Oman | Saudi | UAE | Katar
+            - Radar-Chart mit 6 Achsen:
+              - Inflationsrisiko
+              - FX-Volatilität
+              - Zentralbank-Risiko
+              - Staatsverschuldung
+              - Dollarabhängigkeit
+              - Kapitalflucht-Risiko
+
+            [SEKTION 2 – MAKRO-KACHELN]
+            - Inflation YoY
+            - Leitzins
+            - Devisenreserven
+            - Leistungsbilanz (% BIP)
+            - Staatsrating
+
+            [SEKTION 3 – ZEITREIHEN]
+            - Wechselkursverlauf (Peg → flache Linie)
+            - Inflation
+            - Zinsen
+            - Reserven
+
+            [SEKTION 4 – STORYLINES]
+            4 Spalten:
+            - Oman – Kurzstory
+            - Saudi – Kurzstory
+            - UAE – Kurzstory
+            - Katar – Kurzstory
+
+            [SEKTION 5 – SZENARIO-ENGINE]
+            Dropdown:
+            - US-Zinsanstieg
+            - Ölpreis-Schock
+            - Regionale Instabilität
+
+            Impact-Balken je Land:
+            - niedrig / mittel / hoch
+
+            ---
+
+
+            ## AUTOMATISCHES WÄHRUNGS-SCORING-SYSTEM
+
+            Ziel:
+            - Score 0–100 (100 = sehr stabil)
+
+            Input (0–1 normalisiert):
+            - IR  = Inflationsrisiko
+            - FXR = FX-Volatilitätsrisiko
+            - CBR = Zentralbank-Risiko
+            - SDR = Staatsverschuldungsrisiko
+            - USDR = Dollarabhängigkeitsrisiko
+            - KFR = Kapitalflucht-Risiko
+
+            Formel:
+            Score = 100 * [
+                0.20 * (1 - IR) +
+                0.15 * (1 - FXR) +
+                0.20 * (1 - CBR) +
+                0.20 * (1 - SDR) +
+                0.10 * (1 - USDR) +
+                0.15 * (1 - KFR)
+            ]
+
+            Interpretation:
+            - 80–100: Sehr stabil
+            - 60–79: Stabil
+            - 40–59: Erhöhtes Risiko
+            - < 40: Hohe Risiken
+
+            Beispielwerte:
+            - UAE (AED): Score ~ 88
+            - Saudi (SAR): Score ~ 84
+            - Katar (QAR): Score ~ 82
+            - Oman (OMR): Score ~ 78
+
+            ---
+
+            ## FRÜHWARNSYSTEM FÜR WÄHRUNGSKRISEN
+
+            Trigger 1: Inflation
+            - Warnung: Inflation > 8 %
+            - Alarm: Inflation > 15 %
+
+            Trigger 2: Devisenreserven
+            - Warnung: Reserven fallen 10 % in 3 Monaten
+            - Alarm: Reserven fallen 20 % in 3 Monaten
+
+            Trigger 3: Wechselkurs
+            - Warnung: Abwertung > 5 % in 30 Tagen
+            - Alarm: Abwertung > 10 % in 30 Tagen
+
+            Trigger 4: Zinsen
+            - Warnung: Leitzins steigt 2× in 60 Tagen
+            - Alarm: Notfallzinserhöhung > 200 Basispunkte
+
+            Trigger 5: Kapitalflucht
+            - Warnung: Kapitalabfluss > 3 % BIP
+            - Alarm: Kapitalabfluss > 5 % BIP
+
+            Trigger 6: Politische Instabilität
+            - Warnung: Regierungswechsel, Proteste, SankStionen
+            - Alarm: Staatskrise, Putsch, Krieg
+
+            Output:
+            - Ampel (grün/gelb/rot)
+            - Risiko-Score
+            - Handlungsempfehlung
+
+            ---
+
+            ## GCC-ERWEITERUNG – KUWAIT & BAHRAIN
+
+            Kuwait – KWD
+            - Sehr starke Währung (eine der „teuersten“ der Welt)
+            - Ölreich, hoher Wohlstand
+            - Peg: Korb aus Währungen mit starkem USD-Anteil
+            - Hohe Reserven, relativ konservative Politik
+            - Risiko: Ölpreis, regionale Politik
+
+            Bahrain – BHD
+            - Kleine, offene Wirtschaft
+            - Peg an den US-Dollar
+            - Weniger Reserven als Saudi/UAE/Katar/Kuwait
+            - Teilweise Unterstützung durch Nachbarländer (Saudi, UAE)
+            - Risiko: Schulden, Abhängigkeit von externer Hilfe
+
+            Erweiterung im Dashboard:
+            - Region „GCC“ umfasst:
+              - Saudi-Arabien (SAR)
+              - UAE (AED)
+              - Katar (QAR)
+              - Oman (OMR)
+              - Kuwait (KWD)
+              - Bahrain (BHD)
+            - Vergleichstabelle + Risiko-Ranking + Radar pro Land
+
+            ---
+
+            ## GLOBALER WÄHRUNGSVERGLEICH – TR, AR, CH
+
+            Türkei – TRY
+            - Hohe und volatile Inflation
+            - Zentralbank politisch beeinflusst
+            - Starke Währungsabwertung in den letzten Jahren
+            - Hohe Fremdwährungsschulden im Privatsektor
+            - Kapitalflucht-Tendenzen
+            → Hohe Währungsrisiken
+
+            Argentinien – ARS
+            - Chronisch hohe Inflation (oft zweistellig bis dreistellig)
+            - Mehrfache Staatspleiten in der Geschichte
+            - Kapitalkontrollen, Parallelmärkte (Schwarzmarkt-Dollar)
+            - Sehr geringes Vertrauen in die Landeswährung
+            → Extrem hohes Währungsrisiko, strukturell
+
+            Schweiz – CHF
+            - Sehr niedrige Inflation
+            - Starke, unabhängige Zentralbank (SNB)
+            - Sichere Anlagewährung („Safe Haven“)
+            - Hohe Devisenreserven
+            - Stabile Politik, starke Wirtschaft
+            → Eine der stabilsten Währungen der Welt
+
+            ---
+
+            ## GLOBALER WÄHRUNGS-SCORE (0–100, 100 = sehr stabil)
+
+            Schweiz – CHF
+            - IR=0.05, FXR=0.10, CBR=0.05, SDR=0.20, USDR=0.20, KFR=0.05
+            → Score ≈ 92 (sehr stabil)
+
+            Türkei – TRY
+            - IR=0.80, FXR=0.70, CBR=0.80, SDR=0.50, USDR=0.60, KFR=0.70
+            → Score ≈ 30 (hohes Risiko)
+
+            Argentinien – ARS
+            - IR=0.95, FXR=0.85, CBR=0.90, SDR=0.70, USDR=0.70, KFR=0.90
+            → Score ≈ 18 (extrem hohes Risiko)
+
+            ---
+
+            ## GLOBALE WÄHRUNGS-STORYLINE-ENGINE
+
+            Input:
+            - stability_score (0–100)
+            - inflation_yoy
+            - fx_volatility_risk
+            - cb_independence_risk
+            - sovereign_debt_risk
+            - capital_flight_risk
+            - peg_type (fixed/managed/float)
+            - region
+
+            Regel-Templates:
+
+            1) Stabilitäts-Level
+            - Score ≥ 85:
+              -> "Die Währung zählt zu den stabilsten weltweit und wird häufig als sicherer Hafen betrachtet."
+            - 70 ≤ Score < 85:
+              -> "Die Währung gilt als stabil, mit überschaubaren Risiken."
+            - 50 ≤ Score < 70:
+              -> "Die Währung weist erhöhte Risiken auf, bleibt aber grundsätzlich funktionsfähig."
+            - Score < 50:
+              -> "Die Währung ist mit erheblichen Risiken behaftet; Krisen sind möglich oder bereits sichtbar."
+
+            2) Inflations-Kommentar
+            - inflation_yoy < 3 %:
+              -> "Die Inflation ist niedrig und gut kontrolliert."
+            - 3–8 %:
+              -> "Die Inflation ist erhöht und sollte beobachtet werden."
+            - > 8 %:
+              -> "Die hohe Inflation belastet die Kaufkraft und erhöht das Währungsrisiko deutlich."
+
+            3) Zentralbank-Kommentar
+            - cb_independence_risk niedrig:
+              -> "Die Zentralbank gilt als unabhängig und glaubwürdig."
+            - hoch:
+              -> "Politische Einflussnahme auf die Zentralbank schwächt das Vertrauen in die Währung."
+
+            4) Kapitalflucht-Kommentar
+            - capital_flight_risk hoch:
+              -> "Es besteht ein erhöhtes Risiko, dass Kapital das Land verlässt, was zusätzlichen Druck auf die Währung ausüben kann."
+
+            5) Peg vs. Float
+            - peg_type = fixed:
+              -> "Die Währung ist an eine Leitwährung gekoppelt, was kurzfristig Stabilität, aber langfristig Abhängigkeiten schafft."
+            - peg_type = float:
+              -> "Die Währung wird frei gehandelt und reagiert sensibel auf Markt- und Politikereignisse."
+
+            Output (Beispielstruktur):
+            - Stärken: [Liste generierter Sätze]
+            - Schwächen: [Liste generierter Sätze]
+            - Kurzprognose (1–3 Sätze), z. B.:
+              -> "Kurzfristig bleibt die Währung stabil, mittelfristig hängen die Risiken vor allem von Inflation und Politik ab."
+            """)
 
         # -------------------------------------------------
         # TAB: Ticker → ISIN
@@ -1712,6 +2031,6 @@ def app():
 
                 with gr.Tab("System"):
                     build_system_info()
-        
+
 
     return demo
