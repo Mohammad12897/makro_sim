@@ -240,3 +240,27 @@ makro_sim/
    ├── Portfolio‑Heatmap
    ├── Symbol‑Tools
    └── Debug‑Log
+
+
+makro_sim/
+│
+├── fx_dashboard/                ← dein bestehendes FX‑Projekt (unverändert)
+│   ├── src/
+│   ├── models/
+│   ├── data/
+│   └── ...
+│
+└── risk_dashboard/              ← das große Makro‑Risiko‑Projekt
+    │
+    ├── src/
+    │   ├── data_loader.py        ← lädt (später echte) Makrodaten
+    │   ├── risk_factors.py       ← Berechnung von Indikatoren (GDP, Inflation, etc.)
+    │   ├── risk_engine.py        ← kombiniert alles zu Risiko‑Scores
+    │   ├── fx_integration.py     ← Anbindung an fx_dashboard
+    │   └── app.py                ← Streamlit‑Dashboard (Makro + Risiko + FX)
+    │
+    ├── data/
+    │   └── synthetic_macro.csv   ← synthetische Beispiel‑Daten
+    ├── notebooks/
+    ├── requirements.txt
+    └── README.md
