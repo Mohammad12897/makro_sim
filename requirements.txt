@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 pandas>=1.5
 numpy>=1.23
 gradio>=3.0
@@ -7,3 +8,16 @@ requests>=2.28
 pyarrow>=8.0
 pandasdmx>=1.2
 pytest>=7.0
+=======
+pandas==2.2.2
+numpy
+scikit-learn
+matplotlib
+plotly
+yfinance
+pandas-datareader
+pyyaml
+streamlit
+pytest
+pyyaml
+>>>>>>> 00077ec (Add risk profile presets, UI form, config loader and lesson)

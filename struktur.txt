@@ -1,0 +1,55 @@
+risk_dashboard/
+│
+├── data/
+│   ├── synthetic_macro.csv
+│   ├── fx_data_usd_eur.csv
+│   └── ...
+│
+├── models/
+│   └── rf_model_usd_eur.joblib
+│
+├── src/
+│   ├── app.py
+│   │
+│   ├── core/
+│   │   ├── risk_engine.py
+│   │   ├── fx_model.py
+│   │   ├── macro_loader.py
+│   │   └── utils.py
+│   │
+│   ├── features/
+│   │   ├── fx_features.py
+│   │   └── macro_features.py
+│   │
+│   ├── training/
+│   │   ├── train_fx_model.py
+│   │   └── train_macro_model.py (optional)
+│   │
+│   ├── visualization/
+│   │   ├── macro_charts.py
+│   │   ├── risk_charts.py
+│   │   └── fx_charts.py
+│   │
+│   └── config/
+│       └── settings.yaml
+│
+└── docs/
+    ├── lexikon.md
+    ├── architecture.md
+    └── onboarding.md
+
+
+
+[ Makro ] 
+     ↓
+[ FX ] 
+     ↓
+[ Risiko‑Score ]
+     ↓
+[ Szenario ]
+     ↓
+[ Regime ]
+     ↓
+[ Portfolio‑Engine (RP/HRP) ]
+     ↓
+[ Investment‑Paket ]

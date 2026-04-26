@@ -1,0 +1,14 @@
+paths:
+  data: "risk_dashboard/data"
+  models: "risk_dashboard/models"
+
+risk_weights:
+  inflation: 0.25
+  interest: 0.20
+  growth: 0.20
+  labor: 0.15
+  market_stress: 0.10
+  fx: 0.10
+
+fx:
+  volatility_window: 20

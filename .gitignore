@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 __pycache__/
 *.pyc
 *.pyo
@@ -22,3 +23,20 @@ data/
 *.csv
 /content/drive/
 colab_keys/
+=======
+# Python
+__pycache__/
+*.pyc
+
+# Virtualenv
+venv/
+.env
+
+# Logs and caches
+*.log
+indicator_cache.json
+
+# IDEs
+.vscode/
+.idea/
+>>>>>>> 00077ec (Add risk profile presets, UI form, config loader and lesson)
