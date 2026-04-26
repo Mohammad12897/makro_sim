@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-#core/cluster_engine.py
-=======
-#risk_dashboard/core/cluster_engine.py
->>>>>>> 00077ec (Add risk profile presets, UI form, config loader and lesson)
 from sklearn.cluster import KMeans
 import pandas as pd
 

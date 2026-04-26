@@ -1,30 +1,3 @@
-<<<<<<< HEAD
-#core/risk_engine.py
-
-def compute_risk_scores(presets):
-    # Slider-Werte sind bereits 0–1, wir verwenden sie direkt
-    return presets
-
-
-def apply_shocks_to_scores(base_scores, shock_values):
-    """
-    Wendet Szenario-Shocks auf Risiko-Scores an.
-    Floats werden geschockt, Dicts unverändert übernommen.
-    """
-
-    new_scores = {}
-
-    for key, value in base_scores.items():
-        if isinstance(value, (int, float)):
-            shock = shock_values.get(key, 0.0)
-            new_scores[key] = max(0.0, min(1.0, value + shock))
-        elif isinstance(value, dict):
-            new_scores[key] = value
-        else:
-            new_scores[key] = value
-
-    return new_scores
-=======
 # risk_dashboard/core/risk_engine.py
 import pandas as pd
 import numpy as np
@@ -292,4 +265,3 @@ def detect_risk_regimes_from_scenario(scenario_df):
     df["risk_score_pca"] = compute_pca_score(df)
     df["regime_label"] = assign_regime(df["risk_score_pca"])
     return df
->>>>>>> 00077ec (Add risk profile presets, UI form, config loader and lesson)
