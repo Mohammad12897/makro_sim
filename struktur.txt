@@ -1,0 +1,61 @@
+makro_sim/
+│
+├── pyproject.toml
+├── requirements.txt
+├── README.md
+├── run.py
+│
+├── risk_dashboard/
+│   ├── __init__.py
+│   ├── data/
+│   │   ├── equity_returns.csv
+│   │   ├── bond_returns.csv
+│   │   └── gold_returns.csv
+│   │
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── data_import.py
+│   │   ├── market_engine.py
+│   │   └── portfolio_sim/
+│   │       ├── __init__.py
+│   │       ├── covariance.py
+│   │       ├── mc_engine.py
+│   │       └── risk_metrics.py
+│   │
+│   ├── src/
+│   │   ├── __init__.py
+│   │   └── visualization/
+│   │       ├── __init__.py
+│   │       └── scenario_compare.py
+│   │
+│   ├── ui/
+│   │   ├── __init__.py
+│   │   ├── app.py
+│   │   ├── logic_screener.py
+│   │   ├── logic_portfolio.py
+│   │   └── logic_ki.py
+│   │
+│   └── tests/
+│       ├── test_check.py
+│       ├── test_covariance.py
+│       ├── test_mc_engine.py
+│       ├── test_risk_metrics.py
+│       ├── test_tz_normalization.py
+│       └── test_yf.py
+│
+└── venv/
+
+
+[ Makro ] 
+     ↓
+[ FX ] 
+     ↓
+[ Risiko‑Score ]
+     ↓
+[ Szenario ]
+     ↓
+[ Regime ]
+     ↓
+[ Portfolio‑Engine (RP/HRP) ]
+     ↓
+[ Investment‑Paket ]

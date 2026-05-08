@@ -1,0 +1,4 @@
+fred:
+  api_key: "5b75a1beb133f4e4aa6b8929ca39a762"
+  cache_dir: "cache"
+  max_age_days: 3
