@@ -1,0 +1,33 @@
+100 % funktionierende EU‑ETF‑Liste (Yahoo‑kompatibel)
+1. Aktien – USA / Global
+Kategorie       ETF	                            Yahoo‑Ticker        Status
+S&P 500         iShares Core S&P 500            CSPX.L              ✔ stabil
+Nasdaq 100      Invesco Nasdaq 100              EQQQ.L              ✔ stabil
+MSCI World      iShares Core MSCI World         EUNL.DE             ✔ stabil
+Quality Factor	iShares Edge MSCI World Quality IQQ0.DE	            ✔ stabil
+Small Caps      iShares MSCI World Small Cap    WSML.L              ✔ stabil
+
+2. Europa / Developed Markets
+Kategorie	                ETF	                        Yahoo‑Ticker    Status
+Developed Markets	        Vanguard FTSE Dev. Europe   VEVE.L	        ⚠ manchmal leer
+Alternative (besser!)	    iShares MSCI Europe         IMEU.L          ✔ stabil
+Alternative (noch besser!)	Xtrackers MSCI Europe       XXEU.L          ✔ stabil
+
+➡ Empfehlung:  
+IMEU.L oder XXEU.L statt VEVE.L verwenden.
+
+3. Anleihen (Bonds)
+Kategorie                   ETF	                            Yahoo‑Ticker	Status
+Global Aggregate Bonds	    iShares Global Aggregate Bond	AGGG.L	        ✔ stabil
+EUR Government Bonds	    iShares EUR Govt Bond	        IEGA.L	        ✔ stabil
+UK Gilts (lang)	            iShares UK Gilts	            IGLT.L	        ⚠ manchmal leer
+Alternative (besser!)	    iShares Global Govt Bond	    IGLO.L	        ✔ stabil
+Alternative (noch besser!)	iShares USD Treasury 20+yr	    IDTL.L	        ✔ stabil
+➡ Empfehlung:  
+AGGG.L, IEGA.L, IGLO.L statt IGLT.L.
+
+4. Gold / Rohstoffe
+Kategorie	        ETF	                            Yahoo‑Ticker	Status
+Gold (physisch)	    iShares Physical Gold	        SGLN.L	        ✔ stabil
+Gold (Xetra)	    Xetra‑Gold	                    4GLD.DE	        ✔ stabil
+Rohstoffe breit	    WisdomTree Broad Commodities	PCOM.L	        ✔ stabil

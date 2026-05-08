@@ -1,0 +1,25 @@
+{
+  "macro": "Makroökonomische Stabilität: umfasst Verschuldung, Währungsrisiken, Refinanzierungsrisiken, Kapitalmarktabhängigkeit und die Fähigkeit eines Landes, externe Schocks wirtschaftlich abzufedern.",
+  
+  "geo": "Geopolitische Risiken: beschreibt die Verwundbarkeit gegenüber externem Einfluss, geopolitischen Spannungen, internationalen Konflikten und der Stabilität außenpolitischer Beziehungen.",
+  
+  "governance": "Governance-Qualität: misst institutionelle Stärke, Rechtsstaatlichkeit, Korruptionsniveau, demokratische Strukturen und die Effektivität staatlicher Entscheidungsprozesse.",
+  
+  "handel": "Handelsabhängigkeit: bewertet die Konzentration von Exporten und Importen, die Abhängigkeit von einzelnen Handelspartnern sowie die Verwundbarkeit gegenüber Handelsstörungen.",
+  
+  "supply_chain": "Lieferkettenrisiken: umfasst Chokepoints, Produktionskonzentration, Just-in-Time-Anteile, Lagerpuffer und die Robustheit globaler und nationaler Wertschöpfungsketten.",
+  
+  "financial": "Finanzielle Verwundbarkeit: beschreibt Risiken aus Auslandsverschuldung, Kapitalmarktintegration, Investorenstruktur und der Abhängigkeit von Fremdwährungsfinanzierung.",
+  
+  "tech": "Technologische Abhängigkeit: misst die Abhängigkeit von Halbleitern, Cloud-Diensten, Software, IP-Lizenzen und kritischen Schlüsseltechnologien.",
+  
+  "energie": "Energieabhängigkeit: bewertet die Importabhängigkeit, Diversifikation der Energiequellen, Schockempfindlichkeit und strukturelle Verwundbarkeit des Energiesystems.",
+  
+  "currency": "Währungsrisiken: umfasst USD-Dominanz, FX-Schockempfindlichkeit, Währungsreserven und die Stabilität des nationalen Währungssystems.",
+  
+  "political_security": "Politische Verwundbarkeit: beschreibt Risiken aus externer Einflussnahme, geopolitischen Spannungen, Sanktionsrisiken und sicherheitspolitischer Instabilität.",
+  
+  "strategische_autonomie": "Strategische Autonomie: misst die Fähigkeit eines Landes, unabhängig außen- und wirtschaftspolitisch zu handeln, inklusive diplomatischer Resilienz und Diversifikation kritischer Abhängigkeiten.",
+  
+  "total": "Gesamtrisiko: der aggregierte, gewichtete Risikoindex über alle Dimensionen hinweg. Er bildet die Gesamtverwundbarkeit eines Landes gegenüber ökonomischen, geopolitischen, technologischen und politischen Schocks ab."
+}

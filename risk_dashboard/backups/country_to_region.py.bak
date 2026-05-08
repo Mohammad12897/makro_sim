@@ -1,0 +1,18 @@
+# country_to_region.py
+# Explizite Zuordnung von Ländern zu Regionen
+country_to_region = {
+    "deutschland": "Europa",
+    "germany": "Europa",
+    "frankreich": "Europa",
+    "france": "Europa",
+    "uk": "Europa",
+    "united kingdom": "Europa",
+    "grossbritannien": "Europa",
+    "japan": "Asien",
+    "japan": "Asien",
+    "usa": "USA",
+    "united states": "USA",
+    "us": "USA",
+    "welt": "Global",
+    "global": "Global"
+}
