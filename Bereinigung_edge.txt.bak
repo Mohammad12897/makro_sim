@@ -1,0 +1,26 @@
+Sofortmaßnahmen (ausführen — keine Admin‑Rechte nötig)
+1) Zwischenablage leeren
+
+
+Set-Clipboard -Value ''
+# falls Set-Clipboard Probleme macht:
+Add-Type -AssemblyName PresentationCore
+[Windows.Clipboard]::Clear()
+
+
+2) PowerShell‑History löschen (aktuelle Session + persistente Datei)
+
+
+Clear-History
+$hist = (Get-PSReadLineOption).HistorySavePath
+if (Test-Path $hist) { Remove-Item $hist -Force }
+# Terminal neu starten
+exit
+
+
+Öffne danach PowerShell neu.
+
+3) Prüfen, ob der Block noch in Dateien steht
+
+
+Get-ChildItem -Recurse -File | Select-String -Pattern "edge_all_open_tabs" | Select-Object -ExpandProperty Path -Unique
