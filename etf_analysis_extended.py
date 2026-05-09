@@ -122,40 +122,43 @@ plt.savefig(f"{OUT_DIR}/correlation_heatmap.png", dpi=150)
 plt.close()
 print(f"Korrelations-Heatmap gespeichert: {OUT_DIR}/correlation_heatmap.png")
 
+
+
 # === Einfacher Rebalancing Backtest (gleichgewichtet) ===
 print("Starte Rebalancing-Backtest...")
-# Start mit gleichgewichteter Allokation
 weights = pd.Series(1.0 / len(ETFS), index=ETFS)
 
-# Resample prices to business day frequency to align
-prices = prices.asfreq('B').ffill()
+# Stelle sicher, dass prices und rets dieselbe Index-Frequenz haben
+prices = prices.asfreq('B').ffill()            # Business days, forward-fill missing
+rets = prices.pct_change().fillna(0)           # neu berechnete tägliche Renditen, keine NaNs
 
-# Build portfolio value series with periodic rebalancing
-portfolio_values = pd.Series(index=prices.index, dtype=float)
-holdings = (weights * 1.0)  # relative weights
-cash = 1.0  # start with 1.0 unit of capital
-# We'll simulate by computing portfolio returns with rebalancing at period start
+# Bestimme Rebalancing-Perioden (verwende 'YE' statt 'Y' wegen Deprecation)
 period_starts = prices.resample(REBALANCE_FREQ).first().index
 
-current_weights = weights.copy()
-pv = pd.Series(1.0, index=prices.index)  # portfolio cumulative factor
+# Simpler, korrekter Weg: für jeden Periode-Bereich die täglichen Portfolio-Renditen berechnen
+pv = pd.Series(index=prices.index, dtype=float)
+current_factor = 1.0
 
 for i in range(len(period_starts)):
     start = period_starts[i]
     end = period_starts[i+1] if i+1 < len(period_starts) else prices.index[-1]
     mask = (prices.index >= start) & (prices.index <= end)
-    # compute daily portfolio returns using current_weights
+    if not mask.any():
+        continue
+    # tägliche Renditen für die Periode, ausgerichtet auf prices index
     daily_rets = rets.loc[mask, ETFS].fillna(0)
-    # portfolio daily returns
-    port_daily = (daily_rets * current_weights).sum(axis=1)
-    # update cumulative
-    if mask.any():
-        pv.loc[mask] = (1 + port_daily).cumprod() * (pv.loc[mask].iloc[0] if pv.loc[mask].iloc[0] != 0 else 1.0)
-    # at end, rebalance: set weights back to equal
-    current_weights = weights.copy()
+    # Portfolio tägliche Rendite = gewichtete Summe
+    port_daily = daily_rets.dot(weights)
+    # kumulative Entwicklung in der Periode, multipliziert mit Startfaktor
+    period_cum = (1 + port_daily).cumprod() * current_factor
+    pv.loc[mask] = period_cum.values
+    # setze neuen Startfaktor für nächste Periode auf letzten Wert dieser Periode
+    current_factor = period_cum.iloc[-1]
+    # rebalance: weights bleiben gleich (gleichgewichtet), so nichts zu tun
 
-# If pv has NaNs at beginning, fill
+# Fallback: fülle evtl. NaNs
 pv = pv.fillna(method="ffill").fillna(1.0)
+
 
 # Save backtest cumulative
 pv.to_csv(f"{OUT_DIR}/backtest_cumulative.csv")
