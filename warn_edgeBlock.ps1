@@ -6,19 +6,18 @@ function Warn-EdgeBlock {
   )
 
   $pattern = "edge_all_open_tabs|User's Edge browser tabs metadata"
+  $targets = @()
 
   if ($GitDiff) {
     if (-not (Test-Path .git)) {
       Write-Error "Kein Git-Repository gefunden. Entferne -GitDiff oder führe im Repo aus."
       return 2
     }
-    # prüfe nur geänderte/gestagete Dateien
-    $files = git diff --cached --name-only
-    if (-not $files) {
-      Write-Host "Keine gestageten Änderungen gefunden." -ForegroundColor Yellow
-      return 0
-    }
-    $targets = $files | Where-Object { Test-Path $_ } | ForEach-Object { Resolve-Path $_ }
+    # sichere Abfrage der gestageten Dateien, null-terminiert, dann filtern
+    $raw = git diff --cached --name-only --diff-filter=ACM -z 2>$null
+    if (-not $raw) { Write-Host "Keine gestageten Änderungen gefunden." -ForegroundColor Yellow; return 0 }
+    $files = $raw -split "`0" | Where-Object { $_ -and (Test-Path $_) }
+    $targets = $files
   } else {
     $targets = Get-ChildItem -Path $Path -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
   }
@@ -33,9 +32,9 @@ function Warn-EdgeBlock {
         foreach ($m in $matches) {
           $ln = $m.LineNumber
           $contextStart = [Math]::Max(1, $ln - 2)
-          $contextEnd = $ln + 2
+          $contextEnd = [Math]::Min((Get-Content $f).Count, $ln + 2)
           $lines = Get-Content -Path $f -ErrorAction SilentlyContinue
-          for ($i = $contextStart; $i -le [Math]::Min($lines.Count, $contextEnd); $i++) {
+          for ($i = $contextStart; $i -le $contextEnd; $i++) {
             $prefix = if ($i -eq $ln) { ">>" } else { "  " }
             Write-Host ("{0,4}: {1} {2}" -f $i, $prefix, $lines[$i-1])
           }
