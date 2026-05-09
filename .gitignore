@@ -14,3 +14,4 @@ generate_presets.log
 # IDEs
 .vscode/
 .idea/
+tmp_backup_files_*/
