@@ -15,3 +15,10 @@ generate_presets.log
 .vscode/
 .idea/
 tmp_backup_files_*/
+
+# data and caches
+/data/
+/cache/
+*.csv
+*.parquet
+*.bak
