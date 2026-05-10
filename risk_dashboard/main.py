@@ -1,4 +1,4 @@
-#
+﻿#
 # main.py
 
 from ui.app import app
@@ -9,3 +9,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

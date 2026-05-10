@@ -1,4 +1,4 @@
-# etf_analysis.py
+﻿# etf_analysis.py
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -14,7 +14,7 @@ end = None
 # Daten laden
 data = yf.download(etfs, start=start, end=end, auto_adjust=True)["Close"]
 
-# tägliche Renditen
+# tÃ¤gliche Renditen
 rets = data.pct_change().dropna()
 
 # Kennzahlen
@@ -35,4 +35,5 @@ print(summary.sort_values("Sharpe", ascending=False))
 plt.title("Cumulative Returns")
 plt.show()
 plt.savefig("cumulative_returns.png", dpi=150, bbox_inches="tight")
+
 

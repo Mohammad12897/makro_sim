@@ -1,4 +1,4 @@
-# risk_dashboard/core/cluster.py
+﻿# risk_dashboard/core/cluster.py
 
 from __future__ import annotations
 from typing import Dict, List
@@ -32,13 +32,13 @@ CLUSTER_DIMS = [
 CLUSTER_COLORS = {
     0: "#d62728",  # rot (hohes Risiko)
     1: "#ffbf00",  # gelb (mittleres Risiko)
-    2: "#2ca02c",  # grün (niedriges Risiko)
-    # ggf. weitere Cluster-Farben ergänzen
+    2: "#2ca02c",  # grÃ¼n (niedriges Risiko)
+    # ggf. weitere Cluster-Farben ergÃ¤nzen
 }
 
 def extract_vector(scores: dict) -> np.ndarray:
     """
-    Extrahiert die Risiko-Dimensionen als Vektor für das Clustering.
+    Extrahiert die Risiko-Dimensionen als Vektor fÃ¼r das Clustering.
     """
     return np.array([scores[d] for d in CLUSTER_DIMS], dtype=float)
 
@@ -66,7 +66,7 @@ def cluster_risk_dimensions(presets: dict, k: int = 3):
 
     clusters = {land: int(label) for land, label in zip(lands, labels)}
 
-    return clusters, model   # ❗ WICHTIG
+    return clusters, model   # â— WICHTIG
 
 
 # ---------------------------------------------------------
@@ -89,27 +89,27 @@ def interpret_cluster(center: np.ndarray) -> str:
     for d, v in dims_sorted[:3]:
         md += f"  - {d}: {v:.2f}\n"
 
-    md += "\n- **Stabilitätsanker:**\n"
+    md += "\n- **StabilitÃ¤tsanker:**\n"
     for d, v in dims_sorted[-2:]:
         md += f"  - {d}: {v:.2f}\n"
 
-    md += "\n- **Politische Abhängigkeit & Autonomie:**\n"
+    md += "\n- **Politische AbhÃ¤ngigkeit & Autonomie:**\n"
     ps = center[CLUSTER_DIMS.index("political_security")]
     sa = center[CLUSTER_DIMS.index("strategische_autonomie")]
 
     if ps > 0.75:
-        md += "  - Sehr hohe politische Abhängigkeit.\n"
+        md += "  - Sehr hohe politische AbhÃ¤ngigkeit.\n"
     elif ps > 0.55:
-        md += "  - Erhöhte politische Abhängigkeit.\n"
+        md += "  - ErhÃ¶hte politische AbhÃ¤ngigkeit.\n"
     else:
-        md += "  - Politische Abhängigkeit moderat.\n"
+        md += "  - Politische AbhÃ¤ngigkeit moderat.\n"
 
     if sa > 0.75:
         md += "  - Sehr hohe strategische Autonomie.\n"
     elif sa > 0.50:
         md += "  - Solide strategische Autonomie.\n"
     else:
-        md += "  - Eingeschränkte strategische Autonomie.\n"
+        md += "  - EingeschrÃ¤nkte strategische Autonomie.\n"
 
     return md
 
@@ -120,7 +120,7 @@ def interpret_cluster(center: np.ndarray) -> str:
 
 def cluster_heatmap(presets: Dict[str, dict], k: int = 3):
     """
-    Gibt eine Heatmap-Tabelle zurück:
+    Gibt eine Heatmap-Tabelle zurÃ¼ck:
     Land | Cluster | political_security | strategische_autonomie | total
     """
     clusters, _ = cluster_risk_dimensions(presets, k)
@@ -142,7 +142,7 @@ def cluster_scatterplot(presets: dict, k: int = 3):
     """
     Scatterplot: Politisches Risiko vs. Strategische Autonomie
     Farbe = Cluster (einheitlich)
-    Punktgröße = Gesamtrisiko
+    PunktgrÃ¶ÃŸe = Gesamtrisiko
     """
     clusters, model = cluster_risk_dimensions(presets, k)
     rows = []
@@ -168,7 +168,7 @@ def cluster_scatterplot(presets: dict, k: int = 3):
         color_discrete_map=CLUSTER_COLORS,
         size="Total",
         hover_name="Land",
-        title="Cluster-Scatterplot: Länder nach Risiko-Dimensionen"
+        title="Cluster-Scatterplot: LÃ¤nder nach Risiko-Dimensionen"
     )
 
     fig.update_layout(
@@ -183,22 +183,22 @@ def cluster_scatterplot(presets: dict, k: int = 3):
 def etf_mapping_for_cluster(cid: int) -> str:
     if cid == 2:
         return """
-### ETF-Mapping für Cluster 2 (niedriges Risiko)
-- Industrieländer-ETFs
+### ETF-Mapping fÃ¼r Cluster 2 (niedriges Risiko)
+- IndustrielÃ¤nder-ETFs
 - Infrastruktur-ETFs
-- Qualitätsaktien-ETFs
-- Staatsanleihen hoher Bonität
+- QualitÃ¤tsaktien-ETFs
+- Staatsanleihen hoher BonitÃ¤t
 """
     elif cid == 1:
         return """
-### ETF-Mapping für Cluster 1 (mittleres Risiko)
+### ETF-Mapping fÃ¼r Cluster 1 (mittleres Risiko)
 - Emerging-Markets-ETFs
 - Rohstoff-ETFs
 - Branchen-ETFs (Industrie, Energie)
 """
     else:
         return """
-### ETF-Mapping für Cluster 0 (hohes Risiko)
+### ETF-Mapping fÃ¼r Cluster 0 (hohes Risiko)
 - Frontier-Markets-ETFs (kleiner Anteil)
 - Rohstoff-Exposure
 - Themen-ETFs (taktisch)
@@ -213,10 +213,10 @@ def describe_clusters(presets, clusters, model):
     aut_vals = centers[:, 1]  # strategische Autonomie
     tot_vals = centers[:, 2]  # Gesamtrisiko
 
-    # Hilfsfunktionen für relative Einordnung
+    # Hilfsfunktionen fÃ¼r relative Einordnung
     def rel_risk(value, all_values):
         if value == max(all_values):
-            return "höchstes"
+            return "hÃ¶chstes"
         elif value == min(all_values):
             return "niedrigstes"
         else:
@@ -224,7 +224,7 @@ def describe_clusters(presets, clusters, model):
 
     def rel_aut(value, all_values):
         if value == max(all_values):
-            return "höchste"
+            return "hÃ¶chste"
         elif value == min(all_values):
             return "geringste"
         else:
@@ -247,7 +247,7 @@ def describe_clusters(presets, clusters, model):
         if ps == min(ps_vals) and aut == max(aut_vals):
             cluster_name = "Resiliente, autonome Staaten"
         elif ps == max(ps_vals) and aut == min(aut_vals):
-            cluster_name = "Politisch verwundbare, abhängige Staaten"
+            cluster_name = "Politisch verwundbare, abhÃ¤ngige Staaten"
         elif tot == max(tot_vals):
             cluster_name = "Hochrisiko-Staaten"
         elif tot == min(tot_vals):
@@ -258,9 +258,9 @@ def describe_clusters(presets, clusters, model):
         # Markdown-Ausgabe
         lines.append(f"## Cluster {cid}: {cluster_name}")
         lines.append(f"**Beschreibung:** {ps_desc}, {aut_desc}, {tot_desc}.")
-        lines.append(f"**Beispiel-Länder:** {laender_str}")
+        lines.append(f"**Beispiel-LÃ¤nder:** {laender_str}")
         lines.append("")
-        lines.append("| Ø Politisches Risiko | Ø Autonomie | Ø Gesamtrisiko |")
+        lines.append("| Ã˜ Politisches Risiko | Ã˜ Autonomie | Ã˜ Gesamtrisiko |")
         lines.append("|----------------------|-------------|-----------------|")
         lines.append(f"| {ps:.2f} | {aut:.2f} | {tot:.2f} |")
         lines.append("")
@@ -280,12 +280,12 @@ def investment_profile_for_cluster(ps: float, aut: float, total: float) -> str:
     # Grundcharakter
     if total < 0.4 and ps < 0.3 and aut > 0.7:
         titel = "Resiliente, autonome Staaten (niedriges Gesamtrisiko)"
-        lines.append("- Geeignet für: Staatsanleihen hoher Bonität, breite Aktien-ETFs, Infrastruktur-ETFs.")
-        lines.append("- Fokus: Stabilität, langfristige Planbarkeit, niedrige Ausfallrisiken.")
+        lines.append("- Geeignet fÃ¼r: Staatsanleihen hoher BonitÃ¤t, breite Aktien-ETFs, Infrastruktur-ETFs.")
+        lines.append("- Fokus: StabilitÃ¤t, langfristige Planbarkeit, niedrige Ausfallrisiken.")
     elif total < 0.6:
-        titel = "Staaten mit mittlerem Risiko (Schwellenländer-Profil)"
-        lines.append("- Geeignet für: Emerging-Markets-ETFs, Branchen-ETFs (Industrie, Energie, Rohstoffe).")
-        lines.append("- Fokus: Wachstumspotenzial, aber höhere Volatilität und politische Unsicherheit.")
+        titel = "Staaten mit mittlerem Risiko (SchwellenlÃ¤nder-Profil)"
+        lines.append("- Geeignet fÃ¼r: Emerging-Markets-ETFs, Branchen-ETFs (Industrie, Energie, Rohstoffe).")
+        lines.append("- Fokus: Wachstumspotenzial, aber hÃ¶here VolatilitÃ¤t und politische Unsicherheit.")
     else:
         titel = "Verwundbare Staaten (hohes Gesamtrisiko)"
         lines.append("- Nur selektive, taktische Investments, z.B. Rohstoff-Exposure oder spezielle Projekte.")
@@ -293,15 +293,15 @@ def investment_profile_for_cluster(ps: float, aut: float, total: float) -> str:
 
     # Zusatz: Einordnung der Autonomie
     if aut > 0.7:
-        lines.append("- Hohe strategische Autonomie: geringere Abhängigkeit von externen Akteuren.")
+        lines.append("- Hohe strategische Autonomie: geringere AbhÃ¤ngigkeit von externen Akteuren.")
     elif aut < 0.3:
-        lines.append("- Geringe strategische Autonomie: hohe Abhängigkeit von externen Akteuren.")
+        lines.append("- Geringe strategische Autonomie: hohe AbhÃ¤ngigkeit von externen Akteuren.")
     else:
-        lines.append("- Mittlere strategische Autonomie: gemischtes Abhängigkeitsprofil.")
+        lines.append("- Mittlere strategische Autonomie: gemischtes AbhÃ¤ngigkeitsprofil.")
 
     # Zusatz: Einordnung des politischen Risikos
     if ps > 0.7:
-        lines.append("- Hohes politisches Risiko: erhöhte Gefahr von Schocks, Sanktionen oder Instabilität.")
+        lines.append("- Hohes politisches Risiko: erhÃ¶hte Gefahr von Schocks, Sanktionen oder InstabilitÃ¤t.")
     elif ps < 0.3:
         lines.append("- Niedriges politisches Risiko: stabile politische Rahmenbedingungen.")
     else:
@@ -313,14 +313,14 @@ def investment_profile_for_cluster(ps: float, aut: float, total: float) -> str:
 
 def cluster_radar_plot(model):
     """
-    Erzeugt ein Radar-Chart für alle Cluster (Politisches Risiko, Autonomie, Gesamtrisiko).
+    Erzeugt ein Radar-Chart fÃ¼r alle Cluster (Politisches Risiko, Autonomie, Gesamtrisiko).
     - model.cluster_centers_ erwartet shape (k, 3) mit Werten in [0,1].
     """
     centers = model.cluster_centers_
     k = centers.shape[0]
     labels = ["Politisches Risiko", "Strategische Autonomie", "Gesamtrisiko"]
 
-    # Winkel für die Achsen
+    # Winkel fÃ¼r die Achsen
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False)
     angles = np.concatenate([angles, angles[:1]])
 
@@ -329,9 +329,9 @@ def cluster_radar_plot(model):
     for cid in range(k):
         # Sicherheitschecks
         if cid not in CLUSTER_COLORS:
-            raise KeyError(f"Keine Farbe für Cluster {cid} in CLUSTER_COLORS definiert.")
+            raise KeyError(f"Keine Farbe fÃ¼r Cluster {cid} in CLUSTER_COLORS definiert.")
         values = centers[cid]
-        # Werte zyklisch schließen
+        # Werte zyklisch schlieÃŸen
         values = np.concatenate([values, values[:1]])
 
         # Label setzen, damit legend() etwas hat
@@ -378,12 +378,12 @@ def laender_investment_profil(land: str, presets: dict, clusters: dict, model):
     # 1) Investment-Profil erzeugen
     profil = investment_profile_for_cluster(ps, aut, total)
 
-    # 2) ETF-Mapping hinzufügen
+    # 2) ETF-Mapping hinzufÃ¼gen
     profil += "\n\n" + etf_mapping_for_cluster(cid)
 
     # 3) Markdown zusammenbauen
 
-    md = f"# Länder-Investment-Profil: {land}\n"
+    md = f"# LÃ¤nder-Investment-Profil: {land}\n"
     md += f"**Cluster:** {cid}\n\n"
     md += profil
 
@@ -458,9 +458,9 @@ def portfolio_simulator(w0: float, w1: float, w2: float, model):
     profil = investment_profile_for_cluster(ps, aut, tot)
 
     md = "# Portfolio-Simulation\n"
-    md += f"**Ø Politisches Risiko:** {ps:.2f}\n\n"
-    md += f"**Ø Autonomie:** {aut:.2f}\n\n"
-    md += f"**Ø Gesamtrisiko:** {tot:.2f}\n\n"
+    md += f"**Ã˜ Politisches Risiko:** {ps:.2f}\n\n"
+    md += f"**Ã˜ Autonomie:** {aut:.2f}\n\n"
+    md += f"**Ã˜ Gesamtrisiko:** {tot:.2f}\n\n"
     md += profil
 
     return md
@@ -472,7 +472,7 @@ def asset_klassen_vergleich():
 ## Aktien
 - Renditequellen: Kursgewinne + Dividenden
 - Risiko: mittel bis hoch
-- Rolle: Wachstum, langfristige Vermögensbildung
+- Rolle: Wachstum, langfristige VermÃ¶gensbildung
 
 ## Gold
 - Renditequelle: reine Preisentwicklung
@@ -480,9 +480,9 @@ def asset_klassen_vergleich():
 - Rolle: Absicherung, Krisenschutz, Diversifikation
 
 ## Staatsanleihen
-- Renditequellen: Kupon + Rückzahlung
-- Risiko: abhängig von der Bonität (AAA = sehr niedrig)
-- Rolle: Stabilität, planbare Cashflows
+- Renditequellen: Kupon + RÃ¼ckzahlung
+- Risiko: abhÃ¤ngig von der BonitÃ¤t (AAA = sehr niedrig)
+- Rolle: StabilitÃ¤t, planbare Cashflows
 """
 
 
@@ -492,7 +492,7 @@ def country_credit_spread_from_score(ps_score):
     return 0.001 + ps_score * 0.08
 
 def political_premium(ps_score):
-    return ps_score * 0.02  # bis 2% zusätzlich
+    return ps_score * 0.02  # bis 2% zusÃ¤tzlich
 
 def sovereign_ytm(rf_yield, ps_score):
     spread = country_credit_spread_from_score(ps_score)
@@ -505,3 +505,4 @@ def country_equity_premium(total_score):
 
 def expected_equity_return(rf, beta, erp, total_score):
     return rf + beta * erp + country_equity_premium(total_score)
+

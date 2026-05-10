@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import shutil
 
@@ -17,3 +17,4 @@ def clear_cache():
     if os.path.exists(CACHE_DIR):
         shutil.rmtree(CACHE_DIR)
         os.makedirs(CACHE_DIR)   
+

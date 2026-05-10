@@ -1,4 +1,4 @@
-# risk_dashboard/core/data_import.py
+﻿# risk_dashboard/core/data_import.py
 
 import pandas as pd
 import numpy as np
@@ -8,10 +8,10 @@ from pathlib import Path
 
 def load_returns_csv(filename: str, expected_assets: list = None) -> pd.DataFrame:
     """
-    Lädt Rendite-CSV-Dateien aus risk_dashboard/data.
+    LÃ¤dt Rendite-CSV-Dateien aus risk_dashboard/data.
     - erkennt Datum automatisch
-    - prüft Spalten
-    - füllt fehlende Werte
+    - prÃ¼ft Spalten
+    - fÃ¼llt fehlende Werte
     - sortiert nach Datum
     """
 
@@ -33,13 +33,13 @@ def load_returns_csv(filename: str, expected_assets: list = None) -> pd.DataFram
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").set_index("date")
 
-    # Spalten prüfen
+    # Spalten prÃ¼fen
     if expected_assets:
         missing = set(expected_assets) - set(df.columns)
         if missing:
             raise ValueError(f"Fehlende Spalten in {filename}: {missing}")
 
-    # Fehlende Werte füllen
+    # Fehlende Werte fÃ¼llen
     df = df.ffill().bfill()
 
     # Sicherstellen, dass alles numerisch ist
@@ -50,7 +50,7 @@ def load_returns_csv(filename: str, expected_assets: list = None) -> pd.DataFram
 
 def load_yahoo_returns(ticker, start="2010-01-01", end=None):
     """
-    Lädt historische Renditen von Yahoo Finance.
+    LÃ¤dt historische Renditen von Yahoo Finance.
     """
     data = yf.download(ticker, start=start, end=end)
     if "Adj Close" not in data:
@@ -65,16 +65,16 @@ def validate_returns(df, expected_assets):
     """
     errors = []
 
-    # Spalten prüfen
+    # Spalten prÃ¼fen
     for asset in expected_assets:
         if asset not in df.columns:
             errors.append(f"Fehlende Spalte: {asset}")
 
-    # Datum prüfen
+    # Datum prÃ¼fen
     if not isinstance(df.index, pd.DatetimeIndex):
         errors.append("Index ist kein Datum.")
 
-    # Werte prüfen
+    # Werte prÃ¼fen
     if df.isna().sum().sum() > 0:
         errors.append("Fehlende Werte in den Daten.")
 
@@ -82,3 +82,4 @@ def validate_returns(df, expected_assets):
         errors.append("Unrealistische Renditen (>100% oder < -100%).")
 
     return errors
+

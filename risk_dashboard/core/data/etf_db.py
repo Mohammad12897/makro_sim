@@ -1,4 +1,4 @@
-#core/data/etf_db.py
+﻿#core/data/etf_db.py
 import json
 from pathlib import Path
 
@@ -9,3 +9,4 @@ def load_etf_db():
 
 def list_etf_tickers():
     return [e["ticker"] for e in load_etf_db()]
+

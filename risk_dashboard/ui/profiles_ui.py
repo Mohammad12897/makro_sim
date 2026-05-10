@@ -1,4 +1,4 @@
-# risk_dashboard/ui/profiles_ui.py
+﻿# risk_dashboard/ui/profiles_ui.py
 """
 Streamlit UI for managing portfolio profiles (presets) with validation and analysis.
 """
@@ -19,12 +19,12 @@ LEX_PATH = BASE_DIR / "docs" / "lexikon.md"
 
 TOOLTIPS = {
     "profile_name": "Name des Profils, z. B. Conservative, Balanced, Aggressive.",
-    "category": "Basis-Risikokategorie; füllt empfohlene Standardwerte vor.",
+    "category": "Basis-Risikokategorie; fÃ¼llt empfohlene Standardwerte vor.",
     "equity_pct": "Anteil Aktien am Portfolio in Prozent.",
     "bond_pct": "Anteil Anleihen am Portfolio in Prozent.",
-    "cash_pct": "Liquiditätsreserve in Prozent.",
-    "target_annual_return_pct": "Erwartete durchschnittliche Jahresrendite (Schätzwert).",
-    "max_drawdown_pct": "Maximal tolerierter Verlust vom Peak (z. B. 20 für 20%).",
+    "cash_pct": "LiquiditÃ¤tsreserve in Prozent.",
+    "target_annual_return_pct": "Erwartete durchschnittliche Jahresrendite (SchÃ¤tzwert).",
+    "max_drawdown_pct": "Maximal tolerierter Verlust vom Peak (z. B. 20 fÃ¼r 20%).",
     "rebalance": "Wie oft automatisch umgeschichtet werden soll.",
     "allowed_instruments": "Erlaubte Asset-Klassen oder ETFs (Keys aus dem ETF-Universe).",
     "notes": "Kurze Beschreibung des Profils.",
@@ -66,7 +66,7 @@ def detect_risk_category(eq: float, bd: float, cs: float) -> str:
 def apply_preset(keys: list, etf_universe: dict):
     missing = [k for k in keys if k not in etf_universe]
     if missing:
-        st.warning(f"Preset enthält nicht verfügbare ETFs: {', '.join(missing)}")
+        st.warning(f"Preset enthÃ¤lt nicht verfÃ¼gbare ETFs: {', '.join(missing)}")
     st.session_state.selected_etfs = [k for k in keys if k in etf_universe]
 
 def profile_form_ui() -> None:
@@ -100,7 +100,7 @@ def profile_form_ui() -> None:
     if not defaults:
         defaults.update(CATEGORY_DEFAULTS.get(category, {}))
     else:
-        if st.button("Mit Kategorie-Defaults überschreiben"):
+        if st.button("Mit Kategorie-Defaults Ã¼berschreiben"):
             defaults.update(CATEGORY_DEFAULTS.get(category, {}))
 
     st.markdown("**Profilname**")
@@ -127,13 +127,13 @@ def profile_form_ui() -> None:
     default_etfs = [k for k in raw_defaults if k in etf_options]
     missing_defaults = [k for k in raw_defaults if k not in etf_options]
     if missing_defaults:
-        st.warning("Einige voreingestellte Instrumente sind im aktuellen ETF‑Universe nicht vorhanden: " + ", ".join(missing_defaults) + ". Bitte wähle Alternativen oder ergänze das etf_universe.yaml.")
+        st.warning("Einige voreingestellte Instrumente sind im aktuellen ETFâ€‘Universe nicht vorhanden: " + ", ".join(missing_defaults) + ". Bitte wÃ¤hle Alternativen oder ergÃ¤nze das etf_universe.yaml.")
 
     if not st.session_state.selected_etfs and default_etfs:
         st.session_state.selected_etfs = default_etfs.copy()
 
     st.markdown("**Erlaubte ETFs / Instrumente**")
-    selected_etfs = st.multiselect("Wähle erlaubte ETFs (optional)", options=list(etf_options.keys()), format_func=lambda k: etf_options.get(k, k), default=st.session_state.selected_etfs, help="Wähle ETFs aus dem vordefinierten Universe. Du kannst eigene Keys verwenden.")
+    selected_etfs = st.multiselect("WÃ¤hle erlaubte ETFs (optional)", options=list(etf_options.keys()), format_func=lambda k: etf_options.get(k, k), default=st.session_state.selected_etfs, help="WÃ¤hle ETFs aus dem vordefinierten Universe. Du kannst eigene Keys verwenden.")
     if selected_etfs != st.session_state.selected_etfs:
         st.session_state.selected_etfs = selected_etfs
 
@@ -181,12 +181,12 @@ def profile_form_ui() -> None:
     else:
         auto_risk = "High"
 
-    st.markdown(f"### 🔍 Automatisch erkanntes Risiko: **{auto_risk}**")
+    st.markdown(f"### ðŸ” Automatisch erkanntes Risiko: **{auto_risk}**")
 
     fig = go.Figure(go.Indicator(mode="gauge+number", value=portfolio_vol, title={"text": "Risiko-Thermometer"}, gauge={"axis": {"range": [0, 20]}, "bar": {"color": "red"}, "steps": [{"range": [0, 6], "color": "lightgreen"}, {"range": [6, 12], "color": "yellow"}, {"range": [12, 20], "color": "orange"}],},))
     st.plotly_chart(fig, width='stretch')
 
-    with st.expander("Ausgewählte Instrumente und Paket‑Details"):
+    with st.expander("AusgewÃ¤hlte Instrumente und Paketâ€‘Details"):
         rows = []
         for key, weight in resolved_holdings:
             meta = etf_universe.get(key, {})
@@ -214,12 +214,12 @@ def profile_form_ui() -> None:
         # TER-Fix + Warnschwellen: ter_threshold_warn=0.01 (1%), herfindahl_warn=0.15
         analyze_portfolio_components(etf_universe, resolved_holdings, eq, bd, cs, vol_map, ter_threshold_warn=0.01, herfindahl_warn=0.15)
 
-    st.markdown("**Erlaubte Instrumente / Ausschlüsse (alternativ)**")
+    st.markdown("**Erlaubte Instrumente / AusschlÃ¼sse (alternativ)**")
     allowed_text = st.text_area("Allowed instruments (Komma-getrennt)", value=",".join(st.session_state.selected_etfs) if st.session_state.selected_etfs else ",".join(defaults.get("allowed_instruments", [])), help=TOOLTIPS["allowed_instruments"])
 
-    st.markdown("### 🔗 Abhängigkeiten & gültige Eingaben")
+    st.markdown("### ðŸ”— AbhÃ¤ngigkeiten & gÃ¼ltige Eingaben")
     valid_keys = list(etf_universe.keys())
-    st.markdown("**Gültige ETF-Keys aus dem Universe:**")
+    st.markdown("**GÃ¼ltige ETF-Keys aus dem Universe:**")
     if valid_keys:
         st.code(", ".join(valid_keys))
     else:
@@ -229,14 +229,14 @@ def profile_form_ui() -> None:
     recommended_medium = ["global_equity_etf", "aggregate_bond_etf", "small_cap"]
     recommended_high = ["global_equity_etf", "emerging_markets", "small_cap"]
 
-    st.markdown("**Empfohlene zusätzliche ETFs pro Risikoprofil:**")
+    st.markdown("**Empfohlene zusÃ¤tzliche ETFs pro Risikoprofil:**")
     st.info(f"**Low Risk:** {', '.join(recommended_low)}  \n**Medium Risk:** {', '.join(recommended_medium)}  \n**High Risk:** {', '.join(recommended_high)}")
 
     def check_invalid(user_list):
         return [x for x in user_list if x not in valid_keys]
 
     if check_invalid(recommended_low) or check_invalid(recommended_medium) or check_invalid(recommended_high):
-        st.warning("Einige empfohlene Keys existieren nicht im Universe. Bitte etf_universe.yaml prüfen/erweitern.")
+        st.warning("Einige empfohlene Keys existieren nicht im Universe. Bitte etf_universe.yaml prÃ¼fen/erweitern.")
 
     st.markdown("**Beschreibung / Notizen**")
     notes = st.text_area("Notes", value=defaults.get("notes", ""), help=TOOLTIPS["notes"])
@@ -269,7 +269,7 @@ def profile_form_ui() -> None:
             st.session_state.profile_selected = key
 
     with col_delete:
-        if selected != "<Neu>" and st.button("Profil löschen"):
+        if selected != "<Neu>" and st.button("Profil lÃ¶schen"):
             cfg = load_profiles()
             profiles = cfg.get("profiles", {})
             if selected in profiles:
@@ -279,15 +279,16 @@ def profile_form_ui() -> None:
                 cfg_path.parent.mkdir(parents=True, exist_ok=True)
                 with cfg_path.open("w", encoding="utf-8") as f:
                     yaml.safe_dump(cfg, f, sort_keys=False, allow_unicode=True)
-                st.success(f"Profil '{selected}' gelöscht.")
+                st.success(f"Profil '{selected}' gelÃ¶scht.")
                 st.session_state.profile_selected = "<Neu>"
                 st.session_state.selected_etfs = []
 
     st.markdown("---")
-    st.info("Tipp: Wähle ein Risikoprofil (Low/Medium/High) um empfohlene Standardwerte zu laden. Nutze Auto-normalize, damit Equity+Bonds+Cash automatisch 100% ergeben.")
+    st.info("Tipp: WÃ¤hle ein Risikoprofil (Low/Medium/High) um empfohlene Standardwerte zu laden. Nutze Auto-normalize, damit Equity+Bonds+Cash automatisch 100% ergeben.")
 
     with st.expander("Kurzlexikon und Quickstart"):
         if LEX_PATH.exists():
             st.markdown(LEX_PATH.read_text(encoding="utf-8"))
         else:
             st.write("Lexikon nicht gefunden. Bitte lege docs/lexikon.md an.")
+

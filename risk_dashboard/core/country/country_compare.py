@@ -1,4 +1,4 @@
-#core/country/country_compare.py
+﻿#core/country/country_compare.py
 
 import pandas as pd
 import numpy as np
@@ -15,10 +15,11 @@ def compute_country_metrics(ticker):
     return {
         "Land/Index": ticker,
         "Rendite": total_return,
-        "Volatilität": volatility,
+        "VolatilitÃ¤t": volatility,
         "Max Drawdown": max_dd,
     }
 
 def compare_countries(tickers):
     rows = [compute_country_metrics(t) for t in tickers]
     return pd.DataFrame(rows)
+

@@ -1,4 +1,4 @@
-# core/backend/ki_scanner.py
+﻿# core/backend/ki_scanner.py
 import pandas as pd
 from core.data.assets import get_asset_metrics, get_bitcoin_metrics
 from core.visualization.radar_plotly_assets import plot_asset_radar
@@ -51,7 +51,7 @@ def scan_assets(asset_string: str, profile: str, region: str):
             rows.append(metrics)
 
     if not rows:
-        return pd.DataFrame({"Fehler": ["Keine gültigen Assets gefunden"]}), None
+        return pd.DataFrame({"Fehler": ["Keine gÃ¼ltigen Assets gefunden"]}), None
 
     df = pd.DataFrame(rows)
     df = compute_ki_score(df, profile)
@@ -60,3 +60,4 @@ def scan_assets(asset_string: str, profile: str, region: str):
     fig = plot_asset_radar(rows, mode="experte")
 
     return df, fig
+

@@ -1,4 +1,4 @@
-from tracemalloc import start
+﻿from tracemalloc import start
 
 import yfinance as yf
 import pandas_datareader.data as web
@@ -13,7 +13,7 @@ import time
 from scipy.cluster.hierarchy import linkage, leaves_list
 from scipy.spatial.distance import squareform
 from datetime import datetime, timedelta
-# falls normalize_price_df in derselben Datei definiert ist, kein Import nötig
+# falls normalize_price_df in derselben Datei definiert ist, kein Import nÃ¶tig
 # sonst z.B.:
 from risk_dashboard.core.utils import get_latest_before, ensure_date_column, ensure_date_series, normalize_price_df
 
@@ -27,7 +27,7 @@ VALID_FALLBACKS = {
     "IGLT.L": "AGGG.L",
 }
 
-# Fallbacks für problematische EU-ETFs
+# Fallbacks fÃ¼r problematische EU-ETFs
 ETF_FALLBACKS = {
     "VEVE.L": "IMEU.L",
     "IGLT.L": "AGGG.L",
@@ -53,7 +53,7 @@ def _safe_linkage_from_dist(dist, method="single"):
 # order = leaves_list(Z)
 
 
-# --- Ergänzungen in risk_dashboard/core/market_engine.py ---
+# --- ErgÃ¤nzungen in risk_dashboard/core/market_engine.py ---
 
 
 
@@ -107,8 +107,8 @@ def _to_naive_datetime_index(series: pd.Series) -> pd.Series:
     Vereinheitlicht den Index einer Series:
     - stellt sicher, dass Index ein DatetimeIndex ist
     - konvertiert tz-aware Indizes nach UTC und entfernt tz-Info
-    - falls nötig, rekonstruiert Index mit pd.to_datetime
-    Rückgabe: Series mit tz-naive DatetimeIndex
+    - falls nÃ¶tig, rekonstruiert Index mit pd.to_datetime
+    RÃ¼ckgabe: Series mit tz-naive DatetimeIndex
     """
     # sicherstellen, dass Index DatetimeIndex ist
     if not isinstance(series.index, pd.DatetimeIndex):
@@ -120,7 +120,7 @@ def _to_naive_datetime_index(series: pd.Series) -> pd.Series:
         try:
             series.index = series.index.tz_convert("UTC").tz_localize(None)
         except Exception:
-            # falls tz_convert fehlschlägt, versuche tz_localize(None)
+            # falls tz_convert fehlschlÃ¤gt, versuche tz_localize(None)
             try:
                 series.index = series.index.tz_localize(None)
             except Exception:
@@ -213,10 +213,10 @@ def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=
             logger.warning("yf.download for %s has no Close/Adj Close column: %s", ticker, df.columns.tolist())
             return None
 
-        # Normalisieren (Index, Duplikate, Sortierung) — normalize_price_df erwartet price_col
+        # Normalisieren (Index, Duplikate, Sortierung) â€” normalize_price_df erwartet price_col
         df = normalize_price_df(df, price_col=price_col)
 
-        # Extrahiere die Preis‑Series (erste Spalte nach normalize_price_df)
+        # Extrahiere die Preisâ€‘Series (erste Spalte nach normalize_price_df)
         s = df.iloc[:, 0].copy()
         s.name = ticker
         return s.sort_index()
@@ -229,7 +229,7 @@ def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=
 
 def _try_yf_ticker_history(ticker: str, start: Optional[str]=None, end: Optional[str]=None, period: Optional[str]=None) -> Optional[pd.Series]:
     """
-    Fallback: Verwende yfinance.Ticker(ticker).history(...) falls yf.download fehlschlägt.
+    Fallback: Verwende yfinance.Ticker(ticker).history(...) falls yf.download fehlschlÃ¤gt.
     Liefert eine Series (Close/Adj Close) oder None.
     """
     try:
@@ -275,7 +275,7 @@ def download_etf_history(tickers, start=None, end=None, period="10y", auto_resam
             debug_info[t]["attempts"].append(("ticker_history", s is not None and not getattr(s, "empty", False)))
 
         if s is None or getattr(s, "empty", True):
-            st.warning(f"Keine Daten für {t} geladen.")
+            st.warning(f"Keine Daten fÃ¼r {t} geladen.")
             debug_info[t]["result"] = "missing"
             debug_info[t]["raw_type"] = None if s is None else type(s).__name__
             continue
@@ -285,22 +285,22 @@ def download_etf_history(tickers, start=None, end=None, period="10y", auto_resam
             try:
                 # zuerst sicherstellen, dass eine Datumsspalte/Index vorhanden ist
                 s = ensure_date_column(s, date_col="date") if "date" in s.columns else s
-                # normalize_price_df erwartet price_col; wenn nicht übergeben, versucht sie, eine Preisspalte zu finden
+                # normalize_price_df erwartet price_col; wenn nicht Ã¼bergeben, versucht sie, eine Preisspalte zu finden
                 norm = normalize_price_df(s)
             except Exception:
-                st.warning(f"{t}: DataFrame konnte nicht normalisiert werden — wird übersprungen.")
+                st.warning(f"{t}: DataFrame konnte nicht normalisiert werden â€” wird Ã¼bersprungen.")
                 debug_info[t]["result"] = "missing_no_close"
                 debug_info[t]["raw_type"] = "DataFrame_no_close"
                 continue
 
-            # Wähle Series aus norm
+            # WÃ¤hle Series aus norm
             if t in norm.columns:
                 series = norm[t].copy()
             elif norm.shape[1] >= 1:
                 series = norm.iloc[:, 0].copy()
                 series.name = t
             else:
-                st.warning(f"{t}: Normalisierte DataFrame enthält keine Spalten.")
+                st.warning(f"{t}: Normalisierte DataFrame enthÃ¤lt keine Spalten.")
                 debug_info[t]["result"] = "missing_no_close"
                 debug_info[t]["raw_type"] = "DataFrame_no_close"
                 continue
@@ -314,7 +314,7 @@ def download_etf_history(tickers, start=None, end=None, period="10y", auto_resam
         series = series.sort_index().dropna()
 
         if series.empty:
-            st.warning(f"{t}: Nach Normalisierung keine gültigen Preise vorhanden.")
+            st.warning(f"{t}: Nach Normalisierung keine gÃ¼ltigen Preise vorhanden.")
             debug_info[t]["result"] = "missing_after_norm"
             debug_info[t]["raw_type"] = type(s).__name__
             continue
@@ -338,11 +338,11 @@ def download_etf_history(tickers, start=None, end=None, period="10y", auto_resam
     valid_items = {t: s for t, s in all_prices.items() if isinstance(s, pd.Series) and not s.empty}
     invalid = [t for t in all_prices.keys() if t not in valid_items]
     if invalid:
-        st.warning(f"Die folgenden Ticker lieferten keine gültigen Series und werden übersprungen: {invalid}")
+        st.warning(f"Die folgenden Ticker lieferten keine gÃ¼ltigen Series und werden Ã¼bersprungen: {invalid}")
         st.write("Raw types:", {t: type(all_prices[t]).__name__ for t in invalid})
 
     if not valid_items:
-        st.error("ETF-Loader: Keine gültigen Zeitreihen geladen.")
+        st.error("ETF-Loader: Keine gÃ¼ltigen Zeitreihen geladen.")
         return pd.DataFrame()
 
     df = pd.DataFrame(valid_items)
@@ -358,7 +358,7 @@ def download_etf_history(tickers, start=None, end=None, period="10y", auto_resam
             if getattr(series.index, "tz", None) is not None:
                 series.index = series.index.tz_convert("UTC").tz_localize(None)
         except Exception:
-            # Falls tz_convert fehlschlägt, versuche tz_localize(None) oder rekonstruiere Index
+            # Falls tz_convert fehlschlÃ¤gt, versuche tz_localize(None) oder rekonstruiere Index
             try:
                 series.index = series.index.tz_localize(None)
             except Exception:
@@ -371,13 +371,13 @@ def download_etf_history(tickers, start=None, end=None, period="10y", auto_resam
         # drop NaT nach Konvertierung
         s_norm = s_norm.dropna()
         if s_norm.empty:
-            st.warning(f"{t}: Nach TZ-Normalisierung keine gültigen Zeitstempel mehr.")
+            st.warning(f"{t}: Nach TZ-Normalisierung keine gÃ¼ltigen Zeitstempel mehr.")
             continue
         s_norm.name = t
         normalized_series_list.append(s_norm)
 
     if not normalized_series_list:
-        st.error("ETF-Loader: Nach TZ-Normalisierung keine gültigen Zeitreihen.")
+        st.error("ETF-Loader: Nach TZ-Normalisierung keine gÃ¼ltigen Zeitreihen.")
         return pd.DataFrame()
 
 
@@ -404,7 +404,7 @@ def download_etf_history(tickers, start=None, end=None, period="10y", auto_resam
     prices = pd.concat(normalized_series_list, axis=1).sort_index()
     prices = prices.ffill().dropna(how="all")
 
-    # Resample auf Monatsende falls gewünscht
+    # Resample auf Monatsende falls gewÃ¼nscht
     if auto_resample and not prices.empty:
         prices.index = pd.to_datetime(prices.index, errors="coerce")
         prices = prices.sort_index()
@@ -418,8 +418,8 @@ def download_etf_history(tickers, start=None, end=None, period="10y", auto_resam
 # -----------------------------------------------------
 def build_market_risk_factors(etf_prices: pd.DataFrame):
     """
-    Erzeugt Momentum, Volatilität und Trend-Signale
-    für den Markt (z. B. SPY).
+    Erzeugt Momentum, VolatilitÃ¤t und Trend-Signale
+    fÃ¼r den Markt (z. B. SPY).
     """
 
     df = pd.DataFrame(index=etf_prices.index)
@@ -427,11 +427,12 @@ def build_market_risk_factors(etf_prices: pd.DataFrame):
     # Momentum (60 Tage)
     df["equity_momentum"] = etf_prices.pct_change(60).mean(axis=1)
 
-    # Volatilität (20 Tage)
+    # VolatilitÃ¤t (20 Tage)
     df["equity_vol"] = etf_prices.pct_change().rolling(20).std().mean(axis=1)
 
-    # Trend-Signal (Preis über gleitendem Durchschnitt?)
+    # Trend-Signal (Preis Ã¼ber gleitendem Durchschnitt?)
     ma = etf_prices.rolling(50).mean()
     df["equity_trend"] = (etf_prices > ma).mean(axis=1)
 
     return df.dropna()
+

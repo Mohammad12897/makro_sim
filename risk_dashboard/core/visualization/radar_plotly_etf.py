@@ -1,4 +1,4 @@
-# core/visualization/radar_plotly_etf.py
+﻿# core/visualization/radar_plotly_etf.py
 import plotly.graph_objects as go
 from core.visualization.lexicon import get_tooltip_map_for_tab
 
@@ -13,12 +13,12 @@ def _ampel_color(value: float) -> str:
 
 def plot_etf_radar(rows, mode="einsteiger"):
     all_metrics = [
-        "1Y %", "5Y %", "Volatilität %", "Sharpe",
+        "1Y %", "5Y %", "VolatilitÃ¤t %", "Sharpe",
         "TER", "Tracking Error", "AUM", "DivRendite %"
     ]
 
     if mode == "einsteiger":
-        metrics = ["1Y %", "Volatilität %", "TER", "DivRendite %"]
+        metrics = ["1Y %", "VolatilitÃ¤t %", "TER", "DivRendite %"]
     else:
         metrics = all_metrics
 
@@ -50,3 +50,4 @@ def plot_etf_radar(rows, mode="einsteiger"):
     )
 
     return fig
+

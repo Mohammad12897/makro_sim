@@ -1,4 +1,4 @@
-# core/backend/portfolio_compare.py
+﻿# core/backend/portfolio_compare.py
 import pandas as pd
 from .portfolio_backtest import backtest_portfolio
 
@@ -15,3 +15,4 @@ def compare_two_portfolios(p1, p2, period="5y"):
     ).dropna()
 
     return df
+

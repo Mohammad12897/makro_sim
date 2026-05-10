@@ -1,4 +1,4 @@
-# core/backend/isin_database.py
+﻿# core/backend/isin_database.py
 import json
 from pathlib import Path
 
@@ -85,7 +85,7 @@ ISIN_DATABASE = {
     "MRK.DE": "DE0006599905",
 
     # -------------------------
-    # Europäische Aktien
+    # EuropÃ¤ische Aktien
     # -------------------------
     "NESN.SW": "CH0038863350",
     "NOVN.SW": "CH0012005267",
@@ -96,7 +96,7 @@ ISIN_DATABASE = {
     "AIR.PA": "NL0000235190",
 
     # -------------------------
-    # ETFs – USA
+    # ETFs â€“ USA
     # -------------------------
     "SPY": "US78462F1030",
     "VOO": "US9229083632",
@@ -109,7 +109,7 @@ ISIN_DATABASE = {
     "TLT": "US4642874329",
 
     # -------------------------
-    # ETFs – Europa
+    # ETFs â€“ Europa
     # -------------------------
     "EUNL.DE": "IE00B4L5Y983",
     "VWCE.DE": "IE00BK5BQT80",
@@ -129,7 +129,7 @@ ISIN_DATABASE = {
     "CPER": "US73936B2007",
 
     # -------------------------
-    # Kryptowährungen (keine ISIN)
+    # KryptowÃ¤hrungen (keine ISIN)
     # -------------------------
     "BTC-USD": None,
     "ETH-USD": None,
@@ -137,3 +137,4 @@ ISIN_DATABASE = {
     "ADA-USD": None,
     "XRP-USD": None,
 }
+

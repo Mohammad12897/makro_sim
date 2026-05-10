@@ -1,4 +1,4 @@
-# core/data/country_map.py
+﻿# core/data/country_map.py
 
 COUNTRY_MAP = {
     "Deutschland (DAX)": "^GDAXI",
@@ -13,3 +13,4 @@ def get_country_choices():
 
 def resolve_country(name):
     return COUNTRY_MAP[name]
+

@@ -1,4 +1,4 @@
-# core/backend/portfolio_optimizer.py
+﻿# core/backend/portfolio_optimizer.py
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,7 @@ def optimize_markowitz(symbols):
     returns = load_returns(symbols)
     if returns is None or returns.empty:
         logger.warning("No returns data for Markowitz optimization")
-        return pd.DataFrame({"Fehler": ["Keine Renditedaten verfügbar"]})
+        return pd.DataFrame({"Fehler": ["Keine Renditedaten verfÃ¼gbar"]})
 
     mu = returns.mean() * 252
     cov = returns.cov() * 252
@@ -47,7 +47,7 @@ def optimize_risk_parity(symbols):
     returns = load_returns(symbols)
     if returns is None or returns.empty:
         logger.warning("No returns data for risk parity")
-        return pd.DataFrame({"Fehler": ["Keine Renditedaten verfügbar"]})
+        return pd.DataFrame({"Fehler": ["Keine Renditedaten verfÃ¼gbar"]})
 
     cov = returns.cov() * 252
     vols = np.sqrt(np.diag(cov.values))
@@ -58,9 +58,10 @@ def optimize_risk_parity(symbols):
 
 def optimize_ki_score(df):
     if df is None or df.empty or "ki_score" not in df.columns:
-        return pd.DataFrame({"Fehler": ["Keine KI‑Scores verfügbar"]})
+        return pd.DataFrame({"Fehler": ["Keine KIâ€‘Scores verfÃ¼gbar"]})
     w = df["ki_score"].clip(lower=0)
     if w.sum() == 0:
         w = np.ones(len(df))
     w = w / w.sum()
     return pd.DataFrame({"symbol": df["symbol"], "weight": w})
+

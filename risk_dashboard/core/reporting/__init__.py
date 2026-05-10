@@ -1,4 +1,4 @@
-#core/preporting/pdf_report.py
+﻿#core/preporting/pdf_report.py
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import datetime
@@ -6,7 +6,7 @@ import datetime
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Noto Color Emoji']
 
-def draw_footer(ax, text="MakroSim – Risikoanalyse"):
+def draw_footer(ax, text="MakroSim â€“ Risikoanalyse"):
     ax.text(0.5, 0.02, text, ha="center", fontsize=8)
 
 
@@ -16,8 +16,8 @@ def draw_title_page(pdf, land, logo_path: str | None = None):
 
     today = datetime.date.today().strftime("%d.%m.%Y")
 
-    ax.text(0.5, 0.8, f"Risikoanalyse – {land}", ha="center", fontsize=28, weight="bold")
-    ax.text(0.5, 0.72, "Makroökonomische Szenarien & Risikoindikatoren", ha="center", fontsize=16)
+    ax.text(0.5, 0.8, f"Risikoanalyse â€“ {land}", ha="center", fontsize=28, weight="bold")
+    ax.text(0.5, 0.72, "MakroÃ¶konomische Szenarien & Risikoindikatoren", ha="center", fontsize=16)
     ax.text(0.5, 0.64, f"Erstellt am: {today}", ha="center", fontsize=12)
 
     if logo_path:
@@ -58,7 +58,7 @@ def draw_risk_traffic_light(pdf, ampel_text: str):
     circle = plt.Circle((0.15, 0.5), 0.1, color=color)
     ax.add_patch(circle)
 
-    ax.text(0.35, 0.5, f"Risiko‑Ampel: {ampel_text}", fontsize=16, va="center")
+    ax.text(0.35, 0.5, f"Risikoâ€‘Ampel: {ampel_text}", fontsize=16, va="center")
 
     draw_footer(ax)
     pdf.savefig(fig)
@@ -113,11 +113,11 @@ def draw_portfolio_page(pdf, fig_portfolio, stats_df, weights_dict):
 
     ax.text(0.05, 0.95, "Portfolio-Analyse", fontsize=20, weight="bold", va="top")
 
-    # Platz für eingebettete Performance-Grafik
+    # Platz fÃ¼r eingebettete Performance-Grafik
     # Wir speichern die Figur separat in den PDF-Stream
     pdf.savefig(fig_portfolio)
 
-    # Neue Seite für Kennzahlen + Gewichte
+    # Neue Seite fÃ¼r Kennzahlen + Gewichte
     fig2, ax2 = plt.subplots(figsize=(8.27, 11.69))
     ax2.axis("off")
 
@@ -157,4 +157,5 @@ def create_pdf_report(
 
         if heatmap_fig is not None:
             draw_heatmap_page(pdf, heatmap_fig)
+
 

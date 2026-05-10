@@ -1,4 +1,4 @@
-#ui/logic_crypto.py
+﻿#ui/logic_crypto.py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,18 +13,18 @@ def ui_crypto_analysis(ticker):
     result = compute_ki_score(series, return_factors=True)
 
     if not isinstance(result, tuple) or len(result) != 2:
-        return pd.DataFrame([["KI‑Score Fehler"]]), None
+        return pd.DataFrame([["KIâ€‘Score Fehler"]]), None
 
     score, factors = result
 
     if not isinstance(factors, dict):
-        return pd.DataFrame([["Faktoren ungültig"]]), None
+        return pd.DataFrame([["Faktoren ungÃ¼ltig"]]), None
 
     fig = plot_radar({ticker: factors})
 
     returns = series.pct_change().dropna()
     df = pd.DataFrame({
-        "Kennzahl": ["Volatilität", "Sharpe‑Ratio"],
+        "Kennzahl": ["VolatilitÃ¤t", "Sharpeâ€‘Ratio"],
         "Wert": [
             returns.std() * (252 ** 0.5),
             returns.mean() / (returns.std() + 1e-9)
@@ -32,3 +32,4 @@ def ui_crypto_analysis(ticker):
     })
 
     return df, fig
+

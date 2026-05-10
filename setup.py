@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+﻿from setuptools import setup, find_packages
 
 setup(
     name="makro_sim",
@@ -7,3 +7,4 @@ setup(
     packages=find_packages(),
     python_requires=">=3.9",
 )
+

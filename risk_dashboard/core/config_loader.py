@@ -1,4 +1,4 @@
-# risk_dashboard/core/config_loader.py
+﻿# risk_dashboard/core/config_loader.py
 import yaml
 from pathlib import Path
 

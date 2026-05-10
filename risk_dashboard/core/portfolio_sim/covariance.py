@@ -1,4 +1,4 @@
-# risk_dashboard/core/portfolio_sim/covariance.py
+﻿# risk_dashboard/core/portfolio_sim/covariance.py
 import pandas as pd
 import numpy as np
 from sklearn.covariance import LedoitWolf
@@ -61,3 +61,4 @@ def build_asset_covariance():
         index=["equity", "bonds", "gold"],
         columns=["equity", "bonds", "gold"],
     )
+

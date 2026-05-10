@@ -1,4 +1,4 @@
-# risk_dashboard/src/core/fred_loader.py
+﻿# risk_dashboard/src/core/fred_loader.py
 import pandas as pd
 import requests
 

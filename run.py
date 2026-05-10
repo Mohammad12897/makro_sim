@@ -1,4 +1,4 @@
-#*** a/run.py
+﻿#*** a/run.py
 #--- b/run.py
 #@@ -1,41 +1,41 @@
 #!/usr/bin/env python3
@@ -13,10 +13,10 @@ def parse_args(argv=None):
      parser = argparse.ArgumentParser(description="Start Gradio demo oder gib das Lexikon aus.")
      parser.add_argument("--lexikon", action="store_true", help="Gibt das Lexikon-Markdown auf stdout aus")
      parser.add_argument("--lexikon-out", type=str, default=None, help="Schreibt das Lexikon-Markdown in die angegebene Datei")
-     #parser.add_argument("--share", action="store_true", help="Gradio share=True setzen (öffentliche URL)")
+     #parser.add_argument("--share", action="store_true", help="Gradio share=True setzen (Ã¶ffentliche URL)")
      parser.add_argument("--no-share", action="store_true", help="Disable Gradio share (default: enabled)")
-     parser.add_argument("--server-name", type=str, default=None, help="Optional: server_name für demo.launch")
-     parser.add_argument("--server-port", type=int, default=None, help="Optional: server_port für demo.launch")
+     parser.add_argument("--server-name", type=str, default=None, help="Optional: server_name fÃ¼r demo.launch")
+     parser.add_argument("--server-port", type=int, default=None, help="Optional: server_port fÃ¼r demo.launch")
      return parser.parse_args(argv)
  
 def main(argv=None):
@@ -57,3 +57,4 @@ def main(argv=None):
  
 if __name__ == "__main__":
      sys.exit(main())
+

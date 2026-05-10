@@ -1,4 +1,4 @@
-# risk_dashboard/core/etf_config.py
+﻿# risk_dashboard/core/etf_config.py
 import yaml
 from pathlib import Path
 from typing import Dict, Any
@@ -50,3 +50,4 @@ def build_etf_meta_dict(raw: Dict[str, Dict]) -> Dict[str, ETFMeta]:
             notes=v.get("notes"),
         )
     return out
+

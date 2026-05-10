@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 from pathlib import Path
 import textwrap, os
 
@@ -348,7 +348,7 @@ def simulate_dynamic_years(
             "Jahr": year,
             "Importkosten": importkosten,
             "Resilienz": resilienz,
-            "Volatilität": volatilitaet
+            "VolatilitÃ¤t": volatilitaet
         })
 
     return pd.DataFrame(results)
@@ -434,3 +434,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

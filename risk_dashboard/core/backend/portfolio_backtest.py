@@ -1,4 +1,4 @@
-# core/backend/portfolio_backtest.py
+﻿# core/backend/portfolio_backtest.py
 import pandas as pd
 from core.data.assets import fetch_price_history
 
@@ -27,3 +27,4 @@ def backtest_portfolio(symbols: list[str], weights: list[float], period="5y"):
     portfolio.name = "Portfolio"
 
     return portfolio
+

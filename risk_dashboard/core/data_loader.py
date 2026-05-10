@@ -1,4 +1,4 @@
-# risk_dashboard/core/data_loader.py
+﻿# risk_dashboard/core/data_loader.py
 import pandas as pd
 from typing import List, Dict, Tuple
 from yfinance import download
@@ -46,3 +46,4 @@ def fetch_prices(tickers: List[str], start: str = "2018-01-01", end: str = None)
         else:
             out[tbase] = pd.Series(dtype=float)  # placeholder for missing
     return out
+

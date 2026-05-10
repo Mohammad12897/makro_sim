@@ -1,4 +1,4 @@
-# core/data/ticker_country_map.py
+﻿# core/data/ticker_country_map.py
 
 import yfinance as yf
 
@@ -12,7 +12,7 @@ TICKER_COUNTRY = {
     "VUKE.L": "UK", "ISF.L": "UK", "CSUK.L": "UK",
     "EWJ": "Japan", "XDJP.DE": "Japan",
     "SPY": "USA", "QQQ": "USA", "VT": "Global",
-    "VEA": "Entwickelte Märkte", "VWO": "Schwellenländer",
+    "VEA": "Entwickelte MÃ¤rkte", "VWO": "SchwellenlÃ¤nder",
 }
 
 # --- ETF Regionserkennung ---
@@ -20,13 +20,13 @@ ETF_REGIONS = {
     "SPY": "USA",
     "QQQ": "USA",
     "VT": "Global",
-    "VEA": "Entwickelte Märkte",
-    "VWO": "Schwellenländer",
+    "VEA": "Entwickelte MÃ¤rkte",
+    "VWO": "SchwellenlÃ¤nder",
     "EWJ": "Japan",
-    "EEM": "Schwellenländer",
+    "EEM": "SchwellenlÃ¤nder",
 }
 
-# --- ISO Mapping für ISIN ---
+# --- ISO Mapping fÃ¼r ISIN ---
 ISO_MAP = {
     "US": "USA",
     "DE": "Deutschland",
@@ -47,8 +47,8 @@ ISO_MAP = {
 
 def auto_detect_country(ticker: str) -> str:
     """
-    Automatische Ländererkennung:
-    1) ISIN → Land
+    Automatische LÃ¤ndererkennung:
+    1) ISIN â†’ Land
     2) Yahoo Region
     3) ETF Region
     4) Statisches Mapping
@@ -60,7 +60,7 @@ def auto_detect_country(ticker: str) -> str:
     except Exception:
         info = {}
 
-    # --- 1) ISIN prüfen ---
+    # --- 1) ISIN prÃ¼fen ---
     isin = info.get("isin")
     if isin and len(isin) >= 2:
         prefix = isin[:2]
@@ -96,3 +96,4 @@ def auto_detect_country(ticker: str) -> str:
 
 def map_ticker_to_country(ticker: str) -> str:
     return auto_detect_country(ticker)
+

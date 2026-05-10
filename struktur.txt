@@ -1,61 +1,62 @@
-makro_sim/
-│
-├── pyproject.toml
-├── requirements.txt
-├── README.md
-├── run.py
-│
-├── risk_dashboard/
-│   ├── __init__.py
-│   ├── data/
-│   │   ├── equity_returns.csv
-│   │   ├── bond_returns.csv
-│   │   └── gold_returns.csv
-│   │
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── data_import.py
-│   │   ├── market_engine.py
-│   │   └── portfolio_sim/
-│   │       ├── __init__.py
-│   │       ├── covariance.py
-│   │       ├── mc_engine.py
-│   │       └── risk_metrics.py
-│   │
-│   ├── src/
-│   │   ├── __init__.py
-│   │   └── visualization/
-│   │       ├── __init__.py
-│   │       └── scenario_compare.py
-│   │
-│   ├── ui/
-│   │   ├── __init__.py
-│   │   ├── app.py
-│   │   ├── logic_screener.py
-│   │   ├── logic_portfolio.py
-│   │   └── logic_ki.py
-│   │
-│   └── tests/
-│       ├── test_check.py
-│       ├── test_covariance.py
-│       ├── test_mc_engine.py
-│       ├── test_risk_metrics.py
-│       ├── test_tz_normalization.py
-│       └── test_yf.py
-│
-└── venv/
+﻿makro_sim/
+â”‚
+â”œâ”€â”€ pyproject.toml
+â”œâ”€â”€ requirements.txt
+â”œâ”€â”€ README.md
+â”œâ”€â”€ run.py
+â”‚
+â”œâ”€â”€ risk_dashboard/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ data/
+â”‚   â”‚   â”œâ”€â”€ equity_returns.csv
+â”‚   â”‚   â”œâ”€â”€ bond_returns.csv
+â”‚   â”‚   â””â”€â”€ gold_returns.csv
+â”‚   â”‚
+â”‚   â”œâ”€â”€ core/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ data_import.py
+â”‚   â”‚   â”œâ”€â”€ market_engine.py
+â”‚   â”‚   â””â”€â”€ portfolio_sim/
+â”‚   â”‚       â”œâ”€â”€ __init__.py
+â”‚   â”‚       â”œâ”€â”€ covariance.py
+â”‚   â”‚       â”œâ”€â”€ mc_engine.py
+â”‚   â”‚       â””â”€â”€ risk_metrics.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ src/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â””â”€â”€ visualization/
+â”‚   â”‚       â”œâ”€â”€ __init__.py
+â”‚   â”‚       â””â”€â”€ scenario_compare.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ ui/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ app.py
+â”‚   â”‚   â”œâ”€â”€ logic_screener.py
+â”‚   â”‚   â”œâ”€â”€ logic_portfolio.py
+â”‚   â”‚   â””â”€â”€ logic_ki.py
+â”‚   â”‚
+â”‚   â””â”€â”€ tests/
+â”‚       â”œâ”€â”€ test_check.py
+â”‚       â”œâ”€â”€ test_covariance.py
+â”‚       â”œâ”€â”€ test_mc_engine.py
+â”‚       â”œâ”€â”€ test_risk_metrics.py
+â”‚       â”œâ”€â”€ test_tz_normalization.py
+â”‚       â””â”€â”€ test_yf.py
+â”‚
+â””â”€â”€ venv/
 
 
 [ Makro ] 
-     ↓
+     â†“
 [ FX ] 
-     ↓
-[ Risiko‑Score ]
-     ↓
+     â†“
+[ Risikoâ€‘Score ]
+     â†“
 [ Szenario ]
-     ↓
+     â†“
 [ Regime ]
-     ↓
-[ Portfolio‑Engine (RP/HRP) ]
-     ↓
-[ Investment‑Paket ]
+     â†“
+[ Portfolioâ€‘Engine (RP/HRP) ]
+     â†“
+[ Investmentâ€‘Paket ]
+

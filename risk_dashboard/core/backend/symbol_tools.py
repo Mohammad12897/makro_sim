@@ -1,4 +1,4 @@
-# core/backend/symbol_tools.py
+﻿# core/backend/symbol_tools.py
 import re
 import yfinance as yf
 from core.data.logging import logger
@@ -84,3 +84,4 @@ def ticker_to_isin(ticker: str) -> str | None:
     db[t] = None
     save_isin_db(db)
     return None
+

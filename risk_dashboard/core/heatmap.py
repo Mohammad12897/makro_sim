@@ -1,4 +1,4 @@
-# core/heatmap.py
+﻿# core/heatmap.py
 
 from __future__ import annotations
 from typing import Dict, List
@@ -12,7 +12,7 @@ from risk_dashboard.core.risk_model import compute_risk_scores
 
 def risk_heatmap(presets: Dict[str, dict]) -> List[List]:
     """
-    Gibt eine Heatmap-Tabelle zurück:
+    Gibt eine Heatmap-Tabelle zurÃ¼ck:
     Land | macro | geo | governance | handel | supply_chain | financial | tech | energie | currency | political_security | total
     """
     rows = []
@@ -38,7 +38,7 @@ def risk_heatmap(presets: Dict[str, dict]) -> List[List]:
 
 
 # ---------------------------------------------------------
-# Politische Abhängigkeit – Heatmap
+# Politische AbhÃ¤ngigkeit â€“ Heatmap
 # ---------------------------------------------------------
 
 def political_heatmap(presets: Dict[str, dict]) -> List[List]:
@@ -51,11 +51,11 @@ def political_heatmap(presets: Dict[str, dict]) -> List[List]:
         ps = compute_risk_scores(params)["political_security"]
 
         if ps > 0.75:
-            color = "🔴"
+            color = "ðŸ”´"
         elif ps > 0.55:
-            color = "🟡"
+            color = "ðŸŸ¡"
         else:
-            color = "🟢"
+            color = "ðŸŸ¢"
 
         rows.append([land, round(ps, 3), color])
 
@@ -63,7 +63,7 @@ def political_heatmap(presets: Dict[str, dict]) -> List[List]:
 
 
 # ---------------------------------------------------------
-# Strategische Autonomie – Heatmap
+# Strategische Autonomie â€“ Heatmap
 # ---------------------------------------------------------
 
 def autonomy_heatmap(presets: Dict[str, dict]) -> List[List]:
@@ -76,11 +76,11 @@ def autonomy_heatmap(presets: Dict[str, dict]) -> List[List]:
         sa = compute_risk_scores(params)["strategische_autonomie"]
 
         if sa > 0.75:
-            color = "🟢"
+            color = "ðŸŸ¢"
         elif sa > 0.50:
-            color = "🟡"
+            color = "ðŸŸ¡"
         else:
-            color = "🔴"
+            color = "ðŸ”´"
 
         rows.append([land, round(sa, 3), color])
 
@@ -103,13 +103,13 @@ def combined_political_autonomy_heatmap(presets: Dict[str, dict]) -> List[List]:
         sa = scores["strategische_autonomie"]
 
         if ps > 0.75 and sa < 0.50:
-            interp = "⚠️ Hohe Abhängigkeit, geringe Autonomie"
+            interp = "âš ï¸ Hohe AbhÃ¤ngigkeit, geringe Autonomie"
         elif ps > 0.55 and sa < 0.50:
-            interp = "🟡 Erhöhte Abhängigkeit, begrenzte Autonomie"
+            interp = "ðŸŸ¡ ErhÃ¶hte AbhÃ¤ngigkeit, begrenzte Autonomie"
         elif ps < 0.55 and sa > 0.75:
-            interp = "🟢 Geringe Abhängigkeit, hohe Autonomie"
+            interp = "ðŸŸ¢ Geringe AbhÃ¤ngigkeit, hohe Autonomie"
         else:
-            interp = "➖ Ausgewogen"
+            interp = "âž– Ausgewogen"
 
         rows.append([
             land,
@@ -119,3 +119,4 @@ def combined_political_autonomy_heatmap(presets: Dict[str, dict]) -> List[List]:
         ])
 
     return rows
+

@@ -1,6 +1,6 @@
-# core/analysis/stock_compare.py
+﻿# core/analysis/stock_compare.py
 import numpy as np
-import pandas as pd   # ← WICHTIG: dieser Import hat gefehlt!
+import pandas as pd   # â† WICHTIG: dieser Import hat gefehlt!
 
 from core.analysis.market_data import (
     get_history,
@@ -15,7 +15,7 @@ def stock_compare(t1, t2):
     p2 = get_history(t2)
 
     if p1.empty or p2.empty:
-        return f"Keine Daten für {t1} oder {t2}"
+        return f"Keine Daten fÃ¼r {t1} oder {t2}"
 
     r1 = calc_returns(p1)
     r2 = calc_returns(p2)
@@ -38,10 +38,10 @@ def stock_compare(t1, t2):
 |----------|------|------|
 | 1Y Rendite | {perf(one_year_1)*100:.2f}% | {perf(one_year_2)*100:.2f}% |
 | 5Y Rendite | {perf(p1)*100:.2f}% | {perf(p2)*100:.2f}% |
-| Volatilität | {annual_vol(r1)*100:.2f}% | {annual_vol(r2)*100:.2f}% |
+| VolatilitÃ¤t | {annual_vol(r1)*100:.2f}% | {annual_vol(r2)*100:.2f}% |
 | Sharpe Ratio | {sharpe_ratio(r1):.2f} | {sharpe_ratio(r2):.2f} |
 | Max Drawdown | {max_drawdown(p1)*100:.2f}% | {max_drawdown(p2)*100:.2f}% |
-| Korrelation | {corr:.2f} | – |
+| Korrelation | {corr:.2f} | â€“ |
 
 """
 
@@ -51,4 +51,5 @@ def stock_compare(t1, t2):
         md += f"**Empfehlung:** {t2} hat die bessere risikobereinigte Rendite."
 
     return md
+
 

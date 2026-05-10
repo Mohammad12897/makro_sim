@@ -1,4 +1,4 @@
-#ui/logic_scenario.py
+﻿#ui/logic_scenario.py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ def ui_scenario_comparison(ticker_text, scenario):
         "Rezession": -0.15,
         "Inflation": -0.10,
         "Zinsanstieg": -0.20,
-        "Ölkrise": -0.12
+        "Ã–lkrise": -0.12
     }
 
     # Szenario-Schock bestimmen
@@ -32,3 +32,4 @@ def ui_scenario_comparison(ticker_text, scenario):
         rows.append([t, last, shocked])
 
     return pd.DataFrame(rows, columns=["Ticker", "Aktuell", "Nach Szenario"])
+

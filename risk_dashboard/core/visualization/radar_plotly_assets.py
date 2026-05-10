@@ -1,4 +1,4 @@
-#core/visualization/radar_plotly_assets.py
+﻿#core/visualization/radar_plotly_assets.py
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
@@ -7,7 +7,7 @@ def plot_asset_radar(rows, mode="einsteiger"):
 
     df = pd.DataFrame(rows).set_index("symbol")
 
-    # Schritt 1: Achsen sammeln, die überhaupt existieren
+    # Schritt 1: Achsen sammeln, die Ã¼berhaupt existieren
     available_axes = set()
     for row in rows:
         for key, value in row.items():
@@ -21,7 +21,7 @@ def plot_asset_radar(rows, mode="einsteiger"):
             common_axes.append(axis)
 
     if not common_axes:
-        raise ValueError("Keine gemeinsamen Achsen für Radar gefunden.")
+        raise ValueError("Keine gemeinsamen Achsen fÃ¼r Radar gefunden.")
 
     # Schritt 3: DataFrame auf gemeinsame Achsen reduzieren
     df = df[common_axes]
@@ -32,7 +32,7 @@ def plot_asset_radar(rows, mode="einsteiger"):
     if df.empty:
         raise ValueError("Alle Achsen enthalten nur NaN-Werte.")
 
-    # Schritt 5: Normalisierung robust durchführen
+    # Schritt 5: Normalisierung robust durchfÃ¼hren
     min_vals = df.min()
     max_vals = df.max()
 
@@ -59,3 +59,4 @@ def plot_asset_radar(rows, mode="einsteiger"):
     )
 
     return fig
+

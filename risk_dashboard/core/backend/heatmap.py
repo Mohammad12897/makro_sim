@@ -1,4 +1,4 @@
-# core/backend/heatmap.py
+﻿# core/backend/heatmap.py
 
 import pandas as pd
 import seaborn as sns
@@ -29,5 +29,6 @@ def plot_correlation_heatmap(symbols):
 
     fig, ax = plt.subplots(figsize=(10, 8))
     sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
-    ax.set_title("Korrelation‑Matrix")
+    ax.set_title("Korrelationâ€‘Matrix")
     return fig
+

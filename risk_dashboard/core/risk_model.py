@@ -1,4 +1,4 @@
-# core/risk_model.py
+﻿# core/risk_model.py
 
 from __future__ import annotations
 from typing import Dict, Tuple
@@ -15,7 +15,7 @@ def clamp01(x: float) -> float:
 
 def normalize_exp(x: float, scale: float = 1.0) -> float:
     """
-    Exponentielle Normalisierung: hohe Werte wirken überproportional riskant.
+    Exponentielle Normalisierung: hohe Werte wirken Ã¼berproportional riskant.
     """
     return clamp01(1 - math.exp(-x / scale))
 
@@ -29,7 +29,7 @@ def normalize_log(x: float, max_val: float = 20.0) -> float:
 
 def normalize_value(x):
     """
-    Generische Normalisierung für Slider-Werte (0–1 oder 0–100).
+    Generische Normalisierung fÃ¼r Slider-Werte (0â€“1 oder 0â€“100).
     """
     if x is None:
         return 0.0
@@ -43,7 +43,7 @@ def normalize_value(x):
 
 
 # -------------------------
-# Tech-, Lieferketten- & Finanzabhängigkeit
+# Tech-, Lieferketten- & FinanzabhÃ¤ngigkeit
 # -------------------------
 
 def compute_tech_dependency(p: dict) -> float:
@@ -153,17 +153,17 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
     # 5) Lieferketten-Risiko
     supply_chain = compute_supply_chain_risk(p)
 
-    # 6) Finanzielle Abhängigkeit
+    # 6) Finanzielle AbhÃ¤ngigkeit
     financial = compute_financial_dependency(p)
 
-    # 7) Tech-Abhängigkeit
+    # 7) Tech-AbhÃ¤ngigkeit
     tech = compute_tech_dependency(p)
 
-    # 8) Energieabhängigkeit (NEU)
+    # 8) EnergieabhÃ¤ngigkeit (NEU)
     energie = p.get("energie", 0.5)
     energie = clamp01(energie)
 
-    # 9) Währungs- & Zahlungsabhängigkeit (NEU)
+    # 9) WÃ¤hrungs- & ZahlungsabhÃ¤ngigkeit (NEU)
     usd_dom = p.get("USD_Dominanz", 0.7)
     sank_exp = p.get("Sanktions_Exposure", 0.1)
     fx_sens = p.get("FX_Schockempfindlichkeit", 0.5)
@@ -181,7 +181,7 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
     )
     currency = clamp01(currency)
 
-    # 10) Politische & sicherheitspolitische Abhängigkeit (NEU)
+    # 10) Politische & sicherheitspolitische AbhÃ¤ngigkeit (NEU)
     sicherheit = p.get("sicherheitsgarantien", 0.5)
     aussen = p.get("aussenpolitische_abhaengigkeit", 0.5)
     einfluss = p.get("externer_einfluss", 0.5)
@@ -190,7 +190,7 @@ def compute_risk_scores(p: dict) -> Dict[str, float]:
 
     political_security = (
         0.25 * (1 - clamp01(sicherheit)) +          # mehr Garantien = weniger Risiko
-        0.25 * clamp01(aussen) +                    # mehr Abhängigkeit = mehr Risiko
+        0.25 * clamp01(aussen) +                    # mehr AbhÃ¤ngigkeit = mehr Risiko
         0.20 * clamp01(einfluss) +                  # mehr externer Einfluss = mehr Risiko
         0.20 * clamp01(sanktion) +                  # mehr Verwundbarkeit = mehr Risiko
         0.10 * (1 - clamp01(diplo))                 # mehr Resilienz = weniger Risiko
@@ -248,3 +248,4 @@ def risk_category(score: float) -> Tuple[str, str]:
         return "warnung", "yellow"
     else:
         return "kritisch", "red"
+

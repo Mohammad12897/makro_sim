@@ -1,4 +1,4 @@
-# core/data/etf_db_loader.py
+﻿# core/data/etf_db_loader.py
 import json
 from pathlib import Path
 from functools import lru_cache
@@ -15,8 +15,8 @@ except Exception:
 @lru_cache(maxsize=1)
 def load_etf_db():
     """
-    Lädt die Datei etf_database.json (im selben Verzeichnis) und validiert Ticker.
-    Gibt eine Liste valider Einträge zurück.
+    LÃ¤dt die Datei etf_database.json (im selben Verzeichnis) und validiert Ticker.
+    Gibt eine Liste valider EintrÃ¤ge zurÃ¼ck.
     """
     path = Path(__file__).with_name("etf_database.json")
     if not path.exists():
@@ -32,7 +32,7 @@ def load_etf_db():
         fixed = validate_or_fix_ticker(ticker)
 
         if fixed is None:
-            # ETF komplett ignorieren, wenn Ticker ungültig
+            # ETF komplett ignorieren, wenn Ticker ungÃ¼ltig
             continue
 
         # Normalisiere Eintrag
@@ -47,12 +47,12 @@ def load_etf_db():
     return valid_entries
 
 def list_etf_tickers():
-    """Gibt alle validierten Ticker als Liste zurück."""
+    """Gibt alle validierten Ticker als Liste zurÃ¼ck."""
     return [e["ticker"] for e in load_etf_db()]
 
 def list_etf_by_region(region):
     """
-    Gibt die Ticker-Liste für eine Region zurück.
+    Gibt die Ticker-Liste fÃ¼r eine Region zurÃ¼ck.
     Erwartete region-Strings: 'Europa', 'USA', 'Global' (case-insensitive).
     Wenn region None oder unbekannt, wird 'Global' verwendet.
     """
@@ -86,15 +86,16 @@ def list_etf_by_region(region):
     # Filtere DB
     db = load_etf_db()
     if normalized == "global":
-        # Alle ETFs zurückgeben (oder optional nur solche mit region == 'Global')
+        # Alle ETFs zurÃ¼ckgeben (oder optional nur solche mit region == 'Global')
         return [e["ticker"] for e in db]
     else:
         return [e["ticker"] for e in db if e.get("region", "").strip().lower() == normalized]
 
 # Optional: kleine Hilfsfunktion, falls du Name->Ticker Lookup brauchst
 def find_ticker_by_name(name):
-    """Sucht Ticker anhand (Teil-)Name, gibt erste Treffer-Liste zurück."""
+    """Sucht Ticker anhand (Teil-)Name, gibt erste Treffer-Liste zurÃ¼ck."""
     if not name:
         return []
     name_key = name.strip().lower()
     return [e["ticker"] for e in load_etf_db() if name_key in e.get("name", "").lower()]
+

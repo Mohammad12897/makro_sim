@@ -1,266 +1,267 @@
-# Projektstruktur
-┌────────────────────────────────┐
-│          Inputs                │
-│────────────────────────────────│
-│ • Standard-Parameter           │
-│   (USD_Dominanz, RMB_Akzeptanz,│
-│    Zugangsresilienz, Reserven, │
-│    FX_Schockempfindlichkeit,   │
-│    Sanktions_Exposure,         │
-│    Alternativnetz, Liquidität, │
-│    CBDC_Nutzung, Golddeckung)  │
-│                                │
-│ • Erweiterte Parameter         │
-│   (Innovation, Fachkräfte,     │
-│    Stabilität, Energiepreise,  │
-│    Verschuldung)               │
-│                                │
-│ • Geo-Trigger (Checkboxes)     │
-│ • Run Mode (Preview/Full)      │
-│ • Adaptive Upscaling (Checkbox)│
-│ • Grenzwerte für Ampel-Logik   │
-│ • Zeitsimulations-Slider       │
-└───────────────┬────────────────┘
-                │
-                ▼
-┌────────────────────────────────┐
-│         Simulation             │
-│────────────────────────────────│
-│ • Standard-Simulation          │
-│ • Erweiterte Simulation        │
-│ • Adaptive Summary             │
-│ • Szenarien (Batch, Vergleich) │
-│ • Marginal-Effekte             │
-│ • Impact-Analysen              │
-│ • Zeitsimulation (dynamisch)   │
-└───────────────┬────────────────┘
-                │
-                ▼
-┌────────────────────────────────┐
-│           Outputs              │
-│────────────────────────────────│
-│ • Summary-Plot (p05/Median/p95)│
-│ • Heatmap (Szenarienvergleich) │
-│ • Risiko-Meter (Ampel-Logik)   │
-│ • Vergleichstabellen           │
-│   - Standard vs Erweitert      │
-│   - DeDoll vs USD-Schock       │
-│ • Marginal-Effekte (Plot)      │
-│ • Impact-Analyse (Plot+Text)   │
-│ • Zeitsimulation (Plots+Table) │
-│ • Export (CSV)                 │
-└───────────────┬────────────────┘
-                │
-                ▼
-┌────────────────────────────────┐
-│              UI                │
-│────────────────────────────────│
-│ • Gradio Blocks                │
-│ • Tabs & Rows für Inputs       │
-│ • Buttons für Aktionen         │
-│ • Dataframes & Plots für       │
-│   Ergebnisse                   │
-│ • Markdown-Lexikon (Standard+  │
-│   Erweitert)                   │
-└────────────────────────────────┘
+﻿# Projektstruktur
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚          Inputs                â”‚
+â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚
+â”‚ â€¢ Standard-Parameter           â”‚
+â”‚   (USD_Dominanz, RMB_Akzeptanz,â”‚
+â”‚    Zugangsresilienz, Reserven, â”‚
+â”‚    FX_Schockempfindlichkeit,   â”‚
+â”‚    Sanktions_Exposure,         â”‚
+â”‚    Alternativnetz, LiquiditÃ¤t, â”‚
+â”‚    CBDC_Nutzung, Golddeckung)  â”‚
+â”‚                                â”‚
+â”‚ â€¢ Erweiterte Parameter         â”‚
+â”‚   (Innovation, FachkrÃ¤fte,     â”‚
+â”‚    StabilitÃ¤t, Energiepreise,  â”‚
+â”‚    Verschuldung)               â”‚
+â”‚                                â”‚
+â”‚ â€¢ Geo-Trigger (Checkboxes)     â”‚
+â”‚ â€¢ Run Mode (Preview/Full)      â”‚
+â”‚ â€¢ Adaptive Upscaling (Checkbox)â”‚
+â”‚ â€¢ Grenzwerte fÃ¼r Ampel-Logik   â”‚
+â”‚ â€¢ Zeitsimulations-Slider       â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                â”‚
+                â–¼
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚         Simulation             â”‚
+â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚
+â”‚ â€¢ Standard-Simulation          â”‚
+â”‚ â€¢ Erweiterte Simulation        â”‚
+â”‚ â€¢ Adaptive Summary             â”‚
+â”‚ â€¢ Szenarien (Batch, Vergleich) â”‚
+â”‚ â€¢ Marginal-Effekte             â”‚
+â”‚ â€¢ Impact-Analysen              â”‚
+â”‚ â€¢ Zeitsimulation (dynamisch)   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                â”‚
+                â–¼
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚           Outputs              â”‚
+â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚
+â”‚ â€¢ Summary-Plot (p05/Median/p95)â”‚
+â”‚ â€¢ Heatmap (Szenarienvergleich) â”‚
+â”‚ â€¢ Risiko-Meter (Ampel-Logik)   â”‚
+â”‚ â€¢ Vergleichstabellen           â”‚
+â”‚   - Standard vs Erweitert      â”‚
+â”‚   - DeDoll vs USD-Schock       â”‚
+â”‚ â€¢ Marginal-Effekte (Plot)      â”‚
+â”‚ â€¢ Impact-Analyse (Plot+Text)   â”‚
+â”‚ â€¢ Zeitsimulation (Plots+Table) â”‚
+â”‚ â€¢ Export (CSV)                 â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                â”‚
+                â–¼
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚              UI                â”‚
+â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚
+â”‚ â€¢ Gradio Blocks                â”‚
+â”‚ â€¢ Tabs & Rows fÃ¼r Inputs       â”‚
+â”‚ â€¢ Buttons fÃ¼r Aktionen         â”‚
+â”‚ â€¢ Dataframes & Plots fÃ¼r       â”‚
+â”‚   Ergebnisse                   â”‚
+â”‚ â€¢ Markdown-Lexikon (Standard+  â”‚
+â”‚   Erweitert)                   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
 project_root= /content/makro_sim
 project_root/
-├─ src/
-│  ├─ __init__.py
-│  ├─ config.py
-│  ├─ etl/
-│  │  ├─ __init__.py
-│  │  ├─ fetchers.py        # DataAPI, ComtradeAdapter, IMF-Adapter
-│  │  ├─ persistence.py     # store_indicator, _write_parquet, DATA_DIR
-│  │  └─ transforms.py      # fetch_reserves, helpers
-│  ├─ sim/
-│  │  ├─ __init__.py
-│  │  ├─ core.py            # run_simulation, run_simulation_chunked
-│  │  ├─ extended.py        # run_simulation_extended, _compute_bases_extended
-│  │  └─ dynamic.py         # simulate_dynamic_years, presets
-│  ├─ ui/
-│  │  ├─ __init__.py
-│  │  └─ gradio_app.py      # Gradio Blocks, callbacks
-│  ├─ utils/
-│  │  ├─ __init__.py
-│  │  ├─ validators.py      # sanitize_params, clamp01, validate_params
-│  │  └─ viz.py             # plot_summary, plot_years
-│  └─ tests/
-│     ├─ test_etl.py
-│     ├─ test_sim.py
-│     └─ test_integration.py
-├─ requirements.txt
-├─ README.md
-└─ run.py                   # optional: CLI / entrypoint
+â”œâ”€ src/
+â”‚  â”œâ”€ __init__.py
+â”‚  â”œâ”€ config.py
+â”‚  â”œâ”€ etl/
+â”‚  â”‚  â”œâ”€ __init__.py
+â”‚  â”‚  â”œâ”€ fetchers.py        # DataAPI, ComtradeAdapter, IMF-Adapter
+â”‚  â”‚  â”œâ”€ persistence.py     # store_indicator, _write_parquet, DATA_DIR
+â”‚  â”‚  â””â”€ transforms.py      # fetch_reserves, helpers
+â”‚  â”œâ”€ sim/
+â”‚  â”‚  â”œâ”€ __init__.py
+â”‚  â”‚  â”œâ”€ core.py            # run_simulation, run_simulation_chunked
+â”‚  â”‚  â”œâ”€ extended.py        # run_simulation_extended, _compute_bases_extended
+â”‚  â”‚  â””â”€ dynamic.py         # simulate_dynamic_years, presets
+â”‚  â”œâ”€ ui/
+â”‚  â”‚  â”œâ”€ __init__.py
+â”‚  â”‚  â””â”€ gradio_app.py      # Gradio Blocks, callbacks
+â”‚  â”œâ”€ utils/
+â”‚  â”‚  â”œâ”€ __init__.py
+â”‚  â”‚  â”œâ”€ validators.py      # sanitize_params, clamp01, validate_params
+â”‚  â”‚  â””â”€ viz.py             # plot_summary, plot_years
+â”‚  â””â”€ tests/
+â”‚     â”œâ”€ test_etl.py
+â”‚     â”œâ”€ test_sim.py
+â”‚     â””â”€ test_integration.py
+â”œâ”€ requirements.txt
+â”œâ”€ README.md
+â””â”€ run.py                   # optional: CLI / entrypoint
 
 makro_sim/
-├── presets/
-│   ├── slider_presets.json        # UI-Presets (flach, direkt für PARAM_SLIDERS)
-│   ├── country_presets.json       # Länder-Presets (Indicator-Snapshots, Metadaten)
-│   ├── preset_BR.json             # Rohdaten je Land
-│   ├── preset_CN.json
-│   ├── preset_DE.json
-│   ├── preset_FR.json
-│   ├── preset_GB.json
-│   ├── preset_GR.json
-│   ├── preset_IN.json
-│   ├── preset_IR.json
-│   ├── preset_US.json
-├── scripts/
-│   ├── merge_country_presets.py   # Merged preset_*.json → country_presets.json
-│   ├── generate_slider_presets.py # (optional) Länder → Slider-Presets
-├── src/
-│   └── ui/
-│       └── gradio_app.py          # lädt nur slider_presets.json
+â”œâ”€â”€ presets/
+â”‚   â”œâ”€â”€ slider_presets.json        # UI-Presets (flach, direkt fÃ¼r PARAM_SLIDERS)
+â”‚   â”œâ”€â”€ country_presets.json       # LÃ¤nder-Presets (Indicator-Snapshots, Metadaten)
+â”‚   â”œâ”€â”€ preset_BR.json             # Rohdaten je Land
+â”‚   â”œâ”€â”€ preset_CN.json
+â”‚   â”œâ”€â”€ preset_DE.json
+â”‚   â”œâ”€â”€ preset_FR.json
+â”‚   â”œâ”€â”€ preset_GB.json
+â”‚   â”œâ”€â”€ preset_GR.json
+â”‚   â”œâ”€â”€ preset_IN.json
+â”‚   â”œâ”€â”€ preset_IR.json
+â”‚   â”œâ”€â”€ preset_US.json
+â”œâ”€â”€ scripts/
+â”‚   â”œâ”€â”€ merge_country_presets.py   # Merged preset_*.json â†’ country_presets.json
+â”‚   â”œâ”€â”€ generate_slider_presets.py # (optional) LÃ¤nder â†’ Slider-Presets
+â”œâ”€â”€ src/
+â”‚   â””â”€â”€ ui/
+â”‚       â””â”€â”€ gradio_app.py          # lÃ¤dt nur slider_presets.json
 
 
 
 /content/makro_sim/risk_dashboard
-│
-├── core/
-│   ├── portfolio_sim/
-│   │   ├── covariance.py
-│   │   ├── mc_engine.py
-│   │   ├── risk_metrics.py
-│   │   ├── scenario_adapter.py
-│   │   └── portfolio_model.py
-│   ├── data_import.py
-│   ├── covariance.py
-│   ├── mc_simulator.py
-│   ├── portfolio.py
-│   ├── risk_model.py
-│   ├── scenario_engine.py
-│   ├── cluster.py
-│   ├── heatmap.py
-│   ├── storyline.py
-│   ├── ews.py
-│   ├── country_assets.py
-│   └── utils.py
-│
-├── ui/
-│   ├── app.py
-│   ├── components.py
-│   └── layout.py
-│
-├── data/
-│   ├── equity_returns.csv
-│   ├── bond_returns.csv
-│   ├── gold_returns.csv
-│   ├── slider_presets.json
-│   ├── scenario_presets.json
-│   └── lexicon.json
-│
-│
-├── assets/
-│   └── icons/
-├── docs/
-│
-├── test/
-│   ├── app.py
-│   └── example_presets.py
-├── tests/
-│   ├── test_mc_engine.py
-│   ├── test_risk_metrics.py
-│   ├── test_covariance.py
-│   ├── test_scenario_adapter.py
-│   └── conftest.py
-│
-├── pytest.ini
-├── requirements.txt
-└── main.py
+â”‚
+â”œâ”€â”€ core/
+â”‚   â”œâ”€â”€ portfolio_sim/
+â”‚   â”‚   â”œâ”€â”€ covariance.py
+â”‚   â”‚   â”œâ”€â”€ mc_engine.py
+â”‚   â”‚   â”œâ”€â”€ risk_metrics.py
+â”‚   â”‚   â”œâ”€â”€ scenario_adapter.py
+â”‚   â”‚   â””â”€â”€ portfolio_model.py
+â”‚   â”œâ”€â”€ data_import.py
+â”‚   â”œâ”€â”€ covariance.py
+â”‚   â”œâ”€â”€ mc_simulator.py
+â”‚   â”œâ”€â”€ portfolio.py
+â”‚   â”œâ”€â”€ risk_model.py
+â”‚   â”œâ”€â”€ scenario_engine.py
+â”‚   â”œâ”€â”€ cluster.py
+â”‚   â”œâ”€â”€ heatmap.py
+â”‚   â”œâ”€â”€ storyline.py
+â”‚   â”œâ”€â”€ ews.py
+â”‚   â”œâ”€â”€ country_assets.py
+â”‚   â””â”€â”€ utils.py
+â”‚
+â”œâ”€â”€ ui/
+â”‚   â”œâ”€â”€ app.py
+â”‚   â”œâ”€â”€ components.py
+â”‚   â””â”€â”€ layout.py
+â”‚
+â”œâ”€â”€ data/
+â”‚   â”œâ”€â”€ equity_returns.csv
+â”‚   â”œâ”€â”€ bond_returns.csv
+â”‚   â”œâ”€â”€ gold_returns.csv
+â”‚   â”œâ”€â”€ slider_presets.json
+â”‚   â”œâ”€â”€ scenario_presets.json
+â”‚   â””â”€â”€ lexicon.json
+â”‚
+â”‚
+â”œâ”€â”€ assets/
+â”‚   â””â”€â”€ icons/
+â”œâ”€â”€ docs/
+â”‚
+â”œâ”€â”€ test/
+â”‚   â”œâ”€â”€ app.py
+â”‚   â””â”€â”€ example_presets.py
+â”œâ”€â”€ tests/
+â”‚   â”œâ”€â”€ test_mc_engine.py
+â”‚   â”œâ”€â”€ test_risk_metrics.py
+â”‚   â”œâ”€â”€ test_covariance.py
+â”‚   â”œâ”€â”€ test_scenario_adapter.py
+â”‚   â””â”€â”€ conftest.py
+â”‚
+â”œâ”€â”€ pytest.ini
+â”œâ”€â”€ requirements.txt
+â””â”€â”€ main.py
 
 risk_dashboard/
-│
-├── main.py
-│
-├── ui/
-│   ├── __init__.py
-│   └── app.py
-│
-├── core/
-│   ├── __init__.py
-│   ├── presets.py
-│   ├── scenario_engine.py
-│   ├── risk_engine.py
-│   ├── shock_mapping.py
-│   ├── utils.py
-│   └── ...
-│
-├── portfolio_sim/
-│   ├── __init__.py
-│   ├── mc_engine.py          ← deaktiviert
-│   └── scenario_compare.py   ← MC-frei
-│
-└── data/
-    └── slider_presets.json
+â”‚
+â”œâ”€â”€ main.py
+â”‚
+â”œâ”€â”€ ui/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â””â”€â”€ app.py
+â”‚
+â”œâ”€â”€ core/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ presets.py
+â”‚   â”œâ”€â”€ scenario_engine.py
+â”‚   â”œâ”€â”€ risk_engine.py
+â”‚   â”œâ”€â”€ shock_mapping.py
+â”‚   â”œâ”€â”€ utils.py
+â”‚   â””â”€â”€ ...
+â”‚
+â”œâ”€â”€ portfolio_sim/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ mc_engine.py          â† deaktiviert
+â”‚   â””â”€â”€ scenario_compare.py   â† MC-frei
+â”‚
+â””â”€â”€ data/
+    â””â”€â”€ slider_presets.json
 
 makro_sim/
-│
-├── risk_dashboard/
-│   ├── ui/
-│   │   ├── app.py
-│   │   └── __init__.py
-│   │
-│   ├── core/
-│   │   ├── __init__.py
-│   │
-│   │   ├── data/
-│   │   │   ├── __init__.py
-│   │   │   └── market_data.py
-│   │
-│   │   ├── portfolio/
-│   │   │   ├── __init__.py
-│   │   │   ├── portfolio_engine.py
-│   │   │   ├── portfolio_plots.py
-│   │   │   └── portfolio_storyline.py
-│   │
-│   │   ├── plots/
-│   │   │   ├── __init__.py
-│   │   │   ├── risk_plots.py
-│   │   │   └── heatmap_plots.py
-│   │
-│   │   ├── reporting/
-│   │   │   ├── __init__.py
-│   │   │   └── pdf_report.py
-│   │
-│   │   └── storyline/
-│   │       ├── __init__.py
-│   │       └── storyline_engine.py
-│   │
-│   └── __init__.py
-│
-└── __init__.py
+â”‚
+â”œâ”€â”€ risk_dashboard/
+â”‚   â”œâ”€â”€ ui/
+â”‚   â”‚   â”œâ”€â”€ app.py
+â”‚   â”‚   â””â”€â”€ __init__.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ core/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚
+â”‚   â”‚   â”œâ”€â”€ data/
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â””â”€â”€ market_data.py
+â”‚   â”‚
+â”‚   â”‚   â”œâ”€â”€ portfolio/
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ portfolio_engine.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ portfolio_plots.py
+â”‚   â”‚   â”‚   â””â”€â”€ portfolio_storyline.py
+â”‚   â”‚
+â”‚   â”‚   â”œâ”€â”€ plots/
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ risk_plots.py
+â”‚   â”‚   â”‚   â””â”€â”€ heatmap_plots.py
+â”‚   â”‚
+â”‚   â”‚   â”œâ”€â”€ reporting/
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â””â”€â”€ pdf_report.py
+â”‚   â”‚
+â”‚   â”‚   â””â”€â”€ storyline/
+â”‚   â”‚       â”œâ”€â”€ __init__.py
+â”‚   â”‚       â””â”€â”€ storyline_engine.py
+â”‚   â”‚
+â”‚   â””â”€â”€ __init__.py
+â”‚
+â””â”€â”€ __init__.py
 
-📂 Portfolio‑Studio
-   ├── Portfolio‑Manager
-   ├── Portfolio‑Radar
-   ├── Portfolio‑Backtest
-   ├── Portfolio‑Vergleich
-   ├── Portfolio‑Heatmap
-   ├── Symbol‑Tools
-   └── Debug‑Log
+ðŸ“‚ Portfolioâ€‘Studio
+   â”œâ”€â”€ Portfolioâ€‘Manager
+   â”œâ”€â”€ Portfolioâ€‘Radar
+   â”œâ”€â”€ Portfolioâ€‘Backtest
+   â”œâ”€â”€ Portfolioâ€‘Vergleich
+   â”œâ”€â”€ Portfolioâ€‘Heatmap
+   â”œâ”€â”€ Symbolâ€‘Tools
+   â””â”€â”€ Debugâ€‘Log
 
 
 makro_sim/
-│
-├── fx_dashboard/                ← dein bestehendes FX‑Projekt (unverändert)
-│   ├── src/
-│   ├── models/
-│   ├── data/
-│   └── ...
-│
-└── risk_dashboard/              ← das große Makro‑Risiko‑Projekt
-    │
-    ├── src/
-    │   ├── data_loader.py        ← lädt (später echte) Makrodaten
-    │   ├── risk_factors.py       ← Berechnung von Indikatoren (GDP, Inflation, etc.)
-    │   ├── risk_engine.py        ← kombiniert alles zu Risiko‑Scores
-    │   ├── fx_integration.py     ← Anbindung an fx_dashboard
-    │   └── app.py                ← Streamlit‑Dashboard (Makro + Risiko + FX)
-    │
-    ├── data/
-    │   └── synthetic_macro.csv   ← synthetische Beispiel‑Daten
-    ├── notebooks/
-    ├── requirements.txt
-    └── README.md
+â”‚
+â”œâ”€â”€ fx_dashboard/                â† dein bestehendes FXâ€‘Projekt (unverÃ¤ndert)
+â”‚   â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ models/
+â”‚   â”œâ”€â”€ data/
+â”‚   â””â”€â”€ ...
+â”‚
+â””â”€â”€ risk_dashboard/              â† das groÃŸe Makroâ€‘Risikoâ€‘Projekt
+    â”‚
+    â”œâ”€â”€ src/
+    â”‚   â”œâ”€â”€ data_loader.py        â† lÃ¤dt (spÃ¤ter echte) Makrodaten
+    â”‚   â”œâ”€â”€ risk_factors.py       â† Berechnung von Indikatoren (GDP, Inflation, etc.)
+    â”‚   â”œâ”€â”€ risk_engine.py        â† kombiniert alles zu Risikoâ€‘Scores
+    â”‚   â”œâ”€â”€ fx_integration.py     â† Anbindung an fx_dashboard
+    â”‚   â””â”€â”€ app.py                â† Streamlitâ€‘Dashboard (Makro + Risiko + FX)
+    â”‚
+    â”œâ”€â”€ data/
+    â”‚   â””â”€â”€ synthetic_macro.csv   â† synthetische Beispielâ€‘Daten
+    â”œâ”€â”€ notebooks/
+    â”œâ”€â”€ requirements.txt
+    â””â”€â”€ README.md
+

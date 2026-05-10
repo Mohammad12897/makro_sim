@@ -1,4 +1,4 @@
-#risk_dashboard/core/cluster_engine.py
+﻿#risk_dashboard/core/cluster_engine.py
 from sklearn.cluster import KMeans
 import pandas as pd
 
@@ -8,3 +8,4 @@ def compute_clusters(presets_all, k=3):
     labels = model.fit_predict(df)
     df["cluster"] = labels
     return df
+

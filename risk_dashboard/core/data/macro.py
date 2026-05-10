@@ -1,10 +1,10 @@
-# core/data/macro.py
+﻿# core/data/macro.py
 
 def get_country_macro(country: str) -> dict:
     """
-    Liefert Makro-Kennzahlen für ein Land.
+    Liefert Makro-Kennzahlen fÃ¼r ein Land.
     Diese Version nutzt statische Beispielwerte.
-    Später kannst du echte Datenquellen anbinden (OECD, WorldBank, ECB).
+    SpÃ¤ter kannst du echte Datenquellen anbinden (OECD, WorldBank, ECB).
     """
 
     data = {
@@ -14,7 +14,7 @@ def get_country_macro(country: str) -> dict:
             "Zinsen": 5.25,
             "Arbeitslosenquote": 3.8,
             "Staatsverschuldung": 120,
-            "Währungsstärke": 85,
+            "WÃ¤hrungsstÃ¤rke": 85,
         },
         "Deutschland": {
             "BIP-Wachstum": 0.6,
@@ -22,7 +22,7 @@ def get_country_macro(country: str) -> dict:
             "Zinsen": 4.50,
             "Arbeitslosenquote": 5.8,
             "Staatsverschuldung": 65,
-            "Währungsstärke": 78,
+            "WÃ¤hrungsstÃ¤rke": 78,
         },
         "Japan": {
             "BIP-Wachstum": 1.2,
@@ -30,7 +30,7 @@ def get_country_macro(country: str) -> dict:
             "Zinsen": 0.10,
             "Arbeitslosenquote": 2.6,
             "Staatsverschuldung": 260,
-            "Währungsstärke": 70,
+            "WÃ¤hrungsstÃ¤rke": 70,
         },
         "UK": {
             "BIP-Wachstum": 1.0,
@@ -38,7 +38,7 @@ def get_country_macro(country: str) -> dict:
             "Zinsen": 5.00,
             "Arbeitslosenquote": 4.2,
             "Staatsverschuldung": 100,
-            "Währungsstärke": 80,
+            "WÃ¤hrungsstÃ¤rke": 80,
         },
         "Frankreich": {
             "BIP-Wachstum": 1.1,
@@ -46,7 +46,7 @@ def get_country_macro(country: str) -> dict:
             "Zinsen": 4.50,
             "Arbeitslosenquote": 7.2,
             "Staatsverschuldung": 112,
-            "Währungsstärke": 77,
+            "WÃ¤hrungsstÃ¤rke": 77,
         },
         "China": {
             "BIP-Wachstum": 4.8,
@@ -54,7 +54,7 @@ def get_country_macro(country: str) -> dict:
             "Zinsen": 3.45,
             "Arbeitslosenquote": 5.0,
             "Staatsverschuldung": 80,
-            "Währungsstärke": 65,
+            "WÃ¤hrungsstÃ¤rke": 65,
         },
         "Indien": {
             "BIP-Wachstum": 6.5,
@@ -62,7 +62,7 @@ def get_country_macro(country: str) -> dict:
             "Zinsen": 6.50,
             "Arbeitslosenquote": 7.8,
             "Staatsverschuldung": 85,
-            "Währungsstärke": 60,
+            "WÃ¤hrungsstÃ¤rke": 60,
         },
     }
 
@@ -72,5 +72,6 @@ def get_country_macro(country: str) -> dict:
         "Zinsen": None,
         "Arbeitslosenquote": None,
         "Staatsverschuldung": None,
-        "Währungsstärke": None,
+        "WÃ¤hrungsstÃ¤rke": None,
     })
+
