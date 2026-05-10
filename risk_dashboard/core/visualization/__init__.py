@@ -1,4 +1,4 @@
-# core/visualization/radar_plotly_portfolio.py
+﻿# core/visualization/radar_plotly_portfolio.py
 import plotly.graph_objects as go
 from core.visualization.lexicon import get_tooltip_map_for_tab
 
@@ -13,12 +13,12 @@ def _ampel_color(value: float) -> str:
 
 def plot_portfolio_radar(rows, mode="einsteiger"):
     all_metrics = [
-        "Gewichteter Sharpe", "Gewichtete Volatilität",
+        "Gewichteter Sharpe", "Gewichtete VolatilitÃ¤t",
         "1Y %", "5Y %", "Diversifikation", "Region-Exposure"
     ]
 
     if mode == "einsteiger":
-        metrics = ["Gewichteter Sharpe", "Gewichtete Volatilität", "1Y %"]
+        metrics = ["Gewichteter Sharpe", "Gewichtete VolatilitÃ¤t", "1Y %"]
     else:
         metrics = all_metrics
 
@@ -50,4 +50,5 @@ def plot_portfolio_radar(rows, mode="einsteiger"):
     )
 
     return fig
+
 

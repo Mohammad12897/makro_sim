@@ -1,4 +1,4 @@
-pyproject.toml
+﻿pyproject.toml
 setup.py
 makro_sim.egg-info/PKG-INFO
 makro_sim.egg-info/SOURCES.txt

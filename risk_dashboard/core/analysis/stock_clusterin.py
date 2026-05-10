@@ -1,4 +1,4 @@
-#core/analysis/stock_clusterin.py
+﻿#core/analysis/stock_clusterin.py
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
@@ -6,10 +6,10 @@ from sklearn.cluster import KMeans
 def cluster_stocks(rows):
     df = pd.DataFrame(rows)
 
-    # Features für Clustering
-    features = ["1Y %", "5Y %", "Volatilität %", "Sharpe", "Max Drawdown %", "Beta"]
+    # Features fÃ¼r Clustering
+    features = ["1Y %", "5Y %", "VolatilitÃ¤t %", "Sharpe", "Max Drawdown %", "Beta"]
 
-    # Fehlende Spalten automatisch ergänzen
+    # Fehlende Spalten automatisch ergÃ¤nzen
     for f in features:
         if f not in df.columns:
             df[f] = 0
@@ -19,7 +19,7 @@ def cluster_stocks(rows):
     # Anzahl Aktien
     n = len(df_clean)
 
-    # Wenn weniger als 3 Aktien → kein Clustering möglich
+    # Wenn weniger als 3 Aktien â†’ kein Clustering mÃ¶glich
     if n < 3:
         df["Cluster"] = "Nicht genug Daten (min. 3 Aktien)"
         return df
@@ -33,3 +33,4 @@ def cluster_stocks(rows):
     df["Cluster"] = kmeans.fit_predict(X)
 
     return df
+

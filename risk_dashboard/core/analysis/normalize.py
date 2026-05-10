@@ -1,8 +1,8 @@
-#core/analysis/normalize.py
+﻿#core/analysis/normalize.py
 def normalize_metrics(rows):
     # Alle Kennzahlen, die normiert werden sollen
     base_metrics = [
-        "1Y %", "5Y %", "Volatilität %", "Sharpe", "Max Drawdown %", "Beta",
+        "1Y %", "5Y %", "VolatilitÃ¤t %", "Sharpe", "Max Drawdown %", "Beta",
         "KGV", "KBV", "KUV", "DivRendite %"
     ]
 
@@ -36,3 +36,4 @@ def normalize_metrics(rows):
                 r[m + " norm"] = (val - lo) / (hi - lo)
 
     return rows
+

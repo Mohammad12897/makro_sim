@@ -1,4 +1,4 @@
-#core/portfolio_sim/plots.py
+﻿#core/portfolio_sim/plots.py
 import numpy as np
 import matplotlib.pyplot as plt
     
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 def plot_scenario_radar_overlay(metrics):
     """
-    Zeichnet ein Radar-Overlay für Risiko-Szenarien.
+    Zeichnet ein Radar-Overlay fÃ¼r Risiko-Szenarien.
     metrics: dict {szenario_name: {indikator: wert}}
     """
 
@@ -22,14 +22,14 @@ def plot_scenario_radar_overlay(metrics):
 
     num_vars = len(labels)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-    angles += angles[:1]  # Kreis schließen
+    angles += angles[:1]  # Kreis schlieÃŸen
 
     fig = plt.figure(figsize=(6, 6))
     ax = plt.subplot(111, polar=True)
 
     for scen_name, values in metrics.items():
         vals = list(values.values())
-        vals += vals[:1]  # Kreis schließen
+        vals += vals[:1]  # Kreis schlieÃŸen
 
         ax.plot(angles, vals, linewidth=2, label=scen_name)
         ax.fill(angles, vals, alpha=0.1)
@@ -42,3 +42,4 @@ def plot_scenario_radar_overlay(metrics):
     ax.set_title("Radar-Overlay der Risiko-Szenarien")
 
     return fig
+

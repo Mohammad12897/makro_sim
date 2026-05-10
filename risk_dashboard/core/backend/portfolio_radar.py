@@ -1,4 +1,4 @@
-# core/backend/portfolio_radar.py
+﻿# core/backend/portfolio_radar.py
 import pandas as pd
 from core.data.assets import get_asset_metrics
 from core.visualization.radar_plotly_assets import plot_asset_radar
@@ -32,3 +32,4 @@ def portfolio_radar(symbols: list[str], weights: list[float]):
     if not rows:
         return None
     return plot_asset_radar(rows, mode="experte")
+

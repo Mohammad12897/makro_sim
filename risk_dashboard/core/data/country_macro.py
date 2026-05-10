@@ -1,4 +1,4 @@
-# core/data/country_macro.py
+﻿# core/data/country_macro.py
 
 import json
 import os
@@ -6,7 +6,7 @@ import os
 # Absoluter Pfad zu slider_presets.json
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-# → geht von core/data → core → risk_dashboard
+# â†’ geht von core/data â†’ core â†’ risk_dashboard
 PRESETS_PATH = os.path.join(BASE_DIR, "data", "slider_presets.json")
 
 
@@ -14,7 +14,7 @@ PRESETS_PATH = os.path.join(BASE_DIR, "data", "slider_presets.json")
 with open(PRESETS_PATH, "r", encoding="utf-8") as f:
     PRESETS = json.load(f)
 
-# Länder-Makrodaten extrahieren
+# LÃ¤nder-Makrodaten extrahieren
 COUNTRY_MACRO = PRESETS.get("countries", {})
 
 def get_country_macro(country: str) -> dict:
@@ -24,3 +24,4 @@ def get_country_macro(country: str) -> dict:
         "Zinsen": 0,
         "Arbeitslosenquote": 0,
     })
+

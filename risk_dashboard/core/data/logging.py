@@ -1,4 +1,4 @@
-# core/data/logging.py
+﻿# core/data/logging.py
 import logging
 
 log_buffer = []
@@ -20,3 +20,4 @@ if not logger.handlers:
     fmt = logging.Formatter("[%(asctime)s] %(levelname)s - %(message)s")
     bh.setFormatter(fmt)
     logger.addHandler(bh)
+

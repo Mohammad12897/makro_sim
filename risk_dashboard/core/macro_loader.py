@@ -1,4 +1,4 @@
-#risk_dashboard/core/macro_loader.py
+﻿#risk_dashboard/core/macro_loader.py
 import os
 import time
 from pathlib import Path
@@ -45,7 +45,7 @@ def _fetch_from_fred(series_id: str) -> pd.DataFrame:
 
 def load_macro_series(series_id: str) -> pd.DataFrame:
     """
-    Lädt eine einzelne Makroserie von FRED.
+    LÃ¤dt eine einzelne Makroserie von FRED.
     Gibt DataFrame mit Spalten: date, value
     """
     df = web.DataReader(series_id, "fred")
@@ -57,7 +57,7 @@ def load_macro_series(series_id: str) -> pd.DataFrame:
 
 def load_macro_data() -> pd.DataFrame:
     """
-    Lädt alle Makroserien für Szenario-Engine.
+    LÃ¤dt alle Makroserien fÃ¼r Szenario-Engine.
     """
     df = pd.DataFrame()
 
@@ -74,3 +74,4 @@ def load_macro_data() -> pd.DataFrame:
 def load_market_data():
     prices = download_etf_history(["SPY"], period="10y")
     return build_market_risk_factors(prices)
+

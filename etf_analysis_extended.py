@@ -1,4 +1,4 @@
-# etf_analysis_extended.py
+﻿# etf_analysis_extended.py
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -24,11 +24,11 @@ START = "2016-01-01"
 ANN_FACTOR = 252
 REBALANCE_FREQ = "YE"  # 'YE' = yearly; alternatives: 'Q' quarterly, 'M' monthly
 
-OUT_DIR = "."  # Arbeitsverzeichnis (C:/Projects/makro_sim wenn dort ausgefÃƒÂ¼hrt)
+OUT_DIR = "."  # Arbeitsverzeichnis (C:/Projects/makro_sim wenn dort ausgefÃƒÆ’Ã‚Â¼hrt)
 
 # === Hilfsfunktionen ===
 def annualized_cagr(series):
-    # series: price series (pd.Series) mit tÃƒÂ¤glicher Frequenz
+    # series: price series (pd.Series) mit tÃƒÆ’Ã‚Â¤glicher Frequenz
     n_days = len(series) - 1
     if n_days <= 0:
         return np.nan
@@ -60,7 +60,7 @@ else:
 # Sicherstellen: DataFrame mit Spalten = ETFS
 prices = prices[ETFS].dropna(how="all")
 
-# tÃƒÂ¤gliche Renditen
+# tÃƒÆ’Ã‚Â¤gliche Renditen
 rets = prices.pct_change().dropna()
 
 # === Kennzahlen pro ETF ===
@@ -116,7 +116,7 @@ print(f"Drawdown-Plot gespeichert: {OUT_DIR}/drawdown.png")
 corr = rets.corr()
 plt.figure(figsize=(8,6))
 sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", vmin=-1, vmax=1)
-plt.title("Korrelationsmatrix (tÃƒÂ¤gliche Renditen)")
+plt.title("Korrelationsmatrix (tÃƒÆ’Ã‚Â¤gliche Renditen)")
 plt.tight_layout()
 plt.savefig(f"{OUT_DIR}/correlation_heatmap.png", dpi=150)
 plt.close()
@@ -130,12 +130,12 @@ weights = pd.Series(1.0 / len(ETFS), index=ETFS)
 
 # Stelle sicher, dass prices und rets dieselbe Index-Frequenz haben
 prices = prices.asfreq('B').ffill()            # Business days, forward-fill missing
-rets = prices.pct_change().fillna(0)           # neu berechnete tägliche Renditen, keine NaNs
+rets = prices.pct_change().fillna(0)           # neu berechnete tÃ¤gliche Renditen, keine NaNs
 
 # Bestimme Rebalancing-Perioden (verwende 'YE' statt 'Y' wegen Deprecation)
 period_starts = prices.resample(REBALANCE_FREQ).first().index
 
-# Simpler, korrekter Weg: für jeden Periode-Bereich die täglichen Portfolio-Renditen berechnen
+# Simpler, korrekter Weg: fÃ¼r jeden Periode-Bereich die tÃ¤glichen Portfolio-Renditen berechnen
 pv = pd.Series(index=prices.index, dtype=float)
 current_factor = 1.0
 
@@ -145,18 +145,18 @@ for i in range(len(period_starts)):
     mask = (prices.index >= start) & (prices.index <= end)
     if not mask.any():
         continue
-    # tägliche Renditen für die Periode, ausgerichtet auf prices index
+    # tÃ¤gliche Renditen fÃ¼r die Periode, ausgerichtet auf prices index
     daily_rets = rets.loc[mask, ETFS].fillna(0)
-    # Portfolio tägliche Rendite = gewichtete Summe
+    # Portfolio tÃ¤gliche Rendite = gewichtete Summe
     port_daily = daily_rets.dot(weights)
     # kumulative Entwicklung in der Periode, multipliziert mit Startfaktor
     period_cum = (1 + port_daily).cumprod() * current_factor
     pv.loc[mask] = period_cum.values
-    # setze neuen Startfaktor für nächste Periode auf letzten Wert dieser Periode
+    # setze neuen Startfaktor fÃ¼r nÃ¤chste Periode auf letzten Wert dieser Periode
     current_factor = period_cum.iloc[-1]
     # rebalance: weights bleiben gleich (gleichgewichtet), so nichts zu tun
 
-# Fallback: fülle evtl. NaNs
+# Fallback: fÃ¼lle evtl. NaNs
 pv = pv.fillna(method="ffill").fillna(1.0)
 
 
@@ -164,7 +164,7 @@ pv = pv.fillna(method="ffill").fillna(1.0)
 pv.to_csv(f"{OUT_DIR}/backtest_cumulative.csv")
 plt.figure(figsize=(10,6))
 plt.plot(pv.index, pv.values, label="Equal-weight annual rebalance")
-plt.title("Backtest: Gleichgewichtetes Portfolio (jÃƒÂ¤hrliches Rebalancing)")
+plt.title("Backtest: Gleichgewichtetes Portfolio (jÃƒÆ’Ã‚Â¤hrliches Rebalancing)")
 plt.ylabel("Kumulativer Faktor")
 plt.xlabel("Datum")
 plt.legend()
@@ -173,7 +173,7 @@ plt.savefig(f"{OUT_DIR}/backtest_cumulative.png", dpi=150)
 plt.close()
 print(f"Backtest Ergebnisse gespeichert: {OUT_DIR}/backtest_cumulative.png and backtest_cumulative.csv")
 
-# === ErgÃƒÂ¤nzende Kennzahlen fÃƒÂ¼r das Backtest-Portfolio ===
+# === ErgÃƒÆ’Ã‚Â¤nzende Kennzahlen fÃƒÆ’Ã‚Â¼r das Backtest-Portfolio ===
 # annualized return
 pv_series = pv.dropna()
 backtest_cagr = (pv_series.iloc[-1] / pv_series.iloc[0]) ** (ANN_FACTOR / len(pv_series.pct_change().dropna())) - 1
@@ -192,3 +192,4 @@ backtest_summary.to_csv(f"{OUT_DIR}/backtest_summary.csv")
 print(f"Backtest Kennzahlen gespeichert: {OUT_DIR}/backtest_summary.csv")
 
 print("Fertig.")
+

@@ -1,4 +1,4 @@
-#core/portfolio_sim/risk_metricks.py
+﻿#core/portfolio_sim/risk_metricks.py
 import numpy as np
 
 def mc_risk_metrics(sim):
@@ -23,3 +23,4 @@ def mc_risk_metrics(sim):
         "cvar95": cvar95,
         "max_drawdown": max_dd,
     }
+

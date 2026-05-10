@@ -1,30 +1,30 @@
-# 🌍 Makro Risk Dashboard – Professional Edition
+﻿# ðŸŒ Makro Risk Dashboard â€“ Professional Edition
 
 Dieses Projekt ist ein interaktives Dashboard zur Analyse von:
 
-- makroökonomischen Risiken  
-- geopolitischen Abhängigkeiten  
-- Energie-, Währungs- und Finanzrisiken  
-- politischer & sicherheitspolitischer Abhängigkeit  
+- makroÃ¶konomischen Risiken  
+- geopolitischen AbhÃ¤ngigkeiten  
+- Energie-, WÃ¤hrungs- und Finanzrisiken  
+- politischer & sicherheitspolitischer AbhÃ¤ngigkeit  
 - strategischer Autonomie  
 - Szenarien, Clustern, Heatmaps und Storylines  
 
 ## Struktur
 
 - `core/`
-  - `risk_model.py` – Berechnung aller Risiko-Dimensionen
-  - `scenario_engine.py` – Schock- und Szenario-Engine
-  - `cluster.py` – Clusteranalyse
-  - `heatmap.py` – Heatmap-Tabellen
-  - `storyline.py` – narrative Risiko-Storyline
-  - `ews.py` – Early-Warning-System
+  - `risk_model.py` â€“ Berechnung aller Risiko-Dimensionen
+  - `scenario_engine.py` â€“ Schock- und Szenario-Engine
+  - `cluster.py` â€“ Clusteranalyse
+  - `heatmap.py` â€“ Heatmap-Tabellen
+  - `storyline.py` â€“ narrative Risiko-Storyline
+  - `ews.py` â€“ Early-Warning-System
 - `ui/`
-  - `app.py` – Gradio-App mit allen Tabs
-  - `components.py` – Radarplots, Dropdowns, UI-Komponenten
-  - `layout.py` – Layout-Bausteine (optional genutzt)
+  - `app.py` â€“ Gradio-App mit allen Tabs
+  - `components.py` â€“ Radarplots, Dropdowns, UI-Komponenten
+  - `layout.py` â€“ Layout-Bausteine (optional genutzt)
 - `data/`
-  - `slider_presets.json` – Länder-Presets (10 Länder inkl. Israel)
-  - `scenario_presets.json` – Szenario-Definitionen
+  - `slider_presets.json` â€“ LÃ¤nder-Presets (10 LÃ¤nder inkl. Israel)
+  - `scenario_presets.json` â€“ Szenario-Definitionen
 
 ## Start
 
@@ -32,3 +32,4 @@ Dieses Projekt ist ein interaktives Dashboard zur Analyse von:
 
    ```python
    ROOT = "/content/makro_sim/risk_dashboard"
+

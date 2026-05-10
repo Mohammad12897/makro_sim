@@ -1,4 +1,4 @@
-# risk_dashboard/src/core/stress_tests.py
+﻿# risk_dashboard/src/core/stress_tests.py
 import numpy as np
 import pandas as pd
 
@@ -7,7 +7,7 @@ def apply_shock(value, shock_pct):
 
 def stress_test_fx(fx_forecast, shocks=None):
     if shocks is None:
-        shocks = [-0.10, -0.05, 0.05, 0.10]  # ±5%, ±10%
+        shocks = [-0.10, -0.05, 0.05, 0.10]  # Â±5%, Â±10%
 
     results = []
     for shock in shocks:

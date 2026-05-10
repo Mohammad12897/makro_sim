@@ -1,4 +1,4 @@
-# core/backend/stock_scanner.py
+﻿# core/backend/stock_scanner.py
 
 import yfinance as yf
 import pandas as pd
@@ -38,3 +38,4 @@ def scan_stocks(symbols: list[str]):
         return pd.DataFrame({"Fehler": ["Keine Aktien-Daten gefunden"]})
 
     return pd.DataFrame(rows)
+

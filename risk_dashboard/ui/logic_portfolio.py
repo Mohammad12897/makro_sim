@@ -1,4 +1,4 @@
-# ui/logic_portfolio.py
+﻿# ui/logic_portfolio.py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ def ui_portfolio_studio(ticker_text):
     for t in tickers:
         series = fetch_price_history(t, period="1y")
         if series is None or len(series) == 0:
-            return plt.figure(), pd.DataFrame([[f"Keine Daten für {t}"]], columns=["Info"])
+            return plt.figure(), pd.DataFrame([[f"Keine Daten fÃ¼r {t}"]], columns=["Info"])
         price_data[t] = series
 
     df = pd.DataFrame(price_data)
@@ -24,14 +24,14 @@ def ui_portfolio_studio(ticker_text):
 
     stats = pd.DataFrame({
         "Rendite (p.a.)": returns.mean() * 252,
-        "Volatilität (p.a.)": returns.std() * np.sqrt(252),
+        "VolatilitÃ¤t (p.a.)": returns.std() * np.sqrt(252),
         "Max Drawdown": (perf / perf.cummax() - 1).min(),
-        "KI‑Score": [get_ki_score(t) for t in tickers]
+        "KIâ€‘Score": [get_ki_score(t) for t in tickers]
     })
 
     fig, ax = plt.subplots(figsize=(7, 4))
     perf.plot(ax=ax)
-    ax.set_title("Portfolio‑Performance (normiert)")
+    ax.set_title("Portfolioâ€‘Performance (normiert)")
     ax.set_ylabel("Wert (Start = 1)")
     ax.grid(True)
 
@@ -39,7 +39,7 @@ def ui_portfolio_studio(ticker_text):
 
 def ui_portfolio_optimizer(ticker_text):
     """
-    Portfolio‑Optimierung (Mean‑Variance)
+    Portfolioâ€‘Optimierung (Meanâ€‘Variance)
     """
     try:
         tickers = [t.strip() for t in ticker_text.split(",") if t.strip()]
@@ -72,3 +72,4 @@ def ui_portfolio_optimizer(ticker_text):
 
     except Exception as e:
         return pd.DataFrame([["Fehler", str(e)]]), None
+

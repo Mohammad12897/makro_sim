@@ -1,4 +1,4 @@
-# ui/components.py
+﻿# ui/components.py
 
 import plotly.graph_objects as go
 import gradio as gr
@@ -6,24 +6,24 @@ from core.lexicon import load_lexicon
 
 
 # ---------------------------------------------------------
-# Radar-Plot für ein einzelnes Land (mit Tooltips, Farben, Ring, Legende)
+# Radar-Plot fÃ¼r ein einzelnes Land (mit Tooltips, Farben, Ring, Legende)
 # ---------------------------------------------------------
 
 def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
     """
-    Erstellt einen Radar-Plot für ein einzelnes Land.
+    Erstellt einen Radar-Plot fÃ¼r ein einzelnes Land.
     0 = geringes Risiko (gut), 1 = hohes Risiko (schlecht).
     Mit:
     - Lexikon-Tooltips
-    - Risiko-Farbskala (grün/gelb/rot)
-    - Ø-Risiko-Ring
+    - Risiko-Farbskala (grÃ¼n/gelb/rot)
+    - Ã˜-Risiko-Ring
     - Farblegende
     """
 
     labels = [
         "Makro", "Geo", "Governance", "Handel",
         "Lieferkette", "Finanzen", "Tech", "Energie",
-        "Währung", "Politische Abhängigkeit", "Strategische Autonomie"
+        "WÃ¤hrung", "Politische AbhÃ¤ngigkeit", "Strategische Autonomie"
     ]
 
     dims = [
@@ -34,9 +34,9 @@ def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
 
     # Werte extrahieren
     values = [scores[d] for d in dims]
-    values.append(values[0])  # Radar schließen
+    values.append(values[0])  # Radar schlieÃŸen
 
-    # Ø-Risiko (ohne den duplizierten letzten Punkt)
+    # Ã˜-Risiko (ohne den duplizierten letzten Punkt)
     avg_risk = sum(values[:-1]) / len(values[:-1])
 
     # Lexikon laden
@@ -69,13 +69,13 @@ def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
         hovertemplate="<b>%{theta}</b><br>Wert: %{r}<br><br>%{customdata}"
     ))
 
-    # Ø-Risiko-Ring
+    # Ã˜-Risiko-Ring
     fig.add_trace(go.Scatterpolar(
         r=[avg_risk] * len(values),
         theta=labels + [labels[0]],
         mode="lines",
         line=dict(color="black", width=1, dash="dot"),
-        name=f"Ø Risiko: {avg_risk:.2f}"
+        name=f"Ã˜ Risiko: {avg_risk:.2f}"
     ))
 
     # Farblegende
@@ -83,19 +83,19 @@ def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
         r=[None], theta=[None],
         mode="markers",
         marker=dict(size=12, color="green"),
-        name="Niedriges Risiko (0–0.33)"
+        name="Niedriges Risiko (0â€“0.33)"
     ))
     fig.add_trace(go.Scatterpolar(
         r=[None], theta=[None],
         mode="markers",
         marker=dict(size=12, color="gold"),
-        name="Mittleres Risiko (0.33–0.66)"
+        name="Mittleres Risiko (0.33â€“0.66)"
     ))
     fig.add_trace(go.Scatterpolar(
         r=[None], theta=[None],
         mode="markers",
         marker=dict(size=12, color="red"),
-        name="Hohes Risiko (0.66–1)"
+        name="Hohes Risiko (0.66â€“1)"
     ))
 
     fig.update_layout(
@@ -129,7 +129,7 @@ def make_multi_radar_plot(score_list):
     labels = [
         "Makro", "Geo", "Governance", "Handel",
         "Lieferkette", "Finanzen", "Tech", "Energie",
-        "Währung", "Politische Abhängigkeit", "Strategische Autonomie"
+        "WÃ¤hrung", "Politische AbhÃ¤ngigkeit", "Strategische Autonomie"
     ]
 
     dims = [
@@ -164,7 +164,7 @@ def make_multi_radar_plot(score_list):
         ))
 
     fig.update_layout(
-        title="Ländervergleich – Radar",
+        title="LÃ¤ndervergleich â€“ Radar",
         polar=dict(
             radialaxis=dict(
                 visible=True,
@@ -189,7 +189,7 @@ def make_delta_radar_plot(base_scores, scenario_scores, title="Delta-Radar"):
     labels = [
         "Makro", "Geo", "Governance", "Handel",
         "Lieferkette", "Finanzen", "Tech", "Energie",
-        "Währung", "Politische Abhängigkeit", "Strategische Autonomie"
+        "WÃ¤hrung", "Politische AbhÃ¤ngigkeit", "Strategische Autonomie"
     ]
 
     dims = [
@@ -248,7 +248,7 @@ def make_heatmap_radar(scores, title="Heatmap-Radar"):
     labels = [
         "Makro", "Geo", "Governance", "Handel",
         "Lieferkette", "Finanzen", "Tech", "Energie",
-        "Währung", "Politische Abhängigkeit", "Strategische Autonomie"
+        "WÃ¤hrung", "Politische AbhÃ¤ngigkeit", "Strategische Autonomie"
     ]
 
     dims = [
@@ -270,7 +270,7 @@ def make_heatmap_radar(scores, title="Heatmap-Radar"):
         line=dict(color="black", width=1),
         marker=dict(
             color=values,
-            colorscale="RdYlGn_r",  # grün → gelb → rot
+            colorscale="RdYlGn_r",  # grÃ¼n â†’ gelb â†’ rot
             size=12,
             colorbar=dict(title="Risiko")
         ),
@@ -301,7 +301,7 @@ def make_heatmap_radar(scores, title="Heatmap-Radar"):
 def make_country_dropdown(countries):
     return gr.Dropdown(
         choices=countries,
-        label="Land auswählen",
+        label="Land auswÃ¤hlen",
         value=countries[0]
     )
 
@@ -309,6 +309,7 @@ def make_country_dropdown(countries):
 def make_scenario_dropdown(scenarios):
     return gr.Dropdown(
         choices=scenarios,
-        label="Szenario auswählen",
+        label="Szenario auswÃ¤hlen",
         value=scenarios[0]
     )
+

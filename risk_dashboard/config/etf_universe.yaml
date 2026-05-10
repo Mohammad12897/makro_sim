@@ -1,4 +1,4 @@
-etf_universe:
+﻿etf_universe:
   aggregate_bond_etf:
     name: "iShares Core Global Aggregate Bond ETF"
     ticker: "AGGB"
@@ -192,5 +192,6 @@ etf_universe:
     region: "global"
     ter_pct: 0.22
     replication: "physical"
+
 
 

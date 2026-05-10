@@ -1,4 +1,4 @@
-import yfinance as yf
+﻿import yfinance as yf
 import requests
 import pandas as pd
 
@@ -43,4 +43,5 @@ try:
         print("history returned empty")
 except Exception as e:
     print("history error:", repr(e))
+
 

@@ -1,4 +1,4 @@
-#core/portfolio_sim/mc_engine.py
+﻿#core/portfolio_sim/mc_engine.py
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -38,3 +38,4 @@ def run_portfolio_mc(land, presets, w_equity, w_bond, w_gold, years, scenario_na
 
     summary = summarize_paths(sim)
     return sim, summary
+

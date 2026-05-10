@@ -1,4 +1,4 @@
-# ui/plots.py
+﻿# ui/plots.py
 
 import plotly.graph_objects as go
 from core.lexicon import load_lexicon
@@ -38,3 +38,4 @@ def plot_radar(scores: dict):
     )
 
     return fig
+

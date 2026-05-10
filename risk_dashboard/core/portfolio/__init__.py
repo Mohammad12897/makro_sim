@@ -1,4 +1,4 @@
-#core/portfolio/portfolio_storyline.py
+﻿#core/portfolio/portfolio_storyline.py
 
 def generate_portfolio_storyline(weights, stats):
     lines = []
@@ -16,22 +16,23 @@ def generate_portfolio_storyline(weights, stats):
         lines.append(f"Kleine Beimischungen finden sich in: {', '.join(low)}.")
 
     # Risiko interpretieren
-    vol = stats["Volatilität"]
+    vol = stats["VolatilitÃ¤t"]
     dd = stats["Max Drawdown"]
 
     if vol > 0.25:
-        lines.append("Die Volatilität ist hoch, was auf ein risikoreiches Portfolio hindeutet.")
+        lines.append("Die VolatilitÃ¤t ist hoch, was auf ein risikoreiches Portfolio hindeutet.")
     elif vol > 0.15:
-        lines.append("Die Volatilität ist moderat und gut kontrollierbar.")
+        lines.append("Die VolatilitÃ¤t ist moderat und gut kontrollierbar.")
     else:
-        lines.append("Die Volatilität ist niedrig – das Portfolio ist defensiv ausgerichtet.")
+        lines.append("Die VolatilitÃ¤t ist niedrig â€“ das Portfolio ist defensiv ausgerichtet.")
 
     if dd < -0.3:
-        lines.append("Der maximale Drawdown ist tief – starke Verluste in Stressphasen.")
+        lines.append("Der maximale Drawdown ist tief â€“ starke Verluste in Stressphasen.")
     elif dd < -0.15:
-        lines.append("Der Drawdown ist moderat – gewisse Krisenanfälligkeit.")
+        lines.append("Der Drawdown ist moderat â€“ gewisse KrisenanfÃ¤lligkeit.")
     else:
-        lines.append("Der Drawdown ist gering – gute Stabilität in Stressphasen.")
+        lines.append("Der Drawdown ist gering â€“ gute StabilitÃ¤t in Stressphasen.")
 
     return " ".join(lines)
+
 

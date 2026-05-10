@@ -1,4 +1,4 @@
-#core/engine/assets.py
+﻿#core/engine/assets.py
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -14,7 +14,7 @@ import numpy as np
 # -------------------------------------------------------------------
 def fetch_prices(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
     """
-    Lädt historische Kursdaten über yfinance.
+    LÃ¤dt historische Kursdaten Ã¼ber yfinance.
     """
     if not ticker:
         return None
@@ -63,7 +63,7 @@ def compute_ki_score_from_prices(prices: pd.DataFrame | None) -> float | None:
     except Exception:
         momentum = None
 
-    # 2) Volatilität (immer Float!)
+    # 2) VolatilitÃ¤t (immer Float!)
     vol = returns.std()
     if hasattr(vol, "mean"):
         vol = float(vol.mean())
@@ -111,11 +111,11 @@ def compute_radar_data(asset: Dict[str, Any],
                        prices: pd.DataFrame | None,
                        typ: str) -> Dict[str, Optional[float]]:
     """
-    Gibt ein Dict zurück: {achse: wert_0_100, ...}
+    Gibt ein Dict zurÃ¼ck: {achse: wert_0_100, ...}
     """
     radar: Dict[str, Optional[float]] = {}
 
-    # Hilfsfunktion: Normierung 0–100
+    # Hilfsfunktion: Normierung 0â€“100
     def scale(x: Any, a: float, b: float) -> Optional[float]:
         try:
             x = float(x)
@@ -145,7 +145,7 @@ def compute_radar_data(asset: Dict[str, Any],
         except Exception:
             momentum = None
 
-    # Volatilität (immer Float!)
+    # VolatilitÃ¤t (immer Float!)
     if returns is not None and len(returns) > 0:
         vol_tmp = returns.std()
         if hasattr(vol_tmp, "mean"):
@@ -168,15 +168,15 @@ def compute_radar_data(asset: Dict[str, Any],
     # Radar je nach Asset-Typ
     if typ == "Stock":
         radar["Momentum"] = scale(momentum, -0.5, 0.5)
-        radar["Volatilität (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
+        radar["VolatilitÃ¤t (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
 
         kgv = asset.get("KGV")
         wachstum = asset.get("Wachstum")
         cashflow = asset.get("Cashflow")
 
-        radar["KGV (günstig)"] = scale(-1 * (kgv or 0), -40, 0) if kgv is not None else None
+        radar["KGV (gÃ¼nstig)"] = scale(-1 * (kgv or 0), -40, 0) if kgv is not None else None
         radar["Wachstum"] = scale(wachstum, -0.1, 0.3) if wachstum is not None else None
-        radar["Cashflow‑Qualität"] = scale(cashflow, -0.1, 0.3) if cashflow is not None else None
+        radar["Cashflowâ€‘QualitÃ¤t"] = scale(cashflow, -0.1, 0.3) if cashflow is not None else None
 
     elif typ == "Etf":
         ter = asset.get("TER")
@@ -185,39 +185,40 @@ def compute_radar_data(asset: Dict[str, Any],
         repl = asset.get("Replikation")
 
         radar["Momentum"] = scale(momentum, -0.3, 0.3)
-        radar["TER (günstig)"] = scale(-1 * (ter or 0), -1.0, 0) if ter is not None else None
+        radar["TER (gÃ¼nstig)"] = scale(-1 * (ter or 0), -1.0, 0) if ter is not None else None
         radar["Volumen"] = scale(volumen, 1e6, 1e10) if volumen is not None else None
-        radar["Tracking‑Diff (gut)"] = scale(-1 * (td or 0), -0.05, 0) if td is not None else None
+        radar["Trackingâ€‘Diff (gut)"] = scale(-1 * (td or 0), -0.05, 0) if td is not None else None
         radar["Replikation (physisch=100)"] = 100 if (repl or "").lower().startswith("phys") else 50
 
     elif typ == "Crypto":
         radar["Momentum"] = scale(momentum, -1.0, 1.0)
-        radar["Volatilität (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
+        radar["VolatilitÃ¤t (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
         radar["Drawdown (robust)"] = scale(1 + (dd or -0.9), 0, 1)
 
         if momentum is not None and vol not in (None, 0):
-            radar["Trendstabilität"] = scale(momentum / vol, -2, 2)
+            radar["TrendstabilitÃ¤t"] = scale(momentum / vol, -2, 2)
         else:
-            radar["Trendstabilität"] = None
+            radar["TrendstabilitÃ¤t"] = None
 
-        radar["On‑Chain‑Proxy"] = 50  # Platzhalter
+        radar["Onâ€‘Chainâ€‘Proxy"] = 50  # Platzhalter
 
     elif typ == "Index":
         radar["Momentum"] = scale(momentum, -0.3, 0.3)
-        radar["Volatilität (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
+        radar["VolatilitÃ¤t (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
         radar["Drawdown (robust)"] = scale(1 + (dd or -0.6), 0, 1)
 
         if momentum is not None and vol not in (None, 0):
-            radar["Trendstabilität"] = scale(momentum / vol, -1, 1)
+            radar["TrendstabilitÃ¤t"] = scale(momentum / vol, -1, 1)
         else:
-            radar["Trendstabilität"] = None
+            radar["TrendstabilitÃ¤t"] = None
 
         radar["Marktbreite"] = 50  # Platzhalter
 
     else:
         # Unknown
         radar["Momentum"] = scale(momentum, -0.5, 0.5)
-        radar["Volatilität (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
+        radar["VolatilitÃ¤t (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
 
     return radar
+
 

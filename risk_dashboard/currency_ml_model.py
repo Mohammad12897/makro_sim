@@ -1,5 +1,5 @@
-# ============================================
-# MACHINE LEARNING MODELL FÜR WÄHRUNGSRISIKEN
+﻿# ============================================
+# MACHINE LEARNING MODELL FÃœR WÃ„HRUNGSRISIKEN
 # ============================================
 
 import pandas as pd
@@ -35,7 +35,7 @@ features = [
 ]
 
 target_class = "crisis_12m"        # 0/1
-target_reg = "stability_score"     # 0–100
+target_reg = "stability_score"     # 0â€“100
 
 # ------------------------------------------------
 # 3. KATEGORISCHE UND NUMERISCHE FEATURES
@@ -124,7 +124,7 @@ importances = model.feature_importances_
 print("Feature Importances:", importances)
 
 # ------------------------------------------------
-# 8. VORHERSAGE FÜR NEUE WÄHRUNG
+# 8. VORHERSAGE FÃœR NEUE WÃ„HRUNG
 # ------------------------------------------------
 new_currency = pd.DataFrame([{
     "inflation_yoy": 1.2,
@@ -146,4 +146,5 @@ crisis_prob = clf_model.predict_proba(new_currency)[0][1]
 stability_pred = reg_model.predict(new_currency)[0]
 
 print("Krisenwahrscheinlichkeit:", crisis_prob)
-print("Stabilitäts-Score:", stability_pred)
+print("StabilitÃ¤ts-Score:", stability_pred)
+

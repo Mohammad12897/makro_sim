@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.pyc
 
@@ -26,3 +26,4 @@ tmp_backup_files_*/
 .venv/
 __pycache__/
 *.pyc
+

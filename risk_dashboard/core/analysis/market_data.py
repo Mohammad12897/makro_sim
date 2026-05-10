@@ -1,4 +1,4 @@
-# core/analysis/market_data.py
+﻿# core/analysis/market_data.py
 import datetime as dt
 import numpy as np
 import pandas as pd
@@ -66,7 +66,7 @@ def get_metrics(entry):
         "asset_class": asset_class,
         "1Y %": round(perf(one_year) * 100, 2),
         "5Y %": round(perf(prices) * 100, 2),
-        "Volatilität %": round(annual_vol(rets) * 100, 2),
+        "VolatilitÃ¤t %": round(annual_vol(rets) * 100, 2),
         "Sharpe": round(sharpe_ratio(rets), 2),
         "Max Drawdown %": round(max_drawdown(prices) * 100, 2),
     }
@@ -84,3 +84,4 @@ def get_fundamentals(ticker):
         "KUV": d.get("priceToSalesTrailing12Months"),
         "DivRendite %": d.get("dividendYield", 0) * 100 if d.get("dividendYield") else None,
     }
+

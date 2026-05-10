@@ -1,4 +1,4 @@
-[build-system]
+﻿[build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
@@ -13,3 +13,4 @@ authors = [{name = "Your Name", email = "dein.email@beispiel.de"}]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["risk_dashboard*"]
+

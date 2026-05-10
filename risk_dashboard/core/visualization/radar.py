@@ -1,4 +1,4 @@
-# core/visualization/radar.py
+﻿# core/visualization/radar.py
 import math
 from typing import List, Dict
 
@@ -10,17 +10,17 @@ import numpy as np
 RADAR_METRICS = [
     ("1Y %", True),
     ("5Y %", True),
-    ("Volatilität %", False),   # niedriger = besser
+    ("VolatilitÃ¤t %", False),   # niedriger = besser
     ("Sharpe", True),
     ("Max Drawdown %", False),  # niedriger (weniger negativ) = besser
-    ("Beta", False),            # näher an 1 = besser -> behandeln wir separat
+    ("Beta", False),            # nÃ¤her an 1 = besser -> behandeln wir separat
 ]
 
 
 def _normalize_values(rows: Dict[str, Dict]) -> Dict[str, List[float]]:
     """
     rows: dict { ticker: {metric: value} }
-    Rückgabe: {ticker: [normierte Werte 0-1 in Reihenfolge RADAR_METRICS]}
+    RÃ¼ckgabe: {ticker: [normierte Werte 0-1 in Reihenfolge RADAR_METRICS]}
     """
 
     # Rohwerte sammeln
@@ -41,7 +41,7 @@ def _normalize_values(rows: Dict[str, Dict]) -> Dict[str, List[float]]:
         else:
             metric_minmax[name] = (min(vals), max(vals))
 
-    # Normierung 0–1
+    # Normierung 0â€“1
     norm = {}
     for ticker, r in rows.items():
         vals = []
@@ -68,7 +68,7 @@ def _normalize_values(rows: Dict[str, Dict]) -> Dict[str, List[float]]:
                 else:
                     x = 1.0 - min(dist / max_dist, 1.0)
 
-            # invertieren falls nötig
+            # invertieren falls nÃ¶tig
             if not high_is_good and name != "Beta":
                 x = 1.0 - x
 
@@ -83,10 +83,10 @@ def plot_radar(rows):
     rows: dict { ticker: {metric: value} }
     """
 
-    # Sicherheitsprüfung
+    # SicherheitsprÃ¼fung
     for key, val in rows.items():
         if not isinstance(val, dict):
-            raise ValueError(f"Radar: Ungültige Faktoren für {key}: {val}")
+            raise ValueError(f"Radar: UngÃ¼ltige Faktoren fÃ¼r {key}: {val}")
 
     if not rows:
         fig, ax = plt.subplots()
@@ -122,6 +122,7 @@ def plot_radar(rows):
         ax.fill(angles, vals, color=colors[i % len(colors)], alpha=0.15)
 
     ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
-    ax.set_title("Radar‑Overlay: Kennzahlenvergleich", pad=20)
+    ax.set_title("Radarâ€‘Overlay: Kennzahlenvergleich", pad=20)
 
     return fig
+

@@ -1,4 +1,4 @@
-# risk_dashboard/core/config.py
+﻿# risk_dashboard/core/config.py
 from pathlib import Path
 from typing import Dict, Any, Tuple, List, Optional
 import yaml
@@ -18,8 +18,8 @@ def _append_audit(entry: Dict[str, Any]) -> None:
 
 def load_etf_universe(path: Optional[Path] = None) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
     """
-    Lädt das ETF-Universe und validiert 'components' Verweise.
-    Rückgabe: (universe_dict, validation_warnings)
+    LÃ¤dt das ETF-Universe und validiert 'components' Verweise.
+    RÃ¼ckgabe: (universe_dict, validation_warnings)
     """
     p = Path(path) if path else ETF_UNIVERSE_PATH
     if not p.exists():
@@ -29,7 +29,7 @@ def load_etf_universe(path: Optional[Path] = None) -> Tuple[Dict[str, Dict[str, 
     universe = data.get("etf_universe", data)
     warnings: List[str] = []
 
-    # Validierung: components referenzieren gültige Keys
+    # Validierung: components referenzieren gÃ¼ltige Keys
     for key, meta in universe.items():
         comps = meta.get("components")
         if comps and isinstance(comps, dict):
@@ -57,3 +57,4 @@ def save_profile(key: str, profile_obj: Dict[str, Any], path: Optional[Path] = N
         yaml.safe_dump(cfg_out, f, sort_keys=False, allow_unicode=True)
     # Audit
     _append_audit({"action": "save_profile", "key": key, "profile": profile_obj})
+

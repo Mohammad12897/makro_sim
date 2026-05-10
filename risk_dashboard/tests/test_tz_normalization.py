@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import numpy as np
 import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
@@ -19,3 +19,4 @@ def test_to_naive_utc_mixed():
     df = pd.concat([s_naive.rename("n"), s_aware_conv.rename("a")], axis=1)
     assert "n" in df.columns and "a" in df.columns
     assert not df.empty
+

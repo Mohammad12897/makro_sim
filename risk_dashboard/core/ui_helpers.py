@@ -1,13 +1,13 @@
-# disk_dashboard/core/ui_helpers.py
+﻿# disk_dashboard/core/ui_helpers.py
 from typing import List, Dict
 from risk_dashboard.core.data.etf_db_loader import load_etf_db
 from risk_dashboard.core.data.country_to_region import country_to_region
 
 def countries_with_etfs(countries: List[str]) -> Dict[str, Dict]:
     """
-    Für jede Country-String in 'countries' gibt die Funktion:
+    FÃ¼r jede Country-String in 'countries' gibt die Funktion:
       {country: {"tickers": [...], "count": n, "region": region}}
-    zurück. Leere Liste bedeutet keine ETFs in der DB.
+    zurÃ¼ck. Leere Liste bedeutet keine ETFs in der DB.
     """
     db = load_etf_db()
     result = {}
@@ -28,3 +28,4 @@ def countries_with_etfs(countries: List[str]) -> Dict[str, Dict]:
         tickers = [e["ticker"] for e in db if e.get("region","").strip().lower() == region.strip().lower()]
         result[country] = {"tickers": tickers, "count": len(tickers), "region": region}
     return result
+

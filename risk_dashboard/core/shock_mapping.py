@@ -1,7 +1,7 @@
-# core/shock_mapping.py
+﻿# core/shock_mapping.py
 
 SHOCK_MAP = {
-    "Ölpreis +50%": {
+    "Ã–lpreis +50%": {
         "macro": 0.2,
         "geo": 0.1,
         "energie": 0.8,
@@ -55,7 +55,7 @@ SHOCK_MAP = {
         "political_security": 0.6,
         "macro": 0.2
     },
-    "Bündnisverlust": {
+    "BÃ¼ndnisverlust": {
         "political_security": 1.0,
         "geo": 0.8,
         "strategische_autonomie": 0.6
@@ -99,3 +99,4 @@ def convert_events_to_shocks(event_list):
         result[k] = min(1.0, result[k])
 
     return result
+
