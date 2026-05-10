@@ -22,3 +22,4 @@ tmp_backup_files_*/
 *.csv
 *.parquet
 *.bak
+.venv/
