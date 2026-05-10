@@ -23,3 +23,6 @@ tmp_backup_files_*/
 *.parquet
 *.bak
 .venv/
+.venv/
+__pycache__/
+*.pyc
