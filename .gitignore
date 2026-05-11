@@ -46,3 +46,6 @@ Git_commit_hook.bat
 test_edge.txt
 warn_edgeBlock.ps1
 risk_dashboard/config.yaml
+makro_sim/Bereinigung_edge.txt
+makro_sim/remove_edge_block.ps1
+makro_sim/Bereinigung_edge.png
