@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "makro_sim"
+version = "0.0.1"
+description = "Makro Dashboard"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{name = "Your Name", email = "dein.email@beispiel.de"}]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["risk_dashboard*"]

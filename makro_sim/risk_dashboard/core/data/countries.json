@@ -1,0 +1,7 @@
+[
+  {"name": "Deutschland", "region": "Europa", "aliases": ["Germany", "DE"]},
+  {"name": "Frankreich", "region": "Europa", "aliases": ["France", "FR"]},
+  {"name": "Vereinigtes Königreich", "region": "Europa", "aliases": ["UK", "United Kingdom", "GB"]},
+  {"name": "USA", "region": "USA", "aliases": ["United States", "US"]},
+  {"name": "Japan", "region": "Asien", "aliases": ["Nippon", "JP"]}
+]
