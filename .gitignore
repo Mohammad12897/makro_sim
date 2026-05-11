@@ -27,3 +27,9 @@ tmp_backup_files_*/
 __pycache__/
 *.pyc
 
+Bereinigung_edge.txt
+remove_edge_block.ps1
+Bereinigung_edge.png
+Git_commit_hook.bat
+test_edge.txt
+warn_edgeBlock.ps1
