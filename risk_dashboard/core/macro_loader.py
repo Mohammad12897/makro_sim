@@ -8,14 +8,18 @@ from risk_dashboard.core.config_loader import load_config
 from pandas_datareader import data as web
 from risk_dashboard.core.market_engine import download_etf_history, build_market_risk_factors
 
-
-
 config = load_config()
-FRED_API_KEY = config["fred"]["api_key"]
-CACHE_DIR = Path(config["fred"].get("cache_dir", "cache"))
-MAX_AGE_DAYS = config["fred"].get("max_age_days", 3)
+
+# Robustes Lesen des FRED API Keys: zuerst config.yaml, sonst Umgebungsvariable
+FRED_API_KEY = config.get("fred", {}).get("api_key") or os.environ.get("FRED_API_KEY")
+if not FRED_API_KEY:
+    raise RuntimeError("FRED API key not configured. Set risk_dashboard/config.yaml or FRED_API_KEY env var.")
+
+CACHE_DIR = Path(config.get("fred", {}).get("cache_dir", "cache"))
+MAX_AGE_DAYS = config.get("fred", {}).get("max_age_days", 3)
 
 CACHE_DIR.mkdir(exist_ok=True)
+
 
 def _cache_path(series_id: str) -> Path:
     return CACHE_DIR / f"{series_id}.csv"
