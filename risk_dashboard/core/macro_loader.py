@@ -20,7 +20,6 @@ MAX_AGE_DAYS = config.get("fred", {}).get("max_age_days", 3)
 
 CACHE_DIR.mkdir(exist_ok=True)
 
-
 def _cache_path(series_id: str) -> Path:
     return CACHE_DIR / f"{series_id}.csv"
 
