@@ -57,3 +57,4 @@ risk_dashboard/config.yaml
 makro_sim/Bereinigung_edge.txt
 makro_sim/Git_commit_hook.bat
 makro_sim/remove_edge_block.ps1
+risk_dashboard/config.yaml
