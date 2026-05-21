@@ -1,4 +1,4 @@
-﻿# core/shock_mapping.py
+# core/shock_mapping.py
 
 SHOCK_MAP = {
     "Ã–lpreis +50%": {

@@ -1,4 +1,4 @@
-﻿# Systemarchitektur des Makro Risk Dashboards
+# Systemarchitektur des Makro Risk Dashboards
 
 Dieses Dokument beschreibt die modulare Architektur des Projekts *makro_sim / risk_dashboard*.
 
@@ -9,7 +9,7 @@ Dieses Dokument beschreibt die modulare Architektur des Projekts *makro_sim / ri
 Das Dashboard besteht aus drei Hauptkomponenten:
 
 1. **Makro-Modul**  
-   LÃ¤dt und visualisiert makroÃ¶konomische Zeitreihen.
+   Lädt und visualisiert makroäkonomische Zeitreihen.
 
 2. **Risk Engine**  
    Berechnet einen aggregierten Risikoscore aus mehreren Makro-Faktoren.
@@ -17,25 +17,75 @@ Das Dashboard besteht aus drei Hauptkomponenten:
 3. **FX-Modul**  
    Trainiert ein Modell zur Vorhersage des USD/EUR-Wechselkurses.
 
-Alle Module sind vollstÃ¤ndig getrennt und kommunizieren nur Ã¼ber definierte Schnittstellen.
+Alle Module sind vollständig getrennt und kommunizieren nur Ã¼ber definierte Schnittstellen.
 
 ---
 
 ## 2. Ordnerstruktur
-risk_dashboard/ â”‚ â”œâ”€â”€ data/                 # CSV-Dateien â”œâ”€â”€ models/               # ML-Modelle â”‚ â”œâ”€â”€ src/ â”‚   â”œâ”€â”€ app.py            # Streamlit UI â”‚   â”‚ â”‚   â”œâ”€â”€ core/             # Kernlogik â”‚   â”‚   â”œâ”€â”€ risk_engine.py â”‚   â”‚   â”œâ”€â”€ fx_model.py â”‚   â”‚   â”œâ”€â”€ macro_loader.py â”‚   â”‚   â””â”€â”€ utils.py â”‚   â”‚ â”‚   â”œâ”€â”€ features/         # Feature Engineering â”‚   â”‚   â””â”€â”€ fx_features.py â”‚   â”‚ â”‚   â”œâ”€â”€ training/         # Trainingsskripte â”‚   â”‚   â””â”€â”€ train_fx_model.py â”‚   â”‚ â”‚   â”œâ”€â”€ visualization/    # Charts â”‚   â”‚   â”œâ”€â”€ macro_charts.py â”‚   â”‚   â”œâ”€â”€ risk_charts.py â”‚   â”‚   â””â”€â”€ fx_charts.py â”‚   â”‚ â”‚   â””â”€â”€ config/ â”‚       â””â”€â”€ settings.yaml â”‚ â””â”€â”€ docs/ â”œâ”€â”€ lexikon.md â”œâ”€â”€ architecture.md â””â”€â”€ onboarding.md
+risk_dashboard/
+├── data/                 # CSV-Dateien
+├── models/               # ML-Modelle
+├── src/
+│   ├── app.py            # Streamlit UI
+│   ├── core/             # Kernlogik
+│   │   ├── risk_engine.py
+│   │   ├── fx_model.py
+│   │   ├── macro_loader.py
+│   │   └── utils.py
+│   ├── features/         # Feature Engineering
+│   │   └── fx_features.py
+│   ├── training/         # Trainingsskripte
+│   │   └── train_fx_model.py
+│   └── visualization/    # Charts
+│       ├── macro_charts.py
+│       ├── risk_charts.py
+│       └── fx_charts.py
+├── config/
+│   └── settings.yaml
+└── docs/
+    ├── lexikon.md
+    ├── architecture.md
+    └── onboarding.md
 
----
+
 
 ## 3. Datenfluss
 
+1. Datenquelle
+   - Rohdaten liegen als CSV in risk_dashboard/data/.
+   - Externe APIs (FRED, BLS, Börsen) werden über src/core/macro_loader.py angebunden.
+
+2. Ingestion
+   - CSVs und API‑Daten werden in ein standardisiertes Format transformiert und in data/processed/ abgelegt.
+
+3. Feature Engineering
+   - src/features/fx_features.py erzeugt FX‑ und Makrofeatures.
+   - Missing Values werden imputiert; Zeitreihen werden resampled und synchronisiert.
+
+4. Modelltraining
+   - Trainingsskripte in src/training/ nutzen die verarbeiteten Features.
+   - Modelle werden in models/ persistiert.
+
+5. Risiko‑Engine
+   - src/core/risk_engine.py lädt Modelle, berechnet Risk Scores und erzeugt Alerts.
+
+6. Visualisierung und UI
+   - src/visualization/* erzeugt Diagramme.
+   - src/app.py (Streamlit) stellt Dashboards und Reports bereit.
+
+7. Konfiguration und Deployment
+   - Einstellungen in config/settings.yaml.
+   - Dokumentation in docs/ für Onboarding und Architektur.
+
+
 ### Makro-Daten
-CSV â†’ macro_loader â†’ app.py â†’ Charts + Risk Engine
+CSV → macro_loader → app.py → Charts + Risk Engine
 
 ### Risk Engine
-macro_data â†’ risk_engine â†’ risk_snapshot â†’ app.py
+macro_data → risk_engine → risk_snapshot → app.py
 
 ### FX-Modell
-fx_data â†’ fx_features â†’ train_fx_model â†’ rf_model.joblib â†’ fx_model â†’ app.py
+fx_data → fx_features → train_fx_model → rf_model.joblib → fx_model → app.py
 
 ---
 
@@ -54,4 +104,4 @@ Die Architektur erlaubt:
 
 ## 5. Ziel
 
-Eine robuste, modulare, reproduzierbare Plattform fÃ¼r makroÃ¶konomische Risikoanalyse.
+Eine robuste, modulare, reproduzierbare Plattform für makroäkonomische Risikoanalyse.

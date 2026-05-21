@@ -1,4 +1,4 @@
-﻿# core/plots/portfolio_plots.py
+# core/plots/portfolio_plots.py
 import matplotlib.pyplot as plt
 
 def plot_portfolio(portfolio_returns):

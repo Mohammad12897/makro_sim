@@ -1,4 +1,4 @@
-﻿#core/preporting/pdf_report.py
+#core/preporting/pdf_report.py
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import datetime
@@ -6,7 +6,7 @@ import datetime
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Noto Color Emoji']
 
-def draw_footer(ax, text="MakroSim â€“ Risikoanalyse"):
+def draw_footer(ax, text="MakroSim ‑ Risikoanalyse"):
     ax.text(0.5, 0.02, text, ha="center", fontsize=8)
 
 
@@ -16,8 +16,8 @@ def draw_title_page(pdf, land, logo_path: str | None = None):
 
     today = datetime.date.today().strftime("%d.%m.%Y")
 
-    ax.text(0.5, 0.8, f"Risikoanalyse â€“ {land}", ha="center", fontsize=28, weight="bold")
-    ax.text(0.5, 0.72, "MakroÃ¶konomische Szenarien & Risikoindikatoren", ha="center", fontsize=16)
+    ax.text(0.5, 0.8, f"Risikoanalyse ‑ {land}", ha="center", fontsize=28, weight="bold")
+    ax.text(0.5, 0.72, "Makroökonomische Szenarien & Risikoindikatoren", ha="center", fontsize=16)
     ax.text(0.5, 0.64, f"Erstellt am: {today}", ha="center", fontsize=12)
 
     if logo_path:
@@ -113,11 +113,11 @@ def draw_portfolio_page(pdf, fig_portfolio, stats_df, weights_dict):
 
     ax.text(0.05, 0.95, "Portfolio-Analyse", fontsize=20, weight="bold", va="top")
 
-    # Platz fÃ¼r eingebettete Performance-Grafik
+    # Platz für eingebettete Performance-Grafik
     # Wir speichern die Figur separat in den PDF-Stream
     pdf.savefig(fig_portfolio)
 
-    # Neue Seite fÃ¼r Kennzahlen + Gewichte
+    # Neue Seite für Kennzahlen + Gewichte
     fig2, ax2 = plt.subplots(figsize=(8.27, 11.69))
     ax2.axis("off")
 

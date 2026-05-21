@@ -1,0 +1,7 @@
+{"action": "ter_normalize_suggestion_applied", "key": "apple", "original_ter": 0.0, "normalized_ter": 0.0, "timestamp": "2026-05-15T08:08:28.909533Z"}
+{"action": "ter_normalize_suggestion_applied", "key": "microsoft", "original_ter": 0.0, "normalized_ter": 0.0, "timestamp": "2026-05-15T08:08:28.912536Z"}
+{"action": "ter_normalize_suggestion_applied", "key": "nvda", "original_ter": 0.0, "normalized_ter": 0.0, "timestamp": "2026-05-15T08:08:28.914535Z"}
+{"action": "ter_normalize_suggestion_applied", "key": "amazon", "original_ter": 0.0, "normalized_ter": 0.0, "timestamp": "2026-05-15T08:08:28.916533Z"}
+{"action": "ter_normalize_suggestion_applied", "key": "aggregate_bond_etf", "original_ter": 0.2, "normalized_ter": 0.002, "timestamp": "2026-05-18T17:55:09.763207Z"}
+{"action": "ter_normalize_suggestion_applied", "key": "government_bonds", "original_ter": 0.12, "normalized_ter": 0.0012, "timestamp": "2026-05-18T17:55:09.764207Z"}
+{"action": "ter_normalize_suggestion_applied", "key": "investment_grade_corporates", "original_ter": 0.2, "normalized_ter": 0.002, "timestamp": "2026-05-18T17:55:09.766208Z"}

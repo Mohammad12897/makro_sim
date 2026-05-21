@@ -1,16 +1,16 @@
-﻿# core/data/db.py
+# core/data/db.py
 
 def load_etf_db():
     """
     Beispielhafte ETF-Datenbank.
-    SpÃ¤ter kannst du echte Datenquellen anbinden.
+    Später kannst du echte Datenquellen anbinden.
     """
     return [
         {
             "ticker": "SPY",
             "1Y %": 22.4,
             "5Y %": 78.1,
-            "VolatilitÃ¤t %": 17.2,
+            "Volatilität %": 17.2,
             "Sharpe": 1.35,
             "TER": 0.09,
             "Tracking Error": 0.35,
@@ -21,7 +21,7 @@ def load_etf_db():
             "ticker": "QQQ",
             "1Y %": 28.1,
             "5Y %": 110.4,
-            "VolatilitÃ¤t %": 22.5,
+            "Volatilität %": 22.5,
             "Sharpe": 1.45,
             "TER": 0.20,
             "Tracking Error": 0.40,

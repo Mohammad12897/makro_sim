@@ -1,4 +1,4 @@
-﻿# core/visualization/radar_plotly.py
+# core/visualization/radar_plotly.py
 
 import plotly.graph_objects as go
 from core.visualization.lexicon import get_tooltip_map_for_tab
@@ -7,11 +7,11 @@ from core.visualization.lexicon import get_tooltip_map_for_tab
 def _ampel_color(metric: str, value: float) -> str:
     """
     Einfache Ampel-Logik auf Basis des normierten Werts (0â€“1).
-    GrÃ¼n = gut, Gelb = mittel, Rot = schwach.
+    Grün = gut, Gelb = mittel, Rot = schwach.
     Optional: Kennzahl-spezifische Umkehrlogik.
     """
-    # FÃ¼r Kennzahlen, bei denen "weniger ist besser" (z.B. VolatilitÃ¤t, Drawdown, Arbeitslosenquote),
-    # kÃ¶nnte man invertieren â€“ hier bleiben wir bei der Normierung, die du bereits steuerst.
+    # Für Kennzahlen, bei denen "weniger ist besser" (z.B. Volatilität, Drawdown, Arbeitslosenquote),
+    # könnte man invertieren â€“ hier bleiben wir bei der Normierung, die du bereits steuerst.
     if value >= 0.66:
         return "green"
     if value >= 0.33:
@@ -21,13 +21,13 @@ def _ampel_color(metric: str, value: float) -> str:
 
 def plot_radar_plotly(rows, mode: str = "einsteiger"):
     all_metrics = [
-        "1Y %", "5Y %", "VolatilitÃ¤t %", "Sharpe", "Max Drawdown %", "Beta",
+        "1Y %", "5Y %", "Volatilität %", "Sharpe", "Max Drawdown %", "Beta",
         "KGV", "KBV", "KUV", "DivRendite %",
         "BIP-Wachstum", "Inflation", "Zinsen", "Arbeitslosenquote",
     ]
 
     if mode == "einsteiger":
-        metrics = ["1Y %", "VolatilitÃ¤t %", "KGV", "DivRendite %", "BIP-Wachstum", "Inflation"]
+        metrics = ["1Y %", "Volatilität %", "KGV", "DivRendite %", "BIP-Wachstum", "Inflation"]
     else:
         metrics = all_metrics
 

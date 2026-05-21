@@ -1,4 +1,4 @@
-﻿# core/data/db_assets.py
+# core/data/db_assets.py
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
@@ -437,16 +437,17 @@ def detect_commodity(identifier):
 
 
 TYPE_ICONS = {
-    "Stock": "ðŸ“ˆ Aktie",
-    "ETF": "ðŸŒ ETF",
-    "Crypto": "ðŸª™ Krypto",
-    "Index": "ðŸ“Š Index",
-    "Commodity": "â›ï¸ Rohstoff",
-    "Unknown": "â“ Unbekannt"
+    "Stock": "📈 Aktie",
+    "ETF": "🌍 ETF",
+    "Crypto": "🪙 Krypto",
+    "Index": "📊 Index",
+    "Commodity": "⛏️ Rohstoff",
+    "Unknown": "❓ Unbekannt"
 }
 
+
 TYPE_COLORS = {
-    "Stock": "#4CAF50",      # GrÃ¼n
+    "Stock": "#4CAF50",      # Grün
     "ETF": "#2196F3",        # Blau
     "Crypto": "#FFC107",     # Gelb
     "Index": "#9C27B0",      # Lila
@@ -490,7 +491,7 @@ def type_color(typ: str) -> Tuple[str, str]:
 def find_asset(ticker: str):
     """
     Sucht ein Asset in ETF_DB / STOCK_DB.
-    Gibt (asset_dict, typ_string) zurÃ¼ck.
+    Gibt (asset_dict, typ_string) zurück.
     """
     asset = _find_in_db(ticker, ETF_DB)
     if asset is not None:
@@ -515,7 +516,7 @@ def get_ki_score(ticker: str):
 
 def get_asset_full_profile(ticker: str) -> Dict[str, Any]:
     """
-    Liefert ein vollstÃ¤ndiges Profil:
+    Liefert ein vollständiges Profil:
     - Stammdaten (aus DB)
     - Preise
     - KI-Score
@@ -563,8 +564,8 @@ def process_asset_input_OLD(ticker: str):
 
 def ui_wrapper_OLD(ticker: str):
     """
-    Wrapper fÃ¼r Gradio:
-    Gibt zurÃ¼ck:
+    Wrapper für Gradio:
+    Gibt zurück:
     - HTML-Badge
     - Asset-Daten (dict)
     - KI-Score

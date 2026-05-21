@@ -1,4 +1,4 @@
-﻿#core/portfolio_sim/risk_metricks.py
+#core/portfolio_sim/risk_metricks.py
 import numpy as np
 
 def mc_risk_metrics(sim):

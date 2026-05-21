@@ -1,4 +1,4 @@
-﻿# risk_dashboard/core/risk_engine.py
+# risk_dashboard/core/risk_engine.py
 import pandas as pd
 import numpy as np
 from risk_dashboard.core.macro_loader import load_macro_series
@@ -42,7 +42,7 @@ def classify_scenario_from_score(score):
 def build_scenario_series(risk_score_df):
     df = risk_score_df.copy()
 
-    # UnterstÃ¼tzt beide Versionen
+    # Unterstützt beide Versionen
     score_col = "risk_score_pca" if "risk_score_pca" in df.columns else "risk_score"
 
     df["scenario"] = df[score_col].apply(classify_scenario_from_score)
@@ -64,10 +64,10 @@ def build_fx_risk_factors(fx_prices):
 def build_market_risk_factors(etf_prices: pd.DataFrame) -> pd.DataFrame:
     df = pd.DataFrame(index=etf_prices.index)
 
-    # Momentum (z. B. SPY 60â€‘Tage)
+    # Momentum (z. B. SPY 60‑Tage)
     df["equity_momentum"] = etf_prices["SPY"].pct_change(60)
 
-    # VolatilitÃ¤t (20â€‘Tage)
+    # Volatilität (20‑Tage)
     df["equity_vol"] = etf_prices["SPY"].pct_change().rolling(20).std()
 
     return df.dropna()
@@ -93,10 +93,10 @@ def load_risk_factors():
 
 def compute_raw_risk_score():
     """
-    Beispielâ€‘Skeleton: berechnet einen rohen Risikoâ€‘Score und gibt ein DataFrame zurÃ¼ck.
-    Ersetze die Dummyâ€‘Logik durch deine echte Featureâ€‘Extraktion / PCA / Modell.
+    Beispiel‑Skeleton: berechnet einen rohen Risiko‑Score und gibt ein DataFrame zurück.
+    Ersetze die Dummy‑Logik durch deine echte Feature‑Extraktion / PCA / Modell.
     """
-    # Beispiel: Erzeuge Dummyâ€‘Zeitreihe (ersetzen durch echte Daten)
+    # Beispiel: Erzeuge Dummy‑Zeitreihe (ersetzen durch echte Daten)
     dates = pd.date_range("2020-01-01", periods=24, freq="QE")
     raw_scores = np.random.normal(loc=0.0, scale=1.0, size=len(dates))
 
@@ -168,11 +168,11 @@ def compute_pca_details():
 def detect_risk_regimes():
     """
     Ermittelt Regime via KMeans auf der vorhandenen Risiko-Score-Spalte.
-    Liefert das DataFrame mit zusÃ¤tzlichen Spalten 'regime' (int) und 'regime_label' (str).
+    Liefert das DataFrame mit zusätzlichen Spalten 'regime' (int) und 'regime_label' (str).
     """
     df = compute_risk_score_v2(normalize=True, method="minmax")
 
-    # Defensive PrÃ¼fung
+    # Defensive Prüfung
     if df is None or df.empty:
         raise ValueError("Keine Risiko-Daten vorhanden in detect_risk_regimes().")
 
@@ -205,7 +205,7 @@ def detect_risk_regimes():
 
     df["regime_label"] = df["regime"].map(label_map)
 
-    # Optional: Index/Datum sicherstellen (falls downstream benÃ¶tigt)
+    # Optional: Index/Datum sicherstellen (falls downstream benötigt)
     if not isinstance(df.index, pd.DatetimeIndex) and "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
         df = df.set_index("date")
@@ -217,7 +217,7 @@ def compute_pca_score(df):
     """
     Berechnet den PCA-basierten Makro-Risiko-Score.
     Erwartet Spalten: GDP, CPI, UNRATE, FEDFUNDS.
-    Gibt eine Serie mit dem PCA-Score zurÃ¼ck.
+    Gibt eine Serie mit dem PCA-Score zurück.
     """
 
     macro_vars = ["GDP", "CPI", "UNRATE", "FEDFUNDS"]

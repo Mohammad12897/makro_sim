@@ -1,4 +1,4 @@
-﻿#core/portfolio/portfolio_engine.py
+#core/portfolio/portfolio_engine.py
 
 
 import numpy as np
@@ -40,7 +40,7 @@ def max_drawdown(series):
 
 def portfolio_stats(series):
     return {
-        "VolatilitÃ¤t": portfolio_volatility(series),
+        "Volatilität": portfolio_volatility(series),
         "Max Drawdown": max_drawdown(series),
         "Gesamtrendite": series.add(1).prod() - 1,
     }

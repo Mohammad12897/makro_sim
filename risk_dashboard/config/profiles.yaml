@@ -1,4 +1,4 @@
-﻿profiles:
+profiles:
   conservative:
     display_name: Conservative (Low)
     category: Low
@@ -12,7 +12,7 @@
     - government_bonds
     - investment_grade_corporates
     - short_term_cash
-    notes: Kapitalerhalt; niedrige VolatilitÃ¤t
+    notes: Kapitalerhalt; niedrige Volatilität
   balanced:
     display_name: Balanced (Medium)
     category: Medium
@@ -40,7 +40,7 @@
     - equity_etf
     - small_cap
     - emerging_markets
-    notes: Langfristiges Wachstum; hohe VolatilitÃ¤t akzeptiert
+    notes: Langfristiges Wachstum; hohe Volatilität akzeptiert
   balanced_(medium):
     display_name: Balanced (Medium)
     category: Medium
@@ -67,5 +67,4 @@
     - government_bonds
     - investment_grade_corporates
     - short_term_cash
-    notes: Kapitalerhalt; niedrige VolatilitÃ¤t
-
+    notes: Kapitalerhalt; niedrige Volatilität

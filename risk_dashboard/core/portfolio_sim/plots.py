@@ -1,4 +1,4 @@
-﻿#core/portfolio_sim/plots.py
+#core/portfolio_sim/plots.py
 import numpy as np
 import matplotlib.pyplot as plt
     
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 def plot_scenario_radar_overlay(metrics):
     """
-    Zeichnet ein Radar-Overlay fÃ¼r Risiko-Szenarien.
+    Zeichnet ein Radar-Overlay für Risiko-Szenarien.
     metrics: dict {szenario_name: {indikator: wert}}
     """
 

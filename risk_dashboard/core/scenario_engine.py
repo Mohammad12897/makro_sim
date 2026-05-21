@@ -1,4 +1,4 @@
-﻿#  risk_dashboard/core/scenario_engine.py
+#  risk_dashboard/core/scenario_engine.py
 import pandas as pd
 import numpy as np
 from matplotlib.pylab import var
@@ -82,8 +82,8 @@ def build_scenario(
     """
     Erzeugt ein Szenario basierend auf Schocks.
     Beispiel:
-    - bip_shock=0.95 â†’ BIP -5%
-    - inflation_shock=1.3 â†’ Inflation +30%
+    - bip_shock=0.95 → BIP -5%
+    - inflation_shock=1.3 → Inflation +30%
     """
 
     baseline = build_baseline_scenario(start, periods)

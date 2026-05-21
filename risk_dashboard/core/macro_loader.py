@@ -1,4 +1,4 @@
-﻿#risk_dashboard/core/macro_loader.py
+#risk_dashboard/core/macro_loader.py
 import os
 import time
 from pathlib import Path
@@ -48,7 +48,7 @@ def _fetch_from_fred(series_id: str) -> pd.DataFrame:
 
 def load_macro_series(series_id: str) -> pd.DataFrame:
     """
-    LÃ¤dt eine einzelne Makroserie von FRED.
+    Lädt eine einzelne Makroserie von FRED.
     Gibt DataFrame mit Spalten: date, value
     """
     df = web.DataReader(series_id, "fred")
@@ -60,7 +60,7 @@ def load_macro_series(series_id: str) -> pd.DataFrame:
 
 def load_macro_data() -> pd.DataFrame:
     """
-    LÃ¤dt alle Makroserien fÃ¼r Szenario-Engine.
+    Lädt alle Makroserien für Szenario-Engine.
     """
     df = pd.DataFrame()
 

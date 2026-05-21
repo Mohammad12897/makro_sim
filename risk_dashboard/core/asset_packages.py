@@ -1,4 +1,4 @@
-﻿# risk_dashboard/core/asset_packages.py
+# risk_dashboard/core/asset_packages.py
 import typing as t
 
 # Beispielpakete: Key = Ticker oder Strategie, Value = Gewicht (soll auf 1.0 normiert sein)
@@ -36,7 +36,7 @@ def select_equity_package(regime, scenario, risk_score):
     - regime: z.B. 'High', 'Medium', 'Low' oder Labels aus map_regime_to_label
     - scenario: z.B. 'Stagflation', 'Growth', ...
     - risk_score: numerischer Wert 0..1
-    RÃ¼ckgabe: normalisiertes dict mit Gewichten
+    Rückgabe: normalisiertes dict mit Gewichten
     """
     if regime is None:
         return normalize_weights(equity_package_medium_risk)

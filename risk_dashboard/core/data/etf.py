@@ -1,8 +1,8 @@
-﻿# core/data/etf.py
+# core/data/etf.py
 
 def get_etf_metrics(ticker: str) -> dict:
     """
-    Liefert ETF-Kennzahlen fÃ¼r das Radar.
+    Liefert ETF-Kennzahlen für das Radar.
     Nutzt die interne ETF-Datenbank (load_etf_db).
     """
 
@@ -15,7 +15,7 @@ def get_etf_metrics(ticker: str) -> dict:
         return {
             "1Y %": None,
             "5Y %": None,
-            "VolatilitÃ¤t %": None,
+            "Volatilität %": None,
             "Sharpe": None,
             "TER": None,
             "Tracking Error": None,
@@ -26,7 +26,7 @@ def get_etf_metrics(ticker: str) -> dict:
     return {
         "1Y %": entry.get("1Y %"),
         "5Y %": entry.get("5Y %"),
-        "VolatilitÃ¤t %": entry.get("VolatilitÃ¤t %"),
+        "Volatilität %": entry.get("Volatilität %"),
         "Sharpe": entry.get("Sharpe"),
         "TER": entry.get("TER"),
         "Tracking Error": entry.get("Tracking Error"),

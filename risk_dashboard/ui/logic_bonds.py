@@ -1,4 +1,4 @@
-﻿#ui/logic_bonds.py
+#ui/logic_bonds.py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,12 +14,12 @@ def ui_bond_analysis(ticker):
 
     # --- WICHTIG: Fehler abfangen ---
     if not isinstance(result, tuple) or len(result) != 2:
-        return pd.DataFrame([["KIâ€‘Score Fehler"]]), None
+        return pd.DataFrame([["KI‑Score Fehler"]]), None
 
     score, factors = result
 
     if not isinstance(factors, dict):
-        return pd.DataFrame([["Faktoren ungÃ¼ltig"]]), None
+        return pd.DataFrame([["Faktoren ungültig"]]), None
 
     # Radar
     fig = plot_radar({ticker: factors})
@@ -27,7 +27,7 @@ def ui_bond_analysis(ticker):
     # Kennzahlen
     returns = series.pct_change().dropna()
     df = pd.DataFrame({
-        "Kennzahl": ["Yield (approx.)", "VolatilitÃ¤t", "Max Drawdown"],
+        "Kennzahl": ["Yield (approx.)", "Volatilität", "Max Drawdown"],
         "Wert": [
             returns.mean() * 252,
             returns.std() * (252 ** 0.5),

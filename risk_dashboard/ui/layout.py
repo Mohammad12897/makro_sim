@@ -1,10 +1,10 @@
-﻿# ui/layout.py
+# ui/layout.py
 
 import gradio as gr
 
 
 # ---------------------------------------------------------
-# Standard-Container fÃ¼r Sektionen
+# Standard-Container für Sektionen
 # ---------------------------------------------------------
 
 def section(title: str):
@@ -22,17 +22,17 @@ def sub_section(title: str):
 
 
 # ---------------------------------------------------------
-# Layout-BlÃ¶cke fÃ¼r Tabs
+# Layout-BlÃ¶cke für Tabs
 # ---------------------------------------------------------
 
 def layout_country_profile():
     """
-    Layout fÃ¼r den Tab 'LÃ¤nderprofil'.
+    Layout für den Tab 'Länderprofil'.
     """
-    section("LÃ¤nderprofil")
+    section("Länderprofil")
     with gr.Row():
         with gr.Column(scale=1):
-            country = gr.Dropdown(label="Land auswÃ¤hlen")
+            country = gr.Dropdown(label="Land auswählen")
             btn_radar = gr.Button("Radar anzeigen")
             btn_story = gr.Button("Storyline erzeugen")
             btn_ews = gr.Button("EWS anzeigen")
@@ -55,10 +55,10 @@ def layout_country_profile():
 
 def layout_comparison():
     """
-    Layout fÃ¼r den Tab 'Vergleich'.
+    Layout für den Tab 'Vergleich'.
     """
-    section("LÃ¤ndervergleich")
-    multi_select = gr.CheckboxGroup(label="LÃ¤nder auswÃ¤hlen")
+    section("Ländervergleich")
+    multi_select = gr.CheckboxGroup(label="Länder auswählen")
     btn_multi = gr.Button("Vergleich anzeigen")
     multi_radar_out = gr.Plot()
 
@@ -71,7 +71,7 @@ def layout_comparison():
 
 def layout_heatmaps():
     """
-    Layout fÃ¼r den Tab 'Heatmaps'.
+    Layout für den Tab 'Heatmaps'.
     """
     section("Heatmaps")
 
@@ -81,7 +81,7 @@ def layout_heatmaps():
             heat_out = gr.Dataframe()
 
         with gr.Column():
-            btn_pol = gr.Button("Politische AbhÃ¤ngigkeit")
+            btn_pol = gr.Button("Politische Abhängigkeit")
             pol_out = gr.Dataframe()
 
     with gr.Row():
@@ -107,15 +107,15 @@ def layout_heatmaps():
 
 def layout_scenarios():
     """
-    Layout fÃ¼r den Tab 'Szenarien'.
+    Layout für den Tab 'Szenarien'.
     """
     section("Szenarioanalyse")
 
     with gr.Row():
         with gr.Column(scale=1):
-            country_s = gr.Dropdown(label="Land auswÃ¤hlen")
-            scenario_s = gr.Dropdown(label="Szenario auswÃ¤hlen")
-            btn_scen = gr.Button("Szenario ausfÃ¼hren")
+            country_s = gr.Dropdown(label="Land auswählen")
+            scenario_s = gr.Dropdown(label="Szenario auswählen")
+            btn_scen = gr.Button("Szenario ausführen")
             btn_decision = gr.Button("Decision Support")
 
         with gr.Column(scale=2):
@@ -134,7 +134,7 @@ def layout_scenarios():
 
 def layout_cluster():
     """
-    Layout fÃ¼r den Tab 'Cluster'.
+    Layout für den Tab 'Cluster'.
     """
     section("Clusteranalyse")
     btn_cluster = gr.Button("Cluster berechnen")

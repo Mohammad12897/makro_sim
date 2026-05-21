@@ -1,4 +1,4 @@
-﻿#core/backend/plots.py
+#core/backend/plots.py
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -13,7 +13,7 @@ def plot_efficient_frontier(mean_returns, cov_matrix, points=50):
     results = {"risk": [], "return": []}
 
     for _ in range(points):
-        # ZufÃ¤llige Gewichte
+        # Zufällige Gewichte
         weights = np.random.random(num_assets)
         weights /= np.sum(weights)
 
@@ -27,7 +27,7 @@ def plot_efficient_frontier(mean_returns, cov_matrix, points=50):
     # Plot
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.scatter(results["risk"], results["return"], c=results["return"], cmap="viridis")
-    ax.set_xlabel("Risiko (VolatilitÃ¤t)")
+    ax.set_xlabel("Risiko (Volatilität)")
     ax.set_ylabel("Erwartete Rendite")
     ax.set_title("Effizienzkurve (Efficient Frontier)")
 

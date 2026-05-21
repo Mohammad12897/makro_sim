@@ -1,4 +1,4 @@
-﻿#ui/logic_screener.py
+#ui/logic_screener.py
 from core.data.db_assets import ETF_DB, STOCK_DB, find_asset
 import pandas as pd
 from ui.logic_ki import get_ki_score
@@ -16,8 +16,8 @@ def ui_etf_screener(region, category):
     if df.empty:
         return pd.DataFrame([["Keine Ergebnisse"]], columns=["Info"])
 
-    # KIâ€‘Score hinzufÃ¼gen
-    df["KIâ€‘Score"] = df["Ticker"].apply(get_ki_score)
+    # KI‑Score hinzufügen
+    df["KI‑Score"] = df["Ticker"].apply(get_ki_score)
 
     df = df.sort_values("Volumen", ascending=False)
 
@@ -30,7 +30,7 @@ def ui_etf_screener(region, category):
         "Volumen",
         "Replikation",
         "TD",
-        "KIâ€‘Score"
+        "KI‑Score"
     ]]
 
 
@@ -46,8 +46,8 @@ def ui_stock_screener(sector, country):
     if df.empty:
         return pd.DataFrame([["Keine Ergebnisse"]], columns=["Info"])
 
-    # KIâ€‘Score hinzufÃ¼gen
-    df["KIâ€‘Score"] = df["Ticker"].apply(get_ki_score)
+    # KI‑Score hinzufügen
+    df["KI‑Score"] = df["Ticker"].apply(get_ki_score)
 
     df = df.sort_values("KGV")
 
@@ -62,6 +62,6 @@ def ui_stock_screener(sector, country):
         "Debt/Equity",
         "Cashflow",
         "Wachstum",
-        "KIâ€‘Score"
+        "KI‑Score"
     ]]
 

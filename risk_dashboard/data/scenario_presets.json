@@ -1,6 +1,6 @@
-﻿{
-  "Ã–lpreisschock": [
-    { "type": "Ã–lpreis +50%", "intensity": 1.0 }
+{
+  "Ölpreisschock": [
+    { "type": "Ölpreis +50%", "intensity": 1.0 }
   ],
   "Gasembargo": [
     { "type": "Gasembargo", "intensity": 1.0 }
@@ -27,14 +27,14 @@
   "Geopolitische Spannung": [
     { "type": "Geopolitische Spannung", "intensity": 1.0 }
   ],
-  "BÃ¼ndnisverlust": [
-    { "type": "BÃ¼ndnisverlust", "intensity": 1.0 }
+  "Bündnisverlust": [
+    { "type": "Bündnisverlust", "intensity": 1.0 }
   ],
   "Sanktionen": [
     { "type": "Sanktionen", "intensity": 1.0 }
   ],
   "Doppelschock Energie + Politik": [
-    { "type": "Ã–lpreis +50%", "intensity": 1.0 },
+    { "type": "Ölpreis +50%", "intensity": 1.0 },
     { "type": "Geopolitische Spannung", "intensity": 0.8 }
   ],
   "Finanzielle Stressphase": [
@@ -45,10 +45,10 @@
     { "type": "Technologie-Embargo", "intensity": 1.0 },
     { "type": "Lieferketten-Blockade", "intensity": 0.8 }
   ],
-  "Russland â€“ Energie- und Sanktionseskalation": [
+  "Russland - Energie- und Sanktionseskalation": [
     { "type": "Sanktionen", "intensity": 1.0 },
     { "type": "SWIFT-Ausschluss", "intensity": 0.8 },
-    { "type": "Ã–lpreis +50%", "intensity": 0.7 },
+    { "type": "Ölpreis +50%", "intensity": 0.7 },
     { "type": "Technologie-Embargo", "intensity": 0.9 }
   ]
 }

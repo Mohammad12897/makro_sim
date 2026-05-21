@@ -1,102 +1,102 @@
-﻿# Lexikon
+# Lexikon
 
 ## Equity weight
 **Definition:** Anteil des Portfolios, der in Aktien investiert ist.  
-**Warum wichtig:** Aktien bieten langfristig hÃ¶here Renditen, erhÃ¶hen aber VolatilitÃ¤t und Drawdownâ€‘Risiko.
+**Warum wichtig:** Aktien bieten langfristig höhere Renditen, erhöhen aber Volatilität und Drawdown‑Risiko.
 
 ## Bond weight
 **Definition:** Anteil des Portfolios in Anleihen (Staatsanleihen, Unternehmensanleihen).  
-**Warum wichtig:** DÃ¤mpft Schwankungen und reduziert erwarteten Drawdown.
+**Warum wichtig:** Dämpft Schwankungen und reduziert erwarteten Drawdown.
 
 ## Cash
-**Definition:** LiquiditÃ¤tsreserve in Form von Bargeld oder kurzfristigen Geldmarktinstrumenten.  
-**Warum wichtig:** Dient als Puffer fÃ¼r kurzfristige Ausgaben und Rebalancing.
+**Definition:** Liquiditätsreserve in Form von Bargeld oder kurzfristigen Geldmarktinstrumenten.  
+**Warum wichtig:** Dient als Puffer für kurzfristige Ausgaben und Rebalancing.
 
 ## Target annual return
-**Definition:** Erwartete durchschnittliche Jahresrendite (SchÃ¤tzwert).  
+**Definition:** Erwartete durchschnittliche Jahresrendite (Schätzwert).  
 **Warum wichtig:** Dient zur Simulation und Zielsetzung; keine Garantie.
 
 ## Max drawdown tolerance
-**Definition:** Maximal tolerierter RÃ¼ckgang vom HÃ¶chststand in Prozent.  
-**Warum wichtig:** Hilft bei Risikosteuerung, Stopâ€‘Lossâ€‘Regeln und psychologischer Planung.
+**Definition:** Maximal tolerierter Rückgang vom Höchststand in Prozent.  
+**Warum wichtig:** Hilft bei Risikosteuerung, Stop‑Loss‑Regeln und psychologischer Planung.
 
 ## Rebalance frequency
 **Definition:** Wie oft das Portfolio automatisch wieder auf Zielgewichte gebracht wird (z. B. monthly, quarterly).  
-**Warum wichtig:** HÃ¤ufigeres Rebalancing reduziert Drift, kann aber Transaktionskosten erhÃ¶hen.
+**Warum wichtig:** Häufigeres Rebalancing reduziert Drift, kann aber Transaktionskosten erhöhen.
 
 ## Allowed instruments
-**Definition:** Liste erlaubter Assetâ€‘Klassen oder ETFs (z. B. global_equity_etf).  
-**Warum wichtig:** BeschrÃ¤nkt die Auswahl bei automatischen Strategien und Screening.
+**Definition:** Liste erlaubter Asset‑Klassen oder ETFs (z. B. global_equity_etf).  
+**Warum wichtig:** Beschränkt die Auswahl bei automatischen Strategien und Screening.
 
 ## Drawdown
-**Definition:** Prozentualer RÃ¼ckgang vom letzten HÃ¶chststand eines Portfolios.  
+**Definition:** Prozentualer Rückgang vom letzten Höchststand eines Portfolios.  
 **Warum wichtig:** Misst das Risiko eines Portfolios in Stressphasen.
 
-## VolatilitÃ¤t
+## Volatilität
 **Definition:** Statistische Schwankungsbreite der Renditen (Standardabweichung).  
-**Warum wichtig:** HÃ¶here VolatilitÃ¤t bedeutet grÃ¶ÃŸere Schwankungen und potenziell grÃ¶ÃŸere Drawdowns.
+**Warum wichtig:** Höhere Volatilität bedeutet gröÃŸere Schwankungen und potenziell gröÃŸere Drawdowns.
 
 
 
 
-# Lexikon â€” Risiko Dashboard
+# Lexikon - Risiko Dashboard
 
-Dieses Lexikon erklÃ¤rt die wichtigsten Begriffe und UIâ€‘Felder im Risk Dashboard in einfacher Sprache.
+Dieses Lexikon erklärt die wichtigsten Begriffe und UI‑Felder im Risk Dashboard in einfacher Sprache.
 
 ## Profil / Profilname
 **Was:** Ein gespeichertes Set von Einstellungen (Allocation, Ziele, erlaubte ETFs).  
-**Warum:** ErmÃ¶glicht schnelles Wechseln zwischen Strategien (z. B. konservativ, ausgewogen, aggressiv).
+**Warum:** Ermöglicht schnelles Wechseln zwischen Strategien (z. B. konservativ, ausgewogen, aggressiv).
 
 ## Risikokategorie
-**Low / Medium / High** â€” Basisvorgaben fÃ¼r ein Profil.  
-**Low:** Kapitalerhalt; niedrige VolatilitÃ¤t.  
+**Low / Medium / High** Basisvorgaben für ein Profil.  
+**Low:** Kapitalerhalt; niedrige Volatilität.  
 **Medium:** Ausgewogenes Wachstum mit Schutz.  
-**High:** Langfristiges Wachstum; hÃ¶here VolatilitÃ¤t.
+**High:** Langfristiges Wachstum; höhere Volatilität.
 
 ## Equity weight (Aktienanteil)
 **Was:** Prozentualer Anteil des Portfolios in Aktien.  
-**Hinweis:** HÃ¶herer Aktienanteil â†’ hÃ¶here Renditeerwartung, aber auch hÃ¶here Schwankungen.
+**Hinweis:** Höherer Aktienanteil â†’ höhere Renditeerwartung, aber auch höhere Schwankungen.
 
 ## Bond weight (Anleihenanteil)
 **Was:** Prozentualer Anteil in Anleihen.  
-**Hinweis:** DÃ¤mpft Schwankungen und reduziert Drawdown.
+**Hinweis:** Dämpft Schwankungen und reduziert Drawdown.
 
 ## Cash
-**Was:** LiquiditÃ¤tsreserve in Prozent.  
-**Warum:** Puffer fÃ¼r kurzfristige Ausgaben oder Rebalancing.
+**Was:** Liquiditätsreserve in Prozent.  
+**Warum:** Puffer für kurzfristige Ausgaben oder Rebalancing.
 
 ## Target annual return (Ziel Jahresrendite)
-**Was:** Erwartete durchschnittliche Jahresrendite (SchÃ¤tzwert).  
+**Was:** Erwartete durchschnittliche Jahresrendite (Schätzwert).  
 **Hinweis:** Keine Garantie â€” dient zur Simulation.
 
 ## Max drawdown tolerance (Max. Drawdown)
-**Was:** Maximal tolerierter RÃ¼ckgang vom HÃ¶chststand in Prozent.  
+**Was:** Maximal tolerierter Rückgang vom Höchststand in Prozent.  
 **Warum:** Hilft bei Alarmen und Risikosteuerung.
 
-## Rebalance HÃ¤ufigkeit
+## Rebalance Häufigkeit
 **Optionen:** monthly, quarterly, yearly, threshold.  
 **Was:** Wie oft das Portfolio automatisch wieder auf Zielgewichte gebracht wird.
 
 ## Allowed instruments / ETFs
-**Was:** Liste erlaubter ETFs oder Assetâ€‘Keys.  
-**Wie nutzen:** WÃ¤hle aus dem vordefinierten ETFâ€‘Universe oder gib eigene Keys ein.
+**Was:** Liste erlaubter ETFs oder Asset‑Keys.  
+**Wie nutzen:** Wähle aus dem vordefinierten ETF‑Universe oder gib eigene Keys ein.
 
-## Autoâ€‘normalize
+## Auto‑normalize
 **Was:** Normiert Equity+Bonds+Cash automatisch auf 100%.  
-**Wann nutzen:** Empfohlen fÃ¼r Einsteiger.
+**Wann nutzen:** Empfohlen für Einsteiger.
 
 ## Presets
 **Was:** Vorgefertigte Profile (Conservative, Balanced, Aggressive).  
-**Wie nutzen:** WÃ¤hle ein Preset, passe Werte an, speichere als eigenes Profil.
+**Wie nutzen:** Wähle ein Preset, passe Werte an, speichere als eigenes Profil.
 
 ## Hinweise zur Sicherheit und Daten
 - **Datenquellen:** Historische Daten und Modelle sind nur zur Simulation.  
-- **Verantwortung:** Entscheidungen bleiben beim Nutzer; das Tool liefert Analysen und VorschlÃ¤ge.
+- **Verantwortung:** Entscheidungen bleiben beim Nutzer; das Tool liefert Analysen und Vorschläge.
 
 ## Kurzanleitung (Quickstart)
-1. Ã–ffne **Profile** â†’ wÃ¤hle ein Preset (z. B. Balanced).  
-2. PrÃ¼fe Asset Allocation; aktiviere **Autoâ€‘normalize**.  
-3. WÃ¤hle erlaubte ETFs oder nutze Presetâ€‘ETFs.  
+1. Ã–ffne **Profile** â†’ wähle ein Preset (z. B. Balanced).  
+2. Prüfe Asset Allocation; aktiviere **Auto‑normalize**.  
+3. Wähle erlaubte ETFs oder nutze Preset‑ETFs.  
 4. Klicke **Profil speichern**.  
 5. Wechsle zur Strategie/Simulation und wende das Profil an.
 
@@ -109,15 +109,15 @@ Dieses Lexikon erklÃ¤rt die wichtigsten Begriffe und UIâ€‘Felder im Risk 
 - **inflation**: Verbraucherpreisindex, misst Preissteigerungen.
 - **interest_rate**: Leitzins der Zentralbank.
 - **unemployment**: Arbeitslosenquote.
-- **oil_price**: RohÃ¶lpreis.
-- **fx_rate**: Wechselkurs, z.â€¯B. USD/EUR.
+- **oil_price**: Rohölpreis.
+- **fx_rate**: Wechselkurs, z.B. USD/EUR.
 - **total_risk**: Aggregierter Risikoscore aus allen Komponenten.
-- **inflation_risk**: Risiko aus Inflation und Ã–lpreis.
+- **inflation_risk**: Risiko aus Inflation und Ölpreis.
 - **interest_risk**: Risiko aus Zinsniveau.
 - **growth_risk**: Risiko aus schwachem Wachstum.
 - **labor_risk**: Risiko aus Arbeitsmarkt.
-- **fx_risk**: Risiko aus FX-VolatilitÃ¤t.
-- **market_stress**: Marktstress, aktuell Proxy Ã¼ber FX-VolatilitÃ¤t.
+- **fx_risk**: Risiko aus FX-Volatilität.
+- **market_stress**: Marktstress, aktuell Proxy über FX-Volatilität.
 
 # Makro- und Risiko-Lexikon
 
@@ -136,17 +136,17 @@ Dieses Lexikon erklÃ¤rt die wichtigsten Begriffe und UIâ€‘Felder im Risk 
   Arbeitslosenquote.
 
 - **oil_price**  
-  RohÃ¶lpreis.
+  Rohölpreis.
 
 - **fx_rate**  
-  Wechselkurs, z.â€¯B. USD/EUR.
+  Wechselkurs, z.B. USD/EUR.
 
 ---
 
 ## Risiko-Komponenten
 
 - **inflation_risk**  
-  Risiko aus Inflation und Ã–lpreis.
+  Risiko aus Inflation und Ölpreis.
 
 - **interest_risk**  
   Risiko aus Zinsniveau.
@@ -158,10 +158,10 @@ Dieses Lexikon erklÃ¤rt die wichtigsten Begriffe und UIâ€‘Felder im Risk 
   Risiko aus Arbeitsmarkt.
 
 - **fx_risk**  
-  Risiko aus FX-VolatilitÃ¤t.
+  Risiko aus FX-Volatilität.
 
 - **market_stress**  
-  Marktstress, aktuell Proxy Ã¼ber FX-VolatilitÃ¤t.
+  Marktstress, aktuell Proxy über FX-Volatilität.
 
 - **total_risk**  
   Aggregierter Risikoscore aus allen Komponenten.

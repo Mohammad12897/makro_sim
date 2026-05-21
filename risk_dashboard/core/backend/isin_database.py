@@ -1,4 +1,4 @@
-﻿# core/backend/isin_database.py
+# core/backend/isin_database.py
 import json
 from pathlib import Path
 

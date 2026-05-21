@@ -1,4 +1,4 @@
-﻿# core/visualization/radar_plotly_country.py
+# core/visualization/radar_plotly_country.py
 
 import plotly.graph_objects as go
 from core.visualization.lexicon import get_tooltip_map_for_tab
@@ -15,7 +15,7 @@ def _ampel_color(value: float) -> str:
 def plot_country_radar(rows, mode="einsteiger"):
     all_metrics = [
         "BIP-Wachstum", "Inflation", "Zinsen",
-        "Arbeitslosenquote", "Staatsverschuldung", "WÃ¤hrungsstÃ¤rke"
+        "Arbeitslosenquote", "Staatsverschuldung", "Währungsstärke"
     ]
 
     if mode == "einsteiger":

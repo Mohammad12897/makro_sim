@@ -1,4 +1,4 @@
-﻿# core/backend/portfolio_backtest.py
+# core/backend/portfolio_backtest.py
 import pandas as pd
 from core.data.assets import fetch_price_history
 

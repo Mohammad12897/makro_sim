@@ -1,7 +1,7 @@
-﻿#core/analysis/portfolio_metrics.py
+#core/analysis/portfolio_metrics.py
 def aggregate_portfolio(rows, weights):
     agg = {"Ticker": "Portfolio"}
-    keys = ["1Y %", "5Y %", "VolatilitÃ¤t %", "Sharpe", "Max Drawdown %", "Beta"]
+    keys = ["1Y %", "5Y %", "Volatilität %", "Sharpe", "Max Drawdown %", "Beta"]
 
     for k in keys:
         vals = []

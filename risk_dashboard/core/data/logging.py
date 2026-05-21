@@ -1,4 +1,4 @@
-﻿# core/data/logging.py
+# core/data/logging.py
 import logging
 
 log_buffer = []

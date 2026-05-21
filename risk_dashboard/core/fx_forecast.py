@@ -1,4 +1,4 @@
-﻿# risk_dashboard/core/fx_forecast.py
+# risk_dashboard/core/fx_forecast.py
 import logging
 from typing import Tuple
 import pandas as pd
@@ -52,8 +52,8 @@ def _ensure_date_fx_columns(df: pd.DataFrame, fx_col_name: str) -> pd.DataFrame:
 
 def load_fx_history(pair: str = "EURUSD=X", period: str = "10y") -> pd.DataFrame:
     """
-    Lade FX-Historie fÃ¼r ein WÃ¤hrungspaar.
-    RÃ¼ckgabe: DataFrame mit Spalten ['date','fx'] oder ein leeres DataFrame mit diesen Spalten.
+    Lade FX-Historie für ein Währungspaar.
+    Rückgabe: DataFrame mit Spalten ['date','fx'] oder ein leeres DataFrame mit diesen Spalten.
     """
     # 1) Versuch: yfinance
     try:
@@ -74,7 +74,7 @@ def load_fx_history(pair: str = "EURUSD=X", period: str = "10y") -> pd.DataFrame
                 return pd.DataFrame(columns=["date", "fx"])
             df_alt.index = pd.to_datetime(df_alt.index, errors="coerce")
             df_alt = df_alt.sort_index()
-            # WÃ¤hle die letzte numerische Spalte als FX-Preis
+            # Wähle die letzte numerische Spalte als FX-Preis
             numeric_cols = df_alt.select_dtypes(include="number").columns.tolist()
             if not numeric_cols:
                 logger.info("Fallback data for %s has no numeric columns", pair)
@@ -85,7 +85,7 @@ def load_fx_history(pair: str = "EURUSD=X", period: str = "10y") -> pd.DataFrame
             logger.info("Fallback sources failed for %s: %s", pair, e)
             return pd.DataFrame(columns=["date", "fx"])
 
-    # 3) Wenn yfinance Daten liefert: Normalisieren und Spalte auswÃ¤hlen
+    # 3) Wenn yfinance Daten liefert: Normalisieren und Spalte auswählen
     try:
         # Falls MultiIndex-Spalten vorhanden sind, flach machen
         if isinstance(data.columns, pd.MultiIndex):
@@ -115,14 +115,14 @@ def load_fx_history(pair: str = "EURUSD=X", period: str = "10y") -> pd.DataFrame
 
 def load_fx_data():
     """
-    LÃ¤dt FX-Daten fÃ¼r Forecasting (z. B. DEXUSEU = USD/EUR).
+    Lädt FX-Daten für Forecasting (z. B. DEXUSEU = USD/EUR).
     """
     df = download_fx_history(["DEXUSEU"], period="10y")
 
     df = df.rename(columns={"DEXUSEU": "y"})
     df = df.reset_index().rename(columns={"Date": "ds"})
 
-    # ARIMA braucht tÃ¤gliche Frequenz
+    # ARIMA braucht tägliche Frequenz
     df = df.set_index("ds").asfreq("D").interpolate()
 
     return df.reset_index()
@@ -131,7 +131,7 @@ def load_fx_data():
 def forecast_fx_prophet(steps=60, pair="EURUSD=X", period="10y"):
     """
     Prophet-basierte FX-Prognose.
-    RÃ¼ckgabe: (historie_df, forecast_df)
+    Rückgabe: (historie_df, forecast_df)
     """
     df = load_fx_history(pair=pair, period=period)
 
@@ -156,22 +156,22 @@ def forecast_fx_arima(pair: str = "EURUSD=X",
                       ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     ARIMA-basierte FX-Prognose.
-    RÃ¼ckgabe: (historie_df, forecast_df)
+    Rückgabe: (historie_df, forecast_df)
     - historie_df: DataFrame mit Spalten ['date','fx'] (historische Werte) oder leeres DF
-    - forecast_df: DataFrame mit Spalten ['date','fx_forecast'] (Vorhersage fÃ¼r 'steps' Tage) oder leeres DF
+    - forecast_df: DataFrame mit Spalten ['date','fx_forecast'] (Vorhersage für 'steps' Tage) oder leeres DF
 
     Die Funktion ist fehlertolerant:
-    - Wenn keine Daten vorhanden sind, werden leere DataFrames zurÃ¼ckgegeben.
-    - Wenn die Modellanpassung fehlschlÃ¤gt, wird ebenfalls ein leeres Forecast-DF zurÃ¼ckgegeben.
+    - Wenn keine Daten vorhanden sind, werden leere DataFrames zurückgegeben.
+    - Wenn die Modellanpassung fehlschlägt, wird ebenfalls ein leeres Forecast-DF zurückgegeben.
     """
     try:
         # Lade Daten (load_fx_history muss ein DF mit 'date' und 'fx' liefern oder ein leeres DF)
         df = load_fx_history(pair=pair, period=period)
     except Exception as e:
-        logger.exception("Fehler beim Laden der FX-Historie fÃ¼r %s: %s", pair, e)
+        logger.exception("Fehler beim Laden der FX-Historie für %s: %s", pair, e)
         return pd.DataFrame(columns=["date", "fx"]), pd.DataFrame(columns=["date", "fx_forecast"])
 
-    # PrÃ¼fen, ob Daten vorhanden und korrekt formatiert sind
+    # Prüfen, ob Daten vorhanden und korrekt formatiert sind
     if df is None or df.empty:
         logger.warning("Skipping FX forecast: no data for %s", pair)
         return pd.DataFrame(columns=["date", "fx"]), pd.DataFrame(columns=["date", "fx_forecast"])
@@ -187,14 +187,14 @@ def forecast_fx_arima(pair: str = "EURUSD=X",
         df = df.dropna(subset=["date", "fx"])
         df = df.sort_values("date").reset_index(drop=True)
     except Exception as e:
-        logger.exception("Fehler bei der Datumskonvertierung fÃ¼r %s: %s", pair, e)
+        logger.exception("Fehler bei der Datumskonvertierung für %s: %s", pair, e)
         return pd.DataFrame(columns=["date", "fx"]), pd.DataFrame(columns=["date", "fx_forecast"])
 
     if df.empty:
         logger.warning("After cleaning, no FX data left for %s", pair)
         return pd.DataFrame(columns=["date", "fx"]), pd.DataFrame(columns=["date", "fx_forecast"])
 
-    # Erzeuge Zeitreihe mit tÃ¤glicher Frequenz und fÃ¼lle fehlende Werte vorwÃ¤rts
+    # Erzeuge Zeitreihe mit täglicher Frequenz und fülle fehlende Werte vorwärts
     try:
         ts = df.set_index("date")["fx"].asfreq("D").ffill()
         # Falls noch NaNs am Anfang existieren, entferne sie
@@ -213,7 +213,7 @@ def forecast_fx_arima(pair: str = "EURUSD=X",
     try:
         model = ARIMA(ts, order=order)
         res = model.fit()
-        # Forecast fÃ¼r 'steps' Tage
+        # Forecast für 'steps' Tage
         fc = res.get_forecast(steps=steps)
         fc_index = pd.date_range(start=ts.index[-1] + pd.Timedelta(days=1), periods=steps, freq="D")
         fc_mean = fc.predicted_mean
@@ -221,7 +221,7 @@ def forecast_fx_arima(pair: str = "EURUSD=X",
         if not isinstance(fc_mean.index, pd.DatetimeIndex):
             fc_mean.index = fc_index[:len(fc_mean)]
         forecast_df = pd.DataFrame({"date": fc_mean.index, "fx_forecast": fc_mean.values})
-        # Historische DF zurÃ¼ckgeben (bereinigt)
+        # Historische DF zurückgeben (bereinigt)
         hist_df = df[["date", "fx"]].copy()
         return hist_df, forecast_df
     except Exception as e:

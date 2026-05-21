@@ -1,4 +1,4 @@
-﻿#ui/logic_ki.py
+#ui/logic_ki.py
 from __future__ import annotations
 
 import pandas as pd
@@ -20,14 +20,15 @@ def get_ki_score(ticker: str):
 
 def build_ki_table(assets: list[dict]) -> pd.DataFrame:
     """
-    Baut eine Tabelle mit KIâ€‘Scores fÃ¼r Screener.
+    Baut eine Tabelle mit KI‑Scores für Screener.
     """
     df = pd.DataFrame(assets)
 
     if df.empty:
         return pd.DataFrame([["Keine Ergebnisse"]], columns=["Info"])
 
-    df["KIâ€‘Score"] = df["Ticker"].apply(get_ki_score)
+    df["KI‑Score"] = df["Ticker"].apply(get_ki_score)
 
-    return df.sort_values("KIâ€‘Score", ascending=False)
+
+    return df.sort_values("KI‑Score", ascending=False)
 

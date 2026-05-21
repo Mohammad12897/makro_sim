@@ -1,4 +1,4 @@
-﻿#core/analysis/stock_clusterin.py
+#core/analysis/stock_clusterin.py
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
@@ -7,9 +7,9 @@ def cluster_stocks(rows):
     df = pd.DataFrame(rows)
 
     # Features fÃ¼r Clustering
-    features = ["1Y %", "5Y %", "VolatilitÃ¤t %", "Sharpe", "Max Drawdown %", "Beta"]
+    features = ["1Y %", "5Y %", "Volatilität %", "Sharpe", "Max Drawdown %", "Beta"]
 
-    # Fehlende Spalten automatisch ergÃ¤nzen
+    # Fehlende Spalten automatisch ergänzen
     for f in features:
         if f not in df.columns:
             df[f] = 0

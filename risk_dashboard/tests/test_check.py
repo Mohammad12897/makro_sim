@@ -1,11 +1,11 @@
-﻿import streamlit as st
+import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import yfinance as yf
 from risk_dashboard.core.market_engine import download_etf_history, build_market_risk_factors
 
-# 1) PrÃ¼fe, ob download_etf_history Ã¼berhaupt etwas zurÃ¼ckgibt
+# 1) Prüfe, ob download_etf_history überhaupt etwas zurückgibt
 raw = download_etf_history(["CSPX.L"], period="1mo")
 st.write("DEBUG raw single ticker:", type(raw), raw if raw is not None else "None")
 

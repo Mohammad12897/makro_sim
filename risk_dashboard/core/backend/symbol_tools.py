@@ -1,4 +1,4 @@
-﻿# core/backend/symbol_tools.py
+# core/backend/symbol_tools.py
 import re
 import yfinance as yf
 from core.data.logging import logger

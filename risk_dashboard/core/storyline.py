@@ -1,4 +1,4 @@
-﻿# core/storyline.py
+# core/storyline.py
 
 from __future__ import annotations
 from typing import Dict
@@ -8,20 +8,20 @@ from core.lexicon import load_lexicon
 
 
 # ---------------------------------------------------------
-# Hilfsfunktion: schÃ¶ne Namen fÃ¼r Dimensionen
+# Hilfsfunktion: schöne Namen für Dimensionen
 # ---------------------------------------------------------
 
 DIM_LABELS = {
-    "macro": "MakroÃ¶konomisches Risiko",
+    "macro": "Makroökonomisches Risiko",
     "geo": "Geopolitisches Risiko",
     "governance": "Governance & Institutionen",
-    "handel": "HandelsabhÃ¤ngigkeit",
+    "handel": "Handelsabhängigkeit",
     "supply_chain": "Lieferkettenrisiko",
-    "financial": "Finanzielle AbhÃ¤ngigkeit",
-    "tech": "Technologische AbhÃ¤ngigkeit",
-    "energie": "EnergieabhÃ¤ngigkeit",
-    "currency": "WÃ¤hrungs- & ZahlungsabhÃ¤ngigkeit",
-    "political_security": "Politische & sicherheitspolitische AbhÃ¤ngigkeit",
+    "financial": "Finanzielle Abhängigkeit",
+    "tech": "Technologische Abhängigkeit",
+    "energie": "Energieabhängigkeit",
+    "currency": "Währungs- & Zahlungsabhängigkeit",
+    "political_security": "Politische & sicherheitspolitische Abhängigkeit",
     "strategische_autonomie": "Strategische Autonomie",
     "total": "Gesamtrisiko"
 }
@@ -32,12 +32,12 @@ def label(dimension: str) -> str:
 
 
 # ---------------------------------------------------------
-# Storyline 3.0 â€“ Hauptfunktion
+# Storyline 3.0 - Hauptfunktion
 # ---------------------------------------------------------
 
 def storyline_v3(country: str, params: Dict) -> str:
     """
-    Erzeugt eine narrative Risiko-Storyline fÃ¼r ein Land.
+    Erzeugt eine narrative Risiko-Storyline für ein Land.
     """
     scores = compute_risk_scores(params)
 
@@ -48,50 +48,50 @@ def storyline_v3(country: str, params: Dict) -> str:
         reverse=True
     )
 
-    top = dims_sorted[:3]       # hÃ¶chste Risiken
+    top = dims_sorted[:3]       # höchste Risiken
     low = dims_sorted[-2:]      # stabilste Bereiche
 
     ps = scores["political_security"]
     sa = scores["strategische_autonomie"]
 
-    md = f"# ðŸ§  Risiko-Storyline 3.0 â€“ {country}\n\n"
+    md = f"#Risiko-Storyline 3.0 - {country}\n\n"
 
     # -----------------------------------------------------
     # Haupttreiber
     # -----------------------------------------------------
-    md += "## ðŸ”¥ Haupttreiber des Risikos\n"
+    md += "##Haupttreiber des Risikos\n"
     for d, v in top:
         if d != "strategische_autonomie":
             md += f"- **{label(d)}**: {v:.2f}\n"
 
     # -----------------------------------------------------
-    # StabilitÃ¤tsanker
+    # Stabilitätsanker
     # -----------------------------------------------------
-    md += "\n## ðŸŸ¢ StabilitÃ¤tsanker\n"
+    md += "\n##Stabilitätsanker\n"
     for d, v in low:
         if d != "political_security":
             md += f"- **{label(d)}**: {v:.2f}\n"
 
     # -----------------------------------------------------
-    # Politische AbhÃ¤ngigkeit & Autonomie
+    # Politische Abhängigkeit & Autonomie
     # -----------------------------------------------------
-    md += "\n## ðŸ›¡ Politische AbhÃ¤ngigkeit & Strategische Autonomie\n"
+    md += "\n##Politische Abhängigkeit & Strategische Autonomie\n"
 
-    # Politische AbhÃ¤ngigkeit
+    # Politische Abhängigkeit
     if ps > 0.75:
-        md += "- Das Land weist eine **kritisch hohe politische AbhÃ¤ngigkeit** auf.\n"
+        md += "- Das Land weist eine **kritisch hohe politische Abhängigkeit** auf.\n"
     elif ps > 0.55:
-        md += "- Das Land zeigt eine **erhÃ¶hte politische AbhÃ¤ngigkeit**.\n"
+        md += "- Das Land zeigt eine **erhöhte politische Abhängigkeit**.\n"
     else:
-        md += "- Die politische AbhÃ¤ngigkeit ist **moderat bis gering**.\n"
+        md += "- Die politische Abhängigkeit ist **moderat bis gering**.\n"
 
     # Strategische Autonomie
     if sa > 0.75:
-        md += "- Die **strategische Autonomie** ist sehr hoch â€“ das Land kann souverÃ¤n handeln.\n"
+        md += "- Die **strategische Autonomie** ist sehr hoch - das Land kann souverän handeln.\n"
     elif sa > 0.50:
-        md += "- Die strategische Autonomie ist **solide**, aber nicht vollstÃ¤ndig.\n"
+        md += "- Die strategische Autonomie ist **solide**, aber nicht vollständig.\n"
     else:
-        md += "- Die strategische Autonomie ist **eingeschrÃ¤nkt** â€“ externe Akteure beeinflussen Entscheidungen.\n"
+        md += "- Die strategische Autonomie ist **eingeschränkt** - externe Akteure beeinflussen Entscheidungen.\n"
 
     # -----------------------------------------------------
     # Narrative Analyse
@@ -99,22 +99,22 @@ def storyline_v3(country: str, params: Dict) -> str:
     md += "\n## ðŸ“˜ Narrative Analyse\n"
     md += (
         "Die Risikoarchitektur des Landes zeigt ein komplexes Zusammenspiel aus wirtschaftlichen, "
-        "geopolitischen und politischen Faktoren. Besonders prÃ¤gend sind die Dimensionen "
+        "geopolitischen und politischen Faktoren. Besonders prägend sind die Dimensionen "
         f"**{label(top[0][0])}** und **{label(top[1][0])}**, die das Gesamtbild dominieren. "
         "Gleichzeitig wirken stabile Bereiche als Puffer gegen externe Schocks. "
-        "Die Balance zwischen politischer AbhÃ¤ngigkeit und strategischer Autonomie bestimmt maÃŸgeblich "
-        "die langfristige HandlungsfÃ¤higkeit des Landes.\n"
+        "Die Balance zwischen politischer Abhängigkeit und strategischer Autonomie bestimmt maßgeblich "
+        "die langfristige Handlungsfähigkeit des Landes.\n"
     )
 
     # -----------------------------------------------------
     # Handlungsempfehlungen
     # -----------------------------------------------------
-    md += "\n## ðŸ›  Handlungsempfehlungen\n"
-    md += "- Reduktion politischer AbhÃ¤ngigkeiten\n"
+    md += "\n##Handlungsempfehlungen\n"
+    md += "- Reduktion politischer Abhängigkeiten\n"
     md += "- Ausbau strategischer Autonomie (Diplomatie, Industrie, Energie)\n"
-    md += "- Diversifikation kritischer AbhÃ¤ngigkeiten\n"
-    md += "- StÃ¤rkung institutioneller Resilienz\n"
-    md += "- Ausbau technologischer und finanzieller EigenstÃ¤ndigkeit\n"
+    md += "- Diversifikation kritischer Abhängigkeiten\n"
+    md += "- Stärkung institutioneller Resilienz\n"
+    md += "- Ausbau technologischer und finanzieller Eigenständigkeit\n"
 
     lex = load_lexicon()
 

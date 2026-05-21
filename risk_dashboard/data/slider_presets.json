@@ -1,4 +1,4 @@
-﻿ {
+ {
   "USA": {
     "verschuldung": 0.7,
     "FX_Schockempfindlichkeit": 0.3,
@@ -101,7 +101,7 @@
     "diplomatische_resilienz": 0.7
   },
 
-  "Vereinigtes KÃ¶nigreich": {
+  "Vereinigtes Königreich": {
     "verschuldung": 0.8,
     "FX_Schockempfindlichkeit": 0.4,
     "Reserven_Monate": 8,

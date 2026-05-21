@@ -1,4 +1,4 @@
-﻿# core/regime_model.py
+# core/regime_model.py
 import pandas as pd
 from typing import Union
 import yfinance as yf
@@ -35,7 +35,7 @@ def build_regime_timeline(score_series: Union[pd.Series, pd.DataFrame]) -> pd.Da
     """
     Erwartet eine Serie mit Index = Datum und Werten = Score
     oder ein DataFrame mit Spalte 'risk_score'.
-    Gibt ein DataFrame mit Spalten: ['date', 'risk_score', 'regime'] zurÃ¼ck.
+    Gibt ein DataFrame mit Spalten: ['date', 'risk_score', 'regime'] zurück.
     """
     if isinstance(score_series, pd.DataFrame):
         if "risk_score" not in score_series.columns:
@@ -53,7 +53,7 @@ def build_regime_timeline(score_series: Union[pd.Series, pd.DataFrame]) -> pd.Da
 def compute_regime_transition_matrix(regime_df: pd.DataFrame) -> pd.DataFrame:
     """
     Erwartet DataFrame mit Spalte 'regime' (z.B. Output von build_regime_timeline).
-    Gibt eine normalisierte Transitionsmatrix zurÃ¼ck.
+    Gibt eine normalisierte Transitionsmatrix zurück.
     """
     if "regime" not in regime_df.columns:
         raise ValueError("regime_df muss Spalte 'regime' enthalten.")
@@ -71,7 +71,7 @@ def compute_regime_transition_matrix(regime_df: pd.DataFrame) -> pd.DataFrame:
 
 def next_regime_distribution(current_regime: str, trans_matrix: pd.DataFrame) -> pd.Series:
     """
-    Gibt die Wahrscheinlichkeitsverteilung fÃ¼r das nÃ¤chste Regime zurÃ¼ck.
+    Gibt die Wahrscheinlichkeitsverteilung für das nächste Regime zurück.
     """
     if current_regime not in trans_matrix.index:
         raise ValueError(f"Unbekanntes Regime: {current_regime}")

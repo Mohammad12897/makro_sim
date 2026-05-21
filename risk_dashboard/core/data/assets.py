@@ -1,4 +1,4 @@
-﻿# core/data/assets.py
+# core/data/assets.py
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -22,8 +22,8 @@ def to_float(x):
 
 def sanitize_price_data(data):
     """
-    Nimmt beliebige yfinance-RÃ¼ckgaben (DataFrame/Series/MultiIndex)
-    und gibt eine saubere Series mit Preisen zurÃ¼ck.
+    Nimmt beliebige yfinance-Rückgaben (DataFrame/Series/MultiIndex)
+    und gibt eine saubere Series mit Preisen zurück.
     """
     if data is None or len(data) == 0:
         return None
@@ -60,14 +60,14 @@ def sanitize_price_data(data):
 
 def fetch_price_history(symbol, period="5y"):
     """
-    LÃ¤dt historische Kursdaten.
-    Nutzt ETF_DB, um Ticker wie 'EIMI' â†’ 'EIMI.L' zu korrigieren.
+    Lädt historische Kursdaten.
+    Nutzt ETF_DB, um Ticker wie 'EIMI' — 'EIMI.L' zu korrigieren.
     """
     try:
         # 1. Symbol normalisieren
         symbol = symbol.strip().upper()
 
-        # 2. ETF_DB prÃ¼fen: falls Nutzer "EIMI" eingibt â†’ "EIMI.L" verwenden
+        # 2. ETF_DB prüfen: falls Nutzer "EIMI" eingibt — "EIMI.L" verwenden
         for etf in ETF_DB:
             if etf.get("Ticker") == symbol or etf.get("ISIN") == symbol:
                 symbol = etf["Yahoo"]
@@ -79,7 +79,7 @@ def fetch_price_history(symbol, period="5y"):
         if raw is None or raw.empty:
             return None
 
-        # 4. Nur Schlusskurse zurÃ¼ckgeben
+        # 4. Nur Schlusskurse zurückgeben
         return raw["Close"].dropna()
 
     except Exception as e:
@@ -135,8 +135,8 @@ def calc_correlation(series, benchmark_symbol):
 
 def safe_rename(series_or_df, name):
     """
-    Benennt eine Series oder einen DataFrame zuverlÃ¤ssig in 'name' um.
-    Wird genutzt fÃ¼r Heatmap & Optimizer.
+    Benennt eine Series oder einen DataFrame zuverlässig in 'name' um.
+    Wird genutzt für Heatmap & Optimizer.
     """
     if isinstance(series_or_df, pd.Series):
         return series_or_df.rename(name)

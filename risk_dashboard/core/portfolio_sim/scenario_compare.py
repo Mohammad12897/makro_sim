@@ -1,4 +1,4 @@
-﻿
+
 # core/portfolio_sim/scenario_compare.py
 
 from core.scenario_engine import apply_risk_scenario, RISK_SCENARIOS

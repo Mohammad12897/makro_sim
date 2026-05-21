@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import shutil
 
@@ -9,7 +9,7 @@ def load_isin_db():
     if not os.path.exists(ISIN_DB_PATH):
         return {}
 
-    with open(ISIN_DB_PATH, "r") as f:
+    with open(ISIN_DB_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 

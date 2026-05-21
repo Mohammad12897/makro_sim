@@ -1,4 +1,4 @@
-﻿#core/visualization/radar_plotly_assets.py
+#core/visualization/radar_plotly_assets.py
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np

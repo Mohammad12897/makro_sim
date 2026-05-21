@@ -1,4 +1,4 @@
-﻿etf_universe:
+etf_universe:
   aggregate_bond_etf:
     name: "iShares Core Global Aggregate Bond ETF"
     ticker: "AGGB"
@@ -156,18 +156,9 @@
       nvda: 0.20
       amazon: 0.20
 
-  amundi_faz_100:
-    name: "Amundi F.A.Z. 100 UCITS ETF"
-    ticker: "FZ100.DE"
-    isin: "DE000A2N6A36"
-    asset_class: "equity"
-    region: "germany"
-    ter_pct: 0.15
-    replication: "physical"
-
   xtrackers_dax:
     name: "Xtrackers DAX UCITS ETF"
-    ticker: "XDAX.DE"
+    ticker: "EXS1.DE"
     isin: "DE000A1E0HR9"
     asset_class: "equity"
     region: "germany"
@@ -175,12 +166,21 @@
     replication: "physical"
 
   amundi_dax50_esg:
-    name: "Amundi DAX 50 ESG UCITS ETF"
-    ticker: "DXES.DE"
-    isin: "DE000A2N6B44"
+    name: "Xtrackers ESG Germany UCITS ETF"
+    ticker: "XUDE.DE"
+    isin: "DE000A2QM6B1"
     asset_class: "equity"
     region: "germany"
-    ter_pct: 0.18
+    ter_pct: 0.20
+    replication: "physical"
+
+  amundi_faz_100:
+    name: "iShares MDAX UCITS ETF"
+    ticker: "EXS2.DE"
+    isin: "DE0005933923"
+    asset_class: "equity"
+    region: "germany"
+    ter_pct: 0.51
     replication: "physical"
 
   global_equity_etf:
@@ -192,6 +192,3 @@
     region: "global"
     ter_pct: 0.22
     replication: "physical"
-
-
-
