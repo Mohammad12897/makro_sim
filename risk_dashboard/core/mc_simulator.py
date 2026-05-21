@@ -1,4 +1,4 @@
-﻿# core/mc_simulator.py
+# core/mc_simulator.py
 import numpy as np
 import pandas as pd
 
@@ -20,9 +20,9 @@ def multi_period_mc(weights, mu, cov, years, n_paths=3000, rebalancing=True, sho
     n_paths : int
         Anzahl der Simulationen.
     rebalancing : bool
-        Ob jÃ¤hrlich rebalanciert wird.
+        Ob jährlich rebalanciert wird.
     shock_fn : callable
-        Funktion, die jÃ¤hrliche Schocks liefert (optional).
+        Funktion, die jährliche Schocks liefert (optional).
     seed : int
         Zufallsseed.
 

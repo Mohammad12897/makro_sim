@@ -1,4 +1,4 @@
-﻿# risk_dashboard/core/storyline_engine.py
+# risk_dashboard/core/storyline_engine.py
 
 def compute_risk_score(indicators: dict):
     vals = [abs(v) for v in indicators.values()]
@@ -7,11 +7,12 @@ def compute_risk_score(indicators: dict):
 
 def risk_color(score):
     if score < 0.25:
-        return "ðŸŸ¢ Geringes Risiko"
+        return "🟢 Geringes Risiko"
     elif score < 0.5:
-        return "ðŸŸ¡ Mittleres Risiko"
+        return "🟡 Mittleres Risiko"
     else:
-        return "ðŸ”´ Hohes Risiko"
+        return "🔴 Hohes Risiko"
+
 
 
 def generate_executive_summary(indicators: dict, ampel_text: str) -> str:
@@ -22,23 +23,25 @@ def generate_executive_summary(indicators: dict, ampel_text: str) -> str:
     lines = [f"Gesamtrisiko: {ampel_text}.", ""]
 
     if high:
-        lines.append(f"â€¢ Hohe Risiken bei: {', '.join(high)}.")
+        lines.append(f"• Hohe Risiken bei: {', '.join(high)}.")
     if medium:
-        lines.append(f"â€¢ Moderate Risiken bei: {', '.join(medium)}.")
+        lines.append(f"• Moderate Risiken bei: {', '.join(medium)}.")
     if low:
-        lines.append(f"â€¢ Stabile oder geringe Risiken bei: {', '.join(low)}.")
+        lines.append(f"• Stabile oder geringe Risiken bei: {', '.join(low)}.")
+
+
 
     lines.append("")
-    lines.append("Die Gesamtlage zeigt ein sensibles, aber strukturiert einschÃ¤tzbares Risikoprofil.")
+    lines.append("Die Gesamtlage zeigt ein sensibles, aber strukturiert einschätzbares Risikoprofil.")
 
     return "\n".join(lines)
 
 
 def interpret_indicator(name: str, value: float) -> str:
     if value > 0.4:
-        return f"{name} verschlechtert sich deutlich und erhÃ¶ht das Gesamtrisiko spÃ¼rbar."
+        return f"{name} verschlechtert sich deutlich und erhöht das Gesamtrisiko spürbar."
     elif value > 0.2:
-        return f"{name} ist moderat erhÃ¶ht und wirkt leicht belastend."
+        return f"{name} ist moderat erhöht und wirkt leicht belastend."
     elif value < -0.2:
         return f"{name} verbessert sich klar und wirkt stabilisierend."
     else:

@@ -1,4 +1,4 @@
-﻿# country_assets.py
+# country_assets.py
 import numpy as np
 
 # ---------------------------
@@ -10,7 +10,7 @@ def compute_risk_scores(preset: dict) -> dict:
     Erwartet ein preset mit Rohwerten (0..1) oder skaliertem Input.
     Liefert standardisierte Scores: political_security, strategische_autonomie, total
     """
-    # Beispiel: preset enthÃ¤lt keys 'political_security', 'strategic_autonomy', 'total'
+    # Beispiel: preset enthält keys 'political_security', 'strategic_autonomy', 'total'
     ps = float(preset.get("political_security", 0.5))
     aut = float(preset.get("strategic_autonomy", 0.5))
     total = float(preset.get("total", (ps + (1-aut)) / 2))
@@ -21,7 +21,7 @@ def compute_risk_scores(preset: dict) -> dict:
     return {"political_security": ps, "strategische_autonomie": aut, "total": total}
 
 # ---------------------------
-# Staatsanleihen (YTM SchÃ¤tzer)
+# Staatsanleihen (YTM Schätzer)
 # ---------------------------
 
 def country_credit_spread_from_score(ps_score: float) -> float:
@@ -35,13 +35,13 @@ def country_credit_spread_from_score(ps_score: float) -> float:
 
 def political_premium(ps_score: float) -> float:
     """
-    ZusÃ¤tzlicher politischer Aufschlag (bis z.B. 2%)
+    Zusätzlicher politischer Aufschlag (bis z.B. 2%)
     """
     return ps_score * 0.02
 
 def sovereign_ytm(rf_yield: float, ps_score: float) -> float:
     """
-    SchÃ¤tzt eine erwartete YTM fÃ¼r Staatsanleihen des Landes.
+    Schätzt eine erwartete YTM für Staatsanleihen des Landes.
     rf_yield: risikofreier Zinssatz (z.B. 10y Treasury/Bund) in Dezimal
     ps_score: politisches Risiko (0..1)
     """
@@ -50,12 +50,12 @@ def sovereign_ytm(rf_yield: float, ps_score: float) -> float:
     return rf_yield + spread + pol
 
 # ---------------------------
-# Aktien (lÃ¤nderbezogen)
+# Aktien (länderbezogen)
 # ---------------------------
 
 def country_equity_premium(total_score: float) -> float:
     """
-    LÃ¤nderrisikoaufschlag fÃ¼r Aktien (bis z.B. 6%)
+    Länderrisikoaufschlag für Aktien (bis z.B. 6%)
     """
     return total_score * 0.06
 
@@ -70,14 +70,14 @@ def expected_equity_return(rf: float, beta: float, erp: float, total_score: floa
     return rf + beta * erp + country_equity_premium(total_score)
 
 # ---------------------------
-# Gold (lÃ¤nderbezogen)
+# Gold (länderbezogen)
 # ---------------------------
 
 def expected_gold_return(global_gold_premium: float, fx_change: float, ps_score: float) -> float:
     """
     Erwartete Goldrendite lokal:
     - global_gold_premium: erwartete globale Goldrendite (z.B. 0.03)
-    - fx_change: erwartete WÃ¤hrungsbewegung (positiv = lokale WÃ¤hrung schwÃ¤cht sich)
+    - fx_change: erwartete Währungsbewegung (positiv = lokale Währung schwächt sich)
     - ps_score: politisches Risiko -> leichter Aufschlag
     """
     return global_gold_premium + fx_change + ps_score * 0.01
@@ -89,22 +89,22 @@ def expected_gold_return(global_gold_premium: float, fx_change: float, ps_score:
 def etf_mapping_for_cluster(cid: int) -> str:
     if cid == 2:
         return (
-            "### ETF-Mapping fÃ¼r Cluster 2 (niedriges Risiko)\n"
-            "- IndustrielÃ¤nder-ETFs\n"
+            "### ETF-Mapping für Cluster 2 (niedriges Risiko)\n"
+            "- Industrieländer-ETFs\n"
             "- Infrastruktur-ETFs\n"
-            "- QualitÃ¤tsaktien-ETFs\n"
-            "- Staatsanleihen hoher BonitÃ¤t\n"
+            "- Qualitätsaktien-ETFs\n"
+            "- Staatsanleihen hoher Bonität\n"
         )
     elif cid == 1:
         return (
-            "### ETF-Mapping fÃ¼r Cluster 1 (mittleres Risiko)\n"
+            "### ETF-Mapping für Cluster 1 (mittleres Risiko)\n"
             "- Emerging-Markets-ETFs\n"
             "- Rohstoff-ETFs\n"
             "- Branchen-ETFs (Industrie, Energie)\n"
         )
     else:
         return (
-            "### ETF-Mapping fÃ¼r Cluster 0 (hohes Risiko)\n"
+            "### ETF-Mapping für Cluster 0 (hohes Risiko)\n"
             "- Frontier-Markets-ETFs (kleiner Anteil)\n"
             "- Rohstoff-Exposure\n"
             "- Themen-ETFs (taktisch)\n"
@@ -114,29 +114,29 @@ def investment_profile_for_cluster(ps: float, aut: float, total: float) -> str:
     lines = []
     if total < 0.4 and ps < 0.3 and aut > 0.7:
         titel = "Resiliente, autonome Staaten (niedriges Gesamtrisiko)"
-        lines.append("- Aktien: geeignet fÃ¼r langfristiges Wachstum (breite ETFs, Blue Chips).")
-        lines.append("- Staatsanleihen: hohe BonitÃ¤t, stabile Kupons.")
-        lines.append("- Gold: als Diversifikation mÃ¶glich, aber nicht zwingend notwendig.")
+        lines.append("- Aktien: geeignet für langfristiges Wachstum (breite ETFs, Blue Chips).")
+        lines.append("- Staatsanleihen: hohe Bonität, stabile Kupons.")
+        lines.append("- Gold: als Diversifikation möglich, aber nicht zwingend notwendig.")
     elif total < 0.6:
-        titel = "Staaten mit mittlerem Risiko (SchwellenlÃ¤nder-Profil)"
+        titel = "Staaten mit mittlerem Risiko (Schwellenländer-Profil)"
         lines.append("- Aktien: Emerging-Markets-ETFs, Branchen-ETFs.")
-        lines.append("- Staatsanleihen: mittlere BonitÃ¤t, hÃ¶here Kupons, hÃ¶heres Risiko.")
-        lines.append("- Gold: sinnvoll als StabilitÃ¤tsanker.")
+        lines.append("- Staatsanleihen: mittlere Bonität, höhere Kupons, höheres Risiko.")
+        lines.append("- Gold: sinnvoll als Stabilitätsanker.")
     else:
         titel = "Verwundbare Staaten (hohes Gesamtrisiko)"
-        lines.append("- Aktien: nur selektiv, hohe VolatilitÃ¤t.")
+        lines.append("- Aktien: nur selektiv, hohe Volatilität.")
         lines.append("- Staatsanleihen: hohes Ausfallrisiko, nur taktisch.")
         lines.append("- Gold: wichtig als Absicherung gegen politische Risiken.")
 
     if aut > 0.7:
-        lines.append("- Hohe Autonomie: geringere geopolitische AbhÃ¤ngigkeit.")
+        lines.append("- Hohe Autonomie: geringere geopolitische Abhängigkeit.")
     elif aut < 0.3:
-        lines.append("- Geringe Autonomie: hohe AbhÃ¤ngigkeit von externen Akteuren.")
+        lines.append("- Geringe Autonomie: hohe Abhängigkeit von externen Akteuren.")
     else:
         lines.append("- Mittlere Autonomie: gemischtes Profil.")
 
     if ps > 0.7:
-        lines.append("- Hohes politisches Risiko: erhÃ¶hte Gefahr von Schocks.")
+        lines.append("- Hohes politisches Risiko: erhöhte Gefahr von Schocks.")
     elif ps < 0.3:
         lines.append("- Niedriges politisches Risiko: stabile Rahmenbedingungen.")
     else:
@@ -146,7 +146,7 @@ def investment_profile_for_cluster(ps: float, aut: float, total: float) -> str:
     return md
 
 # ---------------------------
-# LÃ¤nderbezogene Asset-Erwartungen
+# Länderbezogene Asset-Erwartungen
 # ---------------------------
 
 def compute_country_asset_expectations(land: str, presets: dict,
@@ -156,8 +156,8 @@ def compute_country_asset_expectations(land: str, presets: dict,
                                        fx_expectation: float = 0.0,
                                        beta: float = 1.0) -> dict:
     """
-    Liefert erwartete Renditen (dezimal) fÃ¼r Equity, Bonds, Gold fÃ¼r ein Land.
-    presets: dict mit LÃ¤nderdaten (muss compute_risk_scores unterstÃ¼tzen)
+    Liefert erwartete Renditen (dezimal) für Equity, Bonds, Gold für ein Land.
+    presets: dict mit Länderdaten (muss compute_risk_scores unterstützen)
     """
     if land not in presets:
         raise KeyError(f"Land '{land}' nicht in presets.")
@@ -203,7 +203,7 @@ def monte_carlo_portfolio(weights: np.ndarray, mu: np.ndarray, cov: np.ndarray, 
     return {"sim_mean": float(port_returns.mean()), "var95": float(var95), "cvar95": float(cvar95), "sim_returns": port_returns}
 
 # ---------------------------
-# Beispiel-Helper: Erzeuge Kovarianzmatrix aus VolatilitÃ¤ten und Korrelation
+# Beispiel-Helper: Erzeuge Kovarianzmatrix aus Volatilitäten und Korrelation
 # ---------------------------
 
 def build_cov_matrix(vols: np.ndarray, corr: np.ndarray = None) -> np.ndarray:

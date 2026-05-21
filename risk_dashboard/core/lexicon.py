@@ -1,4 +1,4 @@
-﻿#core/lexicon.py
+#core/lexicon.py
 import json
 import os
 

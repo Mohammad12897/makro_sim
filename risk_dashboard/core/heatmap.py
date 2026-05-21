@@ -1,4 +1,4 @@
-﻿# core/heatmap.py
+# core/heatmap.py
 
 from __future__ import annotations
 from typing import Dict, List
@@ -12,7 +12,7 @@ from risk_dashboard.core.risk_model import compute_risk_scores
 
 def risk_heatmap(presets: Dict[str, dict]) -> List[List]:
     """
-    Gibt eine Heatmap-Tabelle zurÃ¼ck:
+    Gibt eine Heatmap-Tabelle zurück:
     Land | macro | geo | governance | handel | supply_chain | financial | tech | energie | currency | political_security | total
     """
     rows = []
@@ -38,7 +38,7 @@ def risk_heatmap(presets: Dict[str, dict]) -> List[List]:
 
 
 # ---------------------------------------------------------
-# Politische AbhÃ¤ngigkeit â€“ Heatmap
+# Politische Abhängigkeit â€“ Heatmap
 # ---------------------------------------------------------
 
 def political_heatmap(presets: Dict[str, dict]) -> List[List]:
@@ -103,13 +103,15 @@ def combined_political_autonomy_heatmap(presets: Dict[str, dict]) -> List[List]:
         sa = scores["strategische_autonomie"]
 
         if ps > 0.75 and sa < 0.50:
-            interp = "âš ï¸ Hohe AbhÃ¤ngigkeit, geringe Autonomie"
+            interp = "⚠️ Hohe Abhängigkeit, geringe Autonomie"
         elif ps > 0.55 and sa < 0.50:
-            interp = "ðŸŸ¡ ErhÃ¶hte AbhÃ¤ngigkeit, begrenzte Autonomie"
+            interp = "🟡 Erhöhte Abhängigkeit, begrenzte Autonomie"
         elif ps < 0.55 and sa > 0.75:
-            interp = "ðŸŸ¢ Geringe AbhÃ¤ngigkeit, hohe Autonomie"
+            interp = "🟢 Geringe Abhängigkeit, hohe Autonomie"
         else:
-            interp = "âž– Ausgewogen"
+            interp = "➖ Ausgewogen"
+
+
 
         rows.append([
             land,

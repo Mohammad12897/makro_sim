@@ -1,4 +1,4 @@
-﻿#ui/logic_risk.py
+#ui/logic_risk.py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,13 +14,13 @@ def ui_risk_dashboard(ticker_text):
             data[t] = series
 
     if not data:
-        return pd.DataFrame([["Keine gÃ¼ltigen Daten"]]), pd.DataFrame(), None
+        return pd.DataFrame([["Keine gültigen Daten"]]), pd.DataFrame(), None
 
     df = pd.DataFrame(data).dropna()
     returns = df.pct_change().dropna()
 
     vol_table = returns.std().reset_index()
-    vol_table.columns = ["Ticker", "VolatilitÃ¤t"]
+    vol_table.columns = ["Ticker", "Volatilität"]
 
     dd_table = (df / df.cummax() - 1).min().reset_index()
     dd_table.columns = ["Ticker", "Max Drawdown"]

@@ -1,4 +1,4 @@
-﻿# risk_dashboard/core/utils.py
+# risk_dashboard/core/utils.py
 from typing import Dict, Any, List, Tuple, Optional
 import pandas as pd
 import numpy as np
@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import datetime
 
 
-# optionaler Audit-Log (falls gewÃ¼nscht)
+# optionaler Audit-Log (falls gewünscht)
 _BASE_DIR = Path(__file__).resolve().parents[1]
 _AUDIT_PATH = _BASE_DIR / "logs" / "utils_audit.jsonl"
 _AUDIT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -20,7 +20,7 @@ def _write_audit(entry: dict) -> None:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-# --- ErgÃ¤nzende Hilfsfunktionen fÃ¼r Datums- und Preisnormalisierung ---
+# --- Ergänzende Hilfsfunktionen für Datums- und Preisnormalisierung ---
 def get_latest_before(df: pd.DataFrame, date_col, target_date):
     import pandas as pd
     if df is None or df.empty:
@@ -70,7 +70,7 @@ def ensure_date_series(obj, date_col: str = "date") -> pd.Series:
     """
     Liefert eine Series mit datetime-Index.
     - Wenn obj Series: Index wird in datetime konvertiert.
-    - Wenn obj DataFrame: versucht, 'date' zu verwenden oder Index zu konvertieren; gibt erste Spalte als Series zurÃ¼ck.
+    - Wenn obj DataFrame: versucht, 'date' zu verwenden oder Index zu konvertieren; gibt erste Spalte als Series zurück.
     """
     if isinstance(obj, pd.Series):
         s = obj.copy()
@@ -84,7 +84,7 @@ def ensure_date_series(obj, date_col: str = "date") -> pd.Series:
         else:
             df.index = pd.to_datetime(df.index, errors="coerce")
         if df.shape[1] == 0:
-            raise ValueError("ensure_date_series: DataFrame enthÃ¤lt keine Spalten.")
+            raise ValueError("ensure_date_series: DataFrame enthält keine Spalten.")
         s = df.iloc[:, 0].copy()
         s.index = pd.to_datetime(s.index, errors="coerce")
         return s.sort_index().dropna()
@@ -94,9 +94,9 @@ def normalize_price_df(df: pd.DataFrame, price_col: Optional[str] = None) -> pd.
     """
     Normalisiert Preis-DataFrames:
     - setzt Index auf Datum (falls 'date' vorhanden)
-    - wÃ¤hlt eine Preisspalte (Adj Close > Close > first numeric)
+    - wählt eine Preisspalte (Adj Close > Close > first numeric)
     - sortiert, entfernt Duplikate
-    RÃ¼ckgabe: DataFrame mit einer Preis-Spalte als erste Spalte.
+    Rückgabe: DataFrame mit einer Preis-Spalte als erste Spalte.
     """
     if df is None or df.empty:
         return pd.DataFrame()
@@ -110,7 +110,7 @@ def normalize_price_df(df: pd.DataFrame, price_col: Optional[str] = None) -> pd.
     else:
         df.index = pd.to_datetime(df.index, errors="coerce")
 
-    # Wenn price_col explizit Ã¼bergeben wurde, prÃ¼fe sie
+    # Wenn price_col explizit übergeben wurde, prüfe sie
     if price_col:
         if price_col in df.columns:
             out = df[[price_col]].copy()
@@ -140,7 +140,7 @@ def normalize_price_df(df: pd.DataFrame, price_col: Optional[str] = None) -> pd.
 
 def validate_prophet_input(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Minimalvalidierung fÃ¼r Prophet: gibt DataFrame mit Spalten 'ds' und 'y' zurÃ¼ck.
+    Minimalvalidierung für Prophet: gibt DataFrame mit Spalten 'ds' und 'y' zurück.
     Erwartet: Datumsspalte 'date' oder Index; Zielspalte 'value' oder erste numerische Spalte.
     """
     if df is None or df.empty:
@@ -171,7 +171,7 @@ def resolve_components(selection: List[str], etf_universe: Dict[str, Dict[str, A
     Wandelt Auswahl in flache Liste (key, weight).
     - Einzelinstrumente -> weight 1.0
     - Pakete mit 'components' -> Komponenten normalisiert auf 1.0 (relativ zum Paket)
-    RÃ¼ckgabe: [(key, weight), ...] aggregiert (gleiche Keys summiert).
+    Rückgabe: [(key, weight), ...] aggregiert (gleiche Keys summiert).
     """
     resolved = []
     for key in selection:
@@ -191,7 +191,7 @@ def resolve_components(selection: List[str], etf_universe: Dict[str, Dict[str, A
 def normalize_ter_value(raw_ter: float):
     """
     Versucht plausibles TER-Format zu erkennen und normalisiert.
-    RÃ¼ckgabe: (normalized_ter_decimal, note)
+    Rückgabe: (normalized_ter_decimal, note)
     """
     if raw_ter is None:
         return 0.0, "missing"
@@ -216,7 +216,7 @@ def normalize_ter_value(raw_ter: float):
 
 def _validate_ter_values(df: pd.DataFrame):
     """
-    PrÃ¼ft TERâ€‘Werte auf PlausibilitÃ¤t und aggregiert.
+    Prüft TER-Werte auf Plausibilität und aggregiert.
     Liefert: (aggregated_ter, ter_warnings:list, df_with_notes)
     """
     ter_warnings = []
@@ -232,9 +232,9 @@ def _validate_ter_values(df: pd.DataFrame):
     df["_ter_normalized"] = normalized
     df["_ter_note"] = notes
     if (df["_ter_normalized"] > 5).any():
-        ter_warnings.append("Einige TER-Werte erscheinen ungewÃ¶hnlich hoch (>5).")
+        ter_warnings.append("Einige TER-Werte erscheinen ungewöhnlich hoch (>5).")
     if (df["_ter_normalized"] == 0.0).all():
-        ter_warnings.append("FÃ¼r alle Komponenten fehlt TER-Angabe (0.0). Aggregierte TER ist nicht aussagekrÃ¤ftig.")
+        ter_warnings.append("Für alle Komponenten fehlt TER-Angabe (0.0). Aggregierte TER ist nicht aussagekräftig.")
     aggregated_ter = (df["abs_weight"] * df["_ter_normalized"]).sum()
     return aggregated_ter, ter_warnings, df
 
@@ -260,7 +260,7 @@ def analyze_portfolio_components(etf_universe: Dict[str, Dict[str, Any]],
         })
     df = pd.DataFrame(rows)
     if df.empty:
-        st.info("Keine Instrumente ausgewÃ¤hlt fÃ¼r Analyse.")
+        st.info("Keine Instrumente ausgewählt für Analyse.")
         return df
 
     # Distribute class shares -> absolute weights
@@ -291,18 +291,18 @@ def analyze_portfolio_components(etf_universe: Dict[str, Dict[str, Any]],
     explanations: List[str] = []
     if aggregated_ter >= ter_threshold_warn:
         explanations.append(
-            f"Aggregierte TER SchÃ¤tzung: {aggregated_ter*100:.2f}% p.a. â†’ sehr hoch; "
-            "dies deutet auf fehlerhafte TERâ€‘Angaben oder extrem teure/kleine Fonds hin."
+            f"Aggregierte TER Schätzung: {aggregated_ter*100:.2f}% p.a. → sehr hoch; "
+            "dies deutet auf fehlerhafte TER-Angaben oder extrem teure/kleine Fonds hin."
         )
     else:
-        explanations.append(f"Aggregierte TER SchÃ¤tzung: {aggregated_ter*100:.2f}% p.a. â†’ akzeptabel.")
+        explanations.append(f"Aggregierte TER Schätzung: {aggregated_ter*100:.2f}% p.a. → akzeptabel.")
 
     if herfindahl >= herfindahl_warn:
         explanations.append(
-            f"Herfindahl Index: {herfindahl:.4f} â†’ deutliche Konzentration (einige wenige Positionen dominieren)."
+            f"Herfindahl Index: {herfindahl:.4f} → deutliche Konzentration (einige wenige Positionen dominieren)."
         )
     else:
-        explanations.append(f"Herfindahl Index: {herfindahl:.4f} â†’ Diversifikation erscheint ausreichend.")
+        explanations.append(f"Herfindahl Index: {herfindahl:.4f} → Diversifikation erscheint ausreichend.")
 
     for w in ter_warnings:
         explanations.append(f"TER Validierung: {w}")
@@ -317,7 +317,7 @@ def analyze_portfolio_components(etf_universe: Dict[str, Dict[str, Any]],
     if missing_components:
         missing_fields.append(f"fehlende Komponenten im Universe: {', '.join(missing_components)}")
     if missing_fields:
-        explanations.append("Datenhinweis: Fehlende oder unvollstÃ¤ndige Felder: " + ", ".join(missing_fields) + ".")
+        explanations.append("Datenhinweis: Fehlende oder unvollständige Felder: " + ", ".join(missing_fields) + ".")
 
     # UI display
     st.subheader("Analyse Panel")
@@ -334,7 +334,7 @@ def analyze_portfolio_components(etf_universe: Dict[str, Dict[str, Any]],
     if not df.empty:
         fig_pie = px.pie(df, names="name", values="abs_weight", title="Absolute Gewichte")
         st.plotly_chart(fig_pie, width='stretch')
-        fig_bar = px.bar(df, x="name", y="risk_contribution", title="Risiko Beitrag (vereinfachte VolatilitÃ¤t)")
+        fig_bar = px.bar(df, x="name", y="risk_contribution", title="Risiko Beitrag (vereinfachte Volatilität)")
         st.plotly_chart(fig_bar, width='stretch')
 
     # TER-Fix preview and apply
@@ -344,28 +344,28 @@ def analyze_portfolio_components(etf_universe: Dict[str, Dict[str, Any]],
     st.table(preview_df[["key", "name", "ticker", "ter_pct", "_ter_normalized_pct", "_ter_note"]])
 
     if any(note != "ok" for note in preview_df["_ter_note"].tolist()):
-        if st.button("TER Normalisierung Ã¼bernehmen (Audit wird geschrieben)"):
+        if st.button("TER Normalisierung übernehmen (Audit wird geschrieben)"):
             # apply normalization to etf_universe file entries if possible (best-effort)
             # We only write audit here; actual persistence should be handled centrally in config loader if desired.
             for _, row in preview_df.iterrows():
                 if row["_ter_note"] != "ok":
                     _write_audit({"action": "ter_normalize_suggestion_applied", "key": row["key"], "original_ter": row["ter_pct"], "normalized_ter": row["_ter_normalized"]})
-            st.success("TER Normalisierung als Vorschlag auditiert. Bitte aktualisiere etf_universe.yaml falls gewÃ¼nscht.")
+            st.success("TER Normalisierung als Vorschlag auditiert. Bitte aktualisiere etf_universe.yaml falls gewünscht.")
     else:
-        st.info("Keine TERâ€‘Anomalien erkannt.")
+        st.info("Keine TER-Anomalien erkannt.")
 
     # Stress-Szenario
     st.markdown("**Stress Szenario**")
     shock = {"equity": -0.20, "bond": -0.05, "cash": 0.0}
     df["shock_return"] = df["asset_class"].map(lambda c: shock.get(c, 0.0))
     portfolio_shock = (df["abs_weight"] * df["shock_return"]).sum()
-    st.markdown(f"GeschÃ¤tzter Portfolioâ€‘Impact bei Shock (Equity -20%, Bond -5%): **{portfolio_shock*100:.2f}%**")
+    st.markdown(f"Geschätzter Portfolio-Impact bei Shock (Equity -20%, Bond -5%): **{portfolio_shock*100:.2f}%**")
 
     # Additional warnings
     if aggregated_ter >= ter_threshold_warn:
-        st.warning("Aggregierte TER liegt Ã¼ber dem Schwellenwert. PrÃ¼fe TERâ€‘Quellen und korrigiere falsche Formate.")
+        st.warning("Aggregierte TER liegt über dem Schwellenwert. Prüfe TER-Quellen und korrigiere falsche Formate.")
     if herfindahl >= herfindahl_warn:
-        st.warning("Hohe Konzentration erkannt. PrÃ¼fe Topâ€‘Holdings und mÃ¶gliche Ãœberschneidungen zwischen Paketen.")
+        st.warning("Hohe Konzentration erkannt. Prüfe Top-Holdings und mögliche Ãœberschneidungen zwischen Paketen.")
 
     return df
 

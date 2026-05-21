@@ -1,4 +1,4 @@
-﻿# risk_dashboard/core/etl.py
+# risk_dashboard/core/etl.py
 import pandas as pd
 from typing import Tuple, Dict, List
 from risk_dashboard.data.etf_universes import ETF_UNIVERSES
@@ -7,10 +7,10 @@ from risk_dashboard.core.data_loader import fetch_prices
 def build_ticker_list(etf_universes: Dict) -> List[str]:
     return [v["ticker"] for v in etf_universes.values() if v.get("ticker")]
 
-def load_prices_for_universe(start: str = "2018-01-01", end: str = None) -> Tuple[pd.DataFrame, List[str], Dict[str,str]]:
+def load_etf_universe_prices(start: str = "2018-01-01", end: str = None) -> Tuple[pd.DataFrame, List[str], Dict[str,str]]:
     """
-    LÃ¤dt historische Preise fÃ¼r alle Ticker in ETF_UNIVERSES.
-    RÃ¼ckgabe:
+    Lädt historische Preise für alle Ticker in ETF_UNIVERSES.
+    Rückgabe:
       - prices_df: DataFrame mit Datum als Index und Spalten = config-keys (z. B. 'global_equity_etf')
       - missing_total: Liste der config-keys, die keine Daten lieferten
       - mapping: success_ticker -> config_key (z. B. 'VWRL.L' -> 'global_equity_etf')
@@ -67,6 +67,6 @@ def load_prices_for_universe(start: str = "2018-01-01", end: str = None) -> Tupl
             continue
         missing_total.append(cfg_key)
 
-    # mapping zurÃ¼ckgeben: success_ticker -> config_key (fÃ¼r Debug/UI)
+    # mapping zurückgeben: success_ticker -> config_key (für Debug/UI)
     return prices_df, missing_total, success_to_key
 

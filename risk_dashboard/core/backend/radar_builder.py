@@ -1,4 +1,4 @@
-﻿#core/backend/radar_builder.py
+#core/backend/radar_builder.py
 import pandas as pd
 from core.visualization.radar_plotly_country import plot_country_radar
 from core.visualization.radar_plotly_etf import plot_etf_radar
@@ -43,7 +43,7 @@ def build_etf_radar(etfs, mode):
 
     rows = []
     for t in etfs:
-        metrics = get_etf_metrics(t)  # dict mit 1Y %, 5Y %, VolatilitÃ¤t %, Sharpe, TER, Tracking Error, AUM, DivRendite %
+        metrics = get_etf_metrics(t)  # dict mit 1Y %, 5Y %, Volatilität %, Sharpe, TER, Tracking Error, AUM, DivRendite %
         metrics["ticker"] = t
         rows.append(metrics)
 
@@ -57,7 +57,7 @@ def build_etf_radar(etfs, mode):
 def build_portfolio_radar(portfolio_name: str, mode: str):
     """
     Baut das Portfolio-Radar + Tabelle + Lexikon + PDF-Pfad.
-    RÃ¼ckgabe: fig, df_metrics, df_lexicon, pdf_path
+    Rückgabe: fig, df_metrics, df_lexicon, pdf_path
     """
     try:
         metrics = get_portfolio_metrics(portfolio_name)
@@ -100,7 +100,7 @@ def build_asset_radar(selected_assets, custom_symbol, mode):
             lex = get_bitcoin_lexicon()
         else:
             metrics = get_asset_metrics(symbol)
-            lex = [{"Kennzahl": "Allgemein", "Beschreibung": f"Kennzahlen fÃ¼r {symbol}"}]
+            lex = [{"Kennzahl": "Allgemein", "Beschreibung": f"Kennzahlen für {symbol}"}]
 
         if metrics is None:
             continue
@@ -109,7 +109,7 @@ def build_asset_radar(selected_assets, custom_symbol, mode):
         lexicon_rows.extend(lex)
 
     if not rows:
-        return None, pd.DataFrame({"Fehler": ["Keine gÃ¼ltigen Assets gefunden"]}), pd.DataFrame()
+        return None, pd.DataFrame({"Fehler": ["Keine gültigen Assets gefunden"]}), pd.DataFrame()
 
     fig = plot_asset_radar(rows, mode)
     df_metrics = pd.DataFrame(rows)

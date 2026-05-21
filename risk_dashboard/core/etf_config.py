@@ -1,4 +1,4 @@
-﻿# risk_dashboard/core/etf_config.py
+# risk_dashboard/core/etf_config.py
 import yaml
 from pathlib import Path
 from typing import Dict, Any

@@ -1,4 +1,4 @@
-﻿# core/risk_ampel.py
+# core/risk_ampel.py
 def compute_risk_score(indicators: dict):
     vals = [abs(v) for v in indicators.values()]
     return sum(vals) / len(vals)

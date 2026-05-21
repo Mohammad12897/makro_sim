@@ -1,4 +1,4 @@
-﻿# core/backend/portfolio_manager.py
+# core/backend/portfolio_manager.py
 import json
 from pathlib import Path
 import pandas as pd
@@ -48,7 +48,7 @@ def delete_portfolio(name):
     portfolios = [p for p in portfolios if p["name"] != name]
     _save_all(portfolios)
     if len(portfolios) < before:
-        return f"Portfolio '{name}' gelÃ¶scht."
+        return f"Portfolio '{name}' gelöscht."
     return f"Portfolio '{name}' nicht gefunden."
 
 def get_portfolio(name):

@@ -1,4 +1,4 @@
-﻿# core/backend/portfolio_compare.py
+# core/backend/portfolio_compare.py
 import pandas as pd
 from .portfolio_backtest import backtest_portfolio
 

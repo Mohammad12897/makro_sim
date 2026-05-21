@@ -1,4 +1,4 @@
-﻿#core/data/asset_map.py
+#core/data/asset_map.py
 ASSET_MAP = {
     "deutschland": "^GDAXI",
     "usa": "^GSPC",

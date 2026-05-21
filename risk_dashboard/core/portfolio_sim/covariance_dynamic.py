@@ -1,4 +1,4 @@
-﻿#core/portfolio_sim/covariance_dynamic.py
+#core/portfolio_sim/covariance_dynamic.py
 import numpy as np
 import pandas as pd
 

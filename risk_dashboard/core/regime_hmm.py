@@ -1,4 +1,4 @@
-﻿import numpy as np
+import numpy as np
 import pandas as pd
 from hmmlearn.hmm import GaussianHMM
 import yfinance as yf
@@ -21,7 +21,7 @@ def fit_hmm_regimes(
     df_num = df_num.dropna()
 
     if len(df_num) < 10:
-        raise ValueError("Zu wenige Daten fÃ¼r HMM nach Entfernen von NaNs.")
+        raise ValueError("Zu wenige Daten für HMM nach Entfernen von NaNs.")
 
     X = df_num.values
 

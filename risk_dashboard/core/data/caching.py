@@ -1,4 +1,4 @@
-﻿# core/data/caching.py
+# core/data/caching.py
 import functools
 import yfinance as yf
 from .logging import logger

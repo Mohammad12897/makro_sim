@@ -1,4 +1,4 @@
-﻿#core/data/etf_db.py
+#core/data/etf_db.py
 import json
 from pathlib import Path
 

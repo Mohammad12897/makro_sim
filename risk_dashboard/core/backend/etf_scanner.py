@@ -1,4 +1,4 @@
-﻿# core/backend/etf_scanner.py
+# core/backend/etf_scanner.py
 
 import requests
 import pandas as pd
@@ -33,7 +33,7 @@ def fetch_justetf_data(isin: str):
             "replication": extract("Replikationsmethode"),
             "tracking_diff": extract("Tracking-Differenz"),
             "domicile": extract("Domizil"),
-            "fund_currency": extract("FondswÃ¤hrung"),
+            "fund_currency": extract("Fondswährung"),
         }
 
     except Exception as e:

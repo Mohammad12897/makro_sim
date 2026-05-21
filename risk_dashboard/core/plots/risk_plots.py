@@ -1,4 +1,4 @@
-﻿#core/plots/risk_plots.py
+#core/plots/risk_plots.py
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -42,7 +42,7 @@ def plot_scenario_radar_overlay(metrics):
         # Normieren
         vals = normalize(vals)
 
-        # Kreis schlieÃŸen
+        # Kreis schließen
         vals = vals.tolist()
         vals.append(vals[0])
 
@@ -56,7 +56,7 @@ def plot_scenario_radar_overlay(metrics):
     ax.set_xticklabels(labels, fontsize=11)
     ax.set_yticklabels([])
 
-    ax.set_title("Risikoâ€‘Radar (normiert)", fontsize=14, pad=20)
+    ax.set_title("Risiko-Radar (normiert)", fontsize=14, pad=20)
     ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
 
     return fig

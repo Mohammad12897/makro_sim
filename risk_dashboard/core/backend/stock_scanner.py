@@ -1,4 +1,4 @@
-﻿# core/backend/stock_scanner.py
+# core/backend/stock_scanner.py
 
 import yfinance as yf
 import pandas as pd

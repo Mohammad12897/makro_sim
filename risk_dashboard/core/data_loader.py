@@ -1,11 +1,85 @@
 ﻿# risk_dashboard/core/data_loader.py
-import pandas as pd
-from typing import List, Dict, Tuple
+from typing import List, Tuple, Dict, Optional
 from yfinance import download
+import pandas as pd
+import numpy as np
+import yfinance as yf
 import logging
+import time
+import concurrent.futures
+import streamlit as st
 
 logger = logging.getLogger(__name__)
 SUFFIXES = ["", ".DE", ".L", ".US", ".AX"]
+
+@st.cache_data(ttl=3600)
+def fetch_prices_with_suffixes(base: str, period: str = "max", auto_adjust: bool = False) -> Tuple[Optional[str], Optional[pd.DataFrame]]:
+    """
+    Versucht mehrere Suffixe und gibt (verwendeter_ticker, df) zurück.
+    df hat Spalten Open, High, Low, Close, Volume und eine Hilfsspalte '__ticker'.
+    """
+    base = (base or "").strip().upper()
+    if not base:
+        return None, None
+
+    for s in SUFFIXES:
+        t = base + s
+        try:
+            ticker = yf.Ticker(t)
+            df = ticker.history(period=period, auto_adjust=auto_adjust)
+            if df is not None and not df.empty:
+                df = df.copy()
+                # Index tz-naive UTC
+                if df.index.tz is not None:
+                    df.index = df.index.tz_convert("UTC").tz_localize(None)
+                df["__ticker"] = t
+                return t, df
+        except Exception as e:
+            logger.debug("yfinance error for %s: %s", t, e)
+            time.sleep(0.1)
+            continue
+    return None, None
+
+def _fetch_one(args):
+    return fetch_prices_with_suffixes(*args)
+
+@st.cache_data(ttl=3600)
+def load_raw_prices_for_universe(universe: List[str], period: str = "max", auto_adjust: bool = False, max_workers: int = 6) -> pd.DataFrame:
+    """
+    Lädt Preise für eine Liste von Basis-Tickern (ohne Suffix).
+    Rückgabe: DataFrame mit MultiIndex (Date, __ticker) und Spalten Open, High, Low, Close, Volume.
+    """
+    # Normalisieren und deduplizieren
+    bases = list(dict.fromkeys([b.strip().upper() for b in universe if isinstance(b, str) and b.strip()]))
+    if not bases:
+        cols = ["Open", "High", "Low", "Close", "Volume", "__ticker"]
+        return pd.DataFrame(columns=cols)
+
+    results = []
+    max_workers = min(max_workers, len(bases))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(_fetch_one, (b, period, auto_adjust)): b for b in bases}
+        for fut in concurrent.futures.as_completed(futures):
+            base = futures[fut]
+            try:
+                used_ticker, df = fut.result()
+                if used_ticker and df is not None and not df.empty:
+                    results.append(df)
+                else:
+                    logger.warning("No data for base %s with any suffixes", base)
+            except Exception as e:
+                logger.exception("Error fetching %s: %s", base, e)
+
+    if not results:
+        cols = ["Open", "High", "Low", "Close", "Volume", "__ticker"]
+        return pd.DataFrame(columns=cols)
+
+    combined = pd.concat(results)
+    combined.index = pd.to_datetime(combined.index)
+    combined = combined.sort_index()
+    combined = combined.reset_index().rename(columns={"index": "Date"})
+    combined = combined.set_index(["Date", "__ticker"]).sort_index()
+    return combined
 
 def try_download_with_alternatives(ticker_base: str, start: str = None, end: str = None) -> Tuple[str, pd.Series]:
     for s in SUFFIXES:
@@ -46,4 +120,3 @@ def fetch_prices(tickers: List[str], start: str = "2018-01-01", end: str = None)
         else:
             out[tbase] = pd.Series(dtype=float)  # placeholder for missing
     return out
-

@@ -1,14 +1,14 @@
-﻿#core/backend/ki_score.py
+#core/backend/ki_score.py
 
 import numpy as np
 import pandas as pd
 
 def normalize(value, min_val, max_val):
-    # Series â†’ float
+    # Series — float
     if isinstance(value, pd.Series):
         value = float(value.iloc[0])
 
-    # NaN â†’ 0
+    # NaN — 0
     if value is None or np.isnan(value):
         return 0.0
 
@@ -19,7 +19,7 @@ def normalize(value, min_val, max_val):
     # Normierung
     norm = (value - min_val) / (max_val - min_val)
 
-    # Clipping auf 0â€“1
+    # Clipping auf 0‑1
     return max(0.0, min(1.0, float(norm)))
     
 def to_float(x):
@@ -31,8 +31,8 @@ def to_float(x):
 
 def compute_ki_score(price_series: pd.Series, return_factors=False):
     """
-    Berechnet einen KI-Score (0â€“100) aus einer Preiszeitreihe.
-    Wenn return_factors=True, werden zusÃ¤tzlich die normierten Faktoren zurÃ¼ckgegeben.
+    Berechnet einen KI-Score (0‑100) aus einer Preiszeitreihe.
+    Wenn return_factors=True, werden zusätzlich die normierten Faktoren zurückgegeben.
     """
 
     # Sicherheitscheck: mindestens 120 Datenpunkte
@@ -55,7 +55,7 @@ def compute_ki_score(price_series: pd.Series, return_factors=False):
         momentum = 0
     momentum_norm = normalize(to_float(momentum), -0.2, 0.3)
 
-    # 3. VolatilitÃ¤t
+    # 3. Volatilität
     vol = to_float(returns.std())
     vol_norm = normalize(vol, 0.005, 0.05)
 
@@ -68,7 +68,7 @@ def compute_ki_score(price_series: pd.Series, return_factors=False):
     drawdown = to_float(((price_series - roll_max) / roll_max).min())
     drawdown_norm = normalize(abs(drawdown), 0, 0.5)
 
-    # 6. TrendstabilitÃ¤t (RÂ²)
+    # 6. Trendstabilität (R²)
     x = np.arange(len(price_series))
     y = price_series.values
     slope, intercept = np.polyfit(x, y, 1)
@@ -100,8 +100,8 @@ def compute_ki_score(price_series: pd.Series, return_factors=False):
 
 def explain_ki_score(ticker, score, factors):
     """
-    Erzeugt eine ausfÃ¼hrliche, verstÃ¤ndliche ErklÃ¤rung fÃ¼r den KIâ€‘Score eines Assets.
-    'factors' enthÃ¤lt normierte Werte (0â€“1):
+    Erzeugt eine ausführliche, verständliche Erklärung für den KI-Score eines Assets.
+    'factors' enthält normierte Werte (0‑1):
         momentum, volatility, drawdown, sharpe, trend_stability
     """
 
@@ -113,13 +113,14 @@ def explain_ki_score(ticker, score, factors):
     stability = to_float(factors["trend_stability"])
 
     # Ampel-Logik
-    def amp(value):
+    def amp(value: float) -> str:
         if value >= 0.66:
-            return "ðŸŸ¢"
+            return "🟢"
         elif value >= 0.33:
-            return "ðŸŸ¡"
+            return "🟡"
         else:
-            return "ðŸ”´"
+            return "🔴"
+
 
     # Risiko-Profil
     risiko_level = (
@@ -150,11 +151,11 @@ def explain_ki_score(ticker, score, factors):
     elif score >= 40:
         summary = "aktuell neutral wirkt"
     elif score >= 20:
-        summary = "deutliche SchwÃ¤chen zeigt"
+        summary = "deutliche Schwächen zeigt"
     else:
         summary = "ein sehr hohes Risiko aufweist"
 
-    # StÃ¤rken/SchwÃ¤chen
+    # Stärken/Schwächen
     strengths = []
     weaknesses = []
 
@@ -164,72 +165,72 @@ def explain_ki_score(ticker, score, factors):
         weaknesses.append("schwaches Momentum")
 
     if volatility < 0.4:
-        strengths.append("gÃ¼nstiges Risikoâ€‘Profil")
+        strengths.append("günstiges Risiko-Profil")
     else:
-        weaknesses.append("erhÃ¶hte VolatilitÃ¤t")
+        weaknesses.append("erhöhte Volatilität")
 
     if sharpe > 0.5:
-        strengths.append("gute Risikoâ€‘Renditeâ€‘Relation")
+        strengths.append("gute Risiko-Rendite-Relation")
     else:
-        weaknesses.append("schwache Sharpeâ€‘Ratio")
+        weaknesses.append("schwache Sharpe-Ratio")
 
     if stability > 0.5:
         strengths.append("stabiler Trend")
     else:
         weaknesses.append("instabiler Trendverlauf")
 
-    strengths_text = ", ".join(strengths) if strengths else "keine ausgeprÃ¤gten StÃ¤rken"
-    weaknesses_text = ", ".join(weaknesses) if weaknesses else "keine wesentlichen SchwÃ¤chen"
+    strengths_text = ", ".join(strengths) if strengths else "keine ausgeprägten Stärken"
+    weaknesses_text = ", ".join(weaknesses) if weaknesses else "keine wesentlichen Schwächen"
 
     return f"""
-### ðŸ“Š KIâ€‘Score Analyse fÃ¼r **{ticker}**
+### KI-Score Analyse für **{ticker}**
 
-Der KIâ€‘Score von **{ticker}** betrÃ¤gt **{score:.1f} / 100**.  
-Er basiert auf einer kombinierten Analyse von Trend, Risiko, StabilitÃ¤t und RenditequalitÃ¤t.
+Der KI-Score von **{ticker}** beträgt **{score:.1f} / 100**.  
+Er basiert auf einer kombinierten Analyse von Trend, Risiko, Stabilität und Renditequalität.
 
 ---
 
-## ðŸ” Einzelâ€‘Faktoren (mit Ampelâ€‘Bewertung)
+## Einzel-Faktoren (mit Ampel-Bewertung)
 
 **Momentum:** {momentum:.2f} {amp(momentum)}  
-â†’ StÃ¤rke des kurzfristigen Trends.
+— Stärke des kurzfristigen Trends.
 
-**VolatilitÃ¤t:** {volatility:.2f} {amp(1 - volatility)}  
-â†’ SchwankungsintensitÃ¤t (je niedriger, desto besser).
+**Volatilität:** {volatility:.2f} {amp(1 - volatility)}  
+— Schwankungsintensität (je niedriger, desto besser).
 
 **Drawdown:** {drawdown:.2f} {amp(1 - drawdown)}  
-â†’ RÃ¼ckschlagsrisiko der letzten Monate.
+— Rückschlagsrisiko der letzten Monate.
 
 **Sharpe Ratio:** {sharpe:.2f} {amp(sharpe)}  
-â†’ Risikoâ€‘angepasste RenditequalitÃ¤t.
+— Risiko-angepasste Renditequalität.
 
-**TrendstabilitÃ¤t:** {stability:.2f} {amp(stability)}  
-â†’ Wie sauber und konsistent der Trend verlÃ¤uft.
+**Trendstabilität:** {stability:.2f} {amp(stability)}  
+— Wie sauber und konsistent der Trend verläuft.
 
 ---
 
-## ðŸ§  Gesamtinterpretation
+## Gesamtinterpretation
 
 - **Momentum:** {trend_level}  
 - **Risiko:** {risiko_level}  
-- **Sharpeâ€‘Profil:** {sharpe_level}  
-- **TrendqualitÃ¤t:** {'stabil' if stability > 0.6 else 'durchwachsen' if stability > 0.3 else 'instabil'}
+- **Sharpe-Profil:** {sharpe_level}  
+- **Trendqualität:** {'stabil' if stability > 0.6 else 'durchwachsen' if stability > 0.3 else 'instabil'}
 
 ---
 
-## ðŸ’¡ StÃ¤rken & SchwÃ¤chen
+## Stärken & Schwächen
 
-**StÃ¤rken:**  
+**Stärken:**  
 - {strengths_text}
 
-**SchwÃ¤chen:**  
+**Schwächen:**  
 - {weaknesses_text}
 
 ---
 
-## ðŸ“ Fazit fÃ¼r {ticker}
+## Fazit für {ticker}
 
 Zusammengefasst zeigt **{ticker}**, dass es aktuell **{summary}**.  
-Diese EinschÃ¤tzung basiert auf TrendstÃ¤rke, Risiko, StabilitÃ¤t und RenditequalitÃ¤t.
+Diese Einschätzung basiert auf Trendstärke, Risiko, Stabilität und Renditequalität.
 """
 

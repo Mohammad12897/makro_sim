@@ -1,4 +1,4 @@
-﻿# core/data/market_data.py
+# core/data/market_data.py
 
 import yfinance as yf
 import pandas as pd
@@ -10,12 +10,12 @@ def load_asset_series(ticker, start="2010-01-01", end=None):
     ticker = validate_or_fix_ticker(ticker)
 
     if ticker is None:
-        raise ValueError(f"Ticker ungÃ¼ltig oder delisted.")
+        raise ValueError(f"Ticker ungültig oder delisted.")
 
     data = yf.download(ticker, start=start, end=end, progress=False)
 
     if data.empty:
-        raise ValueError(f"Keine Daten fÃ¼r {ticker}")
+        raise ValueError(f"Keine Daten für {ticker}")
 
     prices = data["Close"].dropna()
     returns = prices.pct_change().dropna()

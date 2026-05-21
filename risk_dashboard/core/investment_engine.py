@@ -1,4 +1,10 @@
-﻿# risk_dashboard/core/investment_engine.py
+# risk_dashboard/core/investment_engine.py
+import warnings
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
+
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+
 from gradio.monitoring_dashboard import data
 import numpy as np
 import yfinance as yf
@@ -26,7 +32,7 @@ def load_etf_prices_monthly(tickers_tuple, period="10y"):
     prices = download_etf_history(tickers, period=period, auto_resample=True)
 
     if prices is None or prices.empty:
-        st.error("load_etf_prices_monthly â€“ keine Preise geladen.")
+        st.error("load_etf_prices_monthly— keine Preise geladen.")
         return pd.DataFrame(), tickers
 
     prices = prices.ffill().dropna(how="all")
@@ -34,7 +40,7 @@ def load_etf_prices_monthly(tickers_tuple, period="10y"):
     missing = [t for t in tickers if t not in available]
 
     if missing:
-        st.warning(f"ETF-Loader â€“ fehlende Ticker nach Download: {missing}")
+        st.warning(f"ETF-Loader— fehlende Ticker nach Download: {missing}")
 
     prices = prices[available]
     return prices, missing
@@ -50,11 +56,11 @@ def _safe_linkage_from_dist(dist, method="single"):
     """
     Wenn dist eine quadratische Distanzmatrix (NxN) ist, konvertiere sie in
     das kondensierte Format mit squareform. Wenn dist bereits kondensiert
-    ist oder Beobachtungsdaten (NxM), Ã¼bergebe direkt an linkage.
+    ist oder Beobachtungsdaten (NxM), übergebe direkt an linkage.
     """
     arr = np.asarray(dist)
     if arr.ndim == 2 and arr.shape[0] == arr.shape[1]:
-        # prÃ¼fe Diagonale ~ 0
+        # prüfe Diagonale ~ 0
         # convert to condensed vector
         condensed = squareform(arr)
         return linkage(condensed, method=method)
@@ -80,18 +86,18 @@ def classify_scenario_from_score(score: float) -> str:
         return "Boom"
 
 def load_etf_prices(tickers, start=None, end=None):
-    st.write("ETF-Loader â€“ angefragte Ticker:", tickers)
+    st.write("ETF-Loader— angefragte Ticker:", tickers)
 
     data = yf.download(tickers, start=start, end=end, auto_adjust=True)
 
-    st.write("ETF-Loader â€“ rohe Daten:", data.head())
+    st.write("ETF-Loader— rohe Daten:", data.head())
 
     # Fall 1: MultiIndex (mehrere Ticker)
     if isinstance(data.columns, pd.MultiIndex):
         if "Adj Close" in data.columns.levels[0]:
             data = data["Adj Close"]
         else:
-            st.warning("MultiIndex ohne 'Adj Close' â€“ verwende 'Close'.")
+            st.warning("MultiIndex ohne 'Adj Close'— verwende 'Close'.")
             data = data["Close"]
 
     # Fall 2: SingleIndex (ein Ticker)
@@ -104,19 +110,19 @@ def load_etf_prices(tickers, start=None, end=None):
             st.error("Weder 'Adj Close' noch 'Close' vorhanden.")
             return pd.DataFrame()
 
-    # gÃ¼ltige Spalten extrahieren
+    # gültige Spalten extrahieren
     valid_cols = [c for c in data.columns if data[c].notna().sum() > 0]
     missing = [c for c in tickers if c not in valid_cols]
 
     if missing:
-        st.warning(f"ETF-Loader â€“ fehlende Ticker: {missing}")
+        st.warning(f"ETF-Loader— fehlende Ticker: {missing}")
 
     if not valid_cols:
-        st.error("ETF-Loader â€“ keine gÃ¼ltigen Preisreihen gefunden.")
+        st.error("ETF-Loader— keine gültigen Preisreihen gefunden.")
         return pd.DataFrame()
     
-    # âœ… Debug-Ausgabe HIER einfÃ¼gen
-    st.write("DEBUG â€“ ETF Loader Zeitraum:", data.index[:5], data.index[-5:])
+    # âœ… Debug-Ausgabe HIER einfügen
+    st.write("DEBUG— ETF Loader Zeitraum:", data.index[:5], data.index[-5:])
 
     return data[valid_cols]
 
@@ -174,7 +180,7 @@ def classify_risk_level():
     """
     df = compute_risk_score_v2(normalize=True, method="minmax")
 
-    # Defensive PrÃ¼fung
+    # Defensive Prüfung
     if df.empty:
         # Fallback-Verhalten definieren: z.B. konservativ "high" oder raise
         # Hier: konservativ -> "high"
@@ -220,14 +226,14 @@ def map_regime_to_label(regime_value):
 # ETF-MAPPING
 # ---------------------------------------------------------
 def etf_mapping():
-    """ETF-Mapping fÃ¼r jede Assetklasse (generische Typen, keine konkreten Produkte)."""
+    """ETF-Mapping für jede Assetklasse (generische Typen, keine konkreten Produkte)."""
     return {
         "Growth-Aktien": ["NASDAQ-ETF", "Tech-ETF", "Innovation-ETF"],
         "Value-Aktien": ["Value-ETF", "Dividend-ETF"],
         "Defensive Aktien": ["Healthcare-ETF", "Utilities-ETF"],
         "Zyklische Aktien": ["Industrie-ETF", "Konsum-ETF"],
-        "KurzlÃ¤ufer-Anleihen": ["Short-Term Bond ETF"],
-        "LanglÃ¤ufer-Anleihen": ["Long-Term Treasury ETF"],
+        "Kurzläufer-Anleihen": ["Short-Term Bond ETF"],
+        "Langläufer-Anleihen": ["Long-Term Treasury ETF"],
         "Gold": ["Gold-ETF"],
         "Rohstoffe": ["Commodity-ETF", "Energy-ETF"],
         "Geldmarkt": ["Money Market ETF"]
@@ -244,7 +250,7 @@ def regime_based_strategy():
     if regime == "High Risk":
         assets = [
             "Defensive Aktien",
-            "KurzlÃ¤ufer-Anleihen",
+            "Kurzläufer-Anleihen",
             "Gold",
             "Geldmarkt"
         ]
@@ -252,14 +258,14 @@ def regime_based_strategy():
         assets = [
             "Value-Aktien",
             "Defensive Aktien",
-            "KurzlÃ¤ufer-Anleihen",
+            "Kurzläufer-Anleihen",
             "Gold"
         ]
     else:  # Low Risk
         assets = [
             "Growth-Aktien",
             "Zyklische Aktien",
-            "LanglÃ¤ufer-Anleihen",
+            "Langläufer-Anleihen",
             "Rohstoffe"
         ]
 
@@ -294,19 +300,19 @@ def etf_screening_by_regime():
 def portfolio_weights(risk_level, regime, risk_budget: float = 1.0):
     """
     Regelbasierte Portfolio-Gewichtung.
-    risk_budget ist hier ein Skalierungsfaktor (0..1), kÃ¶nnte spÃ¤ter mit VolatilitÃ¤ten verknÃ¼pft werden.
+    risk_budget ist hier ein Skalierungsfaktor (0..1), könnte später mit Volatilitäten verknüpft werden.
     """
     if risk_level == "high" or regime == "High Risk":
         base = {
             "Defensive Aktien": 0.20,
-            "KurzlÃ¤ufer-Anleihen": 0.30,
+            "Kurzläufer-Anleihen": 0.30,
             "Gold": 0.25,
             "Geldmarkt": 0.25
         }
     elif risk_level == "medium" or regime == "Medium Risk":
         base = {
             "Value-Aktien": 0.30,
-            "KurzlÃ¤ufer-Anleihen": 0.25,
+            "Kurzläufer-Anleihen": 0.25,
             "Gold": 0.15,
             "Zyklische Aktien": 0.30
         }
@@ -314,7 +320,7 @@ def portfolio_weights(risk_level, regime, risk_budget: float = 1.0):
         base = {
             "Growth-Aktien": 0.40,
             "Zyklische Aktien": 0.30,
-            "LanglÃ¤ufer-Anleihen": 0.20,
+            "Langläufer-Anleihen": 0.20,
             "Rohstoffe": 0.10
         }
 
@@ -378,13 +384,13 @@ def build_regime_risk_parity_portfolio(low, medium, high, period="10y"):
     tickers = list(set(low + medium + high))
 
     # Debug: Tickerliste anzeigen
-    st.write("ETF-Loader â€“ angefragte Ticker:", tickers)
+    st.write("ETF-Loader— angefragte Ticker:", tickers)
 
     # 2) Preisdaten laden
     prices = load_etf_prices(tickers, start=None, end=None)
 
     # Debug: Rohdaten anzeigen
-    st.write("ETF-Loader â€“ geladene Daten:", prices.head())
+    st.write("ETF-Loader— geladene Daten:", prices.head())
 
     # 3) Returns berechnen
     rets = prices.pct_change().dropna()
@@ -405,12 +411,12 @@ def build_regime_risk_parity_portfolio(low, medium, high, period="10y"):
 def hrp_weights(returns_df: pd.DataFrame):
     """
     Returns: dict key->weight (sums to 1) or {} bei Fehlern.
-    Annahme: returns_df enthÃ¤lt Renditen (columns = tickers).
+    Annahme: returns_df enthält Renditen (columns = tickers).
     """
     # 1) Grundchecks
     returns_df = returns_df.dropna(how="all", axis=1)
     if returns_df.shape[1] == 0:
-        st.warning("HRP â€“ keine gÃ¼ltigen Spalten in returns_df.")
+        st.warning("HRP— keine gültigen Spalten in returns_df.")
         return {}
 
     # 2) Korrelations- und Distanzmatrix
@@ -425,21 +431,21 @@ def hrp_weights(returns_df: pd.DataFrame):
         else:
             condensed = np.asarray(dist_mat)
     except Exception as e:
-        st.error(f"HRP â€“ Fehler beim Erzeugen der kondensierten Distanz: {e}")
+        st.error(f"HRP— Fehler beim Erzeugen der kondensierten Distanz: {e}")
         return {}
 
     # 4) linkage erzeugen (hier single linkage als Beispiel)
     try:
         Z = linkage(condensed, method="single")
     except Exception as e:
-        st.error(f"HRP â€“ Fehler beim Clustering/linkage: {e}")
+        st.error(f"HRP— Fehler beim Clustering/linkage: {e}")
         return {}
 
-    # 5) Reihenfolge der BlÃ¤tter
+    # 5) Reihenfolge der Blätter
     try:
         order = leaves_list(Z)
     except Exception as e:
-        st.error(f"HRP â€“ Fehler beim Ermitteln der leaves: {e}")
+        st.error(f"HRP— Fehler beim Ermitteln der leaves: {e}")
         return {}
 
     # 6) Kovarianz und geordnete Kovarianz
@@ -447,7 +453,7 @@ def hrp_weights(returns_df: pd.DataFrame):
     ordered_cov = cov.iloc[order, order]
 
     # 7) einfache HRPâ€‘Gewichte (vereinfachte Implementierung)
-    # Hier ein sehr einfaches rekursives Split-Verfahren (Platzhalter fÃ¼r vollstÃ¤ndige HRP)
+    # Hier ein sehr einfaches rekursives Split-Verfahren (Platzhalter für vollständige HRP)
     # Ziel: Gewichte pro Ticker (index names)
     tickers = ordered_cov.index.tolist()
     n = len(tickers)
@@ -457,7 +463,7 @@ def hrp_weights(returns_df: pd.DataFrame):
     # einfache Gleichgewichtung als Fallback (du kannst hier die echte HRP-Logik einsetzen)
     weights = {t: 1.0 / n for t in tickers}
 
-    # 8) Map zurÃ¼ck auf originale Spaltenreihenfolge
+    # 8) Map zurück auf originale Spaltenreihenfolge
     # Wenn du die Gewichte in originaler Reihenfolge brauchst:
     result = {t: float(weights.get(t, 0.0)) for t in returns_df.columns}
     # Normieren (sicherheitshalber)
@@ -511,7 +517,7 @@ def build_regime_hrp_portfolio(low, medium, high, rets):
     for regime, tickers in regime_universe.items():
         valid = [t for t in tickers if t in rets.columns]
         if not valid:
-            print(f"WARNUNG HRP: Keine gÃ¼ltigen Ticker im Regime {regime}: {tickers}")
+            print(f"WARNUNG HRP: Keine gültigen Ticker im Regime {regime}: {tickers}")
             continue
 
         sub = rets[valid].dropna(how="all")
@@ -720,7 +726,7 @@ def backtest_etf_regime_portfolio(ticker_map, period="max", scenario_df=None, sc
     """
     Backtest 2.0:
     - ticker_map: dict Regime -> Liste von ETF-Tickern
-    - period: Zeitraum fÃ¼r Yahoo Finance (z.B. '10y' oder 'max')
+    - period: Zeitraum für Yahoo Finance (z.B. '10y' oder 'max')
     """
     # 1. Regime-Historie (monatlich)
     if scenario_regimes is not None and not scenario_regimes.empty:
@@ -728,7 +734,7 @@ def backtest_etf_regime_portfolio(ticker_map, period="max", scenario_df=None, sc
     else:
         regimes = detect_risk_regimes().copy()
 
-    # Defensive: sicherstellen, dass 'date' vorhanden ist und gÃ¼ltig
+    # Defensive: sicherstellen, dass 'date' vorhanden ist und gültig
     regimes = ensure_date_column(regimes)
     regimes["date"] = pd.to_datetime(regimes["date"], errors="coerce")
     regimes = regimes.dropna(subset=["date"])
@@ -821,7 +827,7 @@ def performance_stats(equity_df, risk_free_rate=0.0):
     """
     Berechnet einfache Kennzahlen:
     - annualisierte Rendite
-    - annualisierte VolatilitÃ¤t
+    - annualisierte Volatilität
     - Sharpe Ratio
     - Max Drawdown
     """
@@ -852,7 +858,7 @@ def performance_stats(equity_df, risk_free_rate=0.0):
 
 def regime_heatmap_data(equity_df):
     """
-    Liefert durchschnittliche Monatsrenditen pro Regime fÃ¼r Heatmap.
+    Liefert durchschnittliche Monatsrenditen pro Regime für Heatmap.
     """
     df = equity_df.copy()
     df["ret"] = df["equity"].pct_change()
@@ -871,7 +877,7 @@ def regime_transition_matrix(period="max"):
     regimes["date"] = pd.to_datetime(regimes["date"])
     regimes = regimes.set_index("date").resample("ME").last()
 
-    # 2. ETF-Preise laden (fÃ¼r spÃ¤tere Erweiterungen)
+    # 2. ETF-Preise laden (für spätere Erweiterungen)
     #    â†’ wichtig, damit 'prices' existiert
     all_tickers = ["CSPX.L", "EQQQ.L", "EUNL.DE", "IQQ0.DE", "IMEU.L", "AGGG.L", "IEGA.L", "SGLN.L"]
     prices = download_etf_history(all_tickers, period=period)
@@ -880,7 +886,7 @@ def regime_transition_matrix(period="max"):
     # 3. Regime-Liste extrahieren
     reg_series = regimes["regime"]
 
-    # 4. Transitionen zÃ¤hlen
+    # 4. Transitionen zählen
     transitions = pd.crosstab(
         reg_series.shift(1),
         reg_series,
@@ -892,7 +898,7 @@ def regime_transition_matrix(period="max"):
 
 def generate_investment_package(risk_row, scenario, regimes, etf_meta: dict, prices_df: pd.DataFrame):
     """
-    Erzeugt ein Investment-Paket basierend auf Metadaten und VerfÃ¼gbarkeit der Preisdaten.
+    Erzeugt ein Investment-Paket basierend auf Metadaten und Verfügbarkeit der Preisdaten.
     Liefert dict mit keys: date, regime, package (Liste), risk_score
     """
     # Validierung
@@ -901,11 +907,11 @@ def generate_investment_package(risk_row, scenario, regimes, etf_meta: dict, pri
 
     package = []
     for key, meta in etf_meta.items():
-        # VerfÃ¼gbarkeit prÃ¼fen: Spalte im prices_df
+        # Verfügbarkeit prüfen: Spalte im prices_df
         obs = prices_df.get(key)
         available_obs = int(obs.dropna().shape[0]) if obs is not None else 0
 
-        # Beispielmetrik: VolatilitÃ¤t der letzten 252 Handelstage falls verfÃ¼gbar
+        # Beispielmetrik: Volatilität der letzten 252 Handelstage falls verfügbar
         vol_252 = None
         if available_obs >= 30:
             try:

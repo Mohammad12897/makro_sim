@@ -1,35 +1,35 @@
-﻿gr.Markdown("""
+gr.Markdown("""
 ### WÃ„HRUNGS-LEXIKON
 
 Inflation:
-Anstieg des allgemeinen Preisniveaus; Kaufkraftverlust der WÃ¤hrung.
+Anstieg des allgemeinen Preisniveaus; Kaufkraftverlust der Währung.
 
 Deflation:
-RÃ¼ckgang des Preisniveaus; Wirtschaft schrumpft, Nachfrage sinkt.
+Rückgang des Preisniveaus; Wirtschaft schrumpft, Nachfrage sinkt.
 
 Wechselkurs:
-Preis einer WÃ¤hrung im VerhÃ¤ltnis zu einer anderen (z. B. EUR/USD).
+Preis einer Währung im Verhältnis zu einer anderen (z. B. EUR/USD).
 
 Abwertung:
-WÃ¤hrung verliert an Wert; Importe werden teurer.
+Währung verliert an Wert; Importe werden teurer.
 
 Aufwertung:
-WÃ¤hrung gewinnt an Wert; Exporte werden teurer.
+Währung gewinnt an Wert; Exporte werden teurer.
 
 Zentralbank:
-Institution, die Geldmenge, Zinsen und WÃ¤hrungsstabilitÃ¤t steuert.
+Institution, die Geldmenge, Zinsen und Währungsstabilität steuert.
 
 Dollarbindung (Peg):
-Fester Wechselkurs zum US-Dollar; stabilisiert die WÃ¤hrung, reduziert FlexibilitÃ¤t.
+Fester Wechselkurs zum US-Dollar; stabilisiert die Währung, reduziert Flexibilität.
 
 Kapitalflucht:
 Abfluss von Geld aus dem Land wegen Unsicherheit oder Inflation.
 
 Devisenreserven:
-BestÃ¤nde an FremdwÃ¤hrungen (Dollar, Euro, Gold), um die eigene WÃ¤hrung zu stabilisieren.
+Bestände an Fremdwährungen (Dollar, Euro, Gold), um die eigene Währung zu stabilisieren.
 
-WÃ¤hrungskrise:
-Schneller, starker Wertverlust der LandeswÃ¤hrung; oft begleitet von Inflation.
+Währungskrise:
+Schneller, starker Wertverlust der Landeswährung; oft begleitet von Inflation.
 
 Hyperinflation:
 Extrem schnelle Preissteigerung (z. B. Venezuela, Zimbabwe).
@@ -38,31 +38,31 @@ Geldmenge:
 Gesamtes im Umlauf befindliches Geld; beeinflusst Inflation und Wirtschaft.
 
 Zinsniveau:
-Preis des Geldes; beeinflusst KapitalflÃ¼sse und WÃ¤hrungsstÃ¤rke.
+Preis des Geldes; beeinflusst Kapitalflüsse und Währungsstärke.
 
-FremdwÃ¤hrungsschulden:
-Schulden in Dollar/Euro; gefÃ¤hrlich, wenn die eigene WÃ¤hrung abwertet.
+Fremdwährungsschulden:
+Schulden in Dollar/Euro; gefährlich, wenn die eigene Währung abwertet.
 
-ImportabhÃ¤ngigkeit:
-Land ist auf auslÃ¤ndische GÃ¼ter angewiesen; schwache WÃ¤hrung â†’ teure Importe.
+Importabhängigkeit:
+Land ist auf ausländische Güter angewiesen; schwache Währung → teure Importe.
 
-Zentralbank-UnabhÃ¤ngigkeit:
-Je unabhÃ¤ngiger, desto stabiler die WÃ¤hrung; politische Einflussnahme fÃ¼hrt zu Inflation.
+Zentralbank-Unabhängigkeit:
+Je unabhängiger, desto stabiler die Währung; politische Einflussnahme führt zu Inflation.
 
 ## WÃ„HRUNGS-DASHBOARD â€“ DESIGN
 
 1. Header
-   - WÃ¤hrungsname
+   - Währungsname
    - Flagge
    - Aktueller Wechselkurs
    - Trend (7 Tage / 30 Tage / 1 Jahr)
 
 2. Risiko-Radar (6 Achsen)
    - Inflationsrisiko
-   - WechselkursvolatilitÃ¤t
-   - Zentralbank-UnabhÃ¤ngigkeit
+   - Wechselkursvolatilität
+   - Zentralbank-Unabhängigkeit
    - Staatsverschuldung
-   - DollarabhÃ¤ngigkeit
+   - Dollarabhängigkeit
    - Kapitalflucht-Risiko
 
 3. Makro-Indikatoren
@@ -79,8 +79,8 @@ Je unabhÃ¤ngiger, desto stabiler die WÃ¤hrung; politische Einflussnahme fÃ�
    - Devisenreserven-Verlauf
 
 5. Storyline-Engine (automatische Interpretation)
-   - StÃ¤rken
-   - SchwÃ¤chen
+   - Stärken
+   - Schwächen
    - Chancen
    - Risiken
    - Kurzprognose
@@ -88,13 +88,13 @@ Je unabhÃ¤ngiger, desto stabiler die WÃ¤hrung; politische Einflussnahme fÃ�
 6. Szenario-Modul
    - Zinsanstieg USA
    - Energiepreisschock
-   - Politische InstabilitÃ¤t
+   - Politische Instabilität
    - Schuldenkrise
    - Exportboom
 
 7. Handlungsempfehlungen (neutral formuliert)
    - Risiko-Hinweise
-   - StabilitÃ¤tsfaktoren
+   - Stabilitätsfaktoren
    - Beobachtungspunkte
 
 ---
@@ -104,22 +104,22 @@ Je unabhÃ¤ngiger, desto stabiler die WÃ¤hrung; politische Einflussnahme fÃ�
 Achsen (6 Dimensionen):
 
 1. Inflationsrisiko
-   - HÃ¶he und StabilitÃ¤t der Inflation
+   - Höhe und Stabilität der Inflation
 
-2. WechselkursvolatilitÃ¤t
-   - SchwankungsintensitÃ¤t der WÃ¤hrung
+2. Wechselkursvolatilität
+   - Schwankungsintensität der Währung
 
-3. Zentralbank-UnabhÃ¤ngigkeit
-   - Politische Einflussnahme vs. StabilitÃ¤t
+3. Zentralbank-Unabhängigkeit
+   - Politische Einflussnahme vs. Stabilität
 
 4. Staatsverschuldung
    - Schuldenquote, Defizit, Rating
 
-5. DollarabhÃ¤ngigkeit
+5. Dollarabhängigkeit
    - Anteil der Importe/Schulden in USD
 
 6. Kapitalflucht-Risiko
-   - Vertrauen der BÃ¼rger und Investoren
+   - Vertrauen der Bürger und Investoren
 
 Ausgabe:
 - Radar-Chart
@@ -133,22 +133,22 @@ Ausgabe:
 Achsen (6 Dimensionen):
 
 1. Inflationsrisiko
-   - HÃ¶he und StabilitÃ¤t der Inflation
+   - Höhe und Stabilität der Inflation
 
-2. WechselkursvolatilitÃ¤t
-   - SchwankungsintensitÃ¤t der WÃ¤hrung
+2. Wechselkursvolatilität
+   - Schwankungsintensität der Währung
 
-3. Zentralbank-UnabhÃ¤ngigkeit
-   - Politische Einflussnahme vs. StabilitÃ¤t
+3. Zentralbank-Unabhängigkeit
+   - Politische Einflussnahme vs. Stabilität
 
 4. Staatsverschuldung
    - Schuldenquote, Defizit, Rating
 
-5. DollarabhÃ¤ngigkeit
+5. Dollarabhängigkeit
    - Anteil der Importe/Schulden in USD
 
 6. Kapitalflucht-Risiko
-   - Vertrauen der BÃ¼rger und Investoren
+   - Vertrauen der Bürger und Investoren
 
 Ausgabe:
 - Radar-Chart
@@ -168,15 +168,15 @@ Ausgabe:
    - EUR/CHF
    - EUR/GBP
 
-2. VolatilitÃ¤tsanalyse
-   - 7-Tage-VolatilitÃ¤t
-   - 30-Tage-VolatilitÃ¤t
-   - 1-Jahres-VolatilitÃ¤t
+2. Volatilitätsanalyse
+   - 7-Tage-Volatilität
+   - 30-Tage-Volatilität
+   - 1-Jahres-Volatilität
 
 3. Einflussfaktoren
    - Zinsdifferenzen
    - Inflation
-   - KapitalflÃ¼sse
+   - Kapitalflüsse
    - Rohstoffpreise
    - Politische Ereignisse
 
@@ -187,8 +187,8 @@ Ausgabe:
    - Trendlinien
 
 5. Interpretation
-   - Starke WÃ¤hrung â†’ Kapitalzufluss
-   - Schwache WÃ¤hrung â†’ Inflation, Importprobleme
+   - Starke Währung → Kapitalzufluss
+   - Schwache Währung → Inflation, Importprobleme
 
 ---
 
@@ -198,86 +198,86 @@ Ausgabe:
    - Geldmenge (M1, M2)
    - Wechselkurs
    - Energiepreise
-   - LÃ¶hne
-   - ImportabhÃ¤ngigkeit
+   - Löhne
+   - Importabhängigkeit
    - Staatsausgaben
    - Zinsniveau
 
 2. Output
-   - Kurzfristige Inflation (1â€“3 Monate)
-   - Mittelfristige Inflation (3â€“12 Monate)
-   - Langfristige Inflation (1â€“3 Jahre)
+   - Kurzfristige Inflation (1–3 Monate)
+   - Mittelfristige Inflation (3–12 Monate)
+   - Langfristige Inflation (1–3 Jahre)
 
 3. Mechanik
-   - Geldmengenwachstum â†‘ â†’ Inflation â†‘
-   - WÃ¤hrungsabwertung â†‘ â†’ Importpreise â†‘ â†’ Inflation â†‘
-   - Energiepreise â†‘ â†’ Inflation â†‘
-   - Zinsen â†‘ â†’ Inflation â†“ (mit VerzÃ¶gerung)
+   - Geldmengenwachstum ↑ → Inflation ↑
+   - Währungsabwertung ↑ → Importpreise ↑ → Inflation ↑
+   - Energiepreise ↑ → Inflation ↑
+   - Zinsen ↑ → Inflation ↓ (mit Verzögerung)
 
 4. Risikoindikatoren
    - Lohn-Preis-Spirale
    - Importpreisschock
    - Staatsdefizit
-   - Zentralbank-UnabhÃ¤ngigkeit
+   - Zentralbank-Unabhängigkeit
 
 ---
 
 ##SZENARIO-MODELL FÃœR WÃ„HRUNGSKRISEN
 
 Szenario 1: Zinsanstieg in den USA
-- Dollar wird stÃ¤rker
-- Schwache WÃ¤hrungen fallen
+- Dollar wird stärker
+- Schwache Währungen fallen
 - Inflation steigt durch teurere Importe
 
-Szenario 2: Politische InstabilitÃ¤t
+Szenario 2: Politische Instabilität
 - Vertrauen sinkt
 - Kapital flieht
-- WÃ¤hrung kollabiert
+- Währung kollabiert
 - Inflation steigt
 
 Szenario 3: Schuldenkrise
 - Staat kann Schulden nicht bedienen
-- Rating fÃ¤llt
-- WÃ¤hrung verliert massiv an Wert
+- Rating fällt
+- Währung verliert massiv an Wert
 
 Szenario 4: Energiepreisschock
-- ImportabhÃ¤ngige LÃ¤nder leiden
-- WÃ¤hrung fÃ¤llt
+- Importabhängige Länder leiden
+- Währung fällt
 - Inflation steigt
 
 Szenario 5: Kapitalverkehrskontrollen
-- Regierung beschrÃ¤nkt Geldbewegungen
+- Regierung beschränkt Geldbewegungen
 - Vertrauen sinkt
-- SchwarzmÃ¤rkte entstehen
+- Schwarzmärkte entstehen
 
 ---
 
 ##STORYLINE-ENGINE FÃœR WÃ„HRUNGSRISIKEN
 
-StÃ¤rken:
+Stärken:
 - Hohe Devisenreserven
-- UnabhÃ¤ngige Zentralbank
+- Unabhängige Zentralbank
 - Niedrige Inflation
 - Starke Exportwirtschaft
 
-SchwÃ¤chen:
+Schwächen:
 - Hohe Staatsverschuldung
-- Politische InstabilitÃ¤t
-- ImportabhÃ¤ngigkeit
-- DollarabhÃ¤ngigkeit
+- Politische Instabilität
+- Importabhängigkeit
+- Dollarabhängigkeit
 
 Chancen:
 - Reformen
 - Exportwachstum
 - Stabilisierung der Rohstoffpreise
-- Internationale UnterstÃ¼tzung
+- Internationale Unterstützung
 
 Risiken:
 - Kapitalflucht
 - Inflation
 - Zinsanstieg in den USA
 - Schuldenkrise
-- WÃ¤hrungskollaps
+- Währungskollaps
 
 Output:
 - Kurzprognose
@@ -288,12 +288,12 @@ Output:
 
 ## ZENTRALBANK-RADAR
 
-1. UnabhÃ¤ngigkeit
+1. Unabhängigkeit
    - Hoch / Mittel / Niedrig
 
 2. Leitzins
    - Aktueller Wert
-   - VerÃ¤nderung (1 Monat / 1 Jahr)
+   - Veränderung (1 Monat / 1 Jahr)
 
 3. Geldpolitik
    - Expansiv (locker)
@@ -304,18 +304,18 @@ Output:
    - Wachstum / Schrumpfung
    - QE / QT (Quantitative Easing / Tightening)
 
-5. GlaubwÃ¼rdigkeit
+5. Glaubwürdigkeit
    - Inflationsziel erreicht?
    - Marktvertrauen?
    - Politische Einflussnahme?
 
-6. WÃ¤hrungsstabilitÃ¤t
+6. Währungsstabilität
    - Wechselkursentwicklung
    - Devisenreserven
-   - KapitalflÃ¼sse
+   - Kapitalflüsse
 
 7. Risikoindikatoren
-   - Ãœberhitzung
+   - Überhitzung
    - Rezessionsgefahr
    - Schuldenkrise
 
@@ -324,53 +324,53 @@ Output:
 ##DIGITALE WÃ„HRUNG (NICHT BITCOIN)
 
 Definition:
-Eine digitale WÃ¤hrung ist Geld, das ausschlieÃŸlich elektronisch existiert und nicht als Papiergeld ausgegeben wird.
+Eine digitale Währung ist Geld, das ausschließlich elektronisch existiert und nicht als Papiergeld ausgegeben wird.
 
 Arten:
-1. Digitale ZentralbankwÃ¤hrung (CBDC)
+1. Digitale Zentralbankwährung (CBDC)
    - Von der Zentralbank ausgegeben
    - Gesetzliches Zahlungsmittel
    - Beispiel: Digitaler Euro, Digitaler Yuan
 
 2. Elektronisches Bankgeld
    - Guthaben auf Bankkonten
-   - Wird fÃ¼r Ãœberweisungen, Kartenzahlungen, Online-Zahlungen genutzt
+   - Wird für Überweisungen, Kartenzahlungen, Online-Zahlungen genutzt
    - Existiert nur digital in Bankdatenbanken
 
 Eigenschaften:
 - Kein physisches Bargeld
-- Elektronisch Ã¼bertragbar
+- Elektronisch übertragbar
 - Staatlich reguliert
-- Stabil (keine VolatilitÃ¤t wie Bitcoin)
+- Stabil (keine Volatilität wie Bitcoin)
 
 ---
 
 ##DIGITALE WÃ„HRUNG VS. PAPIERGELD
 
-Vorteile digitaler WÃ¤hrungen:
+Vorteile digitaler Währungen:
 - Schnellere Zahlungen (Sekunden statt Tage)
 - Geringere Kosten (keine Druck- oder Transportkosten)
-- HÃ¶here Sicherheit (keine FÃ¤lschungen, kein Verlust)
-- Bessere Nachverfolgbarkeit (weniger GeldwÃ¤sche)
-- PrÃ¤zisere Geldpolitik (direkte Verteilung mÃ¶glich)
+- Höhere Sicherheit (keine Fälschungen, kein Verlust)
+- Bessere Nachverfolgbarkeit (weniger Geldwäsche)
+- Präzisere Geldpolitik (direkte Verteilung möglich)
 - Einfachere internationale Zahlungen
 
-Nachteile digitaler WÃ¤hrungen:
-- Weniger PrivatsphÃ¤re (Transaktionen sind nachvollziehbar)
-- AbhÃ¤ngigkeit von Technik und Strom
+Nachteile digitaler Währungen:
+- Weniger Privatsphäre (Transaktionen sind nachvollziehbar)
+- Abhängigkeit von Technik und Strom
 - Gefahr staatlicher Ãœberwachung
 - Negativzinsen leichter durchsetzbar
-- Cyberrisiken (Hacks, SystemausfÃ¤lle)
+- Cyberrisiken (Hacks, Systemausfälle)
 
 Vorteile von Papiergeld:
-- AnonymitÃ¤t
+- Anonymität
 - Funktioniert ohne Strom/Internet
 - Psychologisches Vertrauen
 
 Nachteile von Papiergeld:
-- FÃ¤lschungsrisiko
-- Hohe Kosten fÃ¼r Druck/Transport
-- Verlust/Diebstahl mÃ¶glich
+- Fälschungsrisiko
+- Hohe Kosten für Druck/Transport
+- Verlust/Diebstahl möglich
 - Langsame internationale Zahlungen
 
 ---
@@ -389,10 +389,10 @@ Geld:
 Wertpapier:
 - Finanzanspruch oder Eigentumsrecht
 - Beispiele: Aktien, Anleihen, ETFs
-- ReprÃ¤sentiert Kredit, Eigentum oder ErtragsansprÃ¼che
+- Repräsentiert Kredit, Eigentum oder Ertragsansprüche
 
 Unterschied:
 Geld = Zahlungsmittel
-Wertpapier = Anspruch auf zukÃ¼nftige Zahlungen oder Eigentum
+Wertpapier = Anspruch auf zukünftige Zahlungen oder Eigentum
 """)
 

@@ -1,4 +1,4 @@
-﻿#
+#
 # main.py
 
 from ui.app import app

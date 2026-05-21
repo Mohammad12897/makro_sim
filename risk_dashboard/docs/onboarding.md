@@ -1,6 +1,6 @@
-﻿# Onboarding Guide fÃ¼r das Makro Risk Dashboard
+# Onboarding Guide für das Makro Risk Dashboard
 
-Willkommen im Projekt! Dieses Dokument erklÃ¤rt, wie du das Dashboard installierst, startest und erweiterst.
+Willkommen im Projekt! Dieses Dokument erklärt, wie du das Dashboard installierst, startest und erweiterst.
 
 ---
 
@@ -23,7 +23,7 @@ python -m venv venv
 Windows:
 .\venv\Scripts\activate
 
-### AbhÃ¤ngigkeiten installieren
+### Abhängigkeiten installieren
 pip install -r requirements.txt
 
 ---
@@ -46,25 +46,25 @@ Siehe `architecture.md`.
 
 ## 6. Wichtige Module
 
-- `core/` â†’ Business-Logik  
-- `features/` â†’ Feature Engineering  
-- `training/` â†’ ML-Training  
-- `visualization/` â†’ Charts  
-- `config/` â†’ Einstellungen  
-- `docs/` â†’ Dokumentation  
+- `core/` → Business-Logik  
+- `features/` → Feature Engineering  
+- `training/` → ML-Training  
+- `visualization/` → Charts  
+- `config/` → Einstellungen  
+- `docs/` → Dokumentation  
 
 ---
 
-## 7. HÃ¤ufige Probleme
+## 7. Häufige Probleme
 
 ### Modell nicht gefunden
-â†’ `train_fx_model.py` ausfÃ¼hren.
+→ `train_fx_model.py` ausführen.
 
 ### Daten fehlen
-â†’ CSVs in `risk_dashboard/data/` prÃ¼fen.
+→ CSVs in `risk_dashboard/data/` prüfen.
 
 ### Pfadprobleme
-â†’ `settings.yaml` prÃ¼fen.
+→ `settings.yaml` prüfen.
 
 ---
 
@@ -73,5 +73,5 @@ Siehe `architecture.md`.
 - Szenario-Simulationen
 - Stress-Tests
 - API-Anbindung (FRED, ECB)
-- ML-Modelle fÃ¼r Makro-Prognosen
+- ML-Modelle für Makro-Prognosen
 

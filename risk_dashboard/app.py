@@ -408,7 +408,7 @@ with tab_risk:
         st.error("Keine Risiko-Daten verfügbar.")
         st.stop()
 
-    # MÃ¶gliche Spalten priorisieren (falls compute_risk_score_v2 noch 'risk_score_pca' liefert)
+    # Mögliche Spalten priorisieren (falls compute_risk_score_v2 noch 'risk_score_pca' liefert)
     preferred_cols = ["risk_score", "risk_score_pca", "raw_score"]
     col = next((c for c in preferred_cols if c in risk_score_df.columns), None)
     if col is None:
@@ -1364,3 +1364,4 @@ with tab_lexikon:
             st.subheader(category)
             with st.expander(term):
                 st.write(definition)
+
