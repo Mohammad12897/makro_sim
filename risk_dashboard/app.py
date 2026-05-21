@@ -1,46 +1,65 @@
-﻿# risk_dashboard/app.py
+# risk_dashboard/app.py
 # $env:PYTHONPATH="C:\Projects\makro_sim"
 # $env:FRED_API_KEY = "5b75a1beb133f4e4aa6b8929ca39a762"
 # setx FRED_API_KEY "5b75a1beb133f4e4aa6b8929ca39a762"
+# chcp 65001
 # Öffne danach ein neues PowerShell-Fenster, damit die Variable geladen wird.
+# .\.venv\Scripts\Activate.ps1
+# python -m streamlit run .\risk_dashboard\app.py
 
+import sys
+import locale
+import logging
 
-import streamlit as st
+# UTF-8 erzwingen (sicher)
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
+try:
+    locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
+except Exception:
+    pass
+
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import yfinance as yf
+import streamlit as st
 
+# Optional: nur wenn du wirklich den Cache leeren willst, sonst entfernen
+# st.cache_data.clear()
 
+from pathlib import Path
 
+# eigene Module
+from risk_dashboard.core.data_loader import fetch_prices_with_suffixes
+from risk_dashboard.core.analytics import compute_metrics, analyze_ticker
 from risk_dashboard.core.risk_engine import (
-    compute_pca_details, 
-    compute_risk_score_v2, 
-    detect_risk_regimes_from_scenario, 
+    compute_pca_details,
+    compute_risk_score_v2,
+    detect_risk_regimes_from_scenario,
     build_scenario_series,
     build_fx_risk_factors,
     build_market_risk_factors,
 )
-
 from risk_dashboard.core.utils import (
-    get_latest_before, 
-    ensure_date_column, 
-    normalize_price_df, 
+    get_latest_before,
+    ensure_date_column,
+    normalize_price_df,
     ensure_date_series,
     analyze_portfolio_components,
-    validate_prophet_input
+    validate_prophet_input,
 )
-
-
 from risk_dashboard.core.macro_loader import load_macro_data, load_macro_series
 from risk_dashboard.core.scenario_engine import (
-    load_base_data, 
-    apply_shock, 
-    SCENARIOS, 
-    build_baseline_scenario, 
+    load_base_data,
+    apply_shock,
+    SCENARIOS,
+    build_baseline_scenario,
     build_scenario,
 )
-
 from risk_dashboard.core.fx_forecast import forecast_fx_arima, forecast_fx_prophet
 from risk_dashboard.core.fx_engine import download_fx_history
 from risk_dashboard.core.market_engine import download_etf_history, build_market_risk_factors
@@ -60,55 +79,85 @@ from risk_dashboard.core.investment_engine import (
     generate_investment_package,
     map_regime_to_label,
     build_regime_risk_parity_portfolio,
-
 )
-from risk_dashboard.core.risk_ampel import compute_risk_score
 from risk_dashboard.core.regime_model import (
     classify_regime_from_score,
     build_regime_timeline,
     compute_regime_transition_matrix,
     next_regime_distribution,
 )
-
 from risk_dashboard.core.asset_packages import parse_etf_input
-# oben in app.py
-from risk_dashboard.ui.profiles_ui import profile_form_ui
-
-from risk_dashboard.core.etl import load_prices_for_universe
+from risk_dashboard.ui.profiles_ui import profile_form_ui, compute_portfolio_value, compute_abs_weights, compute_etf_breakdown
+from risk_dashboard.core.etl import load_etf_universe_prices
 from risk_dashboard.data.etf_universes import ETF_UNIVERSES
 
-# macro_df: date-indexed, columns: ['gdp_growth', 'inflation', 'unemployment', 'rate']
 from risk_dashboard.core.regime_hmm import fit_hmm_regimes, map_hmm_states_to_labels
 
-import logging
+
+# Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
+# ---------------------------
+# PAGE CONFIG (muss vor allen st.* Aufrufen stehen)
+# ---------------------------
+st.set_page_config(page_title="Macro Risk Dashboard", layout="wide")
+
+# Session defaults
 if "show_lexikon" not in st.session_state:
     st.session_state.show_lexikon = False
 
-
-# ---------------------------------------------------------
-# PAGE CONFIG
-# ---------------------------------------------------------
-st.set_page_config(page_title="Macro Risk Dashboard", layout="wide")
-st.title("Macroeconomic Risk Dashboard")
-
-# an der Stelle, wo das Profilâ€‘Form erscheinen soll
-profile_form_ui()
+if "low_risk_selected" not in st.session_state:
+    st.session_state["low_risk_selected"] = ["CSPX.L", "EUNL.DE"]
+if "med_risk_selected" not in st.session_state:
+    st.session_state["med_risk_selected"] = ["IMEU.L", "IQQ0.DE"]
+if "high_risk_selected" not in st.session_state:
+    st.session_state["high_risk_selected"] = ["AGGG.L", "SGLN.L"]
 
 AVAILABLE_ETF = [
-    "CSPX.L",   # S&P 500
-    "EQQQ.L",   # Nasdaq 100
-    "EUNL.DE",  # MSCI World
-    "IQQ0.DE",  # Quality
-    "IMEU.L",   # Europe (stabiler als VEVE.L)
-    "AGGG.L",   # Global Aggregate Bonds
-    "IEGA.L",   # EUR Government Bonds
-    "SGLN.L",   # Gold
-    "PCOM.L"    # Commodities
+    "CSPX.L","EQQQ.L","EUNL.DE","IQQ0.DE","IMEU.L",
+    "AGGG.L","IEGA.L","SGLN.L","PCOM.L"
 ]
 
+def render_sidebar(available_etfs):
+    st.sidebar.title("Portfolio Eingabe")
+    st.sidebar.text_input("Ticker hinzufügen", key="new_ticker", placeholder="z. B. AAPL oder CSPX.L")
+    if st.sidebar.button("Analysieren", key="analyze_main"):
+        ticker = st.session_state.get("new_ticker", "").strip().upper()
+        if ticker:
+            try:
+                # übergib die vorhandene Liste, nicht eine undefinierte Variable
+                analyze_ticker(ticker, available_etfs)
+            except Exception as e:
+                st.sidebar.error(f"Analyse fehlgeschlagen: {e}")
 
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Standard‑ETFs")
+    low = st.sidebar.multiselect("LOW RISK", options=available_etfs, key="low_risk_selected")
+    med = st.sidebar.multiselect("MEDIUM RISK", options=available_etfs, key="med_risk_selected")
+    high = st.sidebar.multiselect("HIGH RISK", options=available_etfs, key="high_risk_selected")
+    st.sidebar.markdown("---")
+    method = st.sidebar.selectbox("Optimierungsverfahren wählen", ["HRP","Mean-Variance","Min-Var"], key="opt_method")
+
+    if "low_risk_selected" not in st.session_state:
+        st.session_state["low_risk_selected"] = low or []
+    if "med_risk_selected" not in st.session_state:
+        st.session_state["med_risk_selected"] = med or []
+    if "high_risk_selected" not in st.session_state:
+        st.session_state["high_risk_selected"] = high or []
+
+    return {"low": st.session_state["low_risk_selected"],
+            "med": st.session_state["med_risk_selected"],
+            "high": st.session_state["high_risk_selected"],
+            "method": method}
+
+# Sidebar aufrufen (nach set_page_config, vor Tabs / Hauptbereich)
+sidebar_state = render_sidebar(AVAILABLE_ETF)
+
+# Haupttitel (nur einmal)
+st.title("Macroeconomic Risk Dashboard")
+
+# Profil‑Form (falls vorhanden)
+profile_form_ui()
 
 MACRO_LABELS = {
     "GDP": "GDP (Mrd. USD)",
@@ -128,9 +177,9 @@ med_defaults = ["IMEU.L", "IQQ0.DE"]
 high_defaults = ["AGGG.L", "SGLN.L"]
 
 # Textinputs mit eindeutigen Keys
-low_extra = st.text_input("Low Risk ZusÃ¤tzliche ETF (kommagetrennt)", value="", key="input_low_extra")
-med_extra = st.text_input("Medium Risk ZusÃ¤tzliche ETF (kommagetrennt)", value="", key="input_med_extra")
-high_extra = st.text_input("High Risk ZusÃ¤tzliche ETF (kommagetrennt)", value="", key="input_high_extra")
+low_extra = st.text_input("Low Risk Zusätzliche ETF (kommagetrennt)", value="", key="input_low_extra")
+med_extra = st.text_input("Medium Risk Zusätzliche ETF (kommagetrennt)", value="", key="input_med_extra")
+high_extra = st.text_input("High Risk Zusätzliche ETF (kommagetrennt)", value="", key="input_high_extra")
 
 
 low_etf = parse_etf_input(low_defaults, low_extra)
@@ -144,12 +193,11 @@ etf_universes = {
 }
 
 
-
 # ---------------------------------------------------------
 # TABS (KORRIGIERT)
 # ---------------------------------------------------------
-tab_macro, tab_fx, tab_scenarios, tab_risk, tab_hmm , tab_invest, tab_lexikon = st.tabs(
-    ["ðŸ“ˆ Macro Data", "ðŸ’± FX Forecast", "ðŸ§ª Szenarien", "âš ï¸ Risiko", "HMM-Regime", "ðŸ“Š Investment", "ðŸ“˜ Lexikon"]
+tab_macro, tab_fx, tab_scenarios, tab_risk, tab_hmm, tab_invest, tab_lexikon = st.tabs(
+    ["📈 Macro Data", "💱 FX Forecast", "🧪 Szenarien", "⚠️ Risiko", "HMM‑Regime", "📊 Investment", "📘 Lexikon"]
 )
 
 
@@ -160,8 +208,8 @@ with tab_macro:
     st.header("Macro Data (FRED)")
 
     st.info(
-        "Makroserien sind Ã¶konomische Zeitreihen wie GDP, CPI oder UNRATE. "
-        "Sie beschreiben den Zustand einer Volkswirtschaft Ã¼ber die Zeit und sind zentral fÃ¼r Investment-Entscheidungen."
+        "Makroserien sind ökonomische Zeitreihen wie GDP, CPI oder UNRATE. "
+        "Sie beschreiben den Zustand einer Volkswirtschaft über die Zeit und sind zentral für Investment-Entscheidungen."
     )
 
     series = {
@@ -184,18 +232,18 @@ with tab_macro:
     macro_df = load_macro_series(selected)
     macro_df = macro_df.reset_index()
 
-    st.subheader("Beschreibung der ausgewÃ¤hlten Makroserie")
+    st.subheader("Beschreibung der ausgewählten Makroserie")
     desc = get_definition(selected)
-    st.write(desc if desc else "Keine Beschreibung verfÃ¼gbar.")
+    st.write(desc if desc else "Keine Beschreibung verfügbar.")
 
     st.subheader("Investment-Zusammenhang (Aktien / ETF / Wertpapiere)")
     investment_relations = {
-        "GDP": "Wirtschaftswachstum beeinflusst Unternehmensgewinne. HÃ¶heres GDP â†’ tendenziell hÃ¶here Aktienkurse und ETF-Werte.",
+        "GDP": "Wirtschaftswachstum beeinflusst Unternehmensgewinne. Höheres GDP → tendenziell höhere Aktienkurse und ETF-Werte.",
         "CPIAUCSL": "Inflation treibt Zinsen. Hohe Inflation belastet Bewertungen, besonders Wachstums- und Tech-Aktien.",
-        "UNRATE": "Hohe Arbeitslosigkeit schwÃ¤cht Konsum und Unternehmensgewinne â†’ Risiko fÃ¼r AktienmÃ¤rkte.",
-        "FEDFUNDS": "Zinsen bestimmen Diskontierungsfaktoren. HÃ¶here Zinsen â†’ niedrigere Bewertungen von Aktien und Anleihen.",
-        "INDPRO": "Steigende Industrieproduktion signalisiert reale AktivitÃ¤t und Gewinnwachstum â†’ positiv fÃ¼r zyklische Aktien.",
-        "PAYEMS": "Mehr BeschÃ¤ftigung stÃ¤rkt Konsum und Nachfrage â†’ stÃ¼tzt breite Aktienindizes und Konsum-ETF."
+        "UNRATE": "Hohe Arbeitslosigkeit schwächt Konsum und Unternehmensgewinne → Risiko für Aktienmärkte.",
+        "FEDFUNDS": "Zinsen bestimmen Diskontierungsfaktoren. Höhere Zinsen → niedrigere Bewertungen von Aktien und Anleihen.",
+        "INDPRO": "Steigende Industrieproduktion signalisiert reale Aktivität und Gewinnwachstum → positiv für zyklische Aktien.",
+        "PAYEMS": "Mehr Beschäftigung stärkt Konsum und Nachfrage → stützt breite Aktienindizes und Konsum-ETF."
     }
     st.write(investment_relations.get(selected, "Kein direkter Investment-Zusammenhang hinterlegt."))
 
@@ -203,7 +251,7 @@ with tab_macro:
         macro_df,
         x="date",
         y="value",
-        title=f"{selected} â€“ {series[selected]}",
+        title=f"{selected} – {series[selected]}",
         markers=True
     )
     fig.update_layout(
@@ -221,7 +269,7 @@ with tab_fx:
 
     st.info(
         "Wechselkurse werden stark von Makrodaten beeinflusst: Zinsen, Inflation, Wachstum und Risiko. "
-        "Das ist relevant fÃ¼r globale Aktien- und ETF-Portfolios."
+        "Das ist relevant für globale Aktien- und ETF-Portfolios."
     )
 
     model_choice = st.selectbox(
@@ -235,12 +283,12 @@ with tab_fx:
     if model_choice in ["ARIMA", "Both"]:
         hist_arima, fc_arima = forecast_fx_arima(pair="EURUSD=X", period="10y", steps=60)
         if fc_arima is None or fc_arima.empty:
-            st.warning("ARIMA-Forecast nicht verfÃ¼gbar (keine Daten).")
+            st.warning("ARIMA-Forecast nicht verfügbar (keine Daten).")
 
     if model_choice in ["Prophet", "Both"]:
         hist_prophet, fc_prophet = forecast_fx_prophet(steps=60)
         if fc_prophet is None or fc_prophet.empty:
-            st.warning("Prophet-Forecast nicht verfÃ¼gbar (keine Daten).")
+            st.warning("Prophet-Forecast nicht verfügbar (keine Daten).")
 
     fig = go.Figure()
 
@@ -276,9 +324,9 @@ with tab_fx:
                 mode="lines", name="Forecast (Prophet)"
             ))
 
-    # Falls keine Traces hinzugefÃ¼gt wurden, zeige Hinweis
+    # Falls keine Traces hinzugefügt wurden, zeige Hinweis
     if not fig.data:
-        st.info("Keine FX-Daten/Forecasts verfÃ¼gbar zum Plotten.")
+        st.info("Keine FX-Daten/Forecasts verfügbar zum Plotten.")
     else:
         fig.update_layout(
             title="EUR/USD Forecast",
@@ -294,15 +342,15 @@ with tab_fx:
 with tab_scenarios:
     st.header("Makro-Szenariovergleich")
 
-    st.info("Vergleich zwischen Baseline und Szenario fÃ¼r alle Makrovariablen.")
+    st.info("Vergleich zwischen Baseline und Szenario für alle Makrovariablen.")
 
     baseline_df = build_baseline_scenario()
 
     scenario_df = build_scenario(
-        bip_shock=st.slider("BIPâ€‘Schock", 0.7, 1.3, 1.0),
-        inflation_shock=st.slider("Inflationsâ€‘Schock", 0.5, 2.0, 1.0),
-        unemployment_shock=st.slider("Arbeitslosenâ€‘Schock", 0.5, 2.0, 1.0),
-        interest_shock=st.slider("Zinsâ€‘Schock", 0.5, 2.0, 1.0)
+        bip_shock=st.slider("BIP‑Schock", 0.7, 1.3, 1.0),
+        inflation_shock=st.slider("Inflations‑Schock", 0.5, 2.0, 1.0),
+        unemployment_shock=st.slider("Arbeitslosen‑Schock", 0.5, 2.0, 1.0),
+        interest_shock=st.slider("Zins‑Schock", 0.5, 2.0, 1.0)
     )
 
 
@@ -322,7 +370,7 @@ with tab_scenarios:
             x=base["date"],
             y=base["value"],
             mode="lines",
-            name=f"{var} â€“ Baseline",
+            name=f"{var} – Baseline",
             line=dict(width=2)
         ))
 
@@ -330,7 +378,7 @@ with tab_scenarios:
             x=scen["date"],
             y=scen["value"],
             mode="lines",
-            name=f"{var} â€“ Szenario",
+            name=f"{var} – Szenario",
             line=dict(width=2, dash="dash")
         ))
 
@@ -348,16 +396,16 @@ with tab_scenarios:
 # ---------------------------------------------------------
 # RISK SCORE TAB
 # ---------------------------------------------------------
-# Teil 3 â€“ Risk, Regime, HMM
+# Teil 3 – Risk, Regime, HMM
 with tab_risk:
     st.header("Makro-Risiko-Score & Regime-Modell")
 
     # 1. PCA-basierter Risiko-Score (compute_risk_score_v2 liefert idealerweise 'risk_score' normiert)
     risk_score_df = compute_risk_score_v2(normalize=True, method="minmax")
 
-    # Defensive PrÃ¼fung: mindestens eine Zeile
+    # Defensive Prüfung: mindestens eine Zeile
     if risk_score_df.empty:
-        st.error("Keine Risiko-Daten verfÃ¼gbar.")
+        st.error("Keine Risiko-Daten verfügbar.")
         st.stop()
 
     # MÃ¶gliche Spalten priorisieren (falls compute_risk_score_v2 noch 'risk_score_pca' liefert)
@@ -375,7 +423,7 @@ with tab_risk:
         risk_score_df["date"] = pd.to_datetime(risk_score_df["date"], errors="coerce")
         risk_score_df = risk_score_df.set_index("date")
 
-    # 12M-Vergleich: shift(12) nur wenn Zeitreihe mindestens 13 EintrÃ¤ge hat
+    # 12M-Vergleich: shift(12) nur wenn Zeitreihe mindestens 13 Einträge hat
     df_risk = risk_score_df.reset_index(drop=False)
     if col in df_risk.columns and len(df_risk) > 12:
         df_risk[f"{col}_shift12"] = df_risk[col].shift(12)
@@ -387,9 +435,9 @@ with tab_risk:
     col1, col2 = st.columns(2)
     col1.metric("Aktueller Risiko-Score", f"{latest:.3f}")
     if one_year_ago is not None:
-        col2.metric("VerÃ¤nderung 12M", f"{latest - one_year_ago:.3f}")
+        col2.metric("Veränderung 12M", f"{latest - one_year_ago:.3f}")
     else:
-        col2.metric("VerÃ¤nderung 12M", "nicht verfÃ¼gbar")
+        col2.metric("Veränderung 12M", "nicht verfügbar")
 
     # Plot: Risiko-Score Zeitreihe (verwende die standardisierte Spalte)
     plot_df = df_risk.copy()
@@ -406,7 +454,7 @@ with tab_risk:
     st.write("DEBUG cols:", plot_df.columns.tolist())
     st.write("DEBUG head:", plot_df.head())
     if plot_df.empty or plot_col not in plot_df.columns:
-        st.warning("Keine gÃ¼ltigen Daten fÃ¼r den Plot.")
+        st.warning("Keine gültigen Daten für den Plot.")
     else:
         fig = px.line(plot_df, x="date", y=plot_col, title="Makro-Risiko-Score", markers=True)
         fig.update_layout(height=500, yaxis_title="Risk Score")
@@ -425,7 +473,7 @@ with tab_risk:
         risk_score_df = risk_score_df.set_index("date")
     risk_score_series = risk_score_df[col]
 
-    # Defensive PrÃ¼fung vor Zugriff auf letzte Zeile
+    # Defensive Prüfung vor Zugriff auf letzte Zeile
     if risk_score_series.empty:
         st.warning("Keine Risiko-Score-Serie vorhanden.")
         st.stop()
@@ -442,12 +490,12 @@ with tab_risk:
     st.subheader("Regime-Transitionsmatrix")
     st.dataframe(trans_matrix.style.format("{:.2f}"))
 
-    # Wahrscheinlichkeit nÃ¤chstes Regime
+    # Wahrscheinlichkeit nächstes Regime
     next_dist = next_regime_distribution(current_regime, trans_matrix)
-    st.subheader("Wahrscheinlichkeit nÃ¤chstes Regime")
+    st.subheader("Wahrscheinlichkeit nächstes Regime")
     st.bar_chart(next_dist)
 
-    # Debug (temporÃ¤r)
+    # Debug (temporär)
     st.write("DEBUG cols:", risk_score_df.columns.tolist())
     st.write("DEBUG head:", risk_score_df.head())
     st.write("DEBUG regime_df head:", regime_df.head() if not regime_df.empty else "empty")
@@ -457,7 +505,7 @@ with tab_hmm:
 
     # Stelle sicher, dass macro_df existiert (wurde in tab_macro geladen)
     try:
-        macro_df  # prÃ¼ft Existenz
+        macro_df  # prüft Existenz
     except NameError:
         st.error("Makro-Daten (macro_df) nicht gefunden. Bitte zuerst Macro Data laden.")
     else:
@@ -477,7 +525,7 @@ with tab_hmm:
             name=f"{best_col}"
         ))
 
-        # farbige Regime-BÃ¤nder
+        # farbige Regime-Bänder
         for state, label in label_map.items():
             sub = hmm_regime_df[hmm_regime_df["hmm_state"] == state]
             if not sub.empty:
@@ -494,69 +542,69 @@ with tab_hmm:
 
 
 # ---------------------------------------------------------
-# INVESTMENT TAB â€“ FINAL
+# INVESTMENT TAB – FINAL
 # ---------------------------------------------------------
 with tab_invest:
-    st.header("Investition â€“ Makro-Regime, Portfolio & Backtests")
+    st.header("Investition – Makro-Regime, Portfolio & Backtests")
 
-    with st.expander("Makro-Investment-Kochrezept â€“ Wie dieses System funktioniert", expanded=True):
+    with st.expander("Makro-Investment-Kochrezept – Wie dieses System funktioniert", expanded=True):
         st.markdown(
             """
-            ### ðŸ§  1. Regime erkennen
-            Makrodaten â†’ Risk Score â†’ Low / Medium / High Risk  
-            (GDP, Inflation, Arbeitslosenquote, Zinsen â†’ PCA â†’ Clustering)
+            ### 1. Regime erkennen
+            Makrodaten → Risk Score → Low / Medium / High Risk  
+            (GDP, Inflation, Arbeitslosenquote, Zinsen → PCA → Clustering)
 
-            ### ðŸ“Š 2. ETFâ€‘Universum pro Regime auswÃ¤hlen
-            Jedes Regime hat eigene ETFâ€‘Typen  
-            (z.â€¯B. Growth im Lowâ€‘Risk, Gold/TLT im Highâ€‘Risk)
+            ### 2. ETF‑Universum pro Regime auswählen
+            Jedes Regime hat eigene ETF‑Typen  
+            (z.B. Growth im Low‑Risk, Gold/TLT im High-Risk)
 
-            ### âš™ï¸ 3. Optimierungsmethode wÃ¤hlen
-            - **Risk Parity** â†’ Gewichte âˆ 1 / VolatilitÃ¤t  
-            - **HRP** â†’ Clustering + Risikoaufteilung (Hierarchical Risk Parity)
+            ### 3. Optimierungsmethode wählen
+            - **Risk Parity** Gewichte 1 / Volatilität  
+            - **HRP** → Clustering + Risikoaufteilung (Hierarchical Risk Parity)
 
-            ### ðŸ§© 4. Portfolio pro Regime bauen
+            ### 4. Portfolio pro Regime bauen
             Gewichte werden **pro Regime** berechnet  
             (jedes Regime hat sein eigenes Portfolio)
 
-            ### ðŸ“ˆ 5. Backtesten
-            Historische Regime + ETFâ€‘Daten â†’ Equityâ€‘Kurve  
-            (zeigt, wie die Strategie in der Vergangenheit funktioniert hÃ¤tte)
+            ### 5. Backtesten
+            Historische Regime + ETF‑Daten → Equity‑Kurve  
+            (zeigt, wie die Strategie in der Vergangenheit funktioniert hätte)
 
-            ### ðŸ“‰ 6. Performance analysieren
-            Sharpe, VolatilitÃ¤t, Drawdown, Heatmaps  
-            (pro Regime und Ã¼ber alle Regime hinweg)
+            ### 6. Performance analysieren
+            Sharpe, Volatilität, Drawdown, Heatmaps  
+            (pro Regime und über alle Regime hinweg)
 
-            ### ðŸ”§ 7. Optimieren
-            ETFâ€‘Universen, Regimeâ€‘Definitionen, Optimierungsverfahren  
-            (Risk Parity vs. HRP, ETFâ€‘Auswahl, Parameter)
+            ### 7. Optimieren
+            ETF‑Universen, Regime‑Definitionen, Optimierungsverfahren  
+            (Risk Parity vs. HRP, ETF‑Auswahl, Parameter)
             """
         )
 
 
-    # Kochrezept â€“ VerstÃ¤ndnisanker
-    with st.expander("Makro-Investment-Kochrezept â€“ Wie dieses System funktioniert", expanded=True):
+    # Kochrezept – Verständnisanker
+    with st.expander("Makro-Investment-Kochrezept“ Wie dieses System funktioniert", expanded=True):
         st.markdown(
             """
             **1. Regime erkennen**  
-            - Makrovariablen (GDP, Inflation, Arbeitslosenquote, Zinsen) â†’ Risk Score  
-            - PCA + Clustering â†’ Low / Medium / High Risk Regime  
+            - Makrovariablen (GDP, Inflation, Arbeitslosenquote, Zinsen) → Risk Score  
+            - PCA + Clustering → Low / Medium / High Risk Regime  
 
-            **2. ETF-Universum pro Regime auswÃ¤hlen**  
-            - Low Risk â†’ Growth, Zyklisch, EM  
-            - Medium Risk â†’ Value, Quality, Short Bonds  
-            - High Risk â†’ Gold, Treasuries, MinVol, Cash  
+            **2. ETF-Universum pro Regime auswählen**  
+            - Low Risk → Growth, Zyklisch, EM  
+            - Medium Risk → Value, Quality, Short Bonds  
+            - High Risk → Gold, Treasuries, MinVol, Cash  
 
-            **3. Portfolio-Optimierung durchfÃ¼hren**  
+            **3. Portfolio-Optimierung durchführen**  
             - Regelbasiert: feste Gewichte pro Regime  
-            - Risk Parity: Gewichte âˆ 1 / VolatilitÃ¤t pro Regime  
-            - HRP: Hierarchical Risk Parity â€“ Risiko zuerst zwischen Clustern, dann innerhalb der Cluster  
+            - Risk Parity: Gewichte ∝ 1 / Volatilität pro Regime  
+            - HRP: Hierarchical Risk Parity – Risiko zuerst zwischen Clustern, dann innerhalb der Cluster  
 
             **4. Backtesten**  
             - Historische Regime + ETF-Daten (Yahoo Finance)  
             - Equity-Kurven pro Strategie  
 
             **5. Performance pro Regime analysieren**  
-            - Sharpe Ratio, VolatilitÃ¤t, Drawdown  
+            - Sharpe Ratio, Volatilität, Drawdown  
             - Heatmaps pro Regime  
 
             **6. Optimieren**  
@@ -566,22 +614,22 @@ with tab_invest:
         )
 
     # -----------------------------------------------------
-    # Prozess-Diagramm â€“ Gesamtarchitektur des Systems
+    # Prozess-Diagramm – Gesamtarchitektur des Systems
     # -----------------------------------------------------
-    st.subheader("ðŸ”„ Gesamtprozess â€“ Von Makro zu Portfolio")
+    st.subheader("Gesamtprozess Von Makro zu Portfolio")
 
     st.code(
         """
-Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Score â”€â”€â–º Szenario â”€â”€â–º Regime â”€â”€â–º Portfolio â”€â”€â–º Investment-Paket
+Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfolio → Investment‑Paket
 
 [ Makro-Panel ]
     Inflation, Wachstum, PMI, Arbeitsmarkt
 
 [ FX-Panel ]
-    USD-Trend, FX-VolatilitÃ¤t
+    USD-Trend, FX-Volatilität
 
 [ Risiko-Score ]
-    0.0 (Risk-Off)  â€¦  1.0 (Risk-On)
+    0.0 (Risk‑Off) … 1.0 (Risk‑On)
 
 [ Szenarien ]
     Rezession, Stagflation, Soft Landing, Reflation, Boom
@@ -604,7 +652,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     # -----------------------------------------------------
     # Szenario-Framework: Risiko-Score + Szenario + Regime
     # -----------------------------------------------------
-    st.subheader("ðŸ“Š Makro-Risiko-Score & Szenario")
+    st.subheader("📊 Makro-Risiko-Score & Szenario")
 
     
     # -----------------------------------------------------
@@ -623,7 +671,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     # Debug: welche Ticker fehlen
     missing = [c for c in etf_prices.columns if c not in prices_norm.columns]
     for t in missing:
-        st.warning(f"{t}: DataFrame ohne 'Close' Spalte â€” wird Ã¼bersprungen.")
+        st.warning(f"{t}: DataFrame ohne 'Close' Spalte — wird übersprungen.")
 
     etf_prices = prices_norm.copy()
 
@@ -640,9 +688,9 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     # 1) Score berechnen (bereits normiert)
     risk_score_df = compute_risk_score_v2(normalize=True, method="minmax")
 
-    # 2) Defensive PrÃ¼fungen und robustes Lesen
+    # 2) Defensive Prüfungen und robustes Lesen
     if risk_score_df.empty:
-        st.error("Keine Risiko-Daten verfÃ¼gbar.")
+        st.error("Keine Risiko-Daten verfügbar.")
         st.stop()
 
     preferred_cols = ["risk_score", "risk_score_pca", "raw_score"]
@@ -682,7 +730,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
 
     # Anzeige
     st.metric(
-        label="Aktueller Risiko-Score (0â€“1)",
+        label="Aktueller Risiko-Score (0–1)",
         value=f"{current_risk_score:.2f}"
     )
 
@@ -695,7 +743,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     fig_risk = px.line(
         scenario_df,
         y="risk_score",
-        title="Risiko-Score â€“ Zeitverlauf"
+        title="Risiko-Score – Zeitverlauf"
     )
     fig_risk.update_layout(height=300)
     st.plotly_chart(fig_risk, width="stretch")
@@ -704,7 +752,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     fig_scen = px.scatter(
         scenario_df,
         y="scenario",
-        title="Makro-Szenario â€“ Zeitverlauf",
+        title="Makro-Szenario – Zeitverlauf",
         color="scenario"
     )
     fig_scen.update_layout(height=300)
@@ -760,7 +808,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     st.markdown("---")
     st.subheader("Backtest 2.0 mit echten ETF-Daten")
 
-    st.info("Hinweis: Hier werden beispielhafte ETF-Ticker verwendet. Du kannst sie spÃ¤ter anpassen.")
+    st.info("Hinweis: Hier werden beispielhafte ETF-Ticker verwendet. Du kannst sie später anpassen.")
 
 
     ticker_map = {
@@ -790,7 +838,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
             bt_etf = bt_etf.reset_index().rename(columns={"index": "date"})
             st.write("DEBUG bt_etf (nach reset_index):", bt_etf.head())
 
-        # Falls 'date' noch fehlt, prÃ¼fen wir Alternativen oder versuchen reset_index
+        # Falls 'date' noch fehlt, prüfen wir Alternativen oder versuchen reset_index
         if "date" not in bt_etf.columns:
             alt_date_cols = [c for c in bt_etf.columns if "date" in c.lower() or "time" in c.lower()]
             if alt_date_cols:
@@ -803,7 +851,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
                     bt_etf = tmp.rename(columns={datetime_cols[0]: "date"})
                     st.write(f"DEBUG: reset_index ergab datetime Spalte {datetime_cols[0]} -> 'date'")
                 else:
-                    st.error("bt_etf enthÃ¤lt keine Spalte 'date' und kein Datetime-Index. Plot wird nicht erstellt.")
+                    st.error("bt_etf enthält keine Spalte 'date' und kein Datetime-Index. Plot wird nicht erstellt.")
                     st.write("DEBUG bt_etf info:", tmp.info())
                     # Abbruch: kein Plot
                     bt_etf = pd.DataFrame()  # setze leer, damit unten nichts passiert
@@ -816,19 +864,19 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
                     bt_etf = bt_etf.rename(columns={alt_equity[0]: "equity"})
                     st.write(f"DEBUG: Umbenannt {alt_equity[0]} -> 'equity'")
                 else:
-                    st.error("bt_etf enthÃ¤lt keine Spalte 'equity'. Plot wird nicht erstellt.")
+                    st.error("bt_etf enthält keine Spalte 'equity'. Plot wird nicht erstellt.")
                     st.write("DEBUG bt_etf columns:", bt_etf.columns.tolist())
                     bt_etf = pd.DataFrame()  # Abbruch
 
-        # Letzte PrÃ¼fungen und Plot
+        # Letzte Prüfungen und Plot
         if bt_etf is None or (hasattr(bt_etf, "empty") and bt_etf.empty):
-            st.warning("Nach PrÃ¼fungen ist bt_etf leer. Kein Plot.")
+            st.warning("Nach Prüfungen ist bt_etf leer. Kein Plot.")
         else:
             bt_etf["date"] = pd.to_datetime(bt_etf["date"], errors="coerce")
             bt_etf = bt_etf.dropna(subset=["date"])
             bt_etf = bt_etf.sort_values("date").reset_index(drop=True)
 
-            # EndgÃ¼ltiger Debug
+            # Endgültiger Debug
             st.write("DEBUG bt_etf (final):", bt_etf.head())
 
             # Plot sicher erstellen (einmal)
@@ -853,8 +901,6 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     else:
         st.info("Keine Performance-Kennzahlen, da Backtest keine Daten lieferte.")
 
-
-
     st.markdown("---")
     st.subheader("ETF-Universen pro Regime konfigurieren")
 
@@ -863,13 +909,13 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     with col_lr:
         st.markdown("### Low Risk")
         low_multiselect = st.multiselect(
-            "Standard-ETF auswÃ¤hlen",
+            "Standard-ETF auswählen",
             AVAILABLE_ETF,
             default=["CSPX.L", "EUNL.DE"],
             key="low_multi"
         )
         low_custom = st.text_input(
-            "ZusÃ¤tzliche ETF (kommagetrennt)",
+            "Zusätzliche ETF (kommagetrennt)",
             "",
             key="low_custom"
         )
@@ -878,13 +924,13 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     with col_mr:
         st.markdown("### Medium Risk")
         med_multiselect = st.multiselect(
-            "Standard-ETF auswÃ¤hlen",
+            "Standard-ETF auswählen",
             AVAILABLE_ETF,
             default=["IMEU.L", "IQQ0.DE"],
             key="med_multi"
         )
         med_custom = st.text_input(
-            "ZusÃ¤tzliche ETF (kommagetrennt)",
+            "Zusätzliche ETF (kommagetrennt)",
             "",
             key="med_custom"
         )
@@ -893,13 +939,13 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     with col_hr:
         st.markdown("### High Risk")
         high_multiselect = st.multiselect(
-            "Standard-ETF auswÃ¤hlen",
+            "Standard-ETF auswählen",
             AVAILABLE_ETF,
             default=["AGGG.L", "SGLN.L"],
             key="high_multi"
         )
         high_custom = st.text_input(
-            "ZusÃ¤tzliche ETF (kommagetrennt)",
+            "Zusätzliche ETF (kommagetrennt)",
             "",
             key="high_custom"
         )
@@ -921,7 +967,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
         elif isinstance(risk_score_df.index, pd.DatetimeIndex):
             current_date = pd.to_datetime(risk_score_df.index[-1])
         else:
-            raise RuntimeError("risk_score_df enthÃ¤lt keine 'date' Spalte und keinen DatetimeIndex.")
+            raise RuntimeError("risk_score_df enthält keine 'date' Spalte und keinen DatetimeIndex.")
 
         # aktuelle Zeilen holen (column=None erlaubt Index-Fallback)
 
@@ -982,18 +1028,17 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     # -------------------------
     # 3) Optimierungsverfahren: Risk Parity vs. HRP
     # -------------------------
+    # 3) Optimierungsverfahren: Risk Parity vs. HRP
     st.markdown("---")
-    st.subheader("Investment-Modul 4.0/5.0 â€“ Regime-gesteuertes Optimierungsportfolio")
+    st.subheader("Investment-Modul 4.0/5.0 – Regime-gesteuertes Optimierungsportfolio")
 
-    opt_method = st.selectbox(
-        "Optimierungsverfahren wÃ¤hlen",
-        ["Risk Parity", "Hierarchical Risk Parity (HRP)"]
-    )
+    # Wert aus der Sidebar holen
+    opt_method = st.session_state["opt_method"]
 
     missing_rp = []
     missing_hrp = []
 
-    if opt_method == "Risk Parity":
+    if opt_method in ["Risk Parity", "RP", "Mean-Variance"]:   # falls du mehrere Namen nutzt
         bt_opt, opt_struct, missing_rp = backtest_regime_risk_parity(
             low_final, med_final, high_final,
             period="10y",
@@ -1001,7 +1046,8 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
             scenario_regimes=scenario_regimes
         )
         st.info("Aktiv: Regime-gesteuertes Risk-Parity-Portfolio.")
-        st.write("DEBUG â€“ RP Backtest Ergebnis (Head):", bt_opt.head())
+        st.write("DEBUG – RP Backtest Ergebnis (Head):", bt_opt.head())
+
     else:
         bt_opt, opt_struct, missing_hrp = backtest_regime_hrp(
             low_final, med_final, high_final,
@@ -1010,6 +1056,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
             scenario_regimes=scenario_regimes
         )
         st.info("Aktiv: Regime-gesteuertes Hierarchical Risk Parity (HRP)-Portfolio.")
+
 
     missing_total = sorted(set(missing_rp) | set(missing_hrp))
     
@@ -1021,7 +1068,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
 
     # Sicherstellen, dass der Backtest Daten hat
     if bt_opt is None or bt_opt.empty:
-        st.error("Backtest liefert keine Daten â€“ keine gemeinsamen Monatsenden zwischen Returns und Regimen.")
+        st.error("Backtest liefert keine Daten – keine gemeinsamen Monatsenden zwischen Returns und Regimen.")
         st.stop()
 
     # Robust: Datum aus bt_opt bestimmen (entweder 'date' Spalte oder DatetimeIndex)
@@ -1030,11 +1077,11 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     elif isinstance(bt_opt.index, pd.DatetimeIndex):
         bt_opt_dates = pd.to_datetime(bt_opt.index)
     else:
-        st.error("bt_opt enthÃ¤lt keine Datumsinformationen.")
+        st.error("bt_opt enthält keine Datumsinformationen.")
         st.stop()
 
     if bt_opt_dates.isna().all():
-        st.error("bt_opt enthÃ¤lt nur ungÃ¼ltige Datumswerte.")
+        st.error("bt_opt enthält nur ungültige Datumswerte.")
         st.stop()
 
     current_date = bt_opt_dates.iloc[-1]
@@ -1055,7 +1102,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     elif isinstance(risk_score_df.index, pd.DatetimeIndex):
         current_date = pd.to_datetime(risk_score_df.index[-1])
     else:
-        raise RuntimeError("risk_score_df enthÃ¤lt keine 'date' Spalte und keinen DatetimeIndex.")
+        raise RuntimeError("risk_score_df enthält keine 'date' Spalte und keinen DatetimeIndex.")
 
     # --- risk row ---
     tmp = get_latest_before(risk_score_df, "date", current_date)
@@ -1103,28 +1150,27 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     current_regime = _safe_row_get(current_regime_row, "regime", "label", default=None)
 
     # Investment-Paket erzeugen und anzeigen (ein Aufruf)
-    prices_df, missing_total, mapping = load_prices_for_universe(start="2018-01-01")
+    prices_df, missing_total, mapping = load_etf_universe_prices(start="2018-01-01")
 
     if prices_df is None or prices_df.shape[1] == 0:
-        st.error("Keine Preisdaten geladen. PrÃ¼fe ETFâ€‘Ticker in risk_dashboard/config/etf_universe.yaml")
+        st.error("Keine Preisdaten geladen. Prüfe ETF‑Ticker in risk_dashboard/config/etf_universe.yaml")
         st.stop()
 
-    # Optional: Warnung fÃ¼r einzelne fehlende ETFs
+    # Optional: Warnung für einzelne fehlende ETFs
     if missing_total:
         st.warning("Folgende ETFs konnten nicht geladen werden und wurden im Backtest ignoriert: "
                 + ", ".join(missing_total))
 
-    # Ãœbergib prices_df und ETF_UNIVERSES an deine Backtest-/Generatorfunktionen
+    # Übergib prices_df und ETF_UNIVERSES an deine Backtest-/Generatorfunktionen
     result = get_investment_package(
         risk_score_df,
         scenario_df,
         scenario_regimes,
-        lambda r, s, rs, meta, prices: generate_investment_package(r, s, rs, meta, prices),
-        etf_meta=ETF_UNIVERSES,
-        prices_df=prices_df
+        lambda r, s, rs: generate_investment_package(r, s, rs, ETF_UNIVERSES, prices_df)
     )
 
-    st.subheader("ðŸ“¦ Investment-Paket")
+
+    st.subheader("Investment-Paket")
     st.write("Datum:", result.get("date"))
     st.write("Regime:", result.get("regime"))
     st.write("Szenario:", result.get("scenario"))
@@ -1133,7 +1179,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     package = result.get("package", {})
 
 
-    # defensive ETF-Konvertierung einmal ausfÃ¼hren
+    # defensive ETF-Konvertierung einmal ausführen
     etf_raw = package.get("ETF", {})
     if isinstance(etf_raw, (set, list)):
         etf_list = list(etf_raw)
@@ -1160,7 +1206,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
         x="date" if "date" in bt_opt.columns else bt_opt.index,
         y="equity",
         color="regime" if "regime" in bt_opt.columns else None,
-        title=f"{opt_method} â€“ Regime-gesteuertes Portfolio (Equity-Kurve)"
+        title=f"{opt_method} – Regime-gesteuertes Portfolio (Equity-Kurve)"
     )
     fig_opt.update_layout(yaxis_title="Equity (indexiert)", height=500)
     st.plotly_chart(fig_opt, width="stretch", key="fig_opt")
@@ -1177,7 +1223,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
         fig_w = px.bar(
             x=list(weights.keys()),
             y=list(weights.values()),
-            title=f"{opt_method} â€“ Gewichte im {reg} Regime"
+            title=f"{opt_method} – Gewichte im {reg} Regime"
         )
         fig_w.update_layout(yaxis_title="Gewicht", height=350)
         st.plotly_chart(fig_w, width="stretch", key=f"weights_{reg}")
@@ -1187,7 +1233,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     # -----------------------------------------------------
 
     st.markdown("---")
-    st.subheader("Risk-Parity vs. HRP â€“ Outperformance")
+    st.subheader("Risk-Parity vs. HRP – Outperformance")
 
     bt_rp, rp_struct_tmp, missing_rp_tmp = backtest_regime_risk_parity(
         low_final, 
@@ -1197,7 +1243,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
         scenario_df=scenario_df,
         scenario_regimes=scenario_regimes
     )
-    st.write("DEBUG â€“ RP Backtest Ergebnis (Head)2:", bt_rp.head())
+    st.write("DEBUG – RP Backtest Ergebnis (Head)2:", bt_rp.head())
     bt_hrp, hrp_struct_tmp, missing_hrp_tmp = backtest_regime_hrp(
         low_final, 
         med_final, 
@@ -1210,18 +1256,18 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     # Beispiel 1
     # robustes Datum holen
     if bt_rp is None or bt_rp.empty or bt_rp.shape[1] == 0:
-        st.error("bt_rp enthÃ¤lt keine Daten oder keine Spalten â€“ Backtest konnte nicht durchgefÃ¼hrt werden.")
+        st.error("bt_rp enthält keine Daten oder keine Spalten – Backtest konnte nicht durchgeführt werden.")
         st.stop()
 
     if bt_hrp is None or bt_hrp.empty or bt_hrp.shape[1] == 0:
-        st.error("bt_hrp enthÃ¤lt keine Daten oder keine Spalten â€“ Backtest konnte nicht durchgefÃ¼hrt werden.")
+        st.error("bt_hrp enthält keine Daten oder keine Spalten – Backtest konnte nicht durchgeführt werden.")
         st.stop()
 
     # Jetzt sicher aufrufen
     dates_rp = ensure_date_series(bt_rp)
     dates_hrp = ensure_date_series(bt_hrp)
 
-    # Basis-Datum wÃ¤hlen (lÃ¤ngere Serie als Basis)
+    # Basis-Datum wählen (längere Serie als Basis)
     base_dates = dates_rp if len(dates_rp) >= len(dates_hrp) else dates_hrp
     base_dates = base_dates.reset_index(drop=True)
 
@@ -1229,7 +1275,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
     rp_equity = bt_rp["equity"].reset_index(drop=True) if "equity" in bt_rp.columns else pd.Series(dtype=float)
     hrp_equity = bt_hrp["equity"].reset_index(drop=True) if "equity" in bt_hrp.columns else pd.Series(dtype=float)
 
-    # Truncate auf minimale LÃ¤nge, um Misalignment zu vermeiden
+    # Truncate auf minimale Länge, um Misalignment zu vermeiden
     min_len = min(len(base_dates), len(rp_equity), len(hrp_equity))
 
     df_compare = pd.DataFrame({
@@ -1244,7 +1290,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
         df_compare,
         x="date",
         y="Outperformance",
-        title="HRP Outperformance gegenÃ¼ber Risk Parity"
+        title="HRP Outperformance gegenüber Risk Parity"
     )
     fig_out.update_layout(
         height=500,
@@ -1303,7 +1349,7 @@ Makrodaten â”€â”€â–º FX-Modell â”€â”€â–º Risiko-Scor
 # ---------------------------------------------------------
 with tab_lexikon:
     st.header("Makro-Lexikon")
-    st.write("Ein Nachschlagewerk fÃ¼r alle wichtigen Begriffe, Modelle, Datenquellen und Investment-ZusammenhÃ¤nge.")
+    st.write("Ein Nachschlagewerk für alle wichtigen Begriffe, Modelle, Datenquellen und Investment-Zusammenhänge.")
 
     query = st.text_input("Begriff suchen:")
 
