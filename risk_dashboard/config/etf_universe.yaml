@@ -166,13 +166,15 @@ etf_universe:
     replication: "physical"
 
   amundi_dax50_esg:
-    name: "Xtrackers ESG Germany UCITS ETF"
-    ticker: "XUDE.DE"
-    isin: "DE000A2QM6B1"
+    name: "iShares Core DAX UCITS ETF (Ersatz für XUDE)"
+    ticker: "EXS1.DE"
+    isin: "DE000A1E0HR9"
     asset_class: "equity"
     region: "germany"
-    ter_pct: 0.20
+    ter_pct: 0.09
     replication: "physical"
+
+
 
   amundi_faz_100:
     name: "iShares MDAX UCITS ETF"
