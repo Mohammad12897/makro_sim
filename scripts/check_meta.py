@@ -1,4 +1,4 @@
-﻿# scripts/check_meta.py
+# scripts/check_meta.py
 import sys
 import yfinance as yf
 

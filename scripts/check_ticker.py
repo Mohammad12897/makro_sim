@@ -1,4 +1,4 @@
-﻿# scripts/check_ticker.py
+# scripts/check_ticker.py
 import sys
 import yfinance as yf
 
