@@ -2,6 +2,10 @@
 # $env:PYTHONPATH="C:\Projects\makro_sim"
 # $env:FRED_API_KEY = "5b75a1beb133f4e4aa6b8929ca39a762"
 # setx FRED_API_KEY "5b75a1beb133f4e4aa6b8929ca39a762"
+# im aktivierten venv
+# python -m pip install --upgrade pip
+# python -m pip install plotly pandas yfinance streamlit
+# python -m pip install numpy scikit-learn hmmlearn prophet
 # chcp 65001
 # Öffne danach ein neues PowerShell-Fenster, damit die Variable geladen wird.
 # .\.venv\Scripts\Activate.ps1
@@ -95,7 +99,12 @@ from risk_dashboard.core.regime_hmm import fit_hmm_regimes, map_hmm_states_to_la
 
 
 # Logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+#logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+logging.basicConfig(filename='app.log', level=logging.INFO,
+                    format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+logging.getLogger("yfinance").setLevel(logging.WARNING)
+
 
 # ---------------------------
 # PAGE CONFIG (muss vor allen st.* Aufrufen stehen)
