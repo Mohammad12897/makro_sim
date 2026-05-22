@@ -50,8 +50,22 @@ def analyze_ticker(base_ticker: str, etf_universe: List[str]) -> Tuple[Optional[
         logger.info("Ticker %s nicht gefunden oder keine Daten", base_ticker)
         return None, None, None, None
 
+    # erweitertes Universe zusammenstellen und deduplizieren
     custom_universe = list(dict.fromkeys([*etf_universe, used]))
-    prices_multi = load_raw_prices_for_universe(custom_universe)
+    # Normalisieren (Großbuchstaben, Trim) und nochmal dedup
+    custom_universe = [t.strip().upper() for t in custom_universe if isinstance(t, str) and t.strip()]
+    custom_universe = list(dict.fromkeys(custom_universe))
+
+    # load_raw_prices_for_universe gibt jetzt (combined_df, skipped_list) zurück
+    try:
+        prices_multi, skipped = load_raw_prices_for_universe(custom_universe)
+    except Exception as e:
+        logger.exception("Fehler beim Laden des erweiterten Universe für %s: %s", used, e)
+        return used, None, None, None
+
+    # Logge (oder sammle) übersprungene Basis-Ticker, falls vorhanden
+    if skipped:
+        logger.info("Folgende Basis-Ticker wurden beim Laden übersprungen: %s", ", ".join(sorted(set(skipped))))
 
     # Prüfe, ob der verwendete Ticker in prices_multi geladen wurde
     try:
