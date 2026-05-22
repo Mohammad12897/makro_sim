@@ -9,8 +9,12 @@ import time
 import concurrent.futures
 import streamlit as st
 
+
+logging.getLogger("yfinance").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
-SUFFIXES = ["", ".DE", ".L", ".US", ".AX"]
+SUFFIXES = ["", ".DE", ".MI", ".L", ".US", ".AX"]
 
 @st.cache_data(ttl=3600)
 def fetch_prices_with_suffixes(base: str, period: str = "max", auto_adjust: bool = False) -> Tuple[Optional[str], Optional[pd.DataFrame]]:
@@ -27,24 +31,22 @@ def fetch_prices_with_suffixes(base: str, period: str = "max", auto_adjust: bool
         try:
             ticker = yf.Ticker(t)
 
-            # --- BEGIN timezone check and robust history fetch ---
+            # --- timezone check ---
             info = {}
             try:
                 info = ticker.info or {}
-            except Exception as _:
-                # yfinance kann beim Abruf von info gelegentlich Fehler werfen
+            except Exception:
                 info = {}
 
-            tz = info.get("exchangeTimezoneName")
-            if not tz:
+            if not info.get("exchangeTimezoneName"):
                 logger.debug("No timezone for %s (suffix %s) — skipping", base, s)
                 continue
 
-            # Versuche die Historie, aber fange typische yfinance/Yahoo Fehler ab
+            # --- robust history fetch with fallbacks ---
+            df = None
             try:
                 df = ticker.history(period=period, auto_adjust=auto_adjust)
             except ValueError as ve:
-                # z.B. "Period 'max' is invalid" für manche Notierungen -> fallback auf 1d/5d
                 logger.debug("history ValueError for %s: %s. Falling back to 5d", t, ve)
                 try:
                     df = ticker.history(period="5d", auto_adjust=auto_adjust)
@@ -52,12 +54,12 @@ def fetch_prices_with_suffixes(base: str, period: str = "max", auto_adjust: bool
                     logger.debug("Fallback history failed for %s: %s", t, e2)
                     df = None
             except Exception as e:
-                if "401" in str(e) or "Unauthorized" in str(e):
-                    logger.warning("Yahoo returned 401 for %s — skipping for now", t)
-                    time.sleep(0.5)
-                    df = None
-                else:
-                    logger.debug("history fetch failed for %s: %s", t, e)
+                # Versuch: falls history fehlschlägt, probiere yf.download als Fallback
+                logger.debug("history fetch failed for %s: %s. Trying download fallback", t, e)
+                try:
+                    df = download(t, start="2018-01-01", progress=False)
+                except Exception as e2:
+                    logger.debug("download fallback failed for %s: %s", t, e2)
                     df = None
 
             # Wenn wir eine DataFrame bekommen, normalisieren und zurückgeben
@@ -67,42 +69,33 @@ def fetch_prices_with_suffixes(base: str, period: str = "max", auto_adjust: bool
                     df.index = df.index.tz_convert("UTC").tz_localize(None)
                 df["__ticker"] = t
                 return t, df
-            # sonst weiter mit dem nächsten Suffix
-            # --- END timezone check and robust history fetch ---
 
-            # Wenn wir hier sind, versuchen wir die Historie
-            # df = ticker.history(period=period, auto_adjust=auto_adjust)
-
-            if df is not None and not df.empty:
-                df = df.copy()
-                # Index tz-naive UTC
-                if df.index.tz is not None:
-                    df.index = df.index.tz_convert("UTC").tz_localize(None)
-                df["__ticker"] = t
-                return t, df
         except Exception as e:
             logger.debug("yfinance error for %s: %s", t, e)
             time.sleep(0.1)
             continue
-    return None, None
+
+    return None, None        
 
 def _fetch_one(args):
     return fetch_prices_with_suffixes(*args)
 
 @st.cache_data(ttl=3600)
-def load_raw_prices_for_universe(universe: List[str], period: str = "max", auto_adjust: bool = False, max_workers: int = 6) -> pd.DataFrame:
+def load_raw_prices_for_universe(universe: List[str], period: str = "max", auto_adjust: bool = False, max_workers: int = 6) -> Tuple[pd.DataFrame, List[str]]:
     """
     Lädt Preise für eine Liste von Basis-Tickern (ohne Suffix).
-    Rückgabe: DataFrame mit MultiIndex (Date, __ticker) und Spalten Open, High, Low, Close, Volume.
+    Rückgabe: (DataFrame mit MultiIndex (Date, __ticker), Liste der übersprungenen Basis-Ticker)
     """
     # Normalisieren und deduplizieren
     bases = list(dict.fromkeys([b.strip().upper() for b in universe if isinstance(b, str) and b.strip()]))
     if not bases:
         cols = ["Open", "High", "Low", "Close", "Volume", "__ticker"]
-        return pd.DataFrame(columns=cols)
+        return pd.DataFrame(columns=cols), []
 
     results = []
+    skipped: List[str] = []
     max_workers = min(max_workers, len(bases))
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = {ex.submit(_fetch_one, (b, period, auto_adjust)): b for b in bases}
         for fut in concurrent.futures.as_completed(futures):
@@ -113,19 +106,21 @@ def load_raw_prices_for_universe(universe: List[str], period: str = "max", auto_
                     results.append(df)
                 else:
                     logger.warning("No data for base %s with any suffixes", base)
+                    skipped.append(base)
             except Exception as e:
                 logger.exception("Error fetching %s: %s", base, e)
+                skipped.append(base)
 
     if not results:
         cols = ["Open", "High", "Low", "Close", "Volume", "__ticker"]
-        return pd.DataFrame(columns=cols)
+        return pd.DataFrame(columns=cols), skipped
 
     combined = pd.concat(results)
     combined.index = pd.to_datetime(combined.index)
     combined = combined.sort_index()
     combined = combined.reset_index().rename(columns={"index": "Date"})
     combined = combined.set_index(["Date", "__ticker"]).sort_index()
-    return combined
+    return combined, skipped
 
 def try_download_with_alternatives(ticker_base: str, start: str = None, end: str = None) -> Tuple[str, pd.Series]:
     for s in SUFFIXES:
@@ -166,4 +161,7 @@ def fetch_prices(tickers: List[str], start: str = "2018-01-01", end: str = None)
         else:
             out[tbase] = pd.Series(dtype=float)  # placeholder for missing
     return out
+
+
+
 

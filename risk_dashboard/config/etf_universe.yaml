@@ -165,17 +165,6 @@ etf_universe:
     ter_pct: 0.09
     replication: "physical"
 
-  amundi_dax50_esg:
-    name: "iShares Core DAX UCITS ETF (Ersatz für XUDE)"
-    ticker: "EXS1.DE"
-    isin: "DE000A1E0HR9"
-    asset_class: "equity"
-    region: "germany"
-    ter_pct: 0.09
-    replication: "physical"
-
-
-
   amundi_faz_100:
     name: "iShares MDAX UCITS ETF"
     ticker: "EXS2.DE"
@@ -194,3 +183,10 @@ etf_universe:
     region: "global"
     ter_pct: 0.22
     replication: "physical"
+
+  amundi_dax50_esg:
+    name: "iShares Core DAX UCITS ETF (Ersatz für XUDE)"
+    ticker: "EXS1.DE"
+    isin: "DE000A1E0HR9"
+    note: "same underlying as xtrackers_dax (EXS1.DE)"
+
