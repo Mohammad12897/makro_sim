@@ -1,4 +1,4 @@
-﻿# risk_dashboard/core/data_loader.py
+# risk_dashboard/core/data_loader.py
 from typing import List, Tuple, Dict, Optional
 from yfinance import download
 import pandas as pd
@@ -26,7 +26,53 @@ def fetch_prices_with_suffixes(base: str, period: str = "max", auto_adjust: bool
         t = base + s
         try:
             ticker = yf.Ticker(t)
-            df = ticker.history(period=period, auto_adjust=auto_adjust)
+
+            # --- BEGIN timezone check and robust history fetch ---
+            info = {}
+            try:
+                info = ticker.info or {}
+            except Exception as _:
+                # yfinance kann beim Abruf von info gelegentlich Fehler werfen
+                info = {}
+
+            tz = info.get("exchangeTimezoneName")
+            if not tz:
+                logger.debug("No timezone for %s (suffix %s) — skipping", base, s)
+                continue
+
+            # Versuche die Historie, aber fange typische yfinance/Yahoo Fehler ab
+            try:
+                df = ticker.history(period=period, auto_adjust=auto_adjust)
+            except ValueError as ve:
+                # z.B. "Period 'max' is invalid" für manche Notierungen -> fallback auf 1d/5d
+                logger.debug("history ValueError for %s: %s. Falling back to 5d", t, ve)
+                try:
+                    df = ticker.history(period="5d", auto_adjust=auto_adjust)
+                except Exception as e2:
+                    logger.debug("Fallback history failed for %s: %s", t, e2)
+                    df = None
+            except Exception as e:
+                if "401" in str(e) or "Unauthorized" in str(e):
+                    logger.warning("Yahoo returned 401 for %s — skipping for now", t)
+                    time.sleep(0.5)
+                    df = None
+                else:
+                    logger.debug("history fetch failed for %s: %s", t, e)
+                    df = None
+
+            # Wenn wir eine DataFrame bekommen, normalisieren und zurückgeben
+            if df is not None and not df.empty:
+                df = df.copy()
+                if df.index.tz is not None:
+                    df.index = df.index.tz_convert("UTC").tz_localize(None)
+                df["__ticker"] = t
+                return t, df
+            # sonst weiter mit dem nächsten Suffix
+            # --- END timezone check and robust history fetch ---
+
+            # Wenn wir hier sind, versuchen wir die Historie
+            # df = ticker.history(period=period, auto_adjust=auto_adjust)
+
             if df is not None and not df.empty:
                 df = df.copy()
                 # Index tz-naive UTC
@@ -120,3 +166,4 @@ def fetch_prices(tickers: List[str], start: str = "2018-01-01", end: str = None)
         else:
             out[tbase] = pd.Series(dtype=float)  # placeholder for missing
     return out
+
