@@ -14,6 +14,8 @@
 import sys
 import locale
 import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 # UTF-8 erzwingen (sicher)
 try:
@@ -35,7 +37,6 @@ import streamlit as st
 # Optional: nur wenn du wirklich den Cache leeren willst, sonst entfernen
 # st.cache_data.clear()
 
-from pathlib import Path
 
 # eigene Module
 from risk_dashboard.core.data_loader import fetch_prices_with_suffixes
@@ -99,11 +100,19 @@ from risk_dashboard.core.regime_hmm import fit_hmm_regimes, map_hmm_states_to_la
 
 
 # Logging
-#logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-logging.basicConfig(filename='app.log', level=logging.INFO,
-                    format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+log_file = Path(__file__).resolve().parent / "app.log"
+handler = RotatingFileHandler(str(log_file), maxBytes=10*1024*1024, backupCount=5)
+formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+handler.setFormatter(formatter)
+
+root = logging.getLogger()
+root.setLevel(logging.INFO)
+root.addHandler(handler)
+
 logging.getLogger("yfinance").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 
 
 # ---------------------------
