@@ -100,16 +100,22 @@ from risk_dashboard.core.regime_hmm import fit_hmm_regimes, map_hmm_states_to_la
 
 
 # Logging
+# Logdatei im selben Ordner wie app.py (risk_dashboard/app.log)
+log_dir = Path(__file__).resolve().parent
+log_file = log_dir / "app.log"
 
-log_file = Path(__file__).resolve().parent / "app.log"
+# RotatingFileHandler, damit die Datei nicht unendlich wächst
 handler = RotatingFileHandler(str(log_file), maxBytes=10*1024*1024, backupCount=5)
 formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
 handler.setFormatter(formatter)
 
 root = logging.getLogger()
 root.setLevel(logging.INFO)
-root.addHandler(handler)
+# Entferne vorhandene Handler, falls mehrfaches Importieren passiert
+if not root.handlers:
+    root.addHandler(handler)
 
+# noisy libs dämpfen
 logging.getLogger("yfinance").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
