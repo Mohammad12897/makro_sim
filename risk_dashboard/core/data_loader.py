@@ -9,6 +9,7 @@ import time
 import concurrent.futures
 import streamlit as st
 
+from scripts.yf_helper import download_one_with_backoff, download_batch_with_backoff
 
 logger = logging.getLogger(__name__)
 SUFFIXES = ["", ".DE", ".MI", ".L", ".US", ".AX"]
@@ -74,8 +75,35 @@ def fetch_prices_with_suffixes(base: str, period: str = "max", auto_adjust: bool
 
     return None, None        
 
-def _fetch_one(args):
-    return fetch_prices_with_suffixes(*args)
+#def _fetch_one(args):
+#    return fetch_prices_with_suffixes(*args)
+
+
+def _fetch_one(base: str) -> Optional[pd.DataFrame]:
+    """
+    Lade Preise für einen Basis-Ticker mit Retries, Backoff und Fallback.
+    Gibt ein DataFrame oder None zurück.
+    """
+    base = (base or "").strip().upper()
+    if not base:
+        return None
+
+    # Versuche mit Backoff (history() -> download())
+    df = download_one_with_backoff(base)
+    if df is None or df.empty:
+        logger.warning("No data for ticker base %s after retries/fallback", base)
+        return None
+
+    # Normalisiere Index/Spalten falls nötig (behalte bestehende Logik)
+    # Beispiel: ensure DateTimeIndex and sorted
+    try:
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index, errors="coerce")
+        df = df.sort_index()
+    except Exception:
+        logger.exception("Failed to normalize index for %s", base)
+
+    return df
 
 @st.cache_data(ttl=3600)
 def load_raw_prices_for_universe(universe: List[str], period: str = "max", auto_adjust: bool = False, max_workers: int = 6) -> Tuple[pd.DataFrame, List[str]]:
@@ -158,6 +186,7 @@ def fetch_prices(tickers: List[str], start: str = "2018-01-01", end: str = None)
         else:
             out[tbase] = pd.Series(dtype=float)  # placeholder for missing
     return out
+
 
 
 
