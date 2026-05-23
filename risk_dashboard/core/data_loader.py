@@ -10,9 +10,6 @@ import concurrent.futures
 import streamlit as st
 
 
-logging.getLogger("yfinance").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-
 logger = logging.getLogger(__name__)
 SUFFIXES = ["", ".DE", ".MI", ".L", ".US", ".AX"]
 
@@ -161,6 +158,7 @@ def fetch_prices(tickers: List[str], start: str = "2018-01-01", end: str = None)
         else:
             out[tbase] = pd.Series(dtype=float)  # placeholder for missing
     return out
+
 
 
 
