@@ -1,6 +1,7 @@
 # risk_dashboard/core/data_loader.py
 from typing import List, Tuple, Dict, Optional
 from yfinance import download
+import sys
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -8,10 +9,33 @@ import logging
 import time
 import concurrent.futures
 import streamlit as st
+import random
+import logging
 
-from scripts.yf_helper import download_one_with_backoff, download_batch_with_backoff
 
+# Versuche Import aus scripts; falls nicht vorhanden, Fallback (führe nur EINEN Importblock)
 logger = logging.getLogger(__name__)
+try:
+    from scripts.yf_helper import download_batch_with_backoff, download_one_with_backoff, wait_for_rate_slot
+except ModuleNotFoundError:
+    # Fallback: add project root to sys.path and retry
+    from pathlib import Path as _Path
+    project_root = _Path(__file__).resolve().parents[1]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    try:
+        from scripts.yf_helper import download_batch_with_backoff, download_one_with_backoff, wait_for_rate_slot
+    except Exception as e:
+        logger.exception("Konnte scripts.yf_helper nicht importieren: %s", e)
+        # minimaler fallback, damit App nicht abstürzt
+        def download_one_with_backoff(ticker): 
+            return None
+        def download_batch_with_backoff(tickers):
+            return pd.DataFrame()
+        def wait_for_rate_slot():
+            time.sleep(1.5)
+
+
 SUFFIXES = ["", ".DE", ".MI", ".L", ".US", ".AX"]
 
 @st.cache_data(ttl=3600)
@@ -75,10 +99,6 @@ def fetch_prices_with_suffixes(base: str, period: str = "max", auto_adjust: bool
 
     return None, None        
 
-#def _fetch_one(args):
-#    return fetch_prices_with_suffixes(*args)
-
-
 def _fetch_one(base: str) -> Optional[pd.DataFrame]:
     """
     Lade Preise für einen Basis-Ticker mit Retries, Backoff und Fallback.
@@ -88,30 +108,35 @@ def _fetch_one(base: str) -> Optional[pd.DataFrame]:
     if not base:
         return None
 
-    # Versuche mit Backoff (history() -> download())
-    df = download_one_with_backoff(base)
+    try:
+        wait_for_rate_slot()
+        df = download_one_with_backoff(base)
+    except Exception as e:
+        logger.exception("Unexpected exception while downloading %s: %s", base, e)
+        return None
+
+    # kleine Pause, um Bursts zu vermeiden
+    time.sleep(0.2 + random.random() * 0.4)
+
     if df is None or df.empty:
         logger.warning("No data for ticker base %s after retries/fallback", base)
         return None
 
-    # Normalisiere Index/Spalten falls nötig (behalte bestehende Logik)
-    # Beispiel: ensure DateTimeIndex and sorted
     try:
         if not isinstance(df.index, pd.DatetimeIndex):
             df.index = pd.to_datetime(df.index, errors="coerce")
         df = df.sort_index()
     except Exception:
         logger.exception("Failed to normalize index for %s", base)
+        return None
 
     return df
 
 @st.cache_data(ttl=3600)
-def load_raw_prices_for_universe(universe: List[str], period: str = "max", auto_adjust: bool = False, max_workers: int = 6) -> Tuple[pd.DataFrame, List[str]]:
-    """
-    Lädt Preise für eine Liste von Basis-Tickern (ohne Suffix).
-    Rückgabe: (DataFrame mit MultiIndex (Date, __ticker), Liste der übersprungenen Basis-Ticker)
-    """
-    # Normalisieren und deduplizieren
+def load_raw_prices_for_universe(universe: List[str],
+                                 period: str = "max",
+                                 auto_adjust: bool = False,
+                                 max_workers: int = 2) -> Tuple[pd.DataFrame, List[str]]:
     bases = list(dict.fromkeys([b.strip().upper() for b in universe if isinstance(b, str) and b.strip()]))
     if not bases:
         cols = ["Open", "High", "Low", "Close", "Volume", "__ticker"]
@@ -119,33 +144,85 @@ def load_raw_prices_for_universe(universe: List[str], period: str = "max", auto_
 
     results = []
     skipped: List[str] = []
-    max_workers = min(max_workers, len(bases))
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
-        futures = {ex.submit(_fetch_one, (b, period, auto_adjust)): b for b in bases}
-        for fut in concurrent.futures.as_completed(futures):
-            base = futures[fut]
-            try:
-                used_ticker, df = fut.result()
-                if used_ticker and df is not None and not df.empty:
-                    results.append(df)
+    batch_size = 4
+    batches = [bases[i:i+batch_size] for i in range(0, len(bases), batch_size)]
+
+    for batch in batches:
+        try:
+            # globaler rate slot vor Batch
+            wait_for_rate_slot()
+            df_batch = download_batch_with_backoff(batch)
+
+            if df_batch is None or df_batch.empty:
+                # serieller Fallback pro Ticker
+                for t in batch:
+                    wait_for_rate_slot()
+                    df_one = download_one_with_backoff(t)
+                    time.sleep(0.2 + random.random() * 0.4)
+                    if df_one is None or df_one.empty:
+                        skipped.append(t)
+                        logger.warning("No data for ticker base %s after retries/fallback", t)
+                        continue
+                    if "__ticker" not in df_one.columns:
+                        df_one = df_one.copy()
+                        df_one["__ticker"] = t
+                    if not isinstance(df_one.index, pd.DatetimeIndex):
+                        df_one.index = pd.to_datetime(df_one.index, errors="coerce")
+                    df_one = df_one.reset_index().rename(columns={df_one.index.name or "index": "Date"})
+                    df_one = df_one.set_index(["Date", "__ticker"])
+                    results.append(df_one)
+            else:
+                # MultiIndex-Spalten (typisch bei yf.download mit mehreren Tickers)
+                if isinstance(df_batch.columns, pd.MultiIndex):
+                    tickers = list(dict.fromkeys(df_batch.columns.get_level_values(1)))
+                    for ticker in tickers:
+                        try:
+                            sub = df_batch.xs(ticker, axis=1, level=1, drop_level=False)
+                        except Exception:
+                            logger.debug("Could not xs for ticker %s in batch", ticker)
+                            continue
+                        sub = sub.copy()
+                        if isinstance(sub.columns, pd.MultiIndex):
+                            sub.columns = [c[0] for c in sub.columns]
+                        sub["__ticker"] = ticker
+                        sub.index = pd.to_datetime(sub.index, errors="coerce")
+                        sub = sub.reset_index().rename(columns={sub.index.name or "index": "Date"})
+                        sub = sub.set_index(["Date", "__ticker"])
+                        results.append(sub)
                 else:
-                    logger.warning("No data for base %s with any suffixes", base)
-                    skipped.append(base)
-            except Exception as e:
-                logger.exception("Error fetching %s: %s", base, e)
-                skipped.append(base)
+                    # Single-level columns
+                    if len(batch) == 1:
+                        ticker = batch[0]
+                        df = df_batch.copy()
+                        if "__ticker" not in df.columns:
+                            df["__ticker"] = ticker
+                        df.index = pd.to_datetime(df.index, errors="coerce")
+                        df = df.reset_index().rename(columns={df.index.name or "index": "Date"})
+                        df = df.set_index(["Date", "__ticker"])
+                        results.append(df)
+                    else:
+                        df = df_batch.copy()
+                        df["__ticker"] = ",".join(batch)
+                        df.index = pd.to_datetime(df.index, errors="coerce")
+                        df = df.reset_index().rename(columns={df.index.name or "index": "Date"})
+                        df = df.set_index(["Date", "__ticker"])
+                        results.append(df)
 
-    if not results:
-        cols = ["Open", "High", "Low", "Close", "Volume", "__ticker"]
-        return pd.DataFrame(columns=cols), skipped
+        except Exception as e:
+            logger.exception("Batch download failed for %s: %s", batch, e)
+            skipped.extend(batch)
 
-    combined = pd.concat(results)
-    combined.index = pd.to_datetime(combined.index)
-    combined = combined.sort_index()
-    combined = combined.reset_index().rename(columns={"index": "Date"})
-    combined = combined.set_index(["Date", "__ticker"]).sort_index()
-    return combined, skipped
+        # Stagger zwischen Batches
+        time.sleep(1.0 + random.random() * 2.0)
+
+    if results:
+        combined = pd.concat(results, axis=0).sort_index()
+    else:
+        combined = pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+
+    return combined, list(dict.fromkeys(skipped))
+
 
 def try_download_with_alternatives(ticker_base: str, start: str = None, end: str = None) -> Tuple[str, pd.Series]:
     for s in SUFFIXES:
@@ -186,6 +263,7 @@ def fetch_prices(tickers: List[str], start: str = "2018-01-01", end: str = None)
         else:
             out[tbase] = pd.Series(dtype=float)  # placeholder for missing
     return out
+
 
 
 

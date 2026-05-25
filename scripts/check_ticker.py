@@ -1,4 +1,5 @@
 # scripts/check_ticker.py
+# python .\scripts\check_ticker.py XUDE.DE
 import sys
 import yfinance as yf
 
