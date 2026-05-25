@@ -64,3 +64,6 @@ risk_dashboard/config.yaml
 
 # ignore backups
 *.bak
+
+# ignore local backups
+*.bak
