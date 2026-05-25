@@ -6,6 +6,10 @@
 # python -m pip install --upgrade pip
 # python -m pip install plotly pandas yfinance streamlit
 # python -m pip install numpy scikit-learn hmmlearn prophet
+# pip install --upgrade yfinance==0.2.54
+# pip install pre-commit
+# pre-commit install
+# pip install requests
 # chcp 65001
 # Öffne danach ein neues PowerShell-Fenster, damit die Variable geladen wird.
 # .\.venv\Scripts\Activate.ps1
@@ -16,6 +20,12 @@ import locale
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+# Ensure project root is on sys.path so "scripts" package is importable
+project_root = Path(__file__).resolve().parents[1]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 
 # UTF-8 erzwingen (sicher)
 try:
@@ -112,8 +122,14 @@ handler.setFormatter(formatter)
 root = logging.getLogger()
 root.setLevel(logging.INFO)
 # Entferne vorhandene Handler, falls mehrfaches Importieren passiert
-if not root.handlers:
-    root.addHandler(handler)
+# Entferne vorhandene Handler und füge unseren FileHandler hinzu
+for h in root.handlers[:]:
+    root.removeHandler(h)
+root.addHandler(handler)
+
+console = logging.StreamHandler()
+console.setFormatter(formatter)
+root.addHandler(console)
 
 # noisy libs dämpfen
 logging.getLogger("yfinance").setLevel(logging.WARNING)

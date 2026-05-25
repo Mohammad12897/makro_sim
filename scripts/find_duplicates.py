@@ -1,4 +1,5 @@
 # save as scripts/find_duplicates.py and run: python scripts/find_duplicates.py
+# https://finance.yahoo.com/quote/EXS1.DE
 import yaml
 from collections import defaultdict
 p = "risk_dashboard/config/etf_universe.yaml"

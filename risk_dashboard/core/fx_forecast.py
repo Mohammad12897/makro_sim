@@ -1,6 +1,6 @@
 # risk_dashboard/core/fx_forecast.py
 import logging
-from typing import Tuple
+from typing import Tuple, Optional
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -10,16 +10,22 @@ from statsmodels.tsa.arima.model import ARIMA
 from prophet import Prophet
 from risk_dashboard.core.utils import validate_prophet_input
 from risk_dashboard.core.fx_engine import download_fx_history
-
-
-logger = logging.getLogger(__name__)
-
-import logging
-from typing import Optional
-import pandas as pd
-import yfinance as yf
+import requests
+from scripts.yf_helper import _safe_read_csv_text
 
 logger = logging.getLogger(__name__)
+
+def _try_import_pandas_datareader():
+    try:
+        import importlib
+        spec = importlib.util.find_spec("pandas_datareader")
+        if spec is None:
+            return None
+        import pandas_datareader.data as pdr  # type: ignore
+        return pdr
+    except Exception as e:
+        logger.info("pandas_datareader import failed: %s", e)
+        return None
 
 def _ensure_date_fx_columns(df: pd.DataFrame, fx_col_name: str) -> pd.DataFrame:
     """
@@ -65,25 +71,66 @@ def load_fx_history(pair: str = "EURUSD=X", period: str = "10y") -> pd.DataFrame
     # 2) Wenn yfinance leer oder None -> Fallback versuchen
     if data is None or data.empty:
         logger.info("yf.download returned empty for %s, trying fallback sources...", pair)
+
+        # 2a) pandas_datareader / stooq (sicherer, lokaler Import)
+        symbol = pair.replace("=X", "")
+        df_alt = None
+        pdr = _try_import_pandas_datareader()
+        if pdr is not None:
+            try:
+                df_alt = pdr.DataReader(symbol, "stooq")
+            except Exception as e:
+                logger.info("pandas_datareader request failed for %s: %s", pair, e)
+                df_alt = None
+        else:
+            logger.info("pandas_datareader not available; skipping stooq fallback for %s", pair)
+
         try:
-            import pandas_datareader.data as pdr  # type: ignore
-            symbol = pair.replace("=X", "")
-            df_alt = pdr.DataReader(symbol, "stooq")
-            if df_alt is None or df_alt.empty:
-                logger.info("pandas_datareader (stooq) returned no data for %s", pair)
-                return pd.DataFrame(columns=["date", "fx"])
-            df_alt.index = pd.to_datetime(df_alt.index, errors="coerce")
-            df_alt = df_alt.sort_index()
-            # Wähle die letzte numerische Spalte als FX-Preis
-            numeric_cols = df_alt.select_dtypes(include="number").columns.tolist()
-            if not numeric_cols:
+            if df_alt is not None and not df_alt.empty:
+                df_alt.index = pd.to_datetime(df_alt.index, errors="coerce")
+                df_alt = df_alt.sort_index()
+                numeric_cols = df_alt.select_dtypes(include="number").columns.tolist()
+                if numeric_cols:
+                    out = df_alt[[numeric_cols[-1]]].copy()
+                    return _ensure_date_fx_columns(out, numeric_cols[-1])
                 logger.info("Fallback data for %s has no numeric columns", pair)
-                return pd.DataFrame(columns=["date", "fx"])
-            out = df_alt[[numeric_cols[-1]]].copy()
-            return _ensure_date_fx_columns(out, numeric_cols[-1])
+            else:
+                logger.info("pandas_datareader (stooq) returned no data for %s", pair)
         except Exception as e:
-            logger.info("Fallback sources failed for %s: %s", pair, e)
-            return pd.DataFrame(columns=["date", "fx"])
+            logger.info("pandas_datareader (stooq) failed for %s: %s", pair, e)
+
+        # 2b) HTTP CSV Fallbacks (prüfen, ob eine CSV-Antwort valide ist)
+        fallback_urls = [
+            f"https://stooq.com/q/d/l/?s={symbol.lower()}&i=d",
+            # weitere URLs hier ergänzen
+        ]
+        for url in fallback_urls:
+            try:
+                resp = requests.get(url, timeout=10)
+                resp.raise_for_status()
+                try:
+                    df_fallback = _safe_read_csv_text(resp.text)
+                except ValueError:
+                    logger.warning("Fallback returned invalid CSV/HTML for %s", url)
+                    df_fallback = None
+            except requests.RequestException as e:
+                logger.debug("HTTP fallback request failed for %s: %s", url, e)
+                df_fallback = None
+
+            if df_fallback is not None and not df_fallback.empty:
+                try:
+                    df_fallback.index = pd.to_datetime(df_fallback.index, errors="coerce")
+                    df_fallback = df_fallback.sort_index()
+                    numeric_cols = df_fallback.select_dtypes(include="number").columns.tolist()
+                    if numeric_cols:
+                        out = df_fallback[[numeric_cols[-1]]].copy()
+                        return _ensure_date_fx_columns(out, numeric_cols[-1])
+                except Exception as e:
+                    logger.debug("Processing fallback CSV for %s failed: %s", url, e)
+
+        # Alle Fallbacks fehlgeschlagen
+        logger.warning("Fallback sources failed for %s", pair)
+        return pd.DataFrame(columns=["date", "fx"])
 
     # 3) Wenn yfinance Daten liefert: Normalisieren und Spalte auswählen
     try:
