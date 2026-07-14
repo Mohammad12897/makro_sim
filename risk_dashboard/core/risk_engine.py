@@ -60,18 +60,54 @@ def build_fx_risk_factors(fx_prices):
 
     return df
 
-
 def build_market_risk_factors(etf_prices: pd.DataFrame) -> pd.DataFrame:
-    df = pd.DataFrame(index=etf_prices.index)
+    """
+    Erzeugt einfache Markt-Risikofaktoren aus den geladenen ETF-Preisen.
+    Robust gegenüber fehlendem SPY: wählt eine sinnvolle Proxy-Spalte oder
+    die erste numerische Spalte als Fallback.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
 
-    # Momentum (z. B. SPY 60‑Tage)
-    df["equity_momentum"] = etf_prices["SPY"].pct_change(60)
+    df = pd.DataFrame(index=etf_prices.index if etf_prices is not None else [])
 
-    # Volatilität (20‑Tage)
-    df["equity_vol"] = etf_prices["SPY"].pct_change().rolling(20).std()
+    try:
+        if etf_prices is None or etf_prices.empty:
+            logger.warning("build_market_risk_factors: etf_prices ist leer oder None")
+            return df
 
-    return df.dropna()
+        # Priorisierte Equity-Candidates (SPY bevorzugt)
+        equity_candidates = ["SPY", "CSPX.L", "EQQQ.L", "EUNL.DE", "IEGA.L", "EEM"]
 
+        # Wähle erste vorhandene Candidate
+        ref = next((c for c in equity_candidates if c in etf_prices.columns), None)
+
+        # Falls keine Candidate gefunden, nimm die erste numerische Spalte als Fallback
+        if ref is None:
+            numeric_cols = [c for c in etf_prices.columns if pd.api.types.is_numeric_dtype(etf_prices[c])]
+            ref = numeric_cols[0] if numeric_cols else None
+
+        if ref is None:
+            logger.warning("build_market_risk_factors: Keine geeignete Equity-Spalte gefunden")
+            return df
+
+        # Berechnungen (defensiv, mit Fehlerbehandlung)
+        series = etf_prices[ref].astype(float)
+
+        # 60-Tage Momentum (prozentuale Veränderung)
+        df["equity_momentum"] = series.pct_change(60)
+
+        # 20-Tage Volatilität (Std der täglichen Renditen)
+        df["equity_vol"] = series.pct_change().rolling(20).std()
+
+        # Optional: weitere Markt-Faktoren hier ergänzen
+
+        # Entferne Zeilen mit NaNs (nur vollständige Beobachtungen zurückgeben)
+        return df.dropna()
+
+    except Exception as e:
+        logger.exception("Fehler in build_market_risk_factors: %s", e)
+        return pd.DataFrame(index=etf_prices.index if etf_prices is not None else [])
 
 
 def load_risk_factors():
@@ -265,3 +301,4 @@ def detect_risk_regimes_from_scenario(scenario_df):
     df["risk_score_pca"] = compute_pca_score(df)
     df["regime_label"] = assign_regime(df["risk_score_pca"])
     return df
+

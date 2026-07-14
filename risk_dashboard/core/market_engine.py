@@ -96,11 +96,6 @@ def force_tz_naive(df: pd.DataFrame) -> pd.DataFrame:
         df.index = idx
     return df
 
-# Beispielanwendung beim Laden:
-# df = load_price_data(...)
-# df = ensure_datetime_index(df, date_col="date")
-# df = force_tz_naive(df)  # oder force_tz_aware(df, tz="UTC")
-
 
 def _to_naive_datetime_index(series: pd.Series) -> pd.Series:
     """
@@ -347,70 +342,6 @@ def download_etf_history(tickers, start=None, end=None, period="10y", auto_resam
 
     df = pd.DataFrame(valid_items)
     return df
-
-    # --- NEU: Vereinheitliche DatetimeIndex (tz-aware -> tz-naive UTC) vor concat ---
-    def _to_naive_utc_index(series: pd.Series) -> pd.Series:
-        # Sicherstellen, dass Index ein DatetimeIndex ist
-        if not isinstance(series.index, pd.DatetimeIndex):
-            series.index = pd.to_datetime(series.index, errors="coerce")
-        # Falls tz-aware -> in UTC konvertieren und tz entfernen
-        try:
-            if getattr(series.index, "tz", None) is not None:
-                series.index = series.index.tz_convert("UTC").tz_localize(None)
-        except Exception:
-            # Falls tz_convert fehlschlägt, versuche tz_localize(None) oder rekonstruiere Index
-            try:
-                series.index = series.index.tz_localize(None)
-            except Exception:
-                series.index = pd.to_datetime(series.index.astype(str), errors="coerce")
-        return series
-
-    normalized_series_list = []
-    for t, s in valid_items.items():
-        s_norm = _to_naive_utc_index(s.copy())
-        # drop NaT nach Konvertierung
-        s_norm = s_norm.dropna()
-        if s_norm.empty:
-            st.warning(f"{t}: Nach TZ-Normalisierung keine gültigen Zeitstempel mehr.")
-            continue
-        s_norm.name = t
-        normalized_series_list.append(s_norm)
-
-    if not normalized_series_list:
-        st.error("ETF-Loader: Nach TZ-Normalisierung keine gültigen Zeitreihen.")
-        return pd.DataFrame()
-
-
-
-    # tz-naive Series
-    idx_naive = pd.date_range("2020-01-01", periods=5, freq="D")
-    s_naive = pd.Series(np.arange(5), index=idx_naive, name="NAIVE")
-
-    # tz-aware Series (UTC)
-    idx_aware = pd.date_range("2020-01-01", periods=5, freq="D", tz="UTC")
-    s_aware = pd.Series(np.arange(5)+10, index=idx_aware, name="AWARE")
-
-    # Test helper
-    s_aware_conv = to_naive_utc(s_aware)
-    print("aware tz after conv:", getattr(s_aware_conv.index, "tz", None))
-    print("naive tz:", getattr(s_naive.index, "tz", None))
-
-    # concat should work now
-    df = pd.concat([s_naive.rename("NAIVE"), s_aware_conv.rename("AWARE")], axis=1)
-    print(df.head())
-
-
-
-    prices = pd.concat(normalized_series_list, axis=1).sort_index()
-    prices = prices.ffill().dropna(how="all")
-
-    # Resample auf Monatsende falls gewünscht
-    if auto_resample and not prices.empty:
-        prices.index = pd.to_datetime(prices.index, errors="coerce")
-        prices = prices.sort_index()
-        prices = prices.resample("ME").last().ffill().dropna(how="all")
-
-    return prices
 
 
 # -----------------------------------------------------

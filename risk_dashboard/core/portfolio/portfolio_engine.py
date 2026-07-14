@@ -45,7 +45,7 @@ def portfolio_stats(series):
         "Gesamtrendite": series.add(1).prod() - 1,
     }
 
-def simulate_portfolio_with_rebalancing(asset_data: dict, weights: dict, freq="M"):
+def simulate_portfolio_with_rebalancing(asset_data: dict, weights: dict, freq="ME"):
     dfs = []
     for ticker, data in asset_data.items():
         df = pd.DataFrame({ticker: data["returns"]}, index=data["dates"])

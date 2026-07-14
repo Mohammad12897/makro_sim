@@ -1,24 +1,48 @@
-﻿# risk_dashboard/ui/profiles_ui.py
+# risk_dashboard/ui/profiles_ui.py
 """
 Streamlit UI for managing portfolio profiles (presets) with validation and analysis.
 """
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional, List
+import sys
+import traceback
+from typing import Dict, Any, Tuple, Optional, List, Sequence
 from io import StringIO
 import requests
 import plotly.graph_objects as go
 import pandas as pd
 
+from rich import region
 import streamlit as st
 import yaml
-
+import tempfile, os, json
+import logging, inspect, pathlib
+ 
 
 from risk_dashboard.core.config import load_profiles, save_profile, load_etf_universe
-from risk_dashboard.core.utils import resolve_components, analyze_portfolio_components, normalize_ter_value
+from risk_dashboard.core.utils import extract_close_series, resolve_components, analyze_portfolio_components, normalize_ter_value
+from risk_dashboard.core.backtest import run_all_etf_backtests, run_portfolio_backtest
 
-from risk_dashboard.core.analytics import analyze_ticker
+from risk_dashboard.core.analysis import analyze_ticker
+from risk_dashboard.core.weights import compute_abs_weights
 from risk_dashboard.data.etf_universes import ETF_UNIVERSES
-import pandas as pd
+from risk_dashboard.core.holdings import load_ishares_holdings, etf_to_isin_map, load_holdings_with_fallback
+from risk_dashboard.core.macro_pipeline import (
+    detect_regime,
+    select_etfs_for_regime,
+    build_regime_portfolio,
+    run_backtest,
+    analyze_performance
+)
+
+from risk_dashboard.core.holdings import try_relaxed_holdings
+from risk_dashboard.core.etf_tools import download_prices
+from risk_dashboard.core.helpers import classify_etf
+
+logger = logging.getLogger(__name__)
+
+
+logger.debug("DEBUG: run_backtest from:", run_backtest.__module__)
+os.makedirs("risk_dashboard/data", exist_ok=True)
 
 
 # session state defaults (einmalig, ganz oben in profiles_ui.py)
@@ -36,8 +60,15 @@ CSV_CANDIDATES = [
     Path(__file__).parents[2] / "data" / "attribut-warum-wichtig-12.csv",
 ]
 
-BASE_DIR = Path(__file__).resolve().parents[1]
+BASE_DIR = Path(__file__).resolve().parents[1] # risk_dashboard
 LEX_PATH = BASE_DIR / "docs" / "lexikon.md"
+
+
+holdings_dir = BASE_DIR / "data" / "holdings"
+price_path = BASE_DIR / "data" / "price_data.csv"
+macro_path = BASE_DIR / "data" / "macro_df.csv"
+ETF_UNIVERSE_PATH = BASE_DIR / "data" / "etf_universe.yaml"
+
 
 TOOLTIPS = {
     "profile_name": "Name des Profils, z. B. Conservative, Balanced, Aggressive.",
@@ -61,6 +92,131 @@ CATEGORY_DEFAULTS: Dict[str, Dict[str, Any]] = {
 }
 
 
+ETF_INFO = {
+    "iShares": {
+        "anbieter": "BlackRock (UK/US)",
+        "region": "Global / US / UK",
+        "replikation": "Physisch",
+        "ter": "0.07 – 0.20 %",
+    },
+    "Vanguard": {
+        "anbieter": "Vanguard Group (US)",
+        "region": "Global / US",
+        "replikation": "Physisch",
+        "ter": "0.07 – 0.22 %",
+    },
+    "Xtrackers": {
+        "anbieter": "DWS (DE)",
+        "region": "Europa / Deutschland",
+        "replikation": "Physisch / Synthetisch",
+        "ter": "0.09 – 0.25 %",
+    },
+    "Amundi": {
+        "anbieter": "Amundi (FR)",
+        "region": "Europa / Global",
+        "replikation": "Physisch",
+        "ter": "0.15 – 0.30 %",
+    },
+    "Cash": {
+        "anbieter": "Barbestand",
+        "region": "Keine Region",
+        "replikation": "Keine",
+        "ter": "–",
+    },
+    "Unbekannt": {
+        "anbieter": "Unbekannt",
+        "region": "–",
+        "replikation": "–",
+        "ter": "–",
+    },
+}
+
+ETF_LOGOS = {
+    "iShares": "https://upload.wikimedia.org/wikipedia/commons/1/1b/Ishares_logo.svg",
+    "Vanguard": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Vanguard_logo.svg",
+    "Xtrackers": "https://upload.wikimedia.org/wikipedia/commons/4/4e/DWS_Group_logo.svg",
+    "Amundi": "https://upload.wikimedia.org/wikipedia/commons/8/8e/Amundi_logo.svg",
+    "Cash": "https://upload.wikimedia.org/wikipedia/commons/5/5a/Cash_icon.png",
+    "Unbekannt": "https://upload.wikimedia.org/wikipedia/commons/3/3f/Question_mark.svg",
+}
+
+REPLICATION_TOOLTIP = {
+    "physical": "Physisch replizierend: ETF hält die echten Aktien.",
+    "synthetic": "Synthetisch replizierend: ETF nutzt Swaps statt echter Aktien.",
+    None: "Keine Angaben verfügbar."
+}
+
+def get_shared(name):
+    # bevorzugt session_state, dann modul-globals, sonst None
+    val = st.session_state.get(name)
+    if val is not None:
+        return val
+    val = globals().get(name)
+    if val is not None:
+        return val
+    return None
+
+
+def load_etf_yaml():
+    try:
+        if ETF_UNIVERSE_PATH.exists():
+            with open(ETF_UNIVERSE_PATH, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+    except Exception:
+        st.warning("Fehler beim Laden von ETF YAML; benutze leeres Mapping.")
+    return {}
+
+def load_macro_data():
+    # Dummy-Daten bis echte Makrodaten angebunden sind
+    df = pd.DataFrame({
+        "inflation": [2.1, 2.4, 3.0, 3.4],
+        "yield_curve": [0.5, 0.2, -0.1, -0.3],
+        "growth": [1.5, 1.2, 0.4, -0.2]
+    })
+    return df
+
+def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
+    # 1) Versuche session_state
+    df = st.session_state.get(session_key)
+    logger.debug("session_state keys: %s", list(st.session_state.keys()))
+    logger.debug("portfolio_df present in session: %s", session_key in st.session_state)
+
+    # 2) File uploader (UI) — eindeutiger key
+    uploaded = st.file_uploader(
+        "Portfolio CSV (ticker, quantity, price, market_value optional)",
+        type=["csv"],
+        key=f"portfolio_uploader_{session_key}"
+    )
+    if uploaded is not None:
+        try:
+            df = pd.read_csv(uploaded)
+            logger.debug("Loaded portfolio from uploader shape=%s columns=%s", getattr(df, "shape", None), list(df.columns))
+            st.session_state[session_key] = df
+            return df
+        except Exception:
+            logger.exception("Failed to parse uploaded portfolio CSV")
+            st.error("Fehler beim Einlesen der hochgeladenen CSV.")
+            return pd.DataFrame()
+
+    # 3) Fallback: Datei auf Disk
+    disk_path = Path("risk_dashboard/data/portfolio.csv")  # oder holdings/portfolio.csv
+    logger.debug("Trying to load CSV from %s exists=%s", disk_path, disk_path.exists())
+    if disk_path.exists():
+        try:
+            df = pd.read_csv(disk_path)
+            st.session_state[session_key] = df
+            logger.debug("Loaded portfolio from disk shape=%s", df.shape)
+            return df
+        except Exception:
+            logger.exception("Failed to read portfolio CSV from disk")
+            st.error("Fehler beim Lesen der Portfolio‑CSV von der Festplatte.")
+            return pd.DataFrame()
+
+    # 4) Kein Portfolio gefunden -> leeres DataFrame
+    logger.debug("No portfolio found; returning empty DataFrame")
+    return pd.DataFrame()
+
+
 @st.cache_data(ttl=3600)
 def fetch_from_api(ticker: str, api_key: str) -> pd.DataFrame:
     url = "https://apidata.fin2dev.com/v1/etfholdings"
@@ -77,6 +233,14 @@ def fetch_from_provider_csv(ticker: str) -> pd.DataFrame:
     r = requests.get(csv_url, timeout=10)
     r.raise_for_status()
     df = pd.read_csv(pd.compat.StringIO(r.text))
+    # Debug: zeigt dir, was wirklich eingelesen wurde
+    logger.debug(
+        "read df shape=%s columns=%s sample=%s",
+        getattr(df, 'shape', None),
+        list(df.columns),
+        df.head().to_dict(orient='records')[:3]
+    )
+
     # mappe provider-spalten auf weight_in_etf
     return pd.DataFrame({"ticker": df["ticker"], "weight_in_etf": df["weight"]/100.0})
 
@@ -109,11 +273,6 @@ def compute_portfolio_value(df: pd.DataFrame) -> float:
         df["market_value"] = df["quantity"].fillna(0) * df["price"].fillna(0)
     return float(df["market_value"].sum())
 
-def compute_abs_weights(df: pd.DataFrame, portfolio_value: float) -> pd.DataFrame:
-    df = df.copy()
-    df["abs_weight"] = df["market_value"] / portfolio_value if portfolio_value > 0 else 0.0
-    return df
-
 def compute_etf_breakdown(etf_market_value: float, holdings_df: pd.DataFrame, portfolio_value: float) -> pd.DataFrame:
     h = holdings_df.copy()
     h["abs_weight_in_portfolio"] = h["weight_in_etf"] * (etf_market_value / portfolio_value) if portfolio_value > 0 else 0.0
@@ -122,6 +281,14 @@ def compute_etf_breakdown(etf_market_value: float, holdings_df: pd.DataFrame, po
 def load_etf_holdings(uploaded_file):
     # read
     df = pd.read_csv(uploaded_file)
+
+    # Debug: zeigt dir, was wirklich eingelesen wurde
+    logger.debug(
+        "read df shape=%s columns=%s sample=%s",
+        getattr(df, 'shape', None),
+        list(df.columns),
+        df.head().to_dict(orient='records')[:3]
+    )
     # normalize column names
     df.columns = df.columns.str.strip().str.lower()
     # mögliche Varianten prüfen
@@ -148,10 +315,6 @@ def load_etf_holdings(uploaded_file):
 
     df["weight_in_etf"] = df[col].apply(to_float)
     return df
-
-
-# profiles_ui.py  (Ausschnitt / ersetze die alte render_etf_tab Implementierung)
-
 
 def normalize_holdings_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -191,76 +354,318 @@ def normalize_holdings_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def render_etf_tab(session_state):
-    st.header("ETF vs Aktie — Absolute Gewichte (Live)")
+    # --- Dashboard‑Dokumentation / Gebrauchsanweisung ---
+    with st.expander("📘 Dashboard‑Beschreibung und Gebrauchsanweisung"):
+        DOC_PATH = Path(__file__).resolve().parents[1] / "docs" / "dashboard_guide.md"
+        if DOC_PATH.exists():
+            st.markdown(DOC_PATH.read_text(encoding="utf-8"))
+        else:
+            st.write("Dokumentation nicht gefunden. Bitte lege docs/dashboard_guide.md an.")
 
+    st.header("ETF vs Aktie — Absolute Gewichte (Live)")
     with st.expander("Kurzhilfe"):
         st.markdown(
             "ETF = Korb aus Wertpapieren (eigener Ticker). "
             "Absolute Gewicht = Marktwert Position / Gesamtportfolio. "
             "Bei ETFs: ETF_abs * weight_in_etf = absolutes Gewicht der Underlyings."
         )
+    st.markdown("---")
+
+    # --- Status-Legende ---
+    st.markdown("""
+    ### 🔍 Status-Legende
+    🟢 **iShares (UK/US)** – echte Holdings verfügbar  
+    🟡 **Vanguard / Amundi / Xtrackers / EU / US / UK** – keine iShares-CSV, Demo-Holdings  
+    🔴 **Cash / Nicht-ETF** – keine Holdings  
+    ---
+    """)
+
 
     # 1) Portfolio Input
-    uploaded = st.file_uploader("Portfolio CSV (ticker, quantity, price, market_value optional)", type=["csv"])
-    if uploaded:
-        try:
-            df = pd.read_csv(uploaded)
-        except Exception as e:
-            st.error(f"Fehler beim Einlesen der Portfolio‑CSV: {e}")
-            df = pd.DataFrame()
-    else:
-        # Fallback Demo (nur sichtbar, wenn kein Upload)
-        st.info("Keine CSV hochgeladen — Beispielpositionen werden angezeigt (nur Demo).")
-        df = pd.DataFrame([
-            {"ticker":"CASH","quantity":100,"price":100,"market_value":10000},
-            {"ticker":"ETFTECH","quantity":50,"price":400,"market_value":20000},
-            {"ticker":"AAPL","quantity":0,"price":0,"market_value":70000},
-        ])
+    df = load_portfolio_from_ui_or_disk()
+    # --- Validierung: mindestens 'ticker' vorhanden und market_value berechnen ---
+    required = {"ticker"}
+    if not df.empty:
+        if not required.issubset(set(df.columns)):
+            st.error("CSV muss mindestens Spalte 'ticker' enthalten.")
+            df = pd.DataFrame()  # Abbruch / überspringen weiterer Schritte
+        else:
+            # market_value berechnen, falls fehlt
+            if "market_value" not in df.columns:
+                qty = df["quantity"].astype(float).fillna(0.0) if "quantity" in df.columns else pd.Series(0.0, index=df.index)
+                price = df["price"].astype(float).fillna(0.0) if "price" in df.columns else pd.Series(0.0, index=df.index)
+                df["market_value"] = qty * price
+                logger.debug("Computed market_value for portfolio sample=%s", df[["ticker","market_value"]].head().to_dict(orient="records"))
+            st.session_state["portfolio_df"] = df
 
-    # Sicherstellen, dass market_value existiert
-    if not df.empty and "market_value" not in df.columns:
-        df["market_value"] = df.get("quantity", 0).fillna(0) * df.get("price", 0).fillna(0)
+    # sichere Initialisierung aus session_state
+    df = st.session_state.get("portfolio_df", pd.DataFrame())
 
-    # Portfolio value (automatisch oder manuell überschreiben)
+    # sichere Berechnung market_value nur wenn df nicht leer ist
+    if not df.empty:
+        st.dataframe(df)
+        # sichere Series für quantity und price (falls Spalte fehlt, ersetze durch 0er-Serie)
+        if "quantity" in df.columns:
+            qty = df["quantity"].astype(float).fillna(0.0)
+        else:
+            qty = pd.Series(0.0, index=df.index)
+
+        if "price" in df.columns:
+            price = df["price"].astype(float).fillna(0.0)
+        else:
+            price = pd.Series(0.0, index=df.index)
+
+        df["market_value"] = qty * price
+
+        # optional: schreibe das aktualisierte df zurück in session_state
+        st.session_state["portfolio_df"] = df
+
     auto_portfolio_value = compute_portfolio_value(df) if not df.empty else 0.0
     portfolio_value = st.number_input("Gesamtportfolio (leer = Summe der Marktwerte)", value=float(auto_portfolio_value), format="%.2f")
 
     # 2) Auswahl ETFs aus Portfolio
-    tickers = []
-    if not df.empty and "ticker" in df.columns:
-        tickers = df["ticker"].astype(str).str.upper().unique().tolist()
+    tickers = df["ticker"].astype(str).str.upper().unique().tolist() if not df.empty else []
     selected_etfs = st.multiselect("Aus Portfolio wähle ETF(s) zur Aufschlüsselung", options=tickers)
 
-    # 3) Holdings pro ETF (Upload, Session persistence, optional Demo)
+    # 3) Holdings pro ETF
     holdings_map: Dict[str, pd.DataFrame] = {}
-    holdings_dir = Path("data/holdings")
+
     holdings_dir.mkdir(parents=True, exist_ok=True)
 
-    for etf in selected_etfs:
-        st.markdown(f"**Holdings für {etf}**")
-        # Checkbox: Demo nur auf Anfrage
-        use_demo = st.checkbox(f"Demo‑Holdings für {etf} anzeigen", key=f"demo_{etf}")
+    etf_to_isin_map = get_shared("etf_to_isin_map")
+    if etf_to_isin_map is None:
+        etf_to_isin_map = globals().get("etf_to_isin_map", {})
 
-        # File uploader (persistiert in session_state und optional auf Disk)
-        uploaded_h = st.file_uploader(f"Holdings CSV für {etf} (ticker, weight_in_etf)", key=f"h_{etf}")
+
+    # Debug: Pfade in UI
+    st.write("DEBUG price_path:", price_path)
+    st.write("DEBUG macro_path:", macro_path)
+    st.write("price_path exists:", price_path.exists())
+    st.write("macro_path exists:", macro_path.exists())
+
+    # Sicheres Lesen von shared DataFrames
+    price_data = get_shared("price_data")
+    macro_df = get_shared("macro_df")
+
+    # Falls price_data noch None ist und etf_universe vorhanden ist, versuche Loader (falls nötig)
+    etf_universe, universe_warnings = load_etf_universe()
+    if price_data is None:
+        try:
+            price_data = load_price_data(etf_universe)
+            st.session_state["price_data"] = price_data
+        except Exception as e:
+            st.error(f"Fehler in load_price_data(): {e}")
+            price_data = None
+
+    # Falls macro_df noch None, versuche Loader oder CSV-Fallback
+    if macro_df is None:
+        try:
+            macro_df = load_macro_data()
+            st.session_state["macro_df"] = macro_df
+        except Exception:
+            # Verwende einen anderen lokalen Namen, damit die modulweite macro_path nicht überschrieben wird
+            macro_csv_path = BASE_DIR / "data" / "macro_df.csv"
+            if macro_csv_path.exists():
+                try:
+                    macro_df = pd.read_csv(macro_csv_path, index_col=0, parse_dates=True)
+
+                    # Debug: zeigt dir, was wirklich eingelesen wurde
+                    logger.debug(
+                        "read df shape=%s columns=%s sample=%s",
+                        getattr(macro_df, 'shape', None),
+                        list(macro_df.columns),
+                        macro_df.head().to_dict(orient='records')[:3]
+                    )
+                    st.session_state["macro_df"] = macro_df
+                except Exception as e:
+                    st.error("Fehler beim Laden von macro_df.csv: " + str(e))
+                    macro_df = None
+
+
+    # UI‑Warnungen, falls Daten fehlen
+    if price_data is None:
+        st.warning("Preisdaten (price_data) fehlen. Backtest wird beim Klick geprüft.")
+    if macro_df is None:
+        st.warning("Makrodaten (macro_df) fehlen. Backtest wird beim Klick geprüft.")
+
+
+    # --- Hilfsfunktionen / Konstanten (einmalig definieren) ---
+    def detect_region(etf: str) -> str:
+        if etf.endswith(".L"):
+            return "UK"
+        if etf.endswith(".DE"):
+            return "Deutschland"
+        if etf.endswith(".US"):
+            return "USA"
+        if etf.endswith(".FR"):
+            return "Frankreich"
+        return "Global"
+
+    # ETF_LOGOS, ETF_INFO, REPLICATION_TOOLTIP sollten oben definiert sein (wie zuvor besprochen)
+
+    # Lade YAML einmal (nicht in der Schleife)
+    ETF_YAML = load_etf_yaml()  # erwartet: Funktion load_etf_yaml() existiert
+
+    # Stelle sicher, dass diese Variablen/Objekte existieren:
+    # holdings_dir: Path zu holdings CSVs
+    # etf_to_isin_map: dict mapping etf->isin
+    # price_data, macro_df: müssen vor dem Button/Backtest definiert sein
+    # normalize_holdings_df, load_holdings_with_fallback, load_ishares_holdings existieren idealerweise
+
+    for etf in selected_etfs:
+        category, tooltip = classify_etf(etf)
+
+        # Region automatisch erkennen
+        region = detect_region(etf)
+
+        # Logo anzeigen
+        logo_url = ETF_LOGOS.get(category, ETF_LOGOS["Unbekannt"])
+        st.image(logo_url, width=80)
+
+        # ETF‑Info‑Panel
+        info = ETF_INFO.get(category, ETF_INFO["Unbekannt"])
+
+        yaml_info = ETF_YAML.get(etf, {})
+        ter = yaml_info.get("ter", "–")
+        replication = yaml_info.get("replication", None)
+        region_yaml = yaml_info.get("region", None)
+        replication_text = REPLICATION_TOOLTIP.get(replication, "Keine Angaben verfügbar.")
+
+        st.markdown(
+            f"""
+            <div style="border:1px solid #ccc; border-radius:8px; padding:10px; background-color:#f9f9f9;">
+                <b>Anbieter:</b> {info['anbieter']}<br>
+                <b>Region:</b> {region_yaml or region}<br>
+                <b>Replikation:</b> {replication or info['replikation']}<br>
+                <small>{replication_text}</small><br>
+                <b>TER:</b> {ter}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # --- farbige Statusanzeige mit Tooltip ---
+        color_map = {
+            "iShares": "#00A65A",
+            "Vanguard": "#B00000",
+            "Xtrackers": "#004C97",
+            "Amundi": "#0072CE",
+            "Cash": "#808080",
+            "Unbekannt": "#999999",
+        }
+
+        color = color_map.get(category, "#999999")
+        st.markdown(f"<span style='color:{color}; font-weight:bold;'>■</span> **{etf} — Kategorie: {category}**", unsafe_allow_html=True)
+        st.caption(f"ℹ️ {tooltip}")
+
+        st.markdown(f"**Holdings für {etf}**")
+
+        hdf = pd.DataFrame()
         df_key = f"holdings_{etf}"
 
-        if uploaded_h:
+        # Checkboxen
+        use_demo = st.checkbox(f"Demo‑Holdings für {etf} anzeigen", key=f"demo_{etf}")
+        use_ishares = st.checkbox(f"Echte iShares‑Holdings für {etf} laden", key=f"ishares_{etf}")
+
+        uploaded_h = st.file_uploader(f"Holdings CSV für {etf} (ticker, weight_in_etf)", key=f"h_{etf}")
+
+        # 1) CSV Upload
+        if uploaded_h is not None:
             try:
                 hdf = pd.read_csv(uploaded_h)
-                hdf = normalize_holdings_df(hdf)
-                # persist in session
+                # Debug: zeigt dir, was wirklich eingelesen wurde
+                logger.debug(
+                    "read df shape=%s columns=%s sample=%s",
+                    getattr(hdf, 'shape', None),
+                    list(hdf.columns),
+                    hdf.head().to_dict(orient='records')[:3]
+                )
+                # sichere Funktionsermittlung (einmalig)
+                normalize_fn = globals().get("normalize_holdings_df")
+                if callable(normalize_fn):
+                    try:
+                        hdf = normalize_fn(hdf)
+                    except Exception as e:
+                        st.warning(f"normalize_holdings_df schlug fehl: {e} — verwende unbearbeitete CSV.")
+                # session_state setzen
                 st.session_state[df_key] = hdf
-                # optional: persist to disk for reuse across reruns
-                try:
-                    hdf.to_csv(holdings_dir / f"{etf}.csv", index=False)
-                except Exception:
-                    st.info("Konnte Holdings nicht auf Disk speichern (Berechtigung/FS).")
+
+                # speichern
+                save_path = holdings_dir / f"{etf}.csv"
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                hdf.to_csv(save_path, index=False)
+                st.success("Holdings CSV erfolgreich geladen.")
             except Exception as e:
                 st.error(f"Fehler beim Verarbeiten der Holdings‑CSV für {etf}: {e}")
-                hdf = st.session_state.get(df_key, pd.DataFrame())
+
+        # 2) iShares Internet‑Holdings (nur wenn Checkbox gesetzt)
+        elif use_ishares:
+            # definiere isin sicher
+            isin = None
+            if etf_to_isin_map and etf in etf_to_isin_map:
+                isin = etf_to_isin_map[etf]
+
+            logger.debug("holdings_dir (resolved) = %s", holdings_dir.resolve())
+            logger.debug("etf variable = %r", etf)
+            candidates = sorted(holdings_dir.glob(f"{etf}.*"))
+            logger.debug("candidates for %s = %s", etf, [str(p) for p in candidates])
+
+            # innerhalb: for etf in selected_etfs:
+            st.markdown(f"**Holdings für {etf}**")
+            df_key = f"holdings_{etf}"
+            path_to_csv = holdings_dir / f"{etf}.csv"
+
+            # 1) Versuche relaxed fallback (einfaches ticker,weight_in_etf CSV)
+            ok, res = try_relaxed_holdings(path_to_csv)
+            if ok:
+                hdf = res
+                logger.debug("Using relaxed holdings for %s (accepted)", etf)
+                st.session_state[df_key] = hdf
+                path_to_csv.parent.mkdir(parents=True, exist_ok=True)
+                hdf.to_csv(path_to_csv, index=False)
+                st.success(f"Holdings für {etf} aus lokaler CSV geladen (relaxed fallback).")
+                # nur diese Iteration beenden, nächste ETF verarbeiten
+                continue
+
+            # 2) relaxed nicht verwendet -> bestehende Logik ausführen
+            hdf = load_holdings_with_fallback(etf, category, isin, df_key, holdings_dir)
+
+            # 3) iShares / Demo Logik (nur hier, nicht vorher)
+            if category == "iShares" and isin:
+                try:
+                    hdf = load_ishares_holdings(isin)
+                    hdf = normalize_holdings_df(hdf) if callable(normalize_holdings_df) else hdf
+                    hdf.to_csv(path_to_csv, index=False)
+                    st.session_state[df_key] = hdf
+                    st.success(f"Echte iShares‑Holdings geladen und gespeichert unter: {path_to_csv}")
+                except Exception:
+                    st.warning(f"⚠️ Keine gültige iShares‑CSV für {etf} gefunden. Demo‑Holdings werden verwendet.")
+                    hdf = pd.DataFrame([
+                        {"ticker": "AAPL", "weight_in_etf": 0.30},
+                        {"ticker": "MSFT", "weight_in_etf": 0.30},
+                        {"ticker": "NVDA", "weight_in_etf": 0.20},
+                        {"ticker": "AMZN", "weight_in_etf": 0.20},
+                    ])
+                    st.caption("Demo‑Holdings (automatischer Fallback).")
+                    st.session_state[df_key] = hdf
+            else:
+                st.warning(f"{etf} ist kein iShares‑ETF oder ISIN fehlt — Demo‑Holdings werden verwendet.")
+                hdf = pd.DataFrame([
+                    {"ticker": "AAPL", "weight_in_etf": 0.30},
+                    {"ticker": "MSFT", "weight_in_etf": 0.30},
+                    {"ticker": "NVDA", "weight_in_etf": 0.20},
+                    {"ticker": "AMZN", "weight_in_etf": 0.20},
+                ])
+                st.caption("Demo‑Holdings (automatischer Fallback).")
+                st.session_state[df_key] = hdf
+
+
+                logger.warning("Keine gültige iShares‑CSV für %s gefunden. Demo‑Holdings werden verwendet.", etf)
+                logger.debug("Stacktrace for demo-fallback:\n%s", "".join(traceback.format_stack()))
+
+
+        # 3) Session oder Disk
         else:
-            # kein Upload in dieser Session: lade aus session_state oder von Disk
             if df_key in st.session_state:
                 hdf = st.session_state[df_key]
             else:
@@ -268,66 +673,90 @@ def render_etf_tab(session_state):
                 if disk_file.exists():
                     try:
                         hdf = pd.read_csv(disk_file)
-                        hdf = normalize_holdings_df(hdf)
+                        # Debug: zeigt dir, was wirklich eingelesen wurde
+                        logger.debug(
+                            "read df shape=%s columns=%s sample=%s",
+                            getattr(hdf, 'shape', None),
+                            list(hdf.columns),
+                            df.head().to_dict(orient='records')[:3]
+                        )
+                        hdf = normalize_holdings_df(hdf) if callable(normalize_holdings_df) else hdf
                         st.session_state[df_key] = hdf
                     except Exception as e:
                         st.error(f"Fehler beim Laden der gespeicherten Holdings für {etf}: {e}")
-                        hdf = pd.DataFrame()
-                else:
-                    hdf = pd.DataFrame()
 
-        # Demo nur wenn keine echten Holdings vorhanden und Checkbox gesetzt
-        if hdf.empty and use_demo:
+        # 4) Demo fallback (wenn explizit angefordert oder immer noch leer)
+        if (hdf is None or hdf.empty) and use_demo:
             hdf = pd.DataFrame([
-                {"ticker":"AAPL","weight_in_etf":0.30},
-                {"ticker":"MSFT","weight_in_etf":0.30},
-                {"ticker":"NVDA","weight_in_etf":0.20},
-                {"ticker":"AMZN","weight_in_etf":0.20},
+                {"ticker": "AAPL", "weight_in_etf": 0.30},
+                {"ticker": "MSFT", "weight_in_etf": 0.30},
+                {"ticker": "NVDA", "weight_in_etf": 0.20},
+                {"ticker": "AMZN", "weight_in_etf": 0.20},
             ])
             st.caption("Demo‑Holdings (nur Testzwecke).")
+            st.session_state[df_key] = hdf
 
-        # Zeige kurze Vorschau oder Hinweis
-        if not hdf.empty:
+        # Anzeige
+        if hdf is not None and not hdf.empty:
             st.dataframe(hdf.head(10))
         else:
-            st.info("Keine Holdings geladen. Lade eine CSV hoch oder aktiviere Demo.")
+            st.info("Keine Holdings geladen. Lade eine CSV hoch, aktiviere iShares oder Demo.")
 
-        holdings_map[etf] = hdf
+        holdings_map[etf] = hdf.copy() if (isinstance(hdf, pd.DataFrame) and not hdf.empty) else pd.DataFrame()
 
-    # 4) Berechnen (nur bei Klick)
-    if st.button("Berechnen"):
-        if df.empty:
-            st.error("Kein Portfolio vorhanden. Bitte Portfolio CSV hochladen.")
-        else:
-            df_res = compute_abs_weights(df, portfolio_value)
-            df_display = df_res[["ticker","market_value","abs_weight"]].copy()
-            df_display["market_value"] = df_display["market_value"].map("€{:,.2f}".format)
-            df_display["abs_weight"] = (df_display["abs_weight"]*100).map("{:.2f}%".format)
-            st.subheader("Positionen im Portfolio")
-            st.dataframe(df_display)
 
-            # ETF Breakdowns
-            for etf in selected_etfs:
-                st.subheader(f"Breakdown {etf}")
-                etf_row = df[df["ticker"].astype(str).str.upper() == etf.upper()]
-                if etf_row.empty:
-                    st.warning(f"{etf} nicht in Portfolio gefunden. Bitte zuerst als Position hinzufügen.")
-                    continue
-                etf_mv = float(etf_row["market_value"].iloc[0])
-                hdf = holdings_map.get(etf, pd.DataFrame())
-                if hdf.empty:
-                    st.warning(f"Keine Holdings für {etf} vorhanden.")
-                    continue
-                breakdown = compute_etf_breakdown(etf_mv, hdf, portfolio_value)
-                display = breakdown.copy()
-                display["weight_in_etf"] = (display["weight_in_etf"]*100).map("{:.2f}%".format)
-                display["abs_weight_in_portfolio"] = (display["abs_weight_in_portfolio"]*100).map("{:.2f}%".format)
-                st.dataframe(display)
 
-            st.success("Berechnung abgeschlossen.")
-
-    st.markdown("---")
+    # Console logs (für dev)
+    logger.debug("DEBUG: sys.path (first 10):", sys.path[:10])
     
+    price_data = get_shared("price_data")
+    macro_df = get_shared("macro_df")
+
+    # Konsole / Streamlit UI ausgeben (temporär)
+    #st.write("DEBUG session_state keys:", list(st.session_state.keys()))
+    #st.write("DEBUG price_data in session_state:", "price_data" in st.session_state)
+
+    
+    # Fehlerhinweise (falls Daten fehlen)
+    # UI‑Warnungen
+    if price_data is None:
+        st.warning("Preisdaten (price_data) fehlen. Backtest wird beim Klick geprüft.")
+    if macro_df is None:
+        st.warning("Makrodaten (macro_df) fehlen. Backtest wird beim Klick geprüft.")
+
+    # Button immer anzeigen (ein Key, nur einmal im Repo)
+    if st.button("Berechnen", key="btn_etf_calculate"):
+
+        pd_shared = get_shared("price_data")
+        md_shared = get_shared("macro_df")
+
+        if pd_shared is None:
+            st.error("Preisdaten (price_data) sind nicht definiert. Backtest abgebrochen.")
+            return
+
+        if md_shared is None:
+            st.error("Makrodaten (macro_df) sind nicht definiert. Backtest abgebrochen.")
+            return
+
+        try:
+            out = run_all_etf_backtests(
+                selected_etfs=selected_etfs,
+                holdings_dir=holdings_dir,
+                etf_to_isin_map=etf_to_isin_map,
+                price_data=pd_shared,
+                macro_df=md_shared,
+                backtest_dir=Path("risk_dashboard/data/backtests"),
+                portfolio_value=st.session_state.get("portfolio_value", 100000.0),
+            )
+        except Exception as e:
+            st.error(f"Backtest fehlgeschlagen: {e}")
+            logger.exception("Backtest failed: %s", e)
+            return
+
+        st.success("Backtests abgeschlossen.")
+        st.json(out)
+            
+    st.markdown("---")
 
 
 def load_attribute_table_try(paths):
@@ -402,6 +831,101 @@ def apply_preset(keys: list, etf_universe: dict):
         st.warning(f"Preset enthält nicht verfügbare ETFs: {', '.join(missing)}")
     st.session_state.selected_etfs = [k for k in keys if k in etf_universe]
 
+# in risk_dashboard/ui/profiles_ui.py: ersetze die alte load_price_data durch diese Version
+def load_price_data(etf_universe, *args, **kwargs):
+    """
+    Accepts either:
+      - a dict mapping id -> {"ticker": "...", ...}
+      - a list of ticker strings
+    Returns a DataFrame of price series with tickers as columns.
+    """
+    # Accept list input and convert to expected dict format
+    if isinstance(etf_universe, list):
+        etf_universe = {t: {"ticker": t} for t in etf_universe}
+
+    # Defensive: ensure values have 'ticker'
+    tickers = []
+    for v in (etf_universe.values() if isinstance(etf_universe, dict) else []):
+        if isinstance(v, dict) and "ticker" in v:
+            tickers.append(v["ticker"])
+        else:
+            # skip malformed entries
+            continue
+
+    # Fallback: if no tickers, try to interpret keys as tickers
+    if not tickers and isinstance(etf_universe, dict):
+        tickers = [k for k in etf_universe.keys()]
+
+    # final normalization
+    tickers = [str(t).strip().upper() for t in tickers if t]
+
+    # original behavior: download_prices / download_prices wrapper
+    prices = download_prices(tickers, start="2010-01-01")
+    return prices
+
+
+
+def detect_historical_regimes(
+    macro_df: Optional[pd.DataFrame],
+    required_cols: Sequence[str] = ("inflation", "gdp", "volatility"),
+    defaults: dict = None,
+    inflation_threshold: float = 3.0,
+) -> pd.Series:
+    """
+    Ermittelt historische Regime aus macro_df und gibt eine pd.Series mit Regime-Labels zurück.
+    - macro_df: DataFrame mit DatetimeIndex und Makrovariablen als Spalten (kann None sein).
+    - required_cols: erwartete Spalten, die ggf. mit Defaults ergänzt werden.
+    - defaults: dict mit Default-Werten für fehlende Spalten (falls None -> 0.0).
+    - inflation_threshold: Beispiel-Schwelle für 'high_inflation'.
+    """
+
+    # Schutz gegen None
+    if macro_df is None:
+        # leere Series mit DatetimeIndex nicht möglich ohne Index; gib leere Series zurück
+        logger.debug("WARN: detect_historical_regimes called with macro_df=None -> returning empty Series")
+        return pd.Series(dtype="object")
+
+    # Sicherstellen, dass Index ein DatetimeIndex ist
+    if not isinstance(macro_df.index, pd.DatetimeIndex):
+        try:
+            macro_df = macro_df.copy()
+            macro_df.index = pd.to_datetime(macro_df.index)
+            logger.debug("INFO: macro_df.index converted to DatetimeIndex")
+        except Exception:
+            logger.debug("WARN: could not convert macro_df.index to DatetimeIndex; proceeding with original index")
+
+    # Defaults setzen
+    if defaults is None:
+        defaults = {}
+    for col in required_cols:
+        if col not in macro_df.columns:
+            default_value = defaults.get(col, 0.0)
+            logger.debug(f"WARN: macro_df missing '{col}' column; filling with {default_value}")
+            macro_df[col] = default_value
+
+    # Beispiel-Logik: einfache Regime-Klassifikation
+    regimes = []
+    for _, row in macro_df.iterrows():
+        # sichere Zugriffe mit .get (falls später weitere Keys fehlen)
+        infl = row.get("inflation", defaults.get("inflation", 0.0))
+        gdp = row.get("gdp", defaults.get("gdp", 0.0))
+        vol = row.get("volatility", defaults.get("volatility", 0.0))
+
+        # einfache Regeln (anpassbar)
+        if pd.isna(infl):
+            infl = defaults.get("inflation", 0.0)
+        if infl > inflation_threshold:
+            regimes.append("high_inflation")
+        elif vol > 0.2:  # Beispiel: hohe Volatilität
+            regimes.append("high_volatility")
+        elif gdp < 0:
+            regimes.append("recession")
+        else:
+            regimes.append("normal")
+
+    return pd.Series(regimes, index=macro_df.index, name="regime")
+
+
 def profile_form_ui() -> None:
     _init_session_state_defaults()
 
@@ -465,6 +989,61 @@ def profile_form_ui() -> None:
 
     # Universe laden (validierend)
     etf_universe, universe_warnings = load_etf_universe()
+
+    macro_df = load_macro_data()
+    price_data = load_price_data(etf_universe)
+    regimes = detect_historical_regimes(macro_df)
+
+    st.session_state["macro_df"] = macro_df
+    st.session_state["price_data"] = price_data
+
+    # 1. Aktuelles Regime bestimmen
+    macro_regime = detect_regime(macro_df)
+
+    # 2. ETF-Universum für dieses Regime auswählen
+    allowed = select_etfs_for_regime(etf_universe, macro_regime)
+
+    # 3. Portfolio für dieses Regime bauen
+    portfolio = build_regime_portfolio(macro_regime, allowed)
+
+    logger.debug("DEBUG: type(price_data)=", type(price_data), "shape=", getattr(price_data, "shape", None))
+    logger.debug("DEBUG: portfolio=", portfolio)
+    
+    # 4. Backtest durchführen
+    bt = run_backtest(portfolio, price_data, regimes)
+    logger.debug("DEBUG: bt keys=", bt.keys() if isinstance(bt, dict) else type(bt))
+
+    # 5. Performance analysieren
+    stats = analyze_performance(bt)
+
+
+    # 6. Ergebnisse nur schreiben, wenn vorhanden
+    pv = bt.get("portfolio_value") if isinstance(bt, dict) else None
+    metrics = bt.get("metrics") if isinstance(bt, dict) else {}
+    logger.debug("DEBUG: metrics=", metrics)
+
+
+    if pv is not None and not pv.empty:
+        pv_df = pv.rename("portfolio_value").reset_index()
+        # speichere DataFrame als dict oder als CSV‑String in session_state
+        st.session_state["last_backtest_results_df"] = pv_df  # DataFrame direkt
+        st.session_state["last_backtest_results_csv"] = pv_df.to_csv(index=False)
+        logger.debug(f"DEBUG: backtest results stored in session_state, {len(pv_df)} Zeilen")
+    else:
+        logger.debug("DEBUG: portfolio_value leer — keine CSV geschrieben")
+
+    if metrics:
+        st.session_state["last_metrics"] = metrics
+        logger.debug("DEBUG: results stored in session_state['last_metrics']")
+    else:
+        logger.debug("DEBUG: metrics leer — keine JSON geschrieben")
+
+
+    st.write("Aktuelles Makro-Regime:", macro_regime)
+    st.write("Portfolio:", portfolio)
+    st.write("Backtest:", bt)
+    st.write("Performance:", stats)
+
     if universe_warnings:
         for w in universe_warnings:
             st.warning(w)
@@ -676,3 +1255,4 @@ def profile_form_ui() -> None:
             st.markdown(LEX_PATH.read_text(encoding="utf-8"))
         else:
             st.write("Lexikon nicht gefunden. Bitte lege docs/lexikon.md an.")
+
