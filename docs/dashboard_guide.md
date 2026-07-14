@@ -1,0 +1,3 @@
+# Dashboard‑Beschreibung und Gebrauchsanweisung
+...
+(den kompletten Markdown‑Block hier einfügen)

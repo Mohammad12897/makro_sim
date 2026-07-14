@@ -1,4 +1,4 @@
-﻿import yaml, sys
+import yaml, sys
 p = "risk_dashboard/config/etf_universe.yaml"
 try:
     with open(p, "r", encoding="utf-8") as f:

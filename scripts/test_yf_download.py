@@ -6,6 +6,15 @@ import pytz
 import yfinance as yf
 
 TICKER = "EXS1.DE"
+TICKER = "XDAX.DE"
+TICKER = "XUDE.DE"
+TICKER = "AGGB"
+TICKER = "FAZ100.DE"
+#TICKER = " DAXX.DE"
+#TICKER = "DAX50ESG.DE"
+TICKER = "EUNL.DE"
+TICKER = "VWCE.DE"
+TICKER = "SPY"
 TZ = "Europe/Berlin"
 RETRIES = 3
 RETRY_BASE_SLEEP = 0.5  # Sekunden
@@ -44,6 +53,17 @@ def download_with_tz_and_fallback(ticker_symbol: str):
 
     # Wenn alles fehlschlägt, None zurückgeben
     return None
+    
+    
+    
+
+def download_ticker(ticker_symbol: str):
+    t = yf.Ticker("ticker_symbol")
+    df = t.history(period="1mo", auto_adjust=True)
+    print("empty:", df is None or df.empty)
+    print(df.head())
+    
+
 
 if __name__ == "__main__":
     print("Starte Test für yfinance Download mit Zeitzone und Retries")
@@ -52,3 +72,5 @@ if __name__ == "__main__":
         print(f"Kein Daten‑Frame für {TICKER} erhalten.")
     else:
         print(df.tail(5))
+    print("####### download_ticker ######")    
+    download_ticker(TICKER)

@@ -1,4 +1,4 @@
-﻿# test/example_presets.py
+# test/example_presets.py
 import numpy as np
 EXAMPLE_PRESETS = {
     "USA": {"political_security": 0.15, "strategic_autonomy": 0.95, "total": 0.18, "cluster": 2},
@@ -18,4 +18,3 @@ class DummyModel:
 
 CLUSTERS = {k: v.get("cluster") for k, v in EXAMPLE_PRESETS.items()}
 MODEL = DummyModel()
-

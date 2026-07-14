@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 from pathlib import Path
 import textwrap, os
 
@@ -73,7 +73,7 @@ def fetch_reserves(api: DataAPI):
         df["ts"] = pd.to_datetime(df["ts"], errors="coerce")
         df[value_col] = pd.to_numeric(df[value_col], errors="coerce")
         df = df.dropna(subset=["ts", value_col]).sort_values("ts")
-        return df.set_index("ts").resample("M").last()
+        return df.set_index("ts").resample("ME").last()
     df_res = normalize(cb, "reserves_usd"); df_imp = normalize(imp, "imports_usd")
     df = df_res.join(df_imp, how="inner")
     denom = np.maximum(1.0, df["imports_usd"].values)
@@ -434,4 +434,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

@@ -2,6 +2,9 @@
 import yaml
 from pathlib import Path
 from typing import Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 CONFIG_PATH = Path(__file__).parents[1] / "config" / "etf_universe.yaml"
 
@@ -16,7 +19,7 @@ def load_etf_universe(path: Path = CONFIG_PATH) -> Dict[str, Dict[str, Any]]:
 # Beispielnutzung
 if __name__ == "__main__":
     etfs = load_etf_universe()
-    print(list(etfs.keys()))
+    logger.debug(list(etfs.keys()))
 
 # risk_dashboard/core/etf_config.py  (weiter)
 from dataclasses import dataclass, field

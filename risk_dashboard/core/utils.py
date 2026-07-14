@@ -7,6 +7,9 @@ import streamlit as st
 import json
 from pathlib import Path
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # optionaler Audit-Log (falls gewünscht)
@@ -370,6 +373,115 @@ def analyze_portfolio_components(etf_universe: Dict[str, Dict[str, Any]],
     return df
 
 
+def prepare_prices_for_backtest(hdf: pd.DataFrame, project_root: Path, load_price_data_func):
+    """
+    Build etf_universe dict from holdings DataFrame and call load_price_data_func.
+    Returns: prices DataFrame
+    """
+    tickers = [t for t in hdf["ticker"].unique()]
+    etf_universe_dict = {t: {"ticker": t} for t in tickers}
+    logger.debug("prepare_prices_for_backtest: etf_universe_dict keys=%s", list(etf_universe_dict.keys()))
+
+    try:
+        prices = load_price_data_func(etf_universe_dict)
+        return prices
+    except Exception as e:
+        logger.exception("prepare_prices_for_backtest: load_price_data failed: %s", e)
+        price_path = Path(project_root) / "risk_dashboard" / "data" / "price_data.csv"
+        logger.debug("prepare_prices_for_backtest: falling back to %s", price_path)
+        prices = pd.read_csv(price_path, parse_dates=True, index_col=0)
+        return prices
 
 
+def detect_price_format(prices):
+    """
+    Returns: dict with keys:
+      - is_multiindex: bool
+      - has_ohlc_level: bool
+      - close_columns: list of tickers or column names to use as close series
+    """
+    result = {"is_multiindex": False, "has_ohlc_level": False, "close_columns": []}
+    if hasattr(prices.columns, "nlevels") and prices.columns.nlevels > 1:
+        result["is_multiindex"] = True
+        # try to find level names or labels that indicate 'Close'
+        level_names = list(prices.columns.levels[-1])
+        if any(str(x).lower() in ("close","adj close","adjclose") for x in level_names):
+            result["has_ohlc_level"] = True
+            # collect close columns as top-level tickers
+            close_cols = []
+            for col in prices.columns:
+                if str(col[-1]).lower() in ("close","adj close","adjclose"):
+                    close_cols.append(col[0])
+            result["close_columns"] = close_cols
+    else:
+        # flat columns: check for OHLC pattern per ticker prefix or generic 'Close'
+        cols_lower = [c.lower() for c in prices.columns.astype(str)]
+        if any(x in cols_lower for x in ("close","adj close","adjclose")):
+            result["has_ohlc_level"] = False
+            # if columns are like 'AAPL Close' or 'AAPL_Close' try to parse tickers
+            if any(" " in c or "_" in c for c in prices.columns.astype(str)):
+                # heuristic: split and take those ending with close
+                close_cols = []
+                for c in prices.columns.astype(str):
+                    parts = c.replace("_"," ").split()
+                    if parts[-1].lower() in ("close","adj","adjclose","adjclose"):
+                        close_cols.append(c)
+                result["close_columns"] = close_cols or ["Close"] if "Close" in prices.columns else []
+            else:
+                # assume columns are tickers and represent close prices
+                result["close_columns"] = list(prices.columns)
+    return result
 
+def extract_close_series(prices):
+    info = detect_price_format(prices)
+    if info["is_multiindex"] and info["has_ohlc_level"]:
+        # prices[(ticker, 'Close')] -> produce DataFrame with ticker columns
+        close_df = prices.xs("Close", axis=1, level=-1, drop_level=True)
+    elif info["close_columns"]:
+        # if close_columns are column names or tickers
+        close_df = prices[info["close_columns"]]
+        # if names are like 'AAPL Close', rename to ticker
+        new_cols = {c: str(c).split()[0] for c in close_df.columns}
+        close_df = close_df.rename(columns=new_cols)
+    else:
+        # fallback: assume columns are tickers and already close prices
+        close_df = prices.copy()
+    # ensure datetime index
+    close_df.index = pd.to_datetime(close_df.index)
+    return close_df
+
+def compute_market_value_from_holdings(hdf, prices, portfolio_value):
+    """
+    Returns hdf with 'market_value' column.
+    Priority:
+      1. If 'weight_in_etf' present -> market_value = weight_in_etf * portfolio_value
+      2. Else if 'shares' present and prices available -> market_value = shares * last_price
+      3. Else -> equal distribution fallback
+    """
+    h = hdf.copy()
+    if "weight_in_etf" in h.columns:
+        h["market_value"] = h["weight_in_etf"].astype(float) * float(portfolio_value)
+        method = "weight_in_etf"
+    else:
+        # try shares * last_price
+        if "shares" in h.columns:
+            last_prices = extract_close_series(prices).iloc[-1]
+            h = h.set_index("ticker")
+            # map last price; missing tickers -> NaN
+            h["last_price"] = h.index.map(last_prices.to_dict())
+            # if many NaNs, fallback to equal distribution
+            if h["last_price"].isna().sum() / len(h) > 0.5:
+                # too many missing prices -> fallback
+                n = max(len(h), 1)
+                h["market_value"] = float(portfolio_value) / n
+                method = "fallback_equal_due_to_missing_prices"
+            else:
+                h["market_value"] = h["shares"].astype(float) * h["last_price"].astype(float)
+                method = "shares_times_last_price"
+            h = h.reset_index()
+        else:
+            # equal distribution fallback
+            n = max(len(h), 1)
+            h["market_value"] = float(portfolio_value) / n
+            method = "equal_distribution"
+    return h, method

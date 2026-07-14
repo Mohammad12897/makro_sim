@@ -35,10 +35,21 @@ def apply_shock(df, shocks):
         df_sim[var] = df_sim[var] * (1 + shock)
     return df_sim
 
-
-
 def generate_date_range(start="2026-01-01", periods=24, freq="ME"):
-    return pd.date_range(start=start, periods=periods, freq=freq)
+    # Map legacy aliases to supported offsets
+    if isinstance(freq, str):
+        freq_map = {"M": "ME", "Q": "QE", "A": "YE"}
+        freq = freq_map.get(freq.upper(), freq)
+
+    try:
+        return pd.date_range(start=start, periods=periods, freq=freq)
+    except ValueError:
+        # Fallback: explizite Offsets
+        if str(freq).upper() in ("ME", "M"):
+            return pd.date_range(start=start, periods=periods, freq=pd.offsets.MonthEnd())
+        if str(freq).upper() in ("QE", "Q"):
+            return pd.date_range(start=start, periods=periods, freq=pd.offsets.QuarterEnd())
+        raise
 
 
 # ---------------------------------------------------------
@@ -102,4 +113,3 @@ def build_scenario(
     )
 
     return scenario
-

@@ -1,160 +1,86 @@
 etf_universe:
+
   aggregate_bond_etf:
-    name: "iShares Core Global Aggregate Bond ETF"
-    ticker: "AGGB"
+    name: "iShares Core Global Aggregate Bond UCITS ETF"
+    ticker: "AGGH.MI"
+    isin: "IE00BDBRDM35"
     asset_class: "bond"
     region: "global"
-    ter_pct: 0.20
+    ter_pct: 0.10
     replication: "physical"
 
   government_bonds:
-    name: "iShares Euro Government Bond ETF"
-    ticker: "IEGA"
+    name: "iShares Euro Government Bond UCITS ETF"
+    ticker: "EUNA.DE"
+    isin: "IE00B4WXJJ64"
     asset_class: "bond"
     region: "europe"
     ter_pct: 0.12
     replication: "physical"
 
   emerging_markets:
-    name: "iShares MSCI Emerging Markets ETF"
-    ticker: "EEM"
+    name: "iShares Core MSCI EM IMI UCITS ETF"
+    ticker: "EIMI.L"
+    isin: "IE00BKM4GZ66"
     asset_class: "equity"
     region: "emerging"
-    ter_pct: 0.68
+    ter_pct: 0.18
     replication: "physical"
 
   small_cap:
-    name: "iShares MSCI World Small Cap ETF"
-    ticker: "SCW"
+    name: "iShares MSCI World Small Cap UCITS ETF"
+    ticker: "WSML.L"
+    isin: "IE00BF4RFH31"
     asset_class: "equity"
     region: "global"
     ter_pct: 0.35
     replication: "physical"
 
   short_term_cash:
-    name: "Short Term Money Market ETF"
-    ticker: "CASH"
+    name: "iShares USD Ultrashort Bond UCITS ETF"
+    ticker: "ERNU.L"
+    isin: "IE00BCRY6557"
     asset_class: "cash"
     region: "global"
-    ter_pct: 0.05
+    ter_pct: 0.09
     replication: "physical"
+    aum: 100000000
 
   investment_grade_corporates:
-    name: "Investment Grade Corporate Bonds ETF"
-    ticker: "IGCB"
+    name: "iShares Global Corporate Bond UCITS ETF"
+    ticker: "CORP.L"
+    isin: "IE00B3F81R35"
     asset_class: "bond"
     region: "global"
     ter_pct: 0.20
     replication: "physical"
 
-  qqq:
-    name: "Invesco QQQ Trust"
-    ticker: "QQQ"
-    asset_class: "equity"
-    region: "usa"
-    ter_pct: 0.20
-    replication: "physical"
-
-  arkk:
-    name: "ARK Innovation ETF"
-    ticker: "ARKK"
-    asset_class: "equity"
-    region: "usa"
-    ter_pct: 0.75
-    replication: "physical"
-
-  voo:
-    name: "Vanguard S&P 500 ETF"
-    ticker: "VOO"
-    asset_class: "equity"
-    region: "usa"
-    ter_pct: 0.03
-    replication: "physical"
-
-  aggh:
-    name: "iShares Global Aggregate Bond UCITS ETF"
-    ticker: "AGGH"
-    asset_class: "bond"
-    region: "global"
-    ter_pct: 0.10
-    replication: "physical"
-
-  bndx:
-    name: "Vanguard Total International Bond ETF"
-    ticker: "BNDX"
-    asset_class: "bond"
-    region: "global"
-    ter_pct: 0.08
-    replication: "physical"
-
-  imeu_l:
-    name: "iShares MSCI Europe UCITS ETF (IE)"
-    ticker: "IMEU.L"
-    asset_class: "equity"
-    region: "europe"
-    ter_pct: 0.20
-    replication: "physical"
-
-  iqq0_de:
-    name: "iShares Core MSCI World UCITS ETF DE"
-    ticker: "IQQ0.DE"
+  vwrL:
+    name: "Vanguard FTSE All-World UCITS ETF"
+    ticker: "VWRL.L"
+    isin: "IE00BK5BQT80"
     asset_class: "equity"
     region: "global"
-    ter_pct: 0.20
+    ter_pct: 0.22
     replication: "physical"
 
-  apple:
-    name: "Apple Inc."
-    ticker: "AAPL"
-    asset_class: "equity"
-    region: "usa"
-    ter_pct: 0.00
-    replication: "physical"
-
-  microsoft:
-    name: "Microsoft Corp."
-    ticker: "MSFT"
-    asset_class: "equity"
-    region: "usa"
-    ter_pct: 0.00
-    replication: "physical"
-
-  siemens:
-    name: "Siemens AG"
-    ticker: "SIE.DE"
-    asset_class: "equity"
-    region: "europe"
-    ter_pct: 0.00
-    replication: "physical"
-
-  nvda:
-    name: "NVIDIA Corporation"
-    ticker: "NVDA"
-    asset_class: "equity"
-    region: "usa"
-    ter_pct: 0.00
-    replication: "physical"
-
-  amazon:
-    name: "Amazon.com Inc."
-    ticker: "AMZN"
-    asset_class: "equity"
-    region: "usa"
-    ter_pct: 0.00
-    replication: "physical"
-
-  tech_package:
-    name: "Tech Aktienpaket"
-    ticker: "TECH"
+  global_equity_etf:
+    name: "Vanguard FTSE All-World UCITS ETF"
+    ticker: "VWRL.L"
+    isin: "IE00BK5BQT80"
     asset_class: "equity"
     region: "global"
-    ter_pct: 0.00
-    replication: "synthetic"
-    components:
-      apple: 0.30
-      microsoft: 0.30
-      nvda: 0.20
-      amazon: 0.20
+    ter_pct: 0.22
+    replication: "physical"
+
+  equity_etf:
+    name: "Vanguard FTSE All-World UCITS ETF"
+    ticker: "VWRL.L"
+    isin: "IE00BK5BQT80"
+    asset_class: "equity"
+    region: "global"
+    ter_pct: 0.22
+    replication: "physical"
 
   xtrackers_dax:
     name: "Xtrackers DAX UCITS ETF"
@@ -164,8 +90,10 @@ etf_universe:
     region: "germany"
     ter_pct: 0.09
     replication: "physical"
+    aum: 3500000000
+    note: "Standard DAX ETF, kein ESG"
 
-  amundi_faz_100:
+  ishares_mdax:
     name: "iShares MDAX UCITS ETF"
     ticker: "EXS2.DE"
     isin: "DE0005933923"
@@ -173,20 +101,27 @@ etf_universe:
     region: "germany"
     ter_pct: 0.51
     replication: "physical"
+    aum: 1800000000
+    note: "MDAX ETF, nicht DAX, nicht ESG"
 
-  global_equity_etf:
-    name: "Vanguard FTSE All-World UCITS ETF"
-    ticker: "VWRL"
-    preferred_suffix: ".L"
-    isin: "IE00BK5BQT80"
+  amundi_dax:
+    name: "Amundi DAX UCITS ETF"
+    ticker: "DXET.DE"
+    isin: "DE000A2N6B44"
     asset_class: "equity"
-    region: "global"
-    ter_pct: 0.22
+    region: "germany"
+    ter_pct: 0.20
     replication: "physical"
+    aum: 900000000
+    note: "Amundi DAX ETF, nicht ESG, nicht DAX 50"
 
   amundi_dax50_esg:
-    name: "iShares Core DAX UCITS ETF (Ersatz für XUDE)"
-    ticker: "EXS1.DE"
-    isin: "DE000A1E0HR9"
-    note: "same underlying as xtrackers_dax (EXS1.DE)"
-
+    name: "Amundi DAX 50 ESG UCITS ETF"
+    ticker: "DXET.DE"
+    isin: "LU2197908723"
+    asset_class: "equity"
+    region: "germany"
+    ter_pct: 0.18
+    replication: "physical"
+    aum: 1500000000
+    note: "Einziger echter DAX 50 ESG ETF"

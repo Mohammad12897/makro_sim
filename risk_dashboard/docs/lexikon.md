@@ -34,7 +34,7 @@
 
 ## Volatilität
 **Definition:** Statistische Schwankungsbreite der Renditen (Standardabweichung).  
-**Warum wichtig:** Höhere Volatilität bedeutet gröÃŸere Schwankungen und potenziell gröÃŸere Drawdowns.
+**Warum wichtig:** Höhere Volatilität bedeutet größere Schwankungen und potenziell größere Drawdowns.
 
 
 
@@ -55,7 +55,7 @@ Dieses Lexikon erklärt die wichtigsten Begriffe und UI‑Felder im Risk Dashboa
 
 ## Equity weight (Aktienanteil)
 **Was:** Prozentualer Anteil des Portfolios in Aktien.  
-**Hinweis:** Höherer Aktienanteil â†’ höhere Renditeerwartung, aber auch höhere Schwankungen.
+**Hinweis:** Höherer Aktienanteil → höhere Renditeerwartung, aber auch höhere Schwankungen.
 
 ## Bond weight (Anleihenanteil)
 **Was:** Prozentualer Anteil in Anleihen.  
@@ -67,7 +67,7 @@ Dieses Lexikon erklärt die wichtigsten Begriffe und UI‑Felder im Risk Dashboa
 
 ## Target annual return (Ziel Jahresrendite)
 **Was:** Erwartete durchschnittliche Jahresrendite (Schätzwert).  
-**Hinweis:** Keine Garantie â€” dient zur Simulation.
+**Hinweis:** Keine Garantie → dient zur Simulation.
 
 ## Max drawdown tolerance (Max. Drawdown)
 **Was:** Maximal tolerierter Rückgang vom Höchststand in Prozent.  
@@ -94,7 +94,7 @@ Dieses Lexikon erklärt die wichtigsten Begriffe und UI‑Felder im Risk Dashboa
 - **Verantwortung:** Entscheidungen bleiben beim Nutzer; das Tool liefert Analysen und Vorschläge.
 
 ## Kurzanleitung (Quickstart)
-1. Ã–ffne **Profile** â†’ wähle ein Preset (z. B. Balanced).  
+1. Öffne **Profile** → wähle ein Preset (z. B. Balanced).  
 2. Prüfe Asset Allocation; aktiviere **Auto‑normalize**.  
 3. Wähle erlaubte ETFs oder nutze Preset‑ETFs.  
 4. Klicke **Profil speichern**.  

@@ -4,7 +4,7 @@ Dieses Dokument beschreibt die modulare Architektur des Projekts *makro_sim / ri
 
 ---
 
-## 1. Ãœberblick
+## 1. Überblick
 
 Das Dashboard besteht aus drei Hauptkomponenten:
 
@@ -23,29 +23,29 @@ Alle Module sind vollständig getrennt und kommunizieren nur Ã¼ber definierte 
 
 ## 2. Ordnerstruktur
 risk_dashboard/
-├── data/                 # CSV-Dateien
-├── models/               # ML-Modelle
-├── src/
-│   ├── app.py            # Streamlit UI
-│   ├── core/             # Kernlogik
-│   │   ├── risk_engine.py
-│   │   ├── fx_model.py
-│   │   ├── macro_loader.py
-│   │   └── utils.py
-│   ├── features/         # Feature Engineering
-│   │   └── fx_features.py
-│   ├── training/         # Trainingsskripte
-│   │   └── train_fx_model.py
-│   └── visualization/    # Charts
-│       ├── macro_charts.py
-│       ├── risk_charts.py
-│       └── fx_charts.py
-├── config/
-│   └── settings.yaml
-└── docs/
-    ├── lexikon.md
-    ├── architecture.md
-    └── onboarding.md
+├──	data/						#	CSV-Dateien
+├──	models/						#	ML-Modelle
+├──	src/
+│	├──	app.py					#	Streamlit UI
+│	├──	core/					#	Kernlogik
+│	│	├──	risk_engine.py
+│	│	├──	fx_model.py
+│	│	├──	macro_loader.py
+│	│	└──	utils.py
+│	├──	features/				#	Feature Engineering
+│	│	└──	fx_features.py
+│	├──	training/				#	Trainingsskripte
+│	│	└──	train_fx_model.py
+│	└──	visualization/			#	Charts
+│		├──	macro_charts.py
+│		├──	risk_charts.py
+│		└──	fx_charts.py
+├──	config/
+│	└── settings.yaml
+└──	docs/
+	├──	lexikon.md
+	├──	architecture.md
+	└──	onboarding.md
 
 
 

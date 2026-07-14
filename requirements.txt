@@ -51,7 +51,7 @@ jsonschema-specifications==2025.9.1
 kiwisolver==1.5.0
 korean-lunar-calendar==0.3.1
 lxml==6.1.0
--e git+ssh://git@github.com/Mohammad12897/makro_sim.git@e53fbe3678152821de7e25a7485d2a6e5d404202#egg=makro_sim
+# # # -e git+ssh://git@github.com/Mohammad12897/makro_sim.git@3064e6c332bd4a206058bfbd83122f60f23ee9fc#egg=makro_sim
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 matplotlib==3.10.9

@@ -1,4 +1,4 @@
-﻿# etf_analysis_extended.py
+# etf_analysis_extended.py
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -157,7 +157,7 @@ for i in range(len(period_starts)):
     # rebalance: weights bleiben gleich (gleichgewichtet), so nichts zu tun
 
 # Fallback: fÃ¼lle evtl. NaNs
-pv = pv.fillna(method="ffill").fillna(1.0)
+pv = pv.ffill().fillna(1.0)
 
 
 # Save backtest cumulative

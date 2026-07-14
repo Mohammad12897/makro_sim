@@ -1,5 +1,9 @@
 ﻿# Python
 __pycache__/
+*.pyo
+*.tmp
+*.save
+
 *.pyc
 
 # Virtualenv
@@ -21,8 +25,6 @@ tmp_backup_files_*/
 /cache/
 *.csv
 *.parquet
-*.bak
-.venv/
 .venv/
 __pycache__/
 *.pyc
@@ -63,7 +65,8 @@ risk_dashboard/config.yaml
 risk_dashboard/config.yaml
 
 # ignore backups
-*.bak
 
 # ignore local backups
 *.bak
+.venv
+

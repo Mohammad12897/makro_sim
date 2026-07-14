@@ -33,3 +33,34 @@ Dieses Projekt ist ein interaktives Dashboard zur Analyse von:
    ```python
    ROOT = "/content/makro_sim/risk_dashboard"
 
+
+# makro_sim – ETF Analyse & Portfolio Backtesting Dashboard
+
+Ein interaktives Streamlit‑Dashboard zur Analyse, Bewertung und Simulation von ETF‑Portfolios.  
+Das System kombiniert ETF‑Scoring, Portfolio‑Optimierung, Backtesting und Visualisierung in einer klaren, intuitiven Oberfläche.
+
+---
+
+## 🚀 Features
+
+- **ETF‑Scoring** nach TER, AUM, Tracking, Replikation, Liquidität  
+- **Explainable Breakdown** für transparente Bewertung  
+- **Portfolio‑Optimierung** (HRP, Equal Weight, Minimum Variance)  
+- **Manuelle oder automatische Gewichtung**  
+- **Backtesting** mit Rebalancing  
+- **Kumulative Performance‑Charts**  
+- **Gewichtsentwicklung über Zeit**  
+- **Export von CSV & JSON**  
+- **Stabile Session‑State‑Architektur (keine Reload‑Probleme)**  
+
+---
+
+## 📦 Installation
+
+```bash
+git clone https://github.com/<dein-repo>/makro_sim.git
+cd makro_sim
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+

@@ -68,3 +68,25 @@ profiles:
     - investment_grade_corporates
     - short_term_cash
     notes: Kapitalerhalt; niedrige Volatilität
+  <neu>:
+    display_name: <neu>
+    category: Medium
+    equity_pct: 45.0
+    bond_pct: 45.0
+    cash_pct: 10.0
+    target_annual_return_pct: 6.0
+    max_drawdown_pct: 20.0
+    rebalance: monthly
+    allowed_instruments: []
+    notes: ''
+  test1:
+    display_name: Test1
+    category: Medium
+    equity_pct: 45.0
+    bond_pct: 45.0
+    cash_pct: 10.0
+    target_annual_return_pct: 6.0
+    max_drawdown_pct: 20.0
+    rebalance: monthly
+    allowed_instruments: []
+    notes: ''

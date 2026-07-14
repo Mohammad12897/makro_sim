@@ -1,7 +1,9 @@
 # risk_dashboard/core/investment_engine.py
 import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
+import logging
 
+logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
@@ -517,17 +519,17 @@ def build_regime_hrp_portfolio(low, medium, high, rets):
     for regime, tickers in regime_universe.items():
         valid = [t for t in tickers if t in rets.columns]
         if not valid:
-            print(f"WARNUNG HRP: Keine gültigen Ticker im Regime {regime}: {tickers}")
+            logger.debug(f"WARNUNG HRP: Keine gültigen Ticker im Regime {regime}: {tickers}")
             continue
 
         sub = rets[valid].dropna(how="all")
         if sub.empty:
-            print(f"WARNUNG HRP: Leeres Return-Set im Regime {regime}")
+            logger.debug(f"WARNUNG HRP: Leeres Return-Set im Regime {regime}")
             continue
 
         w = hrp_weights(sub)
         if not w:
-            print(f"WARNUNG HRP: Keine Gewichte im Regime {regime}")
+            logger.debug(f"WARNUNG HRP: Keine Gewichte im Regime {regime}")
             continue
 
         result[regime] = {"weights": w, "returns": sub}
@@ -936,4 +938,3 @@ def generate_investment_package(risk_row, scenario, regimes, etf_meta: dict, pri
         "risk_score": float(risk_row.get("risk_score", float("nan"))) if isinstance(risk_row, dict) else float("nan")
     }
     return result
-

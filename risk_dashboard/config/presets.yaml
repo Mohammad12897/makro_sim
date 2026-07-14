@@ -1,0 +1,12 @@
+presets:
+  aggressive:
+    allowed_keys:
+      - qqq
+      - arkk
+      - vwrL
+    defaults:
+      allocation:
+        equity: 0.80
+        bond: 0.20
+      normalize: true
+

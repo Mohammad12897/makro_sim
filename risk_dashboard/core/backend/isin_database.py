@@ -137,4 +137,3 @@ ISIN_DATABASE = {
     "ADA-USD": None,
     "XRP-USD": None,
 }
-

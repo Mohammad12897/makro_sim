@@ -16,28 +16,54 @@ def _append_audit(entry: Dict[str, Any]) -> None:
     with AUDIT_LOG_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-def load_etf_universe(path: Optional[Path] = None) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
-    """
-    Lädt das ETF-Universe und validiert 'components' Verweise.
-    Rückgabe: (universe_dict, validation_warnings)
-    """
-    p = Path(path) if path else ETF_UNIVERSE_PATH
-    if not p.exists():
-        return {}, ["etf_universe.yaml nicht gefunden"]
-    with p.open("r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    universe = data.get("etf_universe", data)
-    warnings: List[str] = []
+def load_etf_universe(path="risk_dashboard/config/etf_universe.yaml"):
 
-    # Validierung: components referenzieren gültige Keys
+    warnings = []
+
+    try:
+        raw = yaml.safe_load(open(path, "r", encoding="utf8"))
+    except Exception as e:
+        return {}, [f"YAML-Fehler in {path}: {e}"]
+
+    if raw is None:
+        return {}, ["etf_universe.yaml ist leer"]
+
+    # Falls Datei Top-Level-Key 'etf_universe' hat → extrahieren
+    if isinstance(raw, dict) and "etf_universe" in raw:
+        universe = raw["etf_universe"]
+    else:
+        universe = raw
+
+    cleaned = {}
+
     for key, meta in universe.items():
-        comps = meta.get("components")
-        if comps and isinstance(comps, dict):
-            for comp_key in comps.keys():
-                if comp_key not in universe:
-                    warnings.append(f"'{key}' verweist auf fehlende Komponente '{comp_key}'")
 
-    return universe, warnings
+        # ❗ Fehler 1: meta ist kein Dict → Warnung statt Absturz
+        if not isinstance(meta, dict):
+            warnings.append(
+                f"Eintrag '{key}' ist kein Dictionary (Typ: {type(meta).__name__}). "
+                f"Vermutlich Einrückungsfehler oder kaputte YAML-Struktur."
+            )
+            continue
+
+        # ❗ Fehler 2: Komponenten müssen Dict sein
+        comps = meta.get("components")
+        if comps is not None and not isinstance(comps, dict):
+            warnings.append(
+                f"ETF '{key}' hat ungültige 'components' (Typ: {type(comps).__name__}). "
+                f"Erwartet wird ein Dictionary."
+            )
+            meta["components"] = None
+
+        # ❗ Fehler 3: Leere Strings oder kaputte Werte entfernen
+        for f, v in list(meta.items()):
+            if isinstance(v, str) and v.strip() == "":
+                warnings.append(f"ETF '{key}' enthält leeren Wert für '{f}' – entfernt.")
+                meta.pop(f)
+
+        cleaned[key] = meta
+
+    return cleaned, warnings
 
 def load_profiles(path: Optional[Path] = None) -> Dict[str, Any]:
     p = Path(path) if path else PROFILES_PATH
