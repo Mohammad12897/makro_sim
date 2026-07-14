@@ -370,7 +370,6 @@ elif choice == "Backtest Rezept":
                 st.write(f"Analysiere {t}")
                 analyze_single_etf_using_df(t, price_df)
 
-
 elif choice == "Upload":
     st.header("Portfolio Upload")
     st.markdown("**Portfolio-CSV (Ticker, Menge, Preis, market_value optional)**")
