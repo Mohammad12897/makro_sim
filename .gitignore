@@ -70,3 +70,5 @@ risk_dashboard/config.yaml
 *.bak
 .venv
 
+
+*.bak
