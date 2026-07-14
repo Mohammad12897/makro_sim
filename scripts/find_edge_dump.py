@@ -1,6 +1,5 @@
 # find_edge_dump.py
 import os, sys
-patterns = ["edge_all_open_tabs", "User's Edge browser tabs metadata"]
 roots = [ os.path.join(sys.prefix, "Lib", "site-packages"), os.getcwd() ]
 for root in roots:
     for dirpath, _, filenames in os.walk(root):
@@ -15,4 +14,7 @@ for root in roots:
                         break
             except Exception:
                 continue
+
+
+
 
