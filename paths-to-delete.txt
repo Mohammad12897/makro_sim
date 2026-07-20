@@ -1,0 +1,8 @@
+Bereinigung_edge.txt
+Git_commit_hook.bat
+Git_commit_hook.bat.bak
+git_commit_hook.ps1
+git_commit_hook.ps1.bak
+remove_edge_block.ps1
+remove_edge_block.ps1.bak
+tmp_backup_files_20260508_100044/*

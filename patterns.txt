@@ -1,0 +1,2 @@
+User's Edge browser tabs metadata==[REMOVED]
+edge_all_open_tabs==[REMOVED]
