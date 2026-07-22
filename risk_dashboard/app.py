@@ -68,12 +68,11 @@ except Exception:
 
 # Eigene Module (lokale Projektstruktur)
 from risk_dashboard.core.data_loader import (
-    fetch_prices_quiet,
     load_raw_prices_for_universe,
     filter_valid_tickers
 )
 from scripts.ticker_cache import validate_ticker_with_cache
-
+from risk_dashboard.data_cache import load_price_data_cached
 
 # Streamlit optional importieren, mit sauberem Shim als Fallback
 import os
@@ -158,35 +157,55 @@ except Exception:
 
 print(">>> AFTER BIG IMPORTS", flush=True)
 
+
+
 def analyze_single_etf(ticker: str):
     st.write(f"Analyse für **{ticker}**")
 
     # 1. Preise laden (mit Spinner)
     with st.spinner("Preise laden und Kennzahlen berechnen..."):
-        df = fetch_prices_quiet([ticker])
+        df = load_price_data_cached(ticker)  # akzeptiert String oder Liste
     if df is None or df.empty:
         st.error("Keine Preisdaten verfügbar für " + ticker)
         return
 
-    # 2. close Serie extrahieren und prüfen
-    if "close" in df.columns:
-        close = df["close"].dropna()
-    else:
-        # falls fetch_prices_quiet DataFrame mit Ticker‑Spalten zurückgibt
-        # z.B. df[ticker] oder df[ticker]['Close']
-        if ticker in df.columns:
-            close = pd.to_numeric(df[ticker], errors="coerce").dropna()
-        else:
-            # versuche erste Spalte als Fallback
-            close = pd.to_numeric(df.iloc[:, 0], errors="coerce").dropna()
+    # 2. close Serie extrahieren und prüfen (robust gegenüber 'Close' / 'close' / MultiIndex)
+    close = None
+    # Falls MultiIndex-Spalten, versuche 'Close' Ebene oder letzte Ebene
+    if isinstance(df.columns, pd.MultiIndex):
+        # Versuche Ebene 'Close' zuerst
+        if "Close" in df.columns.get_level_values(0):
+            try:
+                close = df.xs("Close", axis=1, level=0, drop_level=False).iloc[:, 0].dropna()
+            except Exception:
+                pass
+        if close is None:
+            # Fallback: nimm erste Spalte der letzten Ebene
+            try:
+                df.columns = df.columns.get_level_values(-1)
+            except Exception:
+                pass
 
-    if close.empty:
-        st.error("Close‑Serie ist leer für " + ticker)
+    # Nicht-MultiIndex oder Fallback
+    if close is None:
+        if "Close" in df.columns:
+            close = df["Close"].dropna()
+        elif "close" in df.columns:
+            close = df["close"].dropna()
+        else:
+            # Fallback: erste numerische Spalte
+            numeric_cols = df.select_dtypes("number").columns.tolist()
+            if numeric_cols:
+                close = df[numeric_cols[0]].dropna()
+
+    if close is None or close.empty:
+        st.error("Keine verwertbare Close‑Serie für " + ticker)
         return
 
     # 3. Kennzahlen berechnen
     try:
         metrics = compute_metrics(close)
+        st.write(metrics)
     except Exception as e:
         st.error(f"Fehler bei der Berechnung der Kennzahlen: {e}")
         return
@@ -199,7 +218,8 @@ def analyze_single_etf(ticker: str):
     c4.metric("Max Drawdown", f"{metrics['max_drawdown']*100:.2f} %")
 
     fig = px.line(close, title=f"Preisverlauf von {ticker}")
-    st.plotly_chart(fig, use_container_width=True)
+    #st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     rets = close.pct_change().dropna()
     cum = (1 + rets).cumprod()
@@ -267,7 +287,8 @@ def analyze_single_etf_using_df(ticker: str, price_df: pd.DataFrame):
     c4.metric("Max Drawdown", f"{metrics['max_drawdown']*100:.2f} %")
 
     fig = px.line(close, title=f"Preisverlauf von {ticker}")
-    st.plotly_chart(fig, use_container_width=True)
+    #st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     rets = close.pct_change().dropna()
     cum = (1 + rets).cumprod()
@@ -353,22 +374,24 @@ elif choice == "Backtest Rezept":
         default=["VWRL.L", "VOO"]
     )
 
+
     if not etf_list:
         st.info("Bitte mindestens einen ETF auswählen.")
     else:
         st.write("Ausgewählte ETFs:", etf_list)
-
-        # Batch laden (ein Spinner für alle Downloads)
         with st.spinner("Preise für alle ETFs laden..."):
-            price_df = fetch_prices_quiet(etf_list)
+            price_df = load_price_data_cached(etf_list)  # akzeptiert Liste
 
         if price_df is None or price_df.empty:
             st.error("Keine Preisdaten für die ausgewählten ETFs.")
         else:
+            # optional persistieren
+            st.session_state["price_data"] = price_df
+
             # Einzelanalysen basierend auf dem bereits geladenen DataFrame
             for t in etf_list:
                 st.write(f"Analysiere {t}")
-                analyze_single_etf_using_df(t, price_df)
+                analyze_single_etf_using_df(t, price_df)  # implementiere diese Funktion analog
 
 elif choice == "Upload":
     st.header("Portfolio Upload")

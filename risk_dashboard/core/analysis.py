@@ -8,12 +8,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Lokale Importe hier, um zirkuläre Abhängigkeiten zu vermeiden
-from risk_dashboard.core.data_loader import (
-    fetch_prices_quiet,    
+from risk_dashboard.core.data_loader import (   
     load_raw_prices_for_universe,
     filter_valid_tickers
 )
 from scripts.ticker_cache import validate_ticker_with_cache
+from risk_dashboard.data_cache import load_price_data_cached_with_used
 
 
 @st.cache_data
@@ -54,11 +54,11 @@ def analyze_ticker(base_ticker: str, etf_universe: List[str]) -> Tuple[
         logger.warning("Ticker %s ist ungültig (Cache) – wird verworfen.", base_ticker)
         return None, None, None, None
 
-    used, df = fetch_prices_quiet(base_ticker)
+    used, df = load_price_data_cached_with_used(base_ticker)
     if used is None or df is None or df.empty:
         logger.info("Ticker %s nicht gefunden oder keine Daten", base_ticker)
         return None, None, None, None
-
+     
     # Universe erweitern
     custom_universe = list(dict.fromkeys([*(etf_universe or []), used]))
     custom_universe = [t.strip().upper() for t in custom_universe if isinstance(t, str) and t.strip()]

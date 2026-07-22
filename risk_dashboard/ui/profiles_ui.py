@@ -41,7 +41,7 @@ from risk_dashboard.core.helpers import classify_etf
 logger = logging.getLogger(__name__)
 
 
-logger.debug("DEBUG: run_backtest from:", run_backtest.__module__)
+logger.debug("DEBUG: run_backtest from: %s", run_backtest.__module__)
 os.makedirs("risk_dashboard/data", exist_ok=True)
 
 
@@ -1006,43 +1006,105 @@ def profile_form_ui() -> None:
     # 3. Portfolio für dieses Regime bauen
     portfolio = build_regime_portfolio(macro_regime, allowed)
 
-    logger.debug("DEBUG: type(price_data)=", type(price_data), "shape=", getattr(price_data, "shape", None))
-    logger.debug("DEBUG: portfolio=", portfolio)
-    
-    # 4. Backtest durchführen
-    bt = run_backtest(portfolio, price_data, regimes)
-    logger.debug("DEBUG: bt keys=", bt.keys() if isinstance(bt, dict) else type(bt))
+    # Optional: speichere das erzeugte Portfolio in session_state, damit andere Seiten es finden
+    st.session_state["selected_portfolio"] = portfolio
 
-    # 5. Performance analysieren
-    stats = analyze_performance(bt)
+    logger.debug("DEBUG: type(price_data)=%s shape=%s", type(price_data), getattr(price_data, "shape", None))
+    logger.debug("DEBUG: portfolio=%s", portfolio)
 
 
-    # 6. Ergebnisse nur schreiben, wenn vorhanden
-    pv = bt.get("portfolio_value") if isinstance(bt, dict) else None
-    metrics = bt.get("metrics") if isinstance(bt, dict) else {}
-    logger.debug("DEBUG: metrics=", metrics)
 
 
-    if pv is not None and not pv.empty:
-        pv_df = pv.rename("portfolio_value").reset_index()
-        # speichere DataFrame als dict oder als CSV‑String in session_state
-        st.session_state["last_backtest_results_df"] = pv_df  # DataFrame direkt
-        st.session_state["last_backtest_results_csv"] = pv_df.to_csv(index=False)
-        logger.debug(f"DEBUG: backtest results stored in session_state, {len(pv_df)} Zeilen")
+    # 1) Session reads
+    price_data = st.session_state.get("price_data", pd.DataFrame())
+
+    # portfolio aus session_state bevorzugen, lokale Variable nur als Fallback
+    portfolio = st.session_state.get("selected_portfolio") or (globals().get("portfolio") if 'portfolio' in globals() else {})
+
+    logger.debug("DEBUG: type(price_data)=%s shape=%s", type(price_data), getattr(price_data, "shape", None))
+    logger.debug("DEBUG: portfolio=%s", portfolio)
+
+    # 2) Validierung price_data
+    if not isinstance(price_data, (pd.DataFrame, pd.Series)) or (isinstance(price_data, pd.DataFrame) and price_data.empty):
+        st.error("Preisdaten fehlen. Bitte lade Preisdaten.")
+        st.stop()
+
+    # 3) Ticker extrahieren (anpassbar an dein Portfolio-Format)
+    def _extract_tickers_from_portfolio(p):
+        if isinstance(p, dict):
+            return p.get("tickers") or p.get("assets") or p.get("positions") or []
+        return []
+
+    tickers = _extract_tickers_from_portfolio(portfolio)
+
+    if not tickers:
+        st.warning("Kein Portfolio mit Tickers gefunden.")
+        st.stop()
+
+    # 4) Verfügbare Ticker prüfen
+    price_cols = price_data.columns.tolist() if hasattr(price_data, "columns") else []
+    available = [t for t in tickers if t in price_cols]
+    if not available:
+        st.error("Keine Portfolio‑Ticker in Preisdaten vorhanden.")
+        st.stop()
+
+    # 5) run_backtest sicher aufrufen
+    bt = {}
+    try:
+        regimes_val = globals().get('regimes') or st.session_state.get('regimes')
+        if regimes_val is None:
+            logger.warning("profile_form_ui: 'regimes' nicht definiert.")
+            st.error("Regime-Daten fehlen. Backtest abgebrochen.")
+        else:
+            bt = run_backtest(portfolio, price_data, regimes_val)
+    except ValueError as e:
+        logger.warning("run_backtest raised ValueError: %s", e)
+        st.error("Backtest konnte nicht ausgeführt werden: " + str(e))
+    except Exception as e:
+        logger.exception("Unexpected error in run_backtest: %s", e)
+        st.error("Beim Backtest ist ein unerwarteter Fehler aufgetreten. Details im Log.")
+
+    # 5a) Nur wenn bt gültig ist, Performance analysieren und anzeigen
+    stats = None
+    if isinstance(bt, dict) and bt:
+        try:
+            stats = analyze_performance(bt)
+            st.write(stats)
+        except Exception as e:
+            logger.exception("analyze_performance failed: %s", e)
+            st.error("Fehler bei der Performance‑Analyse. Details im Log.")
     else:
-        logger.debug("DEBUG: portfolio_value leer — keine CSV geschrieben")
+        logger.debug("No backtest result to analyze (bt=%s)", bt)
+        
+    # 6) Ergebnisse prüfen und speichern
+    pv = bt.get("portfolio_value") if isinstance(bt, dict) else None
 
+    def _is_nonempty_df_or_series(x):
+        return x is not None and isinstance(x, (pd.DataFrame, pd.Series)) and not x.empty
+
+    if _is_nonempty_df_or_series(pv):
+        pv_df = pv.rename("portfolio_value").reset_index()
+        st.session_state["last_backtest_results_df"] = pv_df
+        st.session_state["last_backtest_results_csv"] = pv_df.to_csv(index=False)
+        logger.debug("DEBUG: backtest results stored in session_state, %d rows", len(pv_df))
+    else:
+        logger.debug("DEBUG: portfolio_value leer oder nicht vorhanden — keine CSV geschrieben")
+
+
+    # metrics sicher extrahieren und speichern (falls vorhanden)
+    metrics = bt.get("metrics") if isinstance(bt, dict) else {}
     if metrics:
         st.session_state["last_metrics"] = metrics
         logger.debug("DEBUG: results stored in session_state['last_metrics']")
     else:
         logger.debug("DEBUG: metrics leer — keine JSON geschrieben")
 
-
+    # UI Debug-Ausgaben (optional, kann entfernt werden)
     st.write("Aktuelles Makro-Regime:", macro_regime)
     st.write("Portfolio:", portfolio)
     st.write("Backtest:", bt)
     st.write("Performance:", stats)
+
 
     if universe_warnings:
         for w in universe_warnings:

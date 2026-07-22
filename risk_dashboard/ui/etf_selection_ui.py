@@ -272,7 +272,7 @@ def render_etf_selection_ui():
                 if regimes is not None and regimes.empty:
                     logger.debug("WARN: regimes empty — skipping regime-dependent logic")
 
-                logger.debug("DEBUG: run_backtest from:", run_backtest.__module__)
+                logger.debug("DEBUG: run_backtest from: %s", run_backtest.__module__)
                 logger.debug("DEBUG: final check - prices columns sample:", list(prices.columns)[:20])
                 logger.debug("DEBUG: final check - user_weights_mapped keys:", list(user_weights_mapped.keys()))
 
