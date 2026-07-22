@@ -1,34 +1,24 @@
-# This is a stub package designed to roughly emulate the _yaml
-# extension module, which previously existed as a standalone module
-# and has been moved into the `yaml` package namespace.
-# It does not perfectly mimic its old counterpart, but should get
-# close enough for anyone who's relying on it even when they shouldn't.
-import yaml
+# risk_dashboard/__init__.py
+import os
+import logging
 
-# in some circumstances, the yaml module we imoprted may be from a different version, so we need
-# to tread carefully when poking at it here (it may not have the attributes we expect)
-if not getattr(yaml, '__with_libyaml__', False):
-    from sys import version_info
+# logs-Ordner relativ zum Paket
+log_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
+log_dir = os.path.abspath(log_dir)
+os.makedirs(log_dir, exist_ok=True)
 
-    exc = ModuleNotFoundError if version_info >= (3, 6) else ImportError
-    raise exc("No module named '_yaml'")
-else:
-    from yaml._yaml import *
-    import warnings
-    warnings.warn(
-        'The _yaml extension module is now located at yaml._yaml'
-        ' and its location is subject to change.  To use the'
-        ' LibYAML-based parser and emitter, import from `yaml`:'
-        ' `from yaml import CLoader as Loader, CDumper as Dumper`.',
-        DeprecationWarning
-    )
-    del warnings
-    # Don't `del yaml` here because yaml is actually an existing
-    # namespace member of _yaml.
+log_path = os.path.join(log_dir, "risk_dashboard.log")
 
-__name__ = '_yaml'
-# If the module is top-level (i.e. not a part of any specific package)
-# then the attribute should be set to ''.
-# https://docs.python.org/3.8/library/types.html
-__package__ = ''
-
+root_logger = logging.getLogger("risk_dashboard")
+if not root_logger.handlers:
+    try:
+        fh = logging.FileHandler(log_path, encoding="utf-8")
+        fh.setLevel(logging.DEBUG)
+        fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+        fh.setFormatter(fmt)
+        root_logger.addHandler(fh)
+        root_logger.setLevel(logging.DEBUG)
+    except Exception as e:
+        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+        root_logger.warning("Could not create file logger (%s). Falling back to console logging.", e)
+# ---------------------------------------------------------------------
