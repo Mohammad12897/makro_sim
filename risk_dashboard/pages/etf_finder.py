@@ -269,5 +269,4 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                     logger.exception("Unexpected error in run_backtest: %s", e)
                     st.error("Beim Backtest ist ein Fehler aufgetreten. Details im Log.")
                     result = {}
-
                 st.write(result.get("metrics", {}))
