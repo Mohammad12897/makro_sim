@@ -59,7 +59,7 @@ def storyline_v3(country: str, params: Dict) -> str:
     # -----------------------------------------------------
     # Haupttreiber
     # -----------------------------------------------------
-    md += "##Haupttreiber des Risikos\n"
+    md += "## Haupttreiber des Risikos\n"
     for d, v in top:
         if d != "strategische_autonomie":
             md += f"- **{label(d)}**: {v:.2f}\n"
@@ -96,7 +96,7 @@ def storyline_v3(country: str, params: Dict) -> str:
     # -----------------------------------------------------
     # Narrative Analyse
     # -----------------------------------------------------
-    md += "\n## ðŸ“˜ Narrative Analyse\n"
+    md += "\n## Narrative Analyse\n"
     md += (
         "Die Risikoarchitektur des Landes zeigt ein komplexes Zusammenspiel aus wirtschaftlichen, "
         "geopolitischen und politischen Faktoren. Besonders prägend sind die Dimensionen "
@@ -109,7 +109,7 @@ def storyline_v3(country: str, params: Dict) -> str:
     # -----------------------------------------------------
     # Handlungsempfehlungen
     # -----------------------------------------------------
-    md += "\n##Handlungsempfehlungen\n"
+    md += "\n## Handlungsempfehlungen\n"
     md += "- Reduktion politischer Abhängigkeiten\n"
     md += "- Ausbau strategischer Autonomie (Diplomatie, Industrie, Energie)\n"
     md += "- Diversifikation kritischer Abhängigkeiten\n"

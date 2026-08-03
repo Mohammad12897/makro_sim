@@ -201,23 +201,23 @@ def render_etf_selection_ui():
                     manual_map = manual_map or {}
                     mapped = {}
                     for s in selected_list:
-                        # 1) manuelle Map prüfen
+                        # 1. manuelle Map prüfen
                         if s in manual_map:
                             pc = manual_map[s]
                             if pc in price_cols:
                                 mapped[s] = pc
                                 continue
-                        # 2) exakte Übereinstimmung
+                        # 2. exakte Übereinstimmung
                         if s in price_cols:
                             mapped[s] = s
                             continue
-                        # 3) Teilstring-Match (case-insensitive)
+                        # 3. Teilstring-Match (case-insensitive)
                         s_low = s.lower()
                         candidates = [c for c in price_cols if s_low in c.lower() or c.lower() in s_low]
                         if len(candidates) == 1:
                             mapped[s] = candidates[0]
                             continue
-                        # 4) kein eindeutiges Match
+                        # 4. kein eindeutiges Match
                         mapped[s] = None
                     return mapped
 
@@ -272,12 +272,13 @@ def render_etf_selection_ui():
                 if regimes is not None and regimes.empty:
                     logger.debug("WARN: regimes empty — skipping regime-dependent logic")
 
-                logger.debug("DEBUG: run_backtest from: %s", run_backtest.__module__)
+                from risk_dashboard.app import maybe_run_backtest
+                logger.debug("DEBUG: maybe_run_backtest from: %s", maybe_run_backtest.__module__)
                 logger.debug("DEBUG: final check - prices columns sample:", list(prices.columns)[:20])
                 logger.debug("DEBUG: final check - user_weights_mapped keys:", list(user_weights_mapped.keys()))
 
                 # Backtest aufrufen
-                res = run_backtest(weights=user_weights_mapped, prices=prices, regimes=regimes,
+                res = maybe_run_backtest(run_backtest, weights=user_weights_mapped, prices=prices, regimes=regimes,
                                 start=str(start), end=str(end), rebalance=rebalance)
 
                 # --- Robust: Ergebnisse anzeigen, session_state updaten und Rerun-Fallback ---

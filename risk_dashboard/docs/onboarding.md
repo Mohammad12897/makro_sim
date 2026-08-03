@@ -16,62 +16,57 @@ Willkommen im Projekt! Dieses Dokument erklärt, wie du das Dashboard installier
 ## 2. Installation
 
 ### Virtuelle Umgebung erstellen
+```bash
 python -m venv venv
+```
 
-### Aktivieren
+Aktivieren (Windows)
 
-Windows:
+```bash
 .\venv\Scripts\activate
+```
 
-### Abhängigkeiten installieren
+Abhängigkeiten installieren
+
+```bash
 pip install -r requirements.txt
-
----
-
-## 3. Projekt starten
+```
+3. Projekt starten
 streamlit run risk_dashboard/src/app.py
-
----
-
-## 4. FX-Modell trainieren
+4. FX-Modell trainieren
 python -m risk_dashboard.src.training.train_fx_model
+5. Ordnerstruktur verstehen
+Siehe architecture.md.
 
----
+6. Wichtige Module
+core/ → Business-Logik
 
-## 5. Ordnerstruktur verstehen
+features/ → Feature Engineering
 
-Siehe `architecture.md`.
+training/ → ML-Training
 
----
+visualization/ → Charts
 
-## 6. Wichtige Module
+config/ → Einstellungen
 
-- `core/` → Business-Logik  
-- `features/` → Feature Engineering  
-- `training/` → ML-Training  
-- `visualization/` → Charts  
-- `config/` → Einstellungen  
-- `docs/` → Dokumentation  
+docs/ → Dokumentation
 
----
+7. Häufige Probleme
+Modell nicht gefunden
+→ train_fx_model.py ausführen.
 
-## 7. Häufige Probleme
+Daten fehlen
+→ CSVs in risk_dashboard/data/ prüfen.
 
-### Modell nicht gefunden
-→ `train_fx_model.py` ausführen.
+Pfadprobleme
+→ settings.yaml prüfen.
 
-### Daten fehlen
-→ CSVs in `risk_dashboard/data/` prüfen.
+8. Erweiterungsideen
+Szenario-Simulationen
 
-### Pfadprobleme
-→ `settings.yaml` prüfen.
+Stress-Tests
 
----
+API-Anbindung (FRED, ECB)
 
-## 8. Erweiterungsideen
-
-- Szenario-Simulationen
-- Stress-Tests
-- API-Anbindung (FRED, ECB)
-- ML-Modelle für Makro-Prognosen
+ML-Modelle für Makro-Prognosen
 

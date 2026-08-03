@@ -1,22 +1,17 @@
-﻿# Python
-__pycache__/
+# Python
 *.pyo
-*.tmp
 *.save
 
 *.pyc
 
 # Virtualenv
-venv/
 .env
 
 # Logs and caches
-*.log
 indicator_cache.json
 generate_presets.log
 
 # IDEs
-.vscode/
 .idea/
 tmp_backup_files_*/
 
@@ -25,8 +20,6 @@ tmp_backup_files_*/
 /cache/
 *.csv
 *.parquet
-.venv/
-__pycache__/
 *.pyc
 
 Bereinigung_edge.txt
@@ -70,6 +63,25 @@ risk_dashboard/config.yaml
 *.bak
 .venv
 
-
-*.bak
 repo-mirror.git/
+.edge_dump_backups/
+
+# Editor / IDE
+.vscode/
+.vscode/*
+*.code-workspace
+
+# Virtualenv / Python
+.venv/
+venv/
+__pycache__/
+
+# Logs / temp
+*.log
+*.tmp
+*.bak
+
+# Browser / Copilot / workspace cache
+**/Cache_Data/
+**/Cache/
+**/User Data/
