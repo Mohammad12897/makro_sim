@@ -64,7 +64,6 @@ risk_dashboard/config.yaml
 .venv
 
 repo-mirror.git/
-.edge_dump_backups/
 
 # Editor / IDE
 .vscode/
@@ -79,9 +78,11 @@ __pycache__/
 # Logs / temp
 *.log
 *.tmp
-*.bak
 
 # Browser / Copilot / workspace cache
 **/Cache_Data/
 **/Cache/
 **/User Data/
+
+# local backups and dumps
+.edge_dump_backups/
