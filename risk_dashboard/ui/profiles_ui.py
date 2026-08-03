@@ -19,11 +19,9 @@ import logging, inspect, pathlib
  
 
 from risk_dashboard.core.config import load_profiles, save_profile, load_etf_universe
-from risk_dashboard.core.utils import extract_close_series, resolve_components, analyze_portfolio_components, normalize_ter_value
-from risk_dashboard.core.backtest import run_all_etf_backtests, run_portfolio_backtest
+from risk_dashboard.core.utils import resolve_components, analyze_portfolio_components
+from risk_dashboard.core.backtest import run_all_etf_backtests
 
-from risk_dashboard.core.analysis import analyze_ticker
-from risk_dashboard.core.weights import compute_abs_weights
 from risk_dashboard.data.etf_universes import ETF_UNIVERSES
 from risk_dashboard.core.holdings import load_ishares_holdings, etf_to_isin_map, load_holdings_with_fallback
 from risk_dashboard.core.macro_pipeline import (
@@ -41,7 +39,6 @@ from risk_dashboard.core.helpers import classify_etf
 logger = logging.getLogger(__name__)
 
 
-logger.debug("DEBUG: run_backtest from: %s", run_backtest.__module__)
 os.makedirs("risk_dashboard/data", exist_ok=True)
 
 
@@ -176,12 +173,12 @@ def load_macro_data():
     return df
 
 def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
-    # 1) Versuche session_state
+    # 1. Versuche session_state
     df = st.session_state.get(session_key)
     logger.debug("session_state keys: %s", list(st.session_state.keys()))
     logger.debug("portfolio_df present in session: %s", session_key in st.session_state)
 
-    # 2) File uploader (UI) — eindeutiger key
+    # 2. File uploader (UI) — eindeutiger key
     uploaded = st.file_uploader(
         "Portfolio CSV (ticker, quantity, price, market_value optional)",
         type=["csv"],
@@ -198,7 +195,7 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
             st.error("Fehler beim Einlesen der hochgeladenen CSV.")
             return pd.DataFrame()
 
-    # 3) Fallback: Datei auf Disk
+    # 3. Fallback: Datei auf Disk
     disk_path = Path("risk_dashboard/data/portfolio.csv")  # oder holdings/portfolio.csv
     logger.debug("Trying to load CSV from %s exists=%s", disk_path, disk_path.exists())
     if disk_path.exists():
@@ -212,7 +209,7 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
             st.error("Fehler beim Lesen der Portfolio‑CSV von der Festplatte.")
             return pd.DataFrame()
 
-    # 4) Kein Portfolio gefunden -> leeres DataFrame
+    # 4. Kein Portfolio gefunden -> leeres DataFrame
     logger.debug("No portfolio found; returning empty DataFrame")
     return pd.DataFrame()
 
@@ -244,28 +241,47 @@ def fetch_from_provider_csv(ticker: str) -> pd.DataFrame:
     # mappe provider-spalten auf weight_in_etf
     return pd.DataFrame({"ticker": df["ticker"], "weight_in_etf": df["weight"]/100.0})
 
-def get_etf_holdings(ticker: str) -> pd.DataFrame:
-    API_KEY = st.secrets.get("ETF_API_KEY")  # set in Streamlit secrets
-    # 1) Try official API
+def get_etf_holdings(ticker: str, api_key: str | None = None) -> pd.DataFrame:
+    """Versucht API -> CSV -> etf_scraper. Gibt DataFrame oder pd.DataFrame() zurück."""
+    logger = logging.getLogger(__name__)
+
+    # 1. API
     try:
-        if API_KEY:
-            return fetch_from_api(ticker, API_KEY)
-    except Exception:
-        pass
-    # 2) Try provider CSV
+        if api_key:
+            df = fetch_from_api(ticker, api_key)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                logger.debug("Holdings from API for %s: %d rows", ticker, len(df))
+                return df
+    except Exception as e:
+        logger.exception("API holdings failed for %s: %s", ticker, e)
+
+    # 2. Provider CSV
     try:
-        return fetch_from_provider_csv(ticker)
-    except Exception:
-        pass
-    # 3) Fallback: local scraper library (requires pip install etf_scraper)
+        df = fetch_from_provider_csv(ticker)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            logger.debug("Holdings from provider CSV for %s: %d rows", ticker, len(df))
+            return df
+    except Exception as e:
+        logger.exception("Provider CSV failed for %s: %s", ticker, e)
+
+    # 3. etf_scraper fallback
     try:
         from etf_scraper import ETFScraper
         s = ETFScraper()
         hdf = s.query_holdings(ticker)
-        return pd.DataFrame({"ticker": hdf["ticker"], "weight_in_etf": hdf["weight"]/100.0})
-    except Exception:
-        st.warning(f"Holdings für {ticker} konnten nicht automatisch geladen werden. Bitte CSV hochladen.")
-        return pd.DataFrame()
+        if hdf is None or len(hdf) == 0:
+            logger.warning("etf_scraper returned no holdings for %s", ticker)
+            return pd.DataFrame()
+        df = pd.DataFrame({"ticker": hdf["ticker"], "weight_in_etf": hdf["weight"] / 100.0})
+        logger.debug("Holdings from etf_scraper for %s: %d rows", ticker, len(df))
+        return df
+    except Exception as e:
+        logger.exception("etf_scraper fallback failed for %s: %s", ticker, e)
+
+    # Fallback: leeres DF
+    logger.warning("No holdings found for %s (all sources failed)", ticker)
+    return pd.DataFrame()
+
 
 # Hilfsfunktionen
 def compute_portfolio_value(df: pd.DataFrame) -> float:
@@ -381,7 +397,7 @@ def render_etf_tab(session_state):
     """)
 
 
-    # 1) Portfolio Input
+    # 1. Portfolio Input
     df = load_portfolio_from_ui_or_disk()
     # --- Validierung: mindestens 'ticker' vorhanden und market_value berechnen ---
     required = {"ticker"}
@@ -423,11 +439,11 @@ def render_etf_tab(session_state):
     auto_portfolio_value = compute_portfolio_value(df) if not df.empty else 0.0
     portfolio_value = st.number_input("Gesamtportfolio (leer = Summe der Marktwerte)", value=float(auto_portfolio_value), format="%.2f")
 
-    # 2) Auswahl ETFs aus Portfolio
+    # 2. Auswahl ETFs aus Portfolio
     tickers = df["ticker"].astype(str).str.upper().unique().tolist() if not df.empty else []
     selected_etfs = st.multiselect("Aus Portfolio wähle ETF(s) zur Aufschlüsselung", options=tickers)
 
-    # 3) Holdings pro ETF
+    # 3. Holdings pro ETF
     holdings_map: Dict[str, pd.DataFrame] = {}
 
     holdings_dir.mkdir(parents=True, exist_ok=True)
@@ -569,7 +585,7 @@ def render_etf_tab(session_state):
 
         uploaded_h = st.file_uploader(f"Holdings CSV für {etf} (ticker, weight_in_etf)", key=f"h_{etf}")
 
-        # 1) CSV Upload
+        # 1. CSV Upload
         if uploaded_h is not None:
             try:
                 hdf = pd.read_csv(uploaded_h)
@@ -598,7 +614,7 @@ def render_etf_tab(session_state):
             except Exception as e:
                 st.error(f"Fehler beim Verarbeiten der Holdings‑CSV für {etf}: {e}")
 
-        # 2) iShares Internet‑Holdings (nur wenn Checkbox gesetzt)
+        # 2. iShares Internet‑Holdings (nur wenn Checkbox gesetzt)
         elif use_ishares:
             # definiere isin sicher
             isin = None
@@ -615,7 +631,7 @@ def render_etf_tab(session_state):
             df_key = f"holdings_{etf}"
             path_to_csv = holdings_dir / f"{etf}.csv"
 
-            # 1) Versuche relaxed fallback (einfaches ticker,weight_in_etf CSV)
+            # 1. Versuche relaxed fallback (einfaches ticker,weight_in_etf CSV)
             ok, res = try_relaxed_holdings(path_to_csv)
             if ok:
                 hdf = res
@@ -627,10 +643,10 @@ def render_etf_tab(session_state):
                 # nur diese Iteration beenden, nächste ETF verarbeiten
                 continue
 
-            # 2) relaxed nicht verwendet -> bestehende Logik ausführen
+            # 2. relaxed nicht verwendet -> bestehende Logik ausführen
             hdf = load_holdings_with_fallback(etf, category, isin, df_key, holdings_dir)
 
-            # 3) iShares / Demo Logik (nur hier, nicht vorher)
+            # 3. iShares / Demo Logik (nur hier, nicht vorher)
             if category == "iShares" and isin:
                 try:
                     hdf = load_ishares_holdings(isin)
@@ -664,7 +680,7 @@ def render_etf_tab(session_state):
                 logger.debug("Stacktrace for demo-fallback:\n%s", "".join(traceback.format_stack()))
 
 
-        # 3) Session oder Disk
+        # 3. Session oder Disk
         else:
             if df_key in st.session_state:
                 hdf = st.session_state[df_key]
@@ -685,7 +701,7 @@ def render_etf_tab(session_state):
                     except Exception as e:
                         st.error(f"Fehler beim Laden der gespeicherten Holdings für {etf}: {e}")
 
-        # 4) Demo fallback (wenn explizit angefordert oder immer noch leer)
+        # 4. Demo fallback (wenn explizit angefordert oder immer noch leer)
         if (hdf is None or hdf.empty) and use_demo:
             hdf = pd.DataFrame([
                 {"ticker": "AAPL", "weight_in_etf": 0.30},
@@ -1015,7 +1031,7 @@ def profile_form_ui() -> None:
 
 
 
-    # 1) Session reads
+    # 1. Session reads
     price_data = st.session_state.get("price_data", pd.DataFrame())
 
     # portfolio aus session_state bevorzugen, lokale Variable nur als Fallback
@@ -1024,12 +1040,12 @@ def profile_form_ui() -> None:
     logger.debug("DEBUG: type(price_data)=%s shape=%s", type(price_data), getattr(price_data, "shape", None))
     logger.debug("DEBUG: portfolio=%s", portfolio)
 
-    # 2) Validierung price_data
+    # 2. Validierung price_data
     if not isinstance(price_data, (pd.DataFrame, pd.Series)) or (isinstance(price_data, pd.DataFrame) and price_data.empty):
         st.error("Preisdaten fehlen. Bitte lade Preisdaten.")
         st.stop()
 
-    # 3) Ticker extrahieren (anpassbar an dein Portfolio-Format)
+    # 3. Ticker extrahieren (anpassbar an dein Portfolio-Format)
     def _extract_tickers_from_portfolio(p):
         if isinstance(p, dict):
             return p.get("tickers") or p.get("assets") or p.get("positions") or []
@@ -1041,14 +1057,14 @@ def profile_form_ui() -> None:
         st.warning("Kein Portfolio mit Tickers gefunden.")
         st.stop()
 
-    # 4) Verfügbare Ticker prüfen
+    # 4. Verfügbare Ticker prüfen
     price_cols = price_data.columns.tolist() if hasattr(price_data, "columns") else []
     available = [t for t in tickers if t in price_cols]
     if not available:
         st.error("Keine Portfolio‑Ticker in Preisdaten vorhanden.")
         st.stop()
 
-    # 5) run_backtest sicher aufrufen
+    # 5. run_backtest sicher aufrufen
     bt = {}
     try:
         regimes_val = globals().get('regimes') or st.session_state.get('regimes')
@@ -1056,15 +1072,17 @@ def profile_form_ui() -> None:
             logger.warning("profile_form_ui: 'regimes' nicht definiert.")
             st.error("Regime-Daten fehlen. Backtest abgebrochen.")
         else:
-            bt = run_backtest(portfolio, price_data, regimes_val)
+            from risk_dashboard.app import maybe_run_backtest
+            logger.debug("DEBUG: maybe_run_backtest from: %s", maybe_run_backtest.__module__)
+            bt = maybe_run_backtest(run_backtest, portfolio, price_data, regimes_val)
     except ValueError as e:
-        logger.warning("run_backtest raised ValueError: %s", e)
+        logger.warning("maybe_run_backtest raised ValueError: %s", e)
         st.error("Backtest konnte nicht ausgeführt werden: " + str(e))
     except Exception as e:
-        logger.exception("Unexpected error in run_backtest: %s", e)
+        logger.exception("Unexpected error in maybe_run_backtest: %s", e)
         st.error("Beim Backtest ist ein unerwarteter Fehler aufgetreten. Details im Log.")
 
-    # 5a) Nur wenn bt gültig ist, Performance analysieren und anzeigen
+    # 5a. Nur wenn bt gültig ist, Performance analysieren und anzeigen
     stats = None
     if isinstance(bt, dict) and bt:
         try:
@@ -1076,7 +1094,7 @@ def profile_form_ui() -> None:
     else:
         logger.debug("No backtest result to analyze (bt=%s)", bt)
         
-    # 6) Ergebnisse prüfen und speichern
+    # 6. Ergebnisse prüfen und speichern
     pv = bt.get("portfolio_value") if isinstance(bt, dict) else None
 
     def _is_nonempty_df_or_series(x):
@@ -1198,8 +1216,7 @@ def profile_form_ui() -> None:
                     comp_meta = etf_universe.get(ck, {})
                     comp_rows.append({"Key": ck, "Name": comp_meta.get("name", ck), "Ticker": comp_meta.get("ticker", ""), "Weight": f"{(w/total)*100:.1f}%"})
                 st.table(comp_rows)
-
-    
+                    
     # --- Expander: komplette Referenztabelle mit Suche ---
     with st.expander("Wichtige Kennzahlen (Kurzreferenz)"):
         query = st.text_input("Kennzahl suchen", value="")

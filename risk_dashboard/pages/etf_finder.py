@@ -182,9 +182,64 @@ if st.button("Screen & Rank"):
             if not ranked.empty:
                 top = ranked.head(1).index[0]
                 st.subheader(f"Top ETF: {top}")
-                fig = px.line(price_df[top].ffill().bfill().reset_index(), x='Date', y=top, title=f"Price: {top}")
-                #st.plotly_chart(fig, use_container_width=True)
-                st.plotly_chart(fig, width="stretch")
+
+                # Temporäre Debug-Ausgaben (entfernen, wenn alles funktioniert)
+                st.write("DEBUG price_df.columns (repr):", repr(price_df.columns))
+                st.write("DEBUG price_df.columns list:", list(price_df.columns))
+
+                import pandas as pd
+
+                df = price_df.copy()
+
+                # 1) Wenn MultiIndex-Spalten vorhanden sind, versuche die 'Close'-Ebene zu wählen
+                if isinstance(df.columns, pd.MultiIndex):
+                    try:
+                        if 'Close' in df.columns.levels[1]:
+                            price_close = df.xs('Close', axis=1, level=1)
+                        else:
+                            df.columns = ['_'.join([str(c) for c in col if c is not None]).strip() for col in df.columns.values]
+                            price_close = df
+                    except Exception:
+                        df.columns = ['_'.join([str(c) for c in col if c is not None]).strip() for col in df.columns.values]
+                        price_close = df
+                else:
+                    if df.columns.duplicated().any():
+                        cols = []
+                        counts = {}
+                        for c in df.columns:
+                            counts.setdefault(c, 0)
+                            counts[c] += 1
+                            if counts[c] > 1:
+                                cols.append(f"{c}_{counts[c]-1}")
+                            else:
+                                cols.append(c)
+                        df.columns = cols
+                    price_close = df
+
+                # 3) Wähle die passende Spalte für 'top'
+                series = None
+                ycol = None
+                if top in price_close.columns:
+                    series = price_close[top].ffill().bfill().reset_index()
+                    ycol = top
+                else:
+                    candidates = [c for c in price_close.columns if 'Close' in str(c)]
+                    exact_candidates = [c for c in candidates if str(c).startswith(str(top))]
+                    if exact_candidates:
+                        ycol = exact_candidates[0]
+                        series = price_close[ycol].ffill().bfill().reset_index()
+                    elif candidates:
+                        ycol = candidates[0]
+                        series = price_close[ycol].ffill().bfill().reset_index()
+                    else:
+                        st.error("Konnte keine passende Preisspalte für den Top ETF finden.")
+                        series = None
+
+                # 4) Plotten, falls Series vorhanden
+                if series is not None:
+                    xcol = series.columns[0]
+                    fig = px.line(series, x=xcol, y=ycol)
+                    st.plotly_chart(fig, use_container_width=True)
 
             # Speichere Top5 und weights für Backtest
             st.session_state['etf_finder_top5'] = ranked.head(5).index.tolist()
@@ -253,7 +308,8 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
 
                 prices_subset = price_df[available]
                 try:
-                    result = run_backtest(
+                    from risk_dashboard.app import maybe_run_backtest
+                    result = maybe_run_backtest(run_backtest,
                         tickers=available,
                         prices_df=prices_subset,
                         start=start_date,
@@ -262,11 +318,13 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                         weights=weights
                     )
                 except ValueError as e:
-                    logger.warning("run_backtest failed: %s", e)
+                    logger.warning("maybe_run_backtest failed: %s", e)
                     st.error("Backtest konnte nicht ausgeführt werden: keine gültigen Ticker in den Preisdaten.")
                     result = {}
                 except Exception as e:
-                    logger.exception("Unexpected error in run_backtest: %s", e)
+                    logger.exception("Unexpected error in maybe_run_backtest: %s", e)
                     st.error("Beim Backtest ist ein Fehler aufgetreten. Details im Log.")
                     result = {}
                 st.write(result.get("metrics", {}))
+
+

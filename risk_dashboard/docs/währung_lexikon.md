@@ -1,398 +1,337 @@
-gr.Markdown("""
-### WÃ„HRUNGS-LEXIKON
+### Währungs-Lexikon
 
-Inflation:
+**Inflation**  
 Anstieg des allgemeinen Preisniveaus; Kaufkraftverlust der Währung.
 
-Deflation:
+**Deflation**  
 Rückgang des Preisniveaus; Wirtschaft schrumpft, Nachfrage sinkt.
 
-Wechselkurs:
+**Wechselkurs**  
 Preis einer Währung im Verhältnis zu einer anderen (z. B. EUR/USD).
 
-Abwertung:
+**Abwertung**  
 Währung verliert an Wert; Importe werden teurer.
 
-Aufwertung:
+**Aufwertung**  
 Währung gewinnt an Wert; Exporte werden teurer.
 
-Zentralbank:
+**Zentralbank**  
 Institution, die Geldmenge, Zinsen und Währungsstabilität steuert.
 
-Dollarbindung (Peg):
+**Dollarbindung (Peg)**  
 Fester Wechselkurs zum US-Dollar; stabilisiert die Währung, reduziert Flexibilität.
 
-Kapitalflucht:
+**Kapitalflucht**  
 Abfluss von Geld aus dem Land wegen Unsicherheit oder Inflation.
 
-Devisenreserven:
+**Devisenreserven**  
 Bestände an Fremdwährungen (Dollar, Euro, Gold), um die eigene Währung zu stabilisieren.
 
-Währungskrise:
+**Währungskrise**  
 Schneller, starker Wertverlust der Landeswährung; oft begleitet von Inflation.
 
-Hyperinflation:
+**Hyperinflation**  
 Extrem schnelle Preissteigerung (z. B. Venezuela, Zimbabwe).
 
-Geldmenge:
+**Geldmenge**  
 Gesamtes im Umlauf befindliches Geld; beeinflusst Inflation und Wirtschaft.
 
-Zinsniveau:
+**Zinsniveau**  
 Preis des Geldes; beeinflusst Kapitalflüsse und Währungsstärke.
 
-Fremdwährungsschulden:
+**Fremdwährungsschulden**  
 Schulden in Dollar/Euro; gefährlich, wenn die eigene Währung abwertet.
 
-Importabhängigkeit:
+**Importabhängigkeit**  
 Land ist auf ausländische Güter angewiesen; schwache Währung → teure Importe.
 
-Zentralbank-Unabhängigkeit:
+**Zentralbank-Unabhängigkeit**  
 Je unabhängiger, desto stabiler die Währung; politische Einflussnahme führt zu Inflation.
 
-## WÃ„HRUNGS-DASHBOARD â€“ DESIGN
-
-1. Header
-   - Währungsname
-   - Flagge
-   - Aktueller Wechselkurs
-   - Trend (7 Tage / 30 Tage / 1 Jahr)
-
-2. Risiko-Radar (6 Achsen)
-   - Inflationsrisiko
-   - Wechselkursvolatilität
-   - Zentralbank-Unabhängigkeit
-   - Staatsverschuldung
-   - Dollarabhängigkeit
-   - Kapitalflucht-Risiko
-
-3. Makro-Indikatoren
-   - Inflation (YoY)
-   - Leitzins
-   - Devisenreserven
-   - Leistungsbilanz
-   - Staatsrating (S&P, Moodyâ€™s, Fitch)
-
-4. Historische Charts
-   - Wechselkursverlauf
-   - Inflationsverlauf
-   - Zinsverlauf
-   - Devisenreserven-Verlauf
-
-5. Storyline-Engine (automatische Interpretation)
-   - Stärken
-   - Schwächen
-   - Chancen
-   - Risiken
-   - Kurzprognose
-
-6. Szenario-Modul
-   - Zinsanstieg USA
-   - Energiepreisschock
-   - Politische Instabilität
-   - Schuldenkrise
-   - Exportboom
-
-7. Handlungsempfehlungen (neutral formuliert)
-   - Risiko-Hinweise
-   - Stabilitätsfaktoren
-   - Beobachtungspunkte
-
 ---
 
-##WÃ„HRUNGSRISIKO-RADAR
+## Währungs‑Dashboard – Design
 
-Achsen (6 Dimensionen):
+### 1. Header
+- Währungsname  
+- Flagge  
+- Aktueller Wechselkurs  
+- Trend (7 Tage / 30 Tage / 1 Jahr)
 
-1. Inflationsrisiko
-   - Höhe und Stabilität der Inflation
+### 2. Risiko-Radar (6 Achsen)
+- Inflationsrisiko  
+- Wechselkursvolatilität  
+- Zentralbank-Unabhängigkeit  
+- Staatsverschuldung  
+- Dollarabhängigkeit  
+- Kapitalflucht-Risiko
 
-2. Wechselkursvolatilität
-   - Schwankungsintensität der Währung
+### 3. Makro-Indikatoren
+- Inflation (YoY)  
+- Leitzins  
+- Devisenreserven  
+- Leistungsbilanz  
+- Staatsrating (S&P, Moody’s, Fitch)
 
-3. Zentralbank-Unabhängigkeit
-   - Politische Einflussnahme vs. Stabilität
+### 4. Historische Charts
+- Wechselkursverlauf  
+- Inflationsverlauf  
+- Zinsverlauf  
+- Devisenreserven-Verlauf
 
-4. Staatsverschuldung
-   - Schuldenquote, Defizit, Rating
-
-5. Dollarabhängigkeit
-   - Anteil der Importe/Schulden in USD
-
-6. Kapitalflucht-Risiko
-   - Vertrauen der Bürger und Investoren
-
-Ausgabe:
-- Radar-Chart
-- Risikostufen (niedrig/mittel/hoch)
-- Automatische Interpretation
-
----
-
-##WÃ„HRUNGSRISIKO-RADAR
-
-Achsen (6 Dimensionen):
-
-1. Inflationsrisiko
-   - Höhe und Stabilität der Inflation
-
-2. Wechselkursvolatilität
-   - Schwankungsintensität der Währung
-
-3. Zentralbank-Unabhängigkeit
-   - Politische Einflussnahme vs. Stabilität
-
-4. Staatsverschuldung
-   - Schuldenquote, Defizit, Rating
-
-5. Dollarabhängigkeit
-   - Anteil der Importe/Schulden in USD
-
-6. Kapitalflucht-Risiko
-   - Vertrauen der Bürger und Investoren
-
-Ausgabe:
-- Radar-Chart
-- Risikostufen (niedrig/mittel/hoch)
-- Automatische Interpretation
-
----
-
-## WECHSELKURS-MODUL
-
-1. Live-Daten
-   - EUR/USD
-   - USD/TRY
-   - USD/ARS
-   - USD/CNY
-   - USD/SAR
-   - EUR/CHF
-   - EUR/GBP
-
-2. Volatilitätsanalyse
-   - 7-Tage-Volatilität
-   - 30-Tage-Volatilität
-   - 1-Jahres-Volatilität
-
-3. Einflussfaktoren
-   - Zinsdifferenzen
-   - Inflation
-   - Kapitalflüsse
-   - Rohstoffpreise
-   - Politische Ereignisse
-
-4. Charting
-   - Candlestick
-   - Moving Averages
-   - RSI (optional)
-   - Trendlinien
-
-5. Interpretation
-   - Starke Währung → Kapitalzufluss
-   - Schwache Währung → Inflation, Importprobleme
-
----
-
-## INFLATIONS-MODELL
-
-1. Input-Variablen
-   - Geldmenge (M1, M2)
-   - Wechselkurs
-   - Energiepreise
-   - Löhne
-   - Importabhängigkeit
-   - Staatsausgaben
-   - Zinsniveau
-
-2. Output
-   - Kurzfristige Inflation (1–3 Monate)
-   - Mittelfristige Inflation (3–12 Monate)
-   - Langfristige Inflation (1–3 Jahre)
-
-3. Mechanik
-   - Geldmengenwachstum ↑ → Inflation ↑
-   - Währungsabwertung ↑ → Importpreise ↑ → Inflation ↑
-   - Energiepreise ↑ → Inflation ↑
-   - Zinsen ↑ → Inflation ↓ (mit Verzögerung)
-
-4. Risikoindikatoren
-   - Lohn-Preis-Spirale
-   - Importpreisschock
-   - Staatsdefizit
-   - Zentralbank-Unabhängigkeit
-
----
-
-##SZENARIO-MODELL FÃœR WÃ„HRUNGSKRISEN
-
-Szenario 1: Zinsanstieg in den USA
-- Dollar wird stärker
-- Schwache Währungen fallen
-- Inflation steigt durch teurere Importe
-
-Szenario 2: Politische Instabilität
-- Vertrauen sinkt
-- Kapital flieht
-- Währung kollabiert
-- Inflation steigt
-
-Szenario 3: Schuldenkrise
-- Staat kann Schulden nicht bedienen
-- Rating fällt
-- Währung verliert massiv an Wert
-
-Szenario 4: Energiepreisschock
-- Importabhängige Länder leiden
-- Währung fällt
-- Inflation steigt
-
-Szenario 5: Kapitalverkehrskontrollen
-- Regierung beschränkt Geldbewegungen
-- Vertrauen sinkt
-- Schwarzmärkte entstehen
-
----
-
-##STORYLINE-ENGINE FÃœR WÃ„HRUNGSRISIKEN
-
-Stärken:
-- Hohe Devisenreserven
-- Unabhängige Zentralbank
-- Niedrige Inflation
-- Starke Exportwirtschaft
-
-Schwächen:
-- Hohe Staatsverschuldung
-- Politische Instabilität
-- Importabhängigkeit
-- Dollarabhängigkeit
-
-Chancen:
-- Reformen
-- Exportwachstum
-- Stabilisierung der Rohstoffpreise
-- Internationale Unterstützung
-
-Risiken:
-- Kapitalflucht
-- Inflation
-- Zinsanstieg in den USA
-- Schuldenkrise
-- Währungskollaps
-
-Output:
+### 5. Storyline-Engine
+- Stärken  
+- Schwächen  
+- Chancen  
+- Risiken  
 - Kurzprognose
-- Risikobewertung
-- Handlungshinweise
+
+### 6. Szenario-Modul
+- Zinsanstieg USA  
+- Energiepreisschock  
+- Politische Instabilität  
+- Schuldenkrise  
+- Exportboom
+
+### 7. Handlungsempfehlungen
+- Risiko-Hinweise  
+- Stabilitätsfaktoren  
+- Beobachtungspunkte
 
 ---
 
-## ZENTRALBANK-RADAR
+## Währungsrisiko‑Radar
 
-1. Unabhängigkeit
-   - Hoch / Mittel / Niedrig
+### Achsen (6 Dimensionen)
 
-2. Leitzins
-   - Aktueller Wert
-   - Veränderung (1 Monat / 1 Jahr)
+1. **Inflationsrisiko**  
+   Höhe und Stabilität der Inflation.
 
-3. Geldpolitik
-   - Expansiv (locker)
-   - Neutral
-   - Restriktiv (straff)
+2. **Wechselkursvolatilität**  
+   Schwankungsintensität der Währung.
 
-4. Bilanzsumme
-   - Wachstum / Schrumpfung
-   - QE / QT (Quantitative Easing / Tightening)
+3. **Zentralbank-Unabhängigkeit**  
+   Politische Einflussnahme vs. Stabilität.
 
-5. Glaubwürdigkeit
-   - Inflationsziel erreicht?
-   - Marktvertrauen?
-   - Politische Einflussnahme?
+4. **Staatsverschuldung**  
+   Schuldenquote, Defizit, Rating.
 
-6. Währungsstabilität
-   - Wechselkursentwicklung
-   - Devisenreserven
-   - Kapitalflüsse
+5. **Dollarabhängigkeit**  
+   Anteil der Importe/Schulden in USD.
 
-7. Risikoindikatoren
-   - Überhitzung
-   - Rezessionsgefahr
-   - Schuldenkrise
+6. **Kapitalflucht-Risiko**  
+   Vertrauen der Bürger und Investoren.
+
+### Ausgabe
+- Radar-Chart  
+- Risikostufen (niedrig / mittel / hoch)  
+- Automatische Interpretation
 
 ---
 
-##DIGITALE WÃ„HRUNG (NICHT BITCOIN)
+## Wechselkurs-Modul
 
-Definition:
-Eine digitale Währung ist Geld, das ausschließlich elektronisch existiert und nicht als Papiergeld ausgegeben wird.
+### 1. Live-Daten
+- EUR/USD  
+- USD/TRY  
+- USD/ARS  
+- USD/CNY  
+- USD/SAR  
+- EUR/CHF  
+- EUR/GBP  
 
-Arten:
-1. Digitale Zentralbankwährung (CBDC)
-   - Von der Zentralbank ausgegeben
-   - Gesetzliches Zahlungsmittel
-   - Beispiel: Digitaler Euro, Digitaler Yuan
+### 2. Volatilitätsanalyse
+- 7‑Tage‑Volatilität  
+- 30‑Tage‑Volatilität  
+- 1‑Jahres‑Volatilität  
 
-2. Elektronisches Bankgeld
-   - Guthaben auf Bankkonten
-   - Wird für Überweisungen, Kartenzahlungen, Online-Zahlungen genutzt
-   - Existiert nur digital in Bankdatenbanken
+### 3. Einflussfaktoren
+- Zinsdifferenzen  
+- Inflation  
+- Kapitalflüsse  
+- Rohstoffpreise  
+- Politische Ereignisse  
 
-Eigenschaften:
-- Kein physisches Bargeld
-- Elektronisch übertragbar
-- Staatlich reguliert
-- Stabil (keine Volatilität wie Bitcoin)
+### 4. Charting
+- Candlestick  
+- Moving Averages  
+- RSI  
+- Trendlinien  
 
----
-
-##DIGITALE WÃ„HRUNG VS. PAPIERGELD
-
-Vorteile digitaler Währungen:
-- Schnellere Zahlungen (Sekunden statt Tage)
-- Geringere Kosten (keine Druck- oder Transportkosten)
-- Höhere Sicherheit (keine Fälschungen, kein Verlust)
-- Bessere Nachverfolgbarkeit (weniger Geldwäsche)
-- Präzisere Geldpolitik (direkte Verteilung möglich)
-- Einfachere internationale Zahlungen
-
-Nachteile digitaler Währungen:
-- Weniger Privatsphäre (Transaktionen sind nachvollziehbar)
-- Abhängigkeit von Technik und Strom
-- Gefahr staatlicher Ãœberwachung
-- Negativzinsen leichter durchsetzbar
-- Cyberrisiken (Hacks, Systemausfälle)
-
-Vorteile von Papiergeld:
-- Anonymität
-- Funktioniert ohne Strom/Internet
-- Psychologisches Vertrauen
-
-Nachteile von Papiergeld:
-- Fälschungsrisiko
-- Hohe Kosten für Druck/Transport
-- Verlust/Diebstahl möglich
-- Langsame internationale Zahlungen
+### 5. Interpretation
+- Starke Währung → Kapitalzufluss  
+- Schwache Währung → Inflation, Importprobleme  
 
 ---
 
-##IST GELD EIN WERTPAPIER?
+## Inflations-Modell
 
-Kurzantwort:
-Nein. Geld ist KEIN Wertpapier.
+### 1. Input-Variablen
+- Geldmenge (M1, M2)  
+- Wechselkurs  
+- Energiepreise  
+- Löhne  
+- Importabhängigkeit  
+- Staatsausgaben  
+- Zinsniveau  
 
-Geld:
-- Zahlungsmittel
-- Wird von Zentralbanken ausgegeben
-- Dient zum Kaufen, Sparen, Bezahlen
-- Hat keinen Anspruch auf Zinsen oder Eigentum
+### 2. Output
+- Kurzfristige Inflation (1–3 Monate)  
+- Mittelfristige Inflation (3–12 Monate)  
+- Langfristige Inflation (1–3 Jahre)  
 
-Wertpapier:
-- Finanzanspruch oder Eigentumsrecht
-- Beispiele: Aktien, Anleihen, ETFs
-- Repräsentiert Kredit, Eigentum oder Ertragsansprüche
+### 3. Mechanik
+- Geldmengenwachstum ↑ → Inflation ↑  
+- Währungsabwertung ↑ → Importpreise ↑ → Inflation ↑  
+- Energiepreise ↑ → Inflation ↑  
+- Zinsen ↑ → Inflation ↓ (mit Verzögerung)  
 
-Unterschied:
-Geld = Zahlungsmittel
+### 4. Risikoindikatoren
+- Lohn-Preis-Spirale  
+- Importpreisschock  
+- Staatsdefizit  
+- Zentralbank-Unabhängigkeit  
+
+---
+
+## Szenario-Modell für Währungskrisen
+
+### Szenario 1: Zinsanstieg in den USA
+- Dollar wird stärker  
+- Schwache Währungen fallen  
+- Inflation steigt durch teurere Importe  
+
+### Szenario 2: Politische Instabilität
+- Vertrauen sinkt  
+- Kapital flieht  
+- Währung kollabiert  
+- Inflation steigt  
+
+### Szenario 3: Schuldenkrise
+- Staat kann Schulden nicht bedienen  
+- Rating fällt  
+- Währung verliert massiv an Wert  
+
+### Szenario 4: Energiepreisschock
+- Importabhängige Länder leiden  
+- Währung fällt  
+- Inflation steigt  
+
+### Szenario 5: Kapitalverkehrskontrollen
+- Regierung beschränkt Geldbewegungen  
+- Vertrauen sinkt  
+- Schwarzmärkte entstehen  
+
+---
+
+## Storyline-Engine für Währungsrisiken
+
+### Stärken
+- Hohe Devisenreserven  
+- Unabhängige Zentralbank  
+- Niedrige Inflation  
+- Starke Exportwirtschaft  
+
+### Schwächen
+- Hohe Staatsverschuldung  
+- Politische Instabilität  
+- Importabhängigkeit  
+- Dollarabhängigkeit  
+
+### Chancen
+- Reformen  
+- Exportwachstum  
+- Stabilisierung der Rohstoffpreise  
+- Internationale Unterstützung  
+
+### Risiken
+- Kapitalflucht  
+- Inflation  
+- Zinsanstieg in den USA  
+- Schuldenkrise  
+- Währungskollaps  
+
+### Output
+- Kurzprognose  
+- Risikobewertung  
+- Handlungshinweise  
+
+---
+
+## Zentralbank-Radar
+
+1. **Unabhängigkeit** – Hoch / Mittel / Niedrig  
+2. **Leitzins** – aktueller Wert, Veränderung  
+3. **Geldpolitik** – expansiv / neutral / restriktiv  
+4. **Bilanzsumme** – Wachstum / Schrumpfung  
+5. **Glaubwürdigkeit** – Inflationsziel, Marktvertrauen  
+6. **Währungsstabilität** – Wechselkurs, Reserven  
+7. **Risikoindikatoren** – Überhitzung, Rezession, Schuldenkrise  
+
+---
+
+## Digitale Währung (nicht Bitcoin)
+
+### Definition
+Eine digitale Währung existiert ausschließlich elektronisch und wird nicht als Papiergeld ausgegeben.
+
+### Arten
+1. **Digitale Zentralbankwährung (CBDC)**  
+2. **Elektronisches Bankgeld**
+
+### Eigenschaften
+- Kein physisches Bargeld  
+- Elektronisch übertragbar  
+- Staatlich reguliert  
+- Stabil  
+
+---
+
+## Digitale Währung vs. Papiergeld
+
+### Vorteile digitaler Währungen
+- Schnell  
+- Günstig  
+- Sicher  
+- Weniger Geldwäsche  
+- Präzisere Geldpolitik  
+- Internationale Zahlungen einfacher  
+
+### Nachteile digitaler Währungen
+- Weniger Privatsphäre  
+- Technikabhängig  
+- Gefahr staatlicher Überwachung  
+- Negativzinsen möglich  
+- Cyberrisiken  
+
+### Vorteile Papiergeld
+- Anonym  
+- Ohne Strom nutzbar  
+- Psychologisch vertraut  
+
+### Nachteile Papiergeld
+- Fälschungsrisiko  
+- Hohe Kosten  
+- Verlust/Diebstahl  
+- Langsame internationale Zahlungen  
+
+---
+
+## Ist Geld ein Wertpapier?
+
+**Kurzantwort:** Nein.
+
+**Geld**  
+- Zahlungsmittel  
+- Von Zentralbanken ausgegeben  
+- Kein Anspruch auf Zinsen oder Eigentum  
+
+**Wertpapier**  
+- Finanzanspruch oder Eigentumsrecht  
+- Beispiele: Aktien, Anleihen, ETFs  
+
+**Unterschied:**  
+Geld = Zahlungsmittel  
 Wertpapier = Anspruch auf zukünftige Zahlungen oder Eigentum
-""")
 
+---

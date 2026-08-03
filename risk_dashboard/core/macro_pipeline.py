@@ -252,7 +252,7 @@ def run_backtest(tickers, prices_df, start=None, end=None,
             pv_series = pd.Series(portfolio_values, index=dates[:len(portfolio_values)])
             port_rets = pv_series.pct_change().dropna()
             lev = vol_target_leverage(port_rets, target_vol=vol_target, cap=2.0, window=63)
-            # scale positions by lev (note: this is a simplification; in real sim you'd adjust cash/borrow)
+            # scale positions by lev (note: this is a simplification; in real sim you d adjust cash/borrow)
             for t in positions:
                 positions[t] *= lev
 

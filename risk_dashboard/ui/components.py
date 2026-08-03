@@ -16,7 +16,7 @@ def make_radar_plot(scores: dict, title: str = "Radar") -> go.Figure:
     Mit:
     - Lexikon-Tooltips
     - Risiko-Farbskala (grün/gelb/rot)
-    - Ã˜-Risiko-Ring
+    - Risiko-Ring
     - Farblegende
     """
 

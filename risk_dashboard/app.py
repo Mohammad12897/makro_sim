@@ -18,8 +18,8 @@
 # .\.venv\Scripts\Activate.ps1
 # $env:AUTO_FIX_PASTE_BLOCKS="true"
 # python -m streamlit run .\risk_dashboard\app.py
-#python -m streamlit run .\risk_dashboard\app.py --logger.level=debug > .\streamlit_full.log 2>&1
-#python -m streamlit run .\risk_dashboard\app.py --server.runOnSave=false
+# python -m streamlit run .\risk_dashboard\app.py --logger.level=debug > .\streamlit_full.log 2>&1
+# python -m streamlit run .\risk_dashboard\app.py --server.runOnSave=false
 
 # risk_dashboard/app.py
 import os
@@ -81,6 +81,21 @@ import plotly.express as px
 
 try:
     import streamlit as st
+
+    # nach: import streamlit as st
+    if "backtest_ran" not in st.session_state:
+        st.session_state["backtest_ran"] = False
+
+    def maybe_run_backtest(run_fn, *args, **kwargs):
+        """
+        Führt run_fn nur einmal pro Streamlit‑Session aus.
+        Aufruf: maybe_run_backtest(run_backtest, params)
+        """
+        if not st.session_state["backtest_ran"]:
+            st.session_state["backtest_ran"] = True
+            return run_fn(*args, **kwargs)
+        return None
+
 except Exception:
     class _StreamlitShim:
         def write(self, *args, **kwargs): pass
