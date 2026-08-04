@@ -24,22 +24,52 @@ def render_etf_selection_ui():
 
     with st.sidebar:
         st.subheader("Portfolio Eingabe")
+        # Eingabefeld
         new_ticker = st.text_input("Ticker hinzufügen", value="", placeholder="z.B. AAPL oder VWRL")
+
+        # Normalisierung: akzeptiere Liste, Dict oder String
+        def parse_tickers(raw):
+            if raw is None:
+                return []
+            if isinstance(raw, (list, tuple)):
+                tickers = [str(t).strip().upper() for t in raw if str(t).strip()]
+            else:
+                s = str(raw)
+                s = s.replace(";", ",").replace("|", ",")
+                tickers = [t.strip().upper() for t in s.split(",") if t.strip()]
+            # Entferne Duplikate, behalte Reihenfolge
+            seen = set()
+            out = []
+            for t in tickers:
+                if t and t not in seen:
+                    seen.add(t)
+                    out.append(t)
+            return out
+
+        # parsed_tickers ist jetzt immer eine Liste
+        parsed_tickers = parse_tickers(new_ticker)
+        st.write("Parsed tickers:", parsed_tickers)
+
+        # Preise laden (immer Liste übergeben)
+        from risk_dashboard.ui.profiles_ui import load_price_data
+        prices = load_price_data(parsed_tickers)
+
+        # Hinzufügen-Button: validiere mit download_prices und arbeite mit der Liste
         if st.button("Hinzufügen"):
             t = new_ticker.strip().upper()
             if t:
-                # einfache Duplikatprüfung
                 if t in st.session_state.user_tickers:
                     st.warning(f"{t} ist bereits in der Liste.")
                 else:
-                    # Validierung: versuche kurze Preisanfrage
-                    prices = download_prices([t], start="2020-01-01", end=None)
-                    if prices is None or prices.empty:
+                    # Validierung: kurze Preisanfrage mit einer Liste
+                    test_prices = download_prices([t], start="2020-01-01", end=None)
+                    if test_prices is None or test_prices.empty:
                         st.error(f"Ticker {t} ist ungültig oder liefert keine Daten.")
                     else:
                         st.session_state.user_tickers.append(t)
                         save_user_tickers(st.session_state.user_tickers)
                         st.success(f"{t} hinzugefügt.")
+
         # Anzeige und Entfernen
         if st.session_state.user_tickers:
             st.write("Eigene Ticker:")
@@ -50,7 +80,6 @@ def render_etf_selection_ui():
                     st.session_state.user_tickers.remove(t)
                     save_user_tickers(st.session_state.user_tickers)
                     st.experimental_rerun()
-
 
     # Preset selection
     preset = st.selectbox("Gewichtungs‑Preset", ["Balanced", "Conservative", "Aggressive"], index=0)
@@ -318,3 +347,4 @@ def render_etf_selection_ui():
                 st.subheader("Kennzahlen")
                 st.json(metrics)
                 # Ende Block
+
