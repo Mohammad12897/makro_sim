@@ -88,3 +88,6 @@ __pycache__/
 .edge_dump_backups/
 .venv/
 .private_notes/
+
+scripts/
+
