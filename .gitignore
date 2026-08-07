@@ -94,3 +94,12 @@ __pycache__/
 
 scripts/
 *.bak*
+
+.venv/
+repo-mirror.git/
+makro_sim.egg-info/
+cache/
+logs/.vscode/
+scripts/
+*.bak*
+
