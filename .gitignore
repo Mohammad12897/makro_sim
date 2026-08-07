@@ -18,9 +18,11 @@ tmp_backup_files_*/
 # data and caches
 /data/
 /cache/
+cache/
 *.csv
 *.parquet
 *.pyc
+logs/
 
 Bereinigung_edge.txt
 remove_edge_block.ps1
@@ -64,6 +66,8 @@ risk_dashboard/config.yaml
 .venv
 
 repo-mirror.git/
+repo-mirror.git.backup/
+makro_sim.egg-info/
 
 # Editor / IDE
 .vscode/
@@ -86,8 +90,7 @@ __pycache__/
 
 # local backups and dumps
 .edge_dump_backups/
-.venv/
 .private_notes/
 
 scripts/
-
+*.bak*
