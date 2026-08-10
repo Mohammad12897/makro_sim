@@ -103,3 +103,5 @@ logs/.vscode/
 scripts/
 *.bak*
 
+repo_backup/
+src/makro-sim/
