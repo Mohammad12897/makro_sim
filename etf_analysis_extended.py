@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
 
+from risk_dashboard.data_utils import fetch_prices_from_yf
+
 # robustes Styling: versuche seaborn, sonst fallback auf matplotlib default
 try:
     import seaborn as sns
@@ -50,12 +52,19 @@ def compute_total_return(prices, dividends):
 
 # === Daten laden ===
 print("Lade Daten...")
-data = yf.download(ETFS, start=START, auto_adjust=True, actions=True, progress=False)
-if ("Close" in data.columns.levels[0]) if isinstance(data.columns, pd.MultiIndex) else False:
-    prices = data["Close"]
+
+# fetch_prices_quiet liefert flaches DataFrame mit Spalten = TICKER (Uppercase)
+data = fetch_prices_from_yf(ETFS, start=START, end=None, auto_adjust=True, threads=False)
+
+# Falls du explizit Adj Close erwartest, prüfe und wähle:
+if "ADJ CLOSE" in (c.upper() for c in data.columns):
+    prices = data["ADJ CLOSE"] if "ADJ CLOSE" in data.columns else data["ADJ_CLOSE"]
+elif "CLOSE" in (c.upper() for c in data.columns):
+    prices = data["CLOSE"] if "CLOSE" in data.columns else data["Close"]
 else:
-    # yfinance sometimes returns single-level columns when single ticker; normalize
-    prices = data["Close"] if "Close" in data else data
+    # data ist bereits flach; falls mehrere Ticker: prices = data
+    prices = data
+
 
 # Sicherstellen: DataFrame mit Spalten = ETFS
 prices = prices[ETFS].dropna(how="all")

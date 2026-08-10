@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+from risk_dashboard.data_utils import fetch_prices_from_yf
+
 # Beispiel-ETFs (anpassen)
 etfs = ["SPY","IEFA","EEM","AGG","VNQ"]
 
@@ -12,7 +14,9 @@ start = "2016-01-01"
 end = None
 
 # Daten laden
-data = yf.download(etfs, start=start, end=end, auto_adjust=True)["Close"]
+# statt direktem yf.download: benutze fetch_prices_quiet
+data = fetch_prices_from_yf(etfs, start=start, end=end, auto_adjust=True, threads=False)
+
 
 # tÃ¤gliche Renditen
 rets = data.pct_change().dropna()
@@ -35,5 +39,3 @@ print(summary.sort_values("Sharpe", ascending=False))
 plt.title("Cumulative Returns")
 plt.show()
 plt.savefig("cumulative_returns.png", dpi=150, bbox_inches="tight")
-
-

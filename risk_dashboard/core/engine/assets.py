@@ -1,20 +1,23 @@
-#core/engine/assets.py
+# core/engine/assets.py
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import pandas as pd
-import yfinance as yf
-import numpy as np
+import logging
 
+from risk_dashboard.data_utils import fetch_prices_from_yf, flatten_yf_dataframe
+
+logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------
 # Kursdaten laden
 # -------------------------------------------------------------------
 def fetch_prices(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
     """
-    Lädt historische Kursdaten über yfinance.
+    Lädt historische Kursdaten über zentrale fetch_prices_from_yf.
+    Rückgabe: DataFrame mit DatetimeIndex oder None.
     """
     if not ticker:
         return None
@@ -24,20 +27,30 @@ def fetch_prices(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
     start = end - timedelta(days=days)
 
     try:
-        data = yf.download(
-            ticker,
-            start=start,
-            end=end,
-            progress=False,
-            auto_adjust=True,
-            threads=False
-        )
+        # zentrale Funktion verwenden; auto_adjust True entspricht vorherigem Verhalten
+        df = fetch_prices_from_yf(ticker, start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), interval="1d", auto_adjust=True, threads=False)
 
-        if data is None or data.empty:
+        if df is None or df.empty:
             return None
-        return data
+
+        # Falls MultiIndex defensiv flattenen
+        if isinstance(df.columns, pd.MultiIndex):
+            try:
+                df = flatten_yf_dataframe(df)
+            except Exception:
+                logger.debug("flatten_yf_dataframe failed for %s; continuing with raw df", ticker)
+
+        # Index sicherstellen und sortieren
+        try:
+            df.index = pd.to_datetime(df.index)
+        except Exception:
+            logger.debug("Could not convert index to datetime for %s", ticker)
+        df = df.sort_index()
+
+        return df
+
     except Exception as e:
-        print(f"[fetch_prices] Fehler beim Laden von {ticker}: {e}")
+        logger.exception("[fetch_prices] Fehler beim Laden von %s: %s", ticker, e)
         return None
 
 

@@ -1,94 +1,83 @@
-import yfinance as yf
+# risk_dashboard/data_utils.py
+from typing import Optional, Sequence, Tuple, List
 import pandas as pd
+import yfinance as yf
 import logging
 
-from typing import Sequence, Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def _flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
+def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     """
     Robust flatten yfinance output:
-    - Wenn MultiIndex: versuche zuerst (ticker, field) -> wähle 'Close' pro Ticker.
-    - Falls (field, ticker): wähle 'Close' Ebene.
-    - Falls keine 'Close' Ebene vorhanden ist, wähle die erste numerische Spalte pro Ticker.
-    - Liefert DataFrame mit eindeutigen Spaltennamen (Ticker).
+    - Prefer 'Adj Close' then 'Close'
+    - Return DataFrame with uppercase column names (tickers)
     """
     if raw is None or raw.empty:
         return pd.DataFrame()
 
     df = raw.copy()
 
-    # MultiIndex-Fall
     if isinstance(df.columns, pd.MultiIndex):
-        lvl0 = df.columns.get_level_values(0)
-        lvl1 = df.columns.get_level_values(1)
+        # (ticker, field) -> level 1 contains field names
+        for label in ("Adj Close", "AdjClose", "Adj_Close", "Close"):
+            try:
+                if label in df.columns.get_level_values(1):
+                    out = df.xs(label, axis=1, level=1, drop_level=True)
+                    out.columns = [str(c).upper() for c in out.columns]
+                    return out
+            except Exception:
+                continue
 
-        # Fall: (ticker, field) z.B. ('VOO','Close')
-        # Heuristik: viele lvl0 Einträge sind Ticker (alphanumerisch)
-        try:
-            # Suche Close in Ebene 1 (case-insensitive)
-            close_label = None
-            for lab in df.columns.levels[1]:
-                if str(lab).lower() == "close":
-                    close_label = lab
-                    break
-            if close_label is not None:
-                out = df.xs(close_label, axis=1, level=1)
-                out.columns = [str(c).upper() for c in out.columns]
-                return out
-        except Exception:
-            pass
+        # (field, ticker) -> level 0 contains field names
+        for label in ("Adj Close", "AdjClose", "Adj_Close", "Close"):
+            try:
+                if label in df.columns.get_level_values(0):
+                    out = df.xs(label, axis=1, level=0, drop_level=True)
+                    out.columns = [str(c).upper() for c in out.columns]
+                    return out
+            except Exception:
+                continue
 
-        # Fall: (field, ticker) z.B. ('Close','VOO')
-        try:
-            close_label = None
-            for lab in df.columns.levels[0]:
-                if str(lab).lower() == "close":
-                    close_label = lab
-                    break
-            if close_label is not None:
-                out = df.xs(close_label, axis=1, level=0)
-                out.columns = [str(c).upper() for c in out.columns]
-                return out
-        except Exception:
-            pass
-
-        # Fallback: für jeden Ticker die erste numerische Spalte nehmen
+        # Fallback: first numeric column per ticker
         cols = {}
-        # bestimme mögliche ticker-level (beide Ebenen prüfen)
         for lvl in (0, 1):
             try:
-                for t in sorted(set(df.columns.get_level_values(lvl))):
-                    sub = df[t] if t in df.columns else None
-                    if sub is None:
-                        # try selecting by tuple
+                tickers = list(dict.fromkeys(df.columns.get_level_values(lvl)))
+                for t in tickers:
+                    try:
+                        sub = df.xs(t, axis=1, level=lvl, drop_level=True)
+                    except Exception:
                         try:
-                            sub = df.xs(t, axis=1, level=lvl)
+                            sub = df[t]
                         except Exception:
                             sub = None
-                    if sub is not None:
-                        num = sub.select_dtypes("number")
-                        if not num.empty:
-                            cols[str(t).upper()] = num.iloc[:, 0]
+                    if sub is None:
+                        continue
+                    num = sub.select_dtypes(include="number")
+                    if not num.empty:
+                        cols[str(t).upper()] = num.iloc[:, 0]
                 if cols:
                     return pd.DataFrame(cols)
             except Exception:
                 continue
 
-        # Letzter Fallback: concat aller Spalten mit eindeutigen Namen TICKER_FIELD
+        # Last fallback: concat with unique names
         try:
             pieces = []
             names = []
-            for f, t in df.columns:
-                pieces.append(df[(f, t)])
-                names.append(f"{str(t).upper()}_{str(f).upper()}")
-            return pd.concat(pieces, axis=1).set_axis(names, axis=1)
+            for a, b in df.columns:
+                pieces.append(df[(a, b)])
+                names.append(f"{str(a).upper()}_{str(b).upper()}")
+            out = pd.concat(pieces, axis=1)
+            out.columns = names
+            return out
         except Exception:
-            pass
+            df.columns = [f"{c}" for c in df.columns]
+            return df
 
-    # Kein MultiIndex: sichere Umbenennung bei Duplikaten
+    # single-level: uppercase and dedupe
     cols = list(df.columns)
     seen = {}
     new_cols = []
@@ -103,65 +92,49 @@ def _flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     df.columns = new_cols
     return df
 
+def _normalize_tickers(tickers: Sequence[str]) -> List[str]:
+    return [t.strip().upper() for t in tickers if t and str(t).strip()]
 
-def fetch_prices_quiet(tickers, start="2010-01-01", end=None):
-    """
-    Lädt Preisdaten für eine Liste von Tickers.
-    Gibt IMMER NUR ein DataFrame zurück (kein used, df).
-    MultiIndex wird automatisch bereinigt.
-    """
-
+def fetch_prices_from_yf(tickers, start="2010-01-01", end=None,
+                       auto_adjust: bool = False, threads: bool = False) -> pd.DataFrame:
     if isinstance(tickers, str):
         tickers = [tickers]
+    tickers = _normalize_tickers(tickers)
+    if not tickers:
+        return pd.DataFrame()
 
-    logger.debug("fetch_prices_quiet start tickers=%s start=%s end=%s", tickers, start, end)
+    logger.debug("fetch_prices_from_yf start tickers=%s start=%s end=%s", tickers, start, end)
 
     try:
-        df = yf.download(
+        raw = yf.download(
             tickers,
             start=start,
             end=end,
             progress=False,
             group_by="ticker",
-            auto_adjust=False,
-            threads=True
+            auto_adjust=auto_adjust,
+            threads=threads
         )
     except Exception as e:
         logger.warning("fetch_prices_quiet failed for %s: %s", tickers, e)
         return pd.DataFrame()
 
-    if df is None or df.empty:
+    if raw is None or raw.empty:
         logger.warning("fetch_prices_quiet returned empty DataFrame for %s", tickers)
         return pd.DataFrame()
 
-    # MultiIndex flatten
-    if isinstance(df.columns, pd.MultiIndex):
-        logger.debug("DataFrame is MultiIndex with levels %s", df.columns.nlevels)
-        try:
-            # Falls Ebene "Close" existiert → nur Close nehmen
-            if "Close" in df.columns.get_level_values(0):
-                df = df.xs("Close", axis=1, level=0, drop_level=False)
-            else:
-                # sonst letzte Ebene (Ticker)
-                df.columns = df.columns.get_level_values(-1)
-        except Exception as e:
-            logger.warning("MultiIndex flatten failed: %s", e)
-            df.columns = df.columns.get_level_values(-1)
+    df = flatten_yf_dataframe(raw)
 
     # Index bereinigen
     try:
         df.index = pd.to_datetime(df.index)
     except Exception:
         pass
+    df = df.sort_index()
 
-    logger.debug(
-        "fetch_prices_quiet returning dataframe with columns %s and index %s",
-        list(df.columns),
-        df.index[:3] if len(df.index) > 3 else df.index
-    )
-
+    logger.debug("fetch_prices_quiet returning dataframe with columns %s and index length %d",
+                 list(df.columns), len(df.index))
     return df
-
 
 def extract_close_series(df, ticker):
     """
@@ -206,13 +179,18 @@ def extract_close_series(df, ticker):
 
     return pd.Series(dtype=float)
 
-
-def _normalize_tickers(tickers: Sequence[str]) -> list:
-    return [t.strip() for t in tickers if t and str(t).strip()]
-
 def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
                                  start: str = "2010-01-01",
-                                 end: Optional[str] = None) -> Tuple[Optional[str], pd.DataFrame]:
+                                 end: Optional[str] = None,
+                                 auto_adjust: bool = False,
+                                 threads: bool = True,
+                                 progress: bool = False) -> Tuple[Optional[str], pd.DataFrame]:
+    """
+    Lade Close/Adj Close Preise für tickers via yfinance.
+    Rückgabe: (used_ticker_or_column_name, dataframe)
+    - used: erster Ticker (aus input order), der tatsächlich Daten liefert; oder None.
+    - dataframe: DatetimeIndex, Spalten = TICKER (uppercased)
+    """
     if isinstance(tickers, str):
         tickers = [tickers]
     tickers = _normalize_tickers(tickers)
@@ -226,10 +204,10 @@ def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
             tickers,
             start=start,
             end=end,
-            progress=False,
+            progress=progress,
             group_by="ticker",
-            auto_adjust=False,
-            threads=True
+            auto_adjust=auto_adjust,
+            threads=threads
         )
     except Exception as e:
         logger.warning("yfinance download failed for %s: %s", tickers, e)
@@ -240,7 +218,7 @@ def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
         return None, pd.DataFrame()
 
     # Robustes Flattening
-    df = _flatten_yf_dataframe(raw)
+    df = flatten_yf_dataframe(raw)
 
     # Spalten auf Großbuchstaben (einheitlich)
     df.columns = [str(c).upper() for c in df.columns]
@@ -249,10 +227,10 @@ def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
     used = None
     for t in tickers:
         if str(t).upper() in df.columns:
-            used = t
+            used = str(t).upper()
             break
     if used is None:
-        numeric_cols = df.select_dtypes("number").columns.tolist()
+        numeric_cols = df.select_dtypes(include="number").columns.tolist()
         used = numeric_cols[0] if numeric_cols else None
 
     # Index in Datetime konvertieren
@@ -261,5 +239,6 @@ def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
     except Exception:
         pass
 
+    df = df.sort_index()
     logger.debug("fetch_prices_quiet_with_used returning used=%s df.shape=%s", used, df.shape)
     return used, df

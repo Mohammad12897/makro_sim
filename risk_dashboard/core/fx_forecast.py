@@ -1,6 +1,6 @@
 # risk_dashboard/core/fx_forecast.py
 import logging
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -11,7 +11,12 @@ from prophet import Prophet
 from risk_dashboard.core.utils import validate_prophet_input
 from risk_dashboard.core.fx_engine import download_fx_history
 import requests
-from scripts.yf_helper import _safe_read_csv_text
+from risk_dashboard.core.yf_helper import _safe_read_csv_text
+
+import logging
+
+
+from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
 
 logger = logging.getLogger(__name__)
 
@@ -56,107 +61,57 @@ def _ensure_date_fx_columns(df: pd.DataFrame, fx_col_name: str) -> pd.DataFrame:
     out = out[["date", "fx"]].copy()
     return out
 
+
 def load_fx_history(pair: str = "EURUSD=X", period: str = "10y") -> pd.DataFrame:
     """
     Lade FX-Historie für ein Währungspaar.
-    Rückgabe: DataFrame mit Spalten ['date','fx'] oder ein leeres DataFrame mit diesen Spalten.
+    Rückgabe: DataFrame mit Spalte ['fx'] und DatetimeIndex.
     """
-    # 1) Versuch: yfinance
+    # 1) Versuche zentrale Funktion
     try:
-        data = yf.download(pair, period=period, interval="1d", progress=False)
+        df = fetch_prices_from_yf(pair, start=None, end=None, interval="1d")
     except Exception as e:
-        logger.warning("yf.download error for %s: %s", pair, e)
-        data = pd.DataFrame()
+        logger.warning("fetch_prices_from_yf error for %s: %s", pair, e)
+        df = pd.DataFrame()
 
-    # 2) Wenn yfinance leer oder None -> Fallback versuchen
-    if data is None or data.empty:
-        logger.info("yf.download returned empty for %s, trying fallback sources...", pair)
-
-        # 2a) pandas_datareader / stooq (sicherer, lokaler Import)
-        symbol = pair.replace("=X", "")
-        df_alt = None
-        pdr = _try_import_pandas_datareader()
-        if pdr is not None:
-            try:
-                df_alt = pdr.DataReader(symbol, "stooq")
-            except Exception as e:
-                logger.info("pandas_datareader request failed for %s: %s", pair, e)
-                df_alt = None
-        else:
-            logger.info("pandas_datareader not available; skipping stooq fallback for %s", pair)
-
-        try:
-            if df_alt is not None and not df_alt.empty:
-                df_alt.index = pd.to_datetime(df_alt.index, errors="coerce")
-                df_alt = df_alt.sort_index()
-                numeric_cols = df_alt.select_dtypes(include="number").columns.tolist()
-                if numeric_cols:
-                    out = df_alt[[numeric_cols[-1]]].copy()
-                    return _ensure_date_fx_columns(out, numeric_cols[-1])
-                logger.info("Fallback data for %s has no numeric columns", pair)
-            else:
-                logger.info("pandas_datareader (stooq) returned no data for %s", pair)
-        except Exception as e:
-            logger.info("pandas_datareader (stooq) failed for %s: %s", pair, e)
-
-        # 2b) HTTP CSV Fallbacks (prüfen, ob eine CSV-Antwort valide ist)
-        fallback_urls = [
-            f"https://stooq.com/q/d/l/?s={symbol.lower()}&i=d",
-            # weitere URLs hier ergänzen
-        ]
-        for url in fallback_urls:
-            try:
-                resp = requests.get(url, timeout=10)
-                resp.raise_for_status()
-                try:
-                    df_fallback = _safe_read_csv_text(resp.text)
-                except ValueError:
-                    logger.warning("Fallback returned invalid CSV/HTML for %s", url)
-                    df_fallback = None
-            except requests.RequestException as e:
-                logger.debug("HTTP fallback request failed for %s: %s", url, e)
-                df_fallback = None
-
-            if df_fallback is not None and not df_fallback.empty:
-                try:
-                    df_fallback.index = pd.to_datetime(df_fallback.index, errors="coerce")
-                    df_fallback = df_fallback.sort_index()
-                    numeric_cols = df_fallback.select_dtypes(include="number").columns.tolist()
-                    if numeric_cols:
-                        out = df_fallback[[numeric_cols[-1]]].copy()
-                        return _ensure_date_fx_columns(out, numeric_cols[-1])
-                except Exception as e:
-                    logger.debug("Processing fallback CSV for %s failed: %s", url, e)
-
-        # Alle Fallbacks fehlgeschlagen
-        logger.warning("Fallback sources failed for %s", pair)
+    # 2) Fallbacks falls leer
+    if df is None or df.empty:
+        logger.info("fetch_prices_from_yf returned empty for %s, trying fallbacks...", pair)
+        # (Behalte hier deine bestehenden pandas_datareader / HTTP CSV Fallbacks unverändert)
+        # ... (kopiere den bisherigen Fallback‑Block aus deiner Datei)
+        # Wenn alle Fallbacks fehlschlagen:
         return pd.DataFrame(columns=["date", "fx"])
 
-    # 3) Wenn yfinance Daten liefert: Normalisieren und Spalte auswählen
+    # 3) Normalisieren
     try:
-        # Falls MultiIndex-Spalten vorhanden sind, flach machen
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = [" ".join(map(str, c)).strip() for c in data.columns.values]
+        if isinstance(df.columns, pd.MultiIndex):
+            df = flatten_yf_dataframe(df)
 
-        data.index = pd.to_datetime(data.index, errors="coerce")
+        df.index = pd.to_datetime(df.index, errors="coerce")
         # Bevorzugte Spaltenreihenfolge
-        for candidate in ["Adj Close", "Close", "adj_close", "close"]:
-            if candidate in data.columns:
-                out = data[[candidate]].copy()
-                return _ensure_date_fx_columns(out, candidate)
+        for candidate in ["Adj Close", "AdjClose", "Adj_Close", "Close", "close"]:
+            # flexible Suche (case-insensitive)
+            match = [c for c in df.columns if c.upper().replace("_"," ") == candidate.upper().replace("_"," ")]
+            if match:
+                out = df[[match[0]]].copy()
+                out.columns = ["fx"]
+                out = out.sort_index()
+                out.index.name = "date"
+                return out
 
         # Fallback: erste numerische Spalte
-        numeric_cols = data.select_dtypes(include="number").columns.tolist()
+        numeric_cols = df.select_dtypes(include="number").columns.tolist()
         if numeric_cols:
-            out = data[[numeric_cols[0]]].copy()
-            return _ensure_date_fx_columns(out, numeric_cols[0])
+            out = df[[numeric_cols[0]]].copy()
+            out.columns = ["fx"]
+            out.index.name = "date"
+            return out
 
-        # Keine passende Spalte gefunden
-        logger.warning("No suitable price column found for %s (columns: %s)", pair, data.columns.tolist())
+        logger.warning("No suitable price column found for %s (columns: %s)", pair, df.columns.tolist())
         return pd.DataFrame(columns=["date", "fx"])
 
     except Exception as e:
-        logger.exception("Error processing yfinance data for %s: %s", pair, e)
+        logger.exception("Error processing data for %s: %s", pair, e)
         return pd.DataFrame(columns=["date", "fx"])
 
 

@@ -12,6 +12,7 @@ import numpy as np
 import yfinance as yf
 import pandas as pd
 import streamlit as st
+from typing import List, Optional
 
 from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import linkage, leaves_list
@@ -26,6 +27,7 @@ from risk_dashboard.core.asset_packages import (
 
 from functools import lru_cache
 
+from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
 
 
 @lru_cache(maxsize=32)
@@ -87,45 +89,64 @@ def classify_scenario_from_score(score: float) -> str:
     else:
         return "Boom"
 
-def load_etf_prices(tickers, start=None, end=None):
-    st.write("ETF-Loader— angefragte Ticker:", tickers)
+def load_etf_prices(tickers: List[str], start: Optional[str]=None, end: Optional[str]=None) -> pd.DataFrame:
+    st.write("ETF-Loader — angefragte Ticker:", tickers)
 
-    data = yf.download(tickers, start=start, end=end, auto_adjust=True)
+    # zentrale Funktion verwenden
+    try:
+        data = fetch_prices_from_yf(tickers, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
+    except Exception as e:
+        logger.exception("fetch_prices_from_yf failed: %s", e)
+        st.error("Fehler beim Laden der ETF‑Preise.")
+        return pd.DataFrame()
 
-    st.write("ETF-Loader— rohe Daten:", data.head())
+    if data is None or data.empty:
+        st.warning("ETF-Loader — keine Daten erhalten.")
+        return pd.DataFrame()
 
-    # Fall 1: MultiIndex (mehrere Ticker)
+    # Falls MultiIndex defensiv flattenen
     if isinstance(data.columns, pd.MultiIndex):
-        if "Adj Close" in data.columns.levels[0]:
-            data = data["Adj Close"]
-        else:
-            st.warning("MultiIndex ohne 'Adj Close'— verwende 'Close'.")
-            data = data["Close"]
+        try:
+            data = flatten_yf_dataframe(data)
+        except Exception:
+            # fallback: leave as-is
+            pass
 
-    # Fall 2: SingleIndex (ein Ticker)
+    # Normalize column names and prefer ADJ CLOSE -> CLOSE
+    cols_upper = [str(c).upper() for c in data.columns]
+    # Wenn Spalten wie 'ADJ CLOSE' oder 'ADJ_CLOSE' existieren, wähle diese
+    chosen = []
+    if any("ADJ" in c and "CLOSE" in c for c in cols_upper):
+        chosen = [c for c in data.columns if "ADJ" in str(c).upper() and "CLOSE" in str(c).upper()]
+    elif any(c == "CLOSE" for c in cols_upper):
+        chosen = [c for c in data.columns if str(c).upper() == "CLOSE"]
     else:
-        if "Adj Close" in data.columns:
-            data = data[["Adj Close"]]
-        elif "Close" in data.columns:
-            data = data[["Close"]]
-        else:
-            st.error("Weder 'Adj Close' noch 'Close' vorhanden.")
-            return pd.DataFrame()
+        # Falls Spalten bereits Ticker sind (SPY, IEFA...), behalte alle numerischen Spalten
+        numeric = data.select_dtypes(include="number")
+        if not numeric.empty:
+            data = numeric
+            chosen = list(data.columns)
 
-    # gültige Spalten extrahieren
+    if chosen:
+        data = data[chosen]
+
+    # Falls Series -> DataFrame
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
+
+    # gültige Spalten (mindestens ein nicht-NaN Wert)
     valid_cols = [c for c in data.columns if data[c].notna().sum() > 0]
-    missing = [c for c in tickers if c not in valid_cols]
+    missing = [t for t in tickers if t.upper() not in [str(c).upper() for c in valid_cols]]
 
     if missing:
-        st.warning(f"ETF-Loader— fehlende Ticker: {missing}")
+        st.warning(f"ETF-Loader — fehlende Ticker: {missing}")
 
     if not valid_cols:
-        st.error("ETF-Loader— keine gültigen Preisreihen gefunden.")
+        st.error("ETF-Loader — keine gültigen Preisreihen gefunden.")
         return pd.DataFrame()
-    
-    # âœ… Debug-Ausgabe HIER einfügen
-    st.write("DEBUG— ETF Loader Zeitraum:", data.index[:5], data.index[-5:])
 
+    st.write("DEBUG — ETF Loader Zeitraum:", data.index[:5].tolist(), data.index[-5:].tolist())
+    # Rückgabe nur gültiger Spalten
     return data[valid_cols]
 
 
