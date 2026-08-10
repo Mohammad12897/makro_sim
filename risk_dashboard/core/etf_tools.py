@@ -6,6 +6,11 @@ import yfinance as yf
 from datetime import datetime
 import numpy as np
 
+
+# falls du flatten direkt brauchst:
+from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
+
+
 logger = logging.getLogger(__name__)
 
 # Placeholder ETF_CANDIDATES import (user can fill risk_dashboard/config/etf_candidates.py)
@@ -173,30 +178,30 @@ def compute_etf_score_components(row: Dict[str, Any]) -> Dict[str, float]:
 # -------------------------
 _price_cache = {}
 
+
 def download_prices(tickers: List[str], start: str = "2018-01-01", end: str = None) -> pd.DataFrame:
-    """Download Close prices for tickers using yfinance. Returns DataFrame indexed by Date with tickers as columns."""
+    """Download Close prices for tickers using centralized fetch_prices_from_yf."""
     end = end or datetime.today().strftime("%Y-%m-%d")
-    key = (tuple(sorted(tickers)), start, end)
+    key = (tuple(sorted([t.upper() for t in tickers])), start, end)
     if key in _price_cache:
         return _price_cache[key]
+
+    # Verwende zentrale Funktion; sie gibt flaches DataFrame mit Uppercase-Spalten zurück
     try:
-        df = yf.download(tickers, start=start, end=end, progress=False, auto_adjust=False)
+        df = fetch_prices_from_yf(tickers, start=start, end=end, interval="1d")
     except Exception as e:
-        logger.exception("yfinance download failed: %s", e)
+        logger.exception("fetch_prices_from_yf failed: %s", e)
         return pd.DataFrame()
-    # Extract Close prices robustly
+
+    # Falls fetch_prices_from_yf aus irgendeinem Grund MultiIndex liefert, flattenen
     if isinstance(df.columns, pd.MultiIndex):
-        if "Close" in df.columns.get_level_values(0):
-            close = df["Close"].copy()
-        else:
-            lvl0 = df.columns.get_level_values(0)
-            close_cols = [c for c in lvl0 if str(c).lower().startswith("close")]
-            if close_cols:
-                close = df[close_cols[0]]
-            else:
-                close = df.iloc[:, :]
-    else:
-        close = df.copy()
-    close.columns = [str(c).strip() for c in close.columns]
-    _price_cache[key] = close
-    return close
+        try:
+            df = flatten_yf_dataframe(df)
+        except Exception:
+            # fallback: leave as-is
+            pass
+
+    # Säubere Spaltennamen
+    df.columns = [str(c).strip() for c in df.columns]
+    _price_cache[key] = df
+    return df

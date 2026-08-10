@@ -1,3 +1,4 @@
+# risk_dashboard/core/market_engine.py (Auszug)
 from tracemalloc import start
 
 import yfinance as yf
@@ -16,6 +17,11 @@ from datetime import datetime, timedelta
 # falls normalize_price_df in derselben Datei definiert ist, kein Import nötig
 # sonst z.B.:
 from risk_dashboard.core.utils import get_latest_before, ensure_date_column, ensure_date_series, normalize_price_df
+
+from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
+from .helpers import normalize_price_df, ensure_date_column  # passe Importpfad an
+
+
 
 
 logger = logging.getLogger(__name__)
@@ -178,17 +184,24 @@ def to_utc_aware(series: pd.Series) -> pd.Series:
     return series.dropna()
 
 
-# Helper 1: direkte yf.download
 def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=None, period: Optional[str]=None) -> Optional[pd.Series]:
     try:
-        if start is None and end is None:
-            df = yf.download(ticker, period=period, auto_adjust=True, progress=False)
+        # zentrale Funktion: wenn period angegeben, kann start/end None sein
+        if start is None and end is None and period is not None:
+            df = fetch_prices_from_yf(ticker, start=None, end=None, interval="1d", auto_adjust=True, threads=False)
         else:
-            df = yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False)
+            df = fetch_prices_from_yf(ticker, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
 
         if df is None or df.empty:
-            logger.debug("yf.download returned empty for %s", ticker)
+            logger.debug("fetch_prices_from_yf returned empty for %s", ticker)
             return None
+
+        # Falls MultiIndex defensiv flattenen
+        if isinstance(df.columns, pd.MultiIndex):
+            try:
+                df = flatten_yf_dataframe(df)
+            except Exception:
+                pass
 
         # Index sicherstellen
         try:
@@ -199,22 +212,31 @@ def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=
 
         # Preisspalte finden (Adj Close bevorzugt)
         price_col = None
-        for candidate in ["Adj Close", "Close", "adj_close", "close"]:
-            if candidate in df.columns:
-                price_col = candidate
+        for candidate in ["ADJ CLOSE", "ADJ_CLOSE", "ADJClose", "Adj Close", "Close", "close"]:
+            matches = [c for c in df.columns if c.upper().replace("_"," ") == candidate.upper().replace("_"," ")]
+            if matches:
+                price_col = matches[0]
                 break
 
         if price_col is None:
-            logger.warning("yf.download for %s has no Close/Adj Close column: %s", ticker, df.columns.tolist())
-            return None
+            # fallback: erste numerische Spalte
+            numeric = df.select_dtypes(include="number")
+            if numeric.shape[1] == 0:
+                logger.warning("No Close/Adj Close column for %s: %s", ticker, df.columns.tolist())
+                return None
+            price_col = numeric.columns[0]
 
-        # Normalisieren (Index, Duplikate, Sortierung) - normalize_price_df erwartet price_col
+        # Normalisieren (Index, Duplikate, Sortierung)
         df = normalize_price_df(df, price_col=price_col)
 
         # Extrahiere die Preis‑Series (erste Spalte nach normalize_price_df)
         s = df.iloc[:, 0].copy()
         s.name = ticker
         return s.sort_index()
+
+    except Exception:
+        logger.exception("Error in _try_yf_download for %s", ticker)
+        return None
 
     except Exception:
         logger.exception("Error in _try_yf_download for %s", ticker)

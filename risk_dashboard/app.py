@@ -60,7 +60,7 @@ AUTO_FIX = os.getenv("AUTO_FIX_PASTE_BLOCKS", "false").lower() in ("1", "true", 
 
 # Import minimal safety module if vorhanden
 try:
-    from scripts.safety import startup_safety_check, sanitize_project_pastes
+    from risk_dashboard.core.safety import startup_safety_check, sanitize_project_pastes
     startup_safety_check(project_root, auto_fix=AUTO_FIX)
 except Exception:
     # If not present, continue silently
@@ -71,7 +71,7 @@ from risk_dashboard.core.data_loader import (
     load_raw_prices_for_universe,
     filter_valid_tickers
 )
-from scripts.ticker_cache import validate_ticker_with_cache
+from risk_dashboard.core.ticker_cache import validate_ticker_with_cache
 from risk_dashboard.data_cache import load_price_data_cached
 
 # Streamlit optional importieren, mit sauberem Shim als Fallback
@@ -483,7 +483,7 @@ from risk_dashboard.core.config import load_profiles, save_profile, load_etf_uni
 
 # Optional helpers
 try:
-    from scripts.yf_helper import sanitize_project_pastes as yf_sanitize
+    from risk_dashboard.core.yf_helper import sanitize_project_pastes as yf_sanitize
 except Exception:
     yf_sanitize = None
 

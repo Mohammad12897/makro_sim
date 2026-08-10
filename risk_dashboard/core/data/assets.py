@@ -3,9 +3,14 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 from .caching import cached_download
-from .logging import logger
 from core.data.db_assets import ETF_DB, STOCK_DB, find_asset
 import pandas as pd
+from typing import Optional
+import logging
+
+from risk_dashboard.data_utils import fetch_prices_from_yf, flatten_yf_dataframe
+
+logger = logging.getLogger(__name__)
 
 
 def to_float(x):
@@ -57,33 +62,57 @@ def sanitize_price_data(data):
 
     return None
 
-
-def fetch_price_history(symbol, period="5y"):
+def fetch_price_history(symbol: str, period: str = "5y") -> Optional[pd.Series]:
     """
-    Lädt historische Kursdaten.
-    Nutzt ETF_DB, um Ticker wie 'EIMI' — 'EIMI.L' zu korrigieren.
+    Lädt historische Kursdaten. Nutzt ETF_DB zur Korrektur (z.B. EIMI -> EIMI.L).
+    Gibt Series mit Schlusskursen (index = DatetimeIndex) oder None zurück.
     """
     try:
-        # 1. Symbol normalisieren
         symbol = symbol.strip().upper()
 
-        # 2. ETF_DB prüfen: falls Nutzer "EIMI" eingibt — "EIMI.L" verwenden
+        # ETF_DB lookup (wie bisher)
         for etf in ETF_DB:
             if etf.get("Ticker") == symbol or etf.get("ISIN") == symbol:
                 symbol = etf["Yahoo"]
                 break
 
-        # 3. Download
-        raw = yf.download(symbol, period=period, progress=False, auto_adjust=True)
+        # zentrale Fetch-Funktion verwenden
+        df = fetch_prices_from_yf(symbol, start=None, end=None, interval="1d", auto_adjust=True)
 
-        if raw is None or raw.empty:
+        if df is None or df.empty:
             return None
 
-        # 4. Nur Schlusskurse zurückgeben
-        return raw["Close"].dropna()
+        # defensiv flattenen
+        if isinstance(df.columns, pd.MultiIndex):
+            try:
+                df = flatten_yf_dataframe(df)
+            except Exception:
+                pass
+
+        # Bevorzuge 'ADJ CLOSE' -> 'CLOSE' -> erste numerische Spalte
+        cols_upper = [c.upper() for c in df.columns]
+        if any("ADJ" in c and "CLOSE" in c for c in cols_upper):
+            col = next(c for c in df.columns if "ADJ" in str(c).upper() and "CLOSE" in str(c).upper())
+        elif "CLOSE" in cols_upper:
+            col = next(c for c in df.columns if str(c).upper() == "CLOSE")
+        else:
+            numeric = df.select_dtypes(include="number")
+            if numeric.empty:
+                return None
+            col = numeric.columns[0]
+
+        series = df[col].dropna()
+        if series.empty:
+            return None
+        # Index sicherstellen
+        try:
+            series.index = pd.to_datetime(series.index)
+        except Exception:
+            pass
+        return series.sort_index()
 
     except Exception as e:
-        print(f"Error fetching {symbol}: {e}")
+        logger.exception("Error fetching %s: %s", symbol, e)
         return None
 
 

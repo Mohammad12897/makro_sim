@@ -20,16 +20,24 @@ import logging
 import time
 import random
 import pandas as pd
+import yfinance as yf
+import sys
+import os
+import contextlib
+import io
+import streamlit as st
+
+from risk_dashboard.data_utils import flatten_yf_dataframe
 
 # Externe Helfer (sollten in scripts/yf_helper.py existieren)
-from scripts.yf_helper import (
+from risk_dashboard.core.yf_helper import (
     download_batch_with_backoff,
     download_one_with_backoff,
     wait_for_rate_slot,
 )
 
 # Cache-Validator (wie zuvor vorgeschlagen)
-from scripts.ticker_cache import validate_ticker_with_cache
+from risk_dashboard.core.ticker_cache import validate_ticker_with_cache
 
 logger = logging.getLogger(__name__)
 
@@ -54,13 +62,6 @@ def filter_valid_tickers(tickers: List[str]) -> List[str]:
     # deduplizieren und Reihenfolge bewahren
     return list(dict.fromkeys(valid))
 
-
-import sys
-import os
-import contextlib
-import io
-import yfinance as yf
-import streamlit as st
 
 # --- Kontextmanager: stdout/stderr temporär stummschalten ---
 @contextlib.contextmanager
@@ -87,80 +88,42 @@ def suppress_stdout_stderr():
 
 # --- Quiet fetch wrapper mit optionalem Caching ---
 @st.cache_data(ttl=60*60)  # optional: 1 Stunde cache; anpassen oder entfernen
-def fetch_prices_quiet(tickers: List[str],
-                       start: Optional[str] = None,
-                       end: Optional[str] = None,
-                       interval: str = "1d") -> pd.DataFrame:
+def fetch_prices_safe(tickers: List[str],
+                      start: Optional[str] = None,
+                      end: Optional[str] = None,
+                      interval: str = "1d",
+                      auto_adjust: bool = False,
+                      threads: bool = True) -> pd.DataFrame:
     """
-    Lade Preisdaten für tickers, unterdrückt yfinance prints.
-    Gibt ein DataFrame zurück mit MultiIndex columns oder mindestens einer 'close' Spalte.
-    Wenn mehrere Ticker, versucht DataFrame mit close-Spalten pro Ticker zu liefern.
+    Lade Preisdaten für tickers; gibt flaches DataFrame mit Close/AdjClose-Spalten zurück.
     """
-    # 1) Versuche vorhandene Projektfunktion zu nutzen (falls vorhanden)
-    try:
-        # Wenn du eine projektweite Funktion fetch_prices_quiet hast, nutze sie
-        from risk_dashboard.core.data_loader import fetch_prices_quiet as project_fetch
-    except Exception:
-        project_fetch = None
-
-    # 2) Führe den Download innerhalb des suppress-Kontexts aus
-    try:
-        with suppress_stdout_stderr():
-            if project_fetch is not None:
-                # project_fetch erwartet evtl. eine Liste und liefert DataFrame mit 'close'
-                df = project_fetch(tickers)
-            else:
-                # Fallback: yfinance.download
-                # yfinance.download returns a DataFrame with columns like ('Close', 'Adj Close', ...)
-                df = yf.download(tickers, start=start, end=end, interval=interval, group_by='ticker', threads=True, progress=False)
-    except Exception as e:
-        # Fehler beim Laden: gib leeres DF zurück und logge in Streamlit
-        st.warning(f"Fehler beim Laden der Preise für {tickers}: {e}")
+    if isinstance(tickers, str):
+        tickers = [tickers]
+    tickers = [t.strip().upper() for t in tickers if t and str(t).strip()]
+    if not tickers:
         return pd.DataFrame()
 
-    # 3) Normalisiere das Ergebnis: Ziel ist eine Series/DataFrame mit 'close'
-    # Falls project_fetch bereits das gewünschte Format liefert, gib es zurück
-    if isinstance(df, pd.DataFrame):
-        # yfinance single ticker: columns like ['Open','High','Low','Close','Adj Close','Volume']
-        # yfinance multi ticker: top-level columns are tickers
-        # Ziel: DataFrame mit einer 'close' Spalte pro Ticker (oder Series für Einzelticker)
-        try:
-            # Wenn MultiIndex (ticker, field)
-            if isinstance(df.columns, pd.MultiIndex):
-                # Extrahiere Close/close/Close-Spalte für jeden Ticker
-                close_frames = {}
-                for t in tickers:
-                    # tolerant gegenüber verschiedenen Feldnamen
-                    for field in ("Close", "close", "Adj Close", "AdjClose"):
-                        if (t, field) in df.columns:
-                            close_frames[t] = df[(t, field)].rename(t)
-                            break
-                if close_frames:
-                    return pd.concat(close_frames, axis=1)
-            else:
-                # Single ticker oder single-level columns
-                # Versuche 'Close' oder 'close' Spalte
-                if "Close" in df.columns:
-                    return pd.DataFrame({"close": df["Close"]})
-                if "close" in df.columns:
-                    return pd.DataFrame({"close": df["close"]})
-                # Falls project_fetch lieferte bereits 'close' als Spalte
-                if "close" in df.columns:
-                    return df
-        except Exception:
-            pass
-
-    # Fallback: wenn df nicht wie erwartet, versuche es zu konvertieren
     try:
-        # Wenn df ist Series (ein Ticker)
-        if isinstance(df, pd.Series):
-            return pd.DataFrame({"close": df})
+        raw = yf.download(
+            tickers,
+            start=start,
+            end=end,
+            interval=interval,
+            group_by="ticker",
+            auto_adjust=auto_adjust,
+            threads=threads,
+            progress=False
+        )
+    except Exception as e:
+        # log/handle
+        return pd.DataFrame()
+
+    df = flatten_yf_dataframe(raw)
+    try:
+        df.index = pd.to_datetime(df.index)
     except Exception:
         pass
-
-    # Letzter Fallback: leeres DF
-    return pd.DataFrame()
-
+    return df
 
 def load_raw_prices_for_universe(universe: List[str],
                                  period: str = "max",

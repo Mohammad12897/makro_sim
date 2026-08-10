@@ -6,6 +6,8 @@ import yfinance as yf
 from pathlib import Path
 import logging
 
+from risk_dashboard.data_utils import fetch_prices_from_yf
+
 logger = logging.getLogger(__name__)
 
 def load_returns_csv(filename: str, expected_assets: list = None) -> pd.DataFrame:
@@ -60,11 +62,20 @@ def load_yahoo_returns(ticker, start="2010-01-01", end=None):
     """
     Lädt historische Renditen von Yahoo Finance.
     """
-    data = yf.download(ticker, start=start, end=end)
-    if "Adj Close" not in data:
-        raise ValueError(f"Ticker {ticker} hat keine Adj Close Daten.")
-    returns = data["Adj Close"].pct_change().dropna()
-    return returns
+    
+    df = fetch_prices_from_yf(ticker, start=start, end=end, auto_adjust=False, threads=False)
+
+    # Spaltennamen sind Uppercase; prüfe Varianten
+    if "ADJ CLOSE" in df.columns:
+        price_col = "ADJ CLOSE"
+    elif "ADJ_CLOSE" in df.columns:
+        price_col = "ADJ_CLOSE"
+    elif "CLOSE" in df.columns:
+        price_col = "CLOSE"
+    else:
+        raise ValueError(f"Ticker {ticker} hat keine Close/Adj Close Daten.")
+
+    returns = df[price_col].pct_change().dropna()
 
 
 def validate_returns(df, expected_assets):
