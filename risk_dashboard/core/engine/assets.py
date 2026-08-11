@@ -1,10 +1,8 @@
 # core/engine/assets.py
-from __future__ import annotations
-
-from datetime import datetime, timedelta
-from typing import Optional
-
+from __future__ import annotations   # optional, nützlich für spätere Typen
+from typing import Any, Dict, Optional
 import pandas as pd
+from datetime import datetime, timedelta
 import logging
 
 from risk_dashboard.data_utils import fetch_prices_from_yf, flatten_yf_dataframe

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import logging
 
-from core.data.ticker_validation import validate_or_fix_ticker
+from risk_dashboard.core.data.ticker_validation import validate_or_fix_ticker
 from risk_dashboard.data_utils import fetch_prices_from_yf, flatten_yf_dataframe
 
 logger = logging.getLogger(__name__)

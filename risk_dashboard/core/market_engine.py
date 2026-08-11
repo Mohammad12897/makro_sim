@@ -19,10 +19,6 @@ from datetime import datetime, timedelta
 from risk_dashboard.core.utils import get_latest_before, ensure_date_column, ensure_date_series, normalize_price_df
 
 from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
-from .helpers import normalize_price_df, ensure_date_column  # passe Importpfad an
-
-
-
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

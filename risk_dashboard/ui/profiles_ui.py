@@ -34,7 +34,7 @@ from risk_dashboard.core.macro_pipeline import (
 
 from risk_dashboard.core.holdings import try_relaxed_holdings
 from risk_dashboard.core.etf_tools import download_prices
-from risk_dashboard.core.helpers import classify_etf
+from risk_dashboard.core.utils import classify_etf
 
 logger = logging.getLogger(__name__)
 
@@ -879,8 +879,6 @@ def load_price_data(etf_universe, *args, **kwargs):
     prices = download_prices(tickers, start="2010-01-01")
     return prices
 
-
-
 def detect_historical_regimes(
     macro_df: Optional[pd.DataFrame],
     required_cols: Sequence[str] = ("inflation", "gdp", "volatility"),
@@ -1027,8 +1025,6 @@ def profile_form_ui() -> None:
 
     logger.debug("DEBUG: type(price_data)=%s shape=%s", type(price_data), getattr(price_data, "shape", None))
     logger.debug("DEBUG: portfolio=%s", portfolio)
-
-
 
 
     # 1. Session reads
