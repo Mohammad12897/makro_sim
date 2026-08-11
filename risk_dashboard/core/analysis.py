@@ -207,11 +207,14 @@ def analyze_ticker(base_ticker: str, etf_universe: List[str]) -> Tuple[
     if skipped:
         logger.warning("Diese Ticker wurden entfernt, da sie keine Daten liefern: %s", skipped)
 
+    # Debug: kurz Struktur und Sample loggen
+    try:
+        logger.debug("prices_multi.columns: %s", list(prices_multi.columns)[:100])
+        logger.debug("prices_multi.head: %s", prices_multi.head(10).to_dict())
+    except Exception:
+        pass
+
     # --- Extraktion der Rohserie (einmalig) ---
-    logger.debug("prices_multi.columns: %s", list(prices_multi.columns)[:100])
-    logger.debug("prices_multi.head: %s", prices_multi.head(10).to_dict())
-
-
     try:
         raw_series = extract_close_series_for_used(prices_multi, used)
     except KeyError as ke:
@@ -230,29 +233,60 @@ def analyze_ticker(base_ticker: str, etf_universe: List[str]) -> Tuple[
             logger.info("raw_series for %s is all NaN — trying cached single-df fallback", used)
             if df is not None and not df.empty:
                 # Priorität: typische Spalten
-                for col in ("Close", "Adj Close", "close", "adj close"):
+                for col in ("Close", "Adj Close", "close", "adj close", used):
                     if col in df.columns:
-                        candidate = pd.to_numeric(df[col], errors="coerce").dropna()
-                        if not candidate.empty:
+                        candidate_orig = pd.to_numeric(df[col], errors="coerce").dropna()
+                        if candidate_orig.empty:
+                            continue
+
+                        # Prüfe Index-Überschneidung mit prices_multi
+                        try:
+                            common_idx = candidate_orig.index.intersection(prices_multi.index)
+                        except Exception:
+                            common_idx = candidate_orig.index
+
+                        if len(common_idx) > 0:
+                            # Wenn es gemeinsame Zeitpunkte gibt, reindexe auf prices_multi.index und dropna
                             try:
-                                candidate = candidate.reindex(prices_multi.index).dropna()
+                                candidate_reindexed = candidate_orig.reindex(prices_multi.index).dropna()
                             except Exception:
-                                pass
-                            close_series = candidate
-                            logger.info("Using cached df column '%s' for %s as fallback", col, used)
+                                candidate_reindexed = pd.Series(dtype="float64")
+                            if not candidate_reindexed.empty:
+                                close_series = candidate_reindexed
+                                logger.info("Using cached df column '%s' for %s as fallback (reindexed to prices_multi index)", col, used)
+                                break
+                            else:
+                                # Falls reindexed leer, aber candidate_orig nicht leer, verwende candidate_orig
+                                close_series = candidate_orig
+                                logger.info("Using cached df column '%s' for %s as fallback (cached index used)", col, used)
+                                break
+                        else:
+                            # Keine Überschneidung: verwende cached series direkt
+                            close_series = candidate_orig
+                            logger.info("Using cached df column '%s' for %s as fallback (no index overlap; using cached index)", col, used)
                             break
-                # fallback: erste numerische Spalte
+
+                # fallback: erste numerische Spalte falls noch nichts gefunden
                 if close_series.empty:
                     numeric_cols = df.select_dtypes(include=[np.number]).columns
                     if len(numeric_cols) > 0:
-                        candidate = pd.to_numeric(df[numeric_cols[0]], errors="coerce").dropna()
-                        try:
-                            candidate = candidate.reindex(prices_multi.index).dropna()
-                        except Exception:
-                            pass
-                        if not candidate.empty:
-                            close_series = candidate
-                            logger.info("Using cached df numeric column '%s' for %s as fallback", numeric_cols[0], used)
+                        candidate_orig = pd.to_numeric(df[numeric_cols[0]], errors="coerce").dropna()
+                        if not candidate_orig.empty:
+                            common_idx = candidate_orig.index.intersection(prices_multi.index)
+                            if len(common_idx) > 0:
+                                try:
+                                    candidate_reindexed = candidate_orig.reindex(prices_multi.index).dropna()
+                                except Exception:
+                                    candidate_reindexed = pd.Series(dtype="float64")
+                                if not candidate_reindexed.empty:
+                                    close_series = candidate_reindexed
+                                    logger.info("Using cached df numeric column '%s' for %s as fallback (reindexed)", numeric_cols[0], used)
+                                else:
+                                    close_series = candidate_orig
+                                    logger.info("Using cached df numeric column '%s' for %s as fallback (cached index)", numeric_cols[0], used)
+                            else:
+                                close_series = candidate_orig
+                                logger.info("Using cached df numeric column '%s' for %s as fallback (cached index)", numeric_cols[0], used)
     except Exception:
         logger.exception("Fehler beim Verwenden des cached df als Fallback für %s", used)
 
