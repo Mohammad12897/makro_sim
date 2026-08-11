@@ -1,4 +1,4 @@
-# scripts/yf_helper.py
+# risk_dashboard/core/yf_helper.py
 import time
 import random
 import threading
@@ -12,8 +12,8 @@ import yfinance as yf
 
 from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
 # weitere lokale Hilfen wie wait_for_rate_slot, CACHE_DIR, CACHE_TTL_SECONDS etc. bleiben unverändert
-
-
+# oben in risk_dashboard/core/yf_helper.py
+from risk_dashboard.core.utils import _ensure_date_fx_columns
 
 logger = logging.getLogger(__name__)
 
