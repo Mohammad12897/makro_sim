@@ -2,7 +2,7 @@
 import pandas as pd
 import streamlit as st
 from typing import Sequence, Tuple, Optional
-from risk_dashboard.data_utils import fetch_prices_quiet
+from risk_dashboard.data_utils import fetch_prices_from_yf, fetch_prices_quiet_with_used
 
 
 @st.cache_data(ttl=24*3600, show_spinner=False)
@@ -33,7 +33,7 @@ def load_price_data_cached(tickers, start="2010-01-01"):
     if isinstance(tickers, str):
         tickers = [tickers]
 
-    df = fetch_prices_quiet(tickers, start=start)   # <‑‑ NUR EIN RETURN
+    df = fetch_prices_from_yf(tickers, start=start)   # <‑‑ NUR EIN RETURN
 
     if df is None:
         return pd.DataFrame()

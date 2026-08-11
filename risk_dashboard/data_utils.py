@@ -96,31 +96,39 @@ def _normalize_tickers(tickers: Sequence[str]) -> List[str]:
     return [t.strip().upper() for t in tickers if t and str(t).strip()]
 
 def fetch_prices_from_yf(tickers, start="2010-01-01", end=None,
-                       auto_adjust: bool = False, threads: bool = False) -> pd.DataFrame:
+                         interval: str = "1d", auto_adjust: bool = False,
+                         threads: bool = False, **kwargs) -> pd.DataFrame:
+    """
+    Lädt Preise mit yfinance.download.
+    - interval: '1d', '1wk', '1mo', ...
+    - zusätzliche kwargs werden an yf.download weitergereicht
+    """
     if isinstance(tickers, str):
         tickers = [tickers]
     tickers = _normalize_tickers(tickers)
     if not tickers:
         return pd.DataFrame()
 
-    logger.debug("fetch_prices_from_yf start tickers=%s start=%s end=%s", tickers, start, end)
+    logger.debug("fetch_prices_from_yf start tickers=%s start=%s end=%s interval=%s", tickers, start, end, interval)
 
     try:
         raw = yf.download(
             tickers,
             start=start,
             end=end,
+            interval=interval,
             progress=False,
             group_by="ticker",
             auto_adjust=auto_adjust,
-            threads=threads
+            threads=threads,
+            **kwargs
         )
     except Exception as e:
-        logger.warning("fetch_prices_quiet failed for %s: %s", tickers, e)
+        logger.warning("fetch_prices_from_yf failed for %s: %s", tickers, e)
         return pd.DataFrame()
 
     if raw is None or raw.empty:
-        logger.warning("fetch_prices_quiet returned empty DataFrame for %s", tickers)
+        logger.warning("fetch_prices_from_yf returned empty DataFrame for %s", tickers)
         return pd.DataFrame()
 
     df = flatten_yf_dataframe(raw)
@@ -132,7 +140,7 @@ def fetch_prices_from_yf(tickers, start="2010-01-01", end=None,
         pass
     df = df.sort_index()
 
-    logger.debug("fetch_prices_quiet returning dataframe with columns %s and index length %d",
+    logger.debug("fetch_prices_from_yf returning dataframe with columns %s and index length %d",
                  list(df.columns), len(df.index))
     return df
 

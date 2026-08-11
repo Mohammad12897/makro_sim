@@ -1,4 +1,5 @@
 # risk_dashboard/core/utils.py
+from __future__ import annotations
 from typing import Dict, Any, List, Tuple, Optional
 import pandas as pd
 import numpy as np
@@ -16,6 +17,22 @@ logger = logging.getLogger(__name__)
 _BASE_DIR = Path(__file__).resolve().parents[1]
 _AUDIT_PATH = _BASE_DIR / "logs" / "utils_audit.jsonl"
 _AUDIT_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+
+def classify_etf(etf: str) -> Tuple[str, str]:
+    if etf.startswith(("CSPX", "EQQQ")):
+        return ("iShares", "UK‑/US‑Anbieter (BlackRock). Echte Holdings verfügbar über iShares‑CSV.")
+    if etf.startswith(("VUAA", "VWRL")):
+        return ("Vanguard", "US‑Anbieter. Keine iShares‑CSV, Demo‑Holdings empfohlen.")
+    if etf.startswith("XDAX"):
+        return ("Xtrackers", "Deutsche DWS‑ETFs. Keine iShares‑CSV, Demo‑Holdings empfohlen.")
+    if etf.startswith("FZ"):
+        return ("Amundi", "Französischer Anbieter. Keine iShares‑CSV, Demo‑Holdings empfohlen.")
+    if etf == "CASH":
+        return ("Cash", "Barbestand oder Geldmarktposition, keine Holdings.")
+    return ("Unbekannt", "Keine Zuordnung möglich. Demo‑Holdings empfohlen.")
+
+
 
 def _write_audit(entry: dict) -> None:
     entry["timestamp"] = datetime.utcnow().isoformat() + "Z"
