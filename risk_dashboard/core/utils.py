@@ -33,6 +33,35 @@ def classify_etf(etf: str) -> Tuple[str, str]:
     return ("Unbekannt", "Keine Zuordnung möglich. Demo‑Holdings empfohlen.")
 
 
+def _ensure_date_fx_columns(df: pd.DataFrame, fx_col_name: str) -> pd.DataFrame:
+    """
+    Hilfsfunktion: nimmt ein DataFrame mit einem Preiskolumnennamen fx_col_name
+    und stellt sicher, dass die Spalten 'date' und 'fx' existieren.
+    """
+    # reset_index und sichere Umbenennung der Index-Spalte in 'date'
+    out = df.reset_index()
+    # Falls die Index-Spalte bereits 'date' heiÃŸt, ist das fine.
+    if "date" not in out.columns:
+        # Die erste Spalte nach reset_index ist die ehemalige Index-Spalte
+        idx_col = out.columns[0]
+        out = out.rename(columns={idx_col: "date"})
+    # Falls fx_col_name nicht exakt vorhanden ist (z. B. durch Umbenennung), versuche Fallback
+    if fx_col_name not in out.columns:
+        # Suche erste numerische Spalte (auÃŸer 'date')
+        numeric = [c for c in out.select_dtypes(include="number").columns if c != "date"]
+        if numeric:
+            fx_col_name = numeric[0]
+        else:
+            # kein numerisches Feld gefunden -> leeres DF
+            return pd.DataFrame(columns=["date", "fx"])
+    # Jetzt sicherstellen, dass 'fx' existiert
+    out = out.rename(columns={fx_col_name: "fx"})
+    # Konvertiere Datumsspalte
+    out["date"] = pd.to_datetime(out["date"], errors="coerce")
+    out = out.dropna(subset=["date", "fx"])
+    out = out[["date", "fx"]].copy()
+    return out
+
 
 def _write_audit(entry: dict) -> None:
     entry["timestamp"] = datetime.utcnow().isoformat() + "Z"
