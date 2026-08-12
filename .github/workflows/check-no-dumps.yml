@@ -1,1 +1,16 @@
-# (kopiere den YAML-Inhalt oben hierher)
+name: Block accidental dumps
+on: [push, pull_request]
+jobs:
+  check-dumps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Search for browser dump markers
+        run: |
+          set -e
+          if git grep -n -E "edge_all_open_tabs|User's Edge browser tabs metadata|pageTitle" -- ':!vendor' ':!node_modules' >/dev/null 2>&1; then
+            echo "ERROR: Found browser dump markers in repository. Remove them before merging."
+            git grep -n -E "edge_all_open_tabs|User's Edge browser tabs metadata|pageTitle"
+            exit 1
+          fi
