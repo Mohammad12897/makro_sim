@@ -92,8 +92,7 @@ __pycache__/
 .edge_dump_backups/
 .private_notes/
 
-scripts/
-*.bak*
+*.dump
 
 .venv/
 repo-mirror.git/
