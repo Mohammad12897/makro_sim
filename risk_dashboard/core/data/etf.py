@@ -33,4 +33,3 @@ def get_etf_metrics(ticker: str) -> dict:
         "AUM": entry.get("AUM"),
         "DivRendite %": entry.get("DivRendite %"),
     }
-

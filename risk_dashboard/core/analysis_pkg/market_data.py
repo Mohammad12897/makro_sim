@@ -84,4 +84,3 @@ def get_fundamentals(ticker):
         "KUV": d.get("priceToSalesTrailing12Months"),
         "DivRendite %": d.get("dividendYield", 0) * 100 if d.get("dividendYield") else None,
     }
-

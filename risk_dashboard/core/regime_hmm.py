@@ -53,4 +53,3 @@ def map_hmm_states_to_labels(regime_df: pd.DataFrame):
 
     regime_df["regime_label"] = regime_df["hmm_state"].map(label_map)
     return regime_df, label_map, best_col
-

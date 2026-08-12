@@ -53,4 +53,3 @@ def build_etf_meta_dict(raw: Dict[str, Dict]) -> Dict[str, ETFMeta]:
             notes=v.get("notes"),
         )
     return out
-

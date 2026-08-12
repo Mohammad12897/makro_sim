@@ -312,4 +312,3 @@ def make_scenario_dropdown(scenarios):
         label="Szenario auswählen",
         value=scenarios[0]
     )
-

@@ -58,4 +58,3 @@ def get_gold():
 
 def get_bond():
     return load_asset_series("IEF")  # US 7-10y Treasury ETF
-

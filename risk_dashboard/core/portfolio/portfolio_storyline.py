@@ -34,4 +34,3 @@ def generate_portfolio_storyline(weights, stats):
         lines.append("Der Drawdown ist gering ‑ gute Stabilität in Stressphasen.")
 
     return " ".join(lines)
-

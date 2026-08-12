@@ -32,4 +32,3 @@ def portfolio_radar(symbols: list[str], weights: list[float]):
     if not rows:
         return None
     return plot_asset_radar(rows, mode="experte")
-

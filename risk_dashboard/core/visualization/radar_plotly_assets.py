@@ -59,4 +59,3 @@ def plot_asset_radar(rows, mode="einsteiger"):
     )
 
     return fig
-

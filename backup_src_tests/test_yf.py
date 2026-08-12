@@ -16,7 +16,7 @@ import yfinance
 logger.debug("yfinance", yfinance.__version__)
 
 logger.debug("\n== Direct HTTP check to Yahoo download endpoint ==")
-url = "https://query1.finance.yahoo.com/v7/finance/download/EUNL.DE?period1=1451606400&period2=1704067200&interval=1d&events=history&includeAdjustedClose=true"
+url = "<URL_REMOVED>
 try:
     r = requests.get(url, timeout=10)
     logger.debug("HTTP status:", r.status_code)
@@ -46,5 +46,3 @@ try:
         logger.debug("history returned empty")
 except Exception as e:
     logger.debug("history error:", repr(e))
-
-

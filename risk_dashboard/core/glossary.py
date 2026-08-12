@@ -119,4 +119,3 @@ def search_glossary(query: str):
                 results.append((category, term, definition))
 
     return results
-

@@ -16,5 +16,4 @@ def load_isin_db():
 def clear_cache():
     if os.path.exists(CACHE_DIR):
         shutil.rmtree(CACHE_DIR)
-        os.makedirs(CACHE_DIR)   
-
+        os.makedirs(CACHE_DIR)

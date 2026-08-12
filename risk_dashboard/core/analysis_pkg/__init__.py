@@ -368,9 +368,3 @@ def analyze_portfolio_components(etf_universe: Dict[str, Dict[str, Any]],
         st.warning("Hohe Konzentration erkannt. Prüfe Top-Holdings und mögliche Ãœberschneidungen zwischen Paketen.")
 
     return df
-
-
-
-
-
-

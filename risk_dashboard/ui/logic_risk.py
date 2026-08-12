@@ -28,4 +28,3 @@ def ui_risk_dashboard(ticker_text):
     fig = plot_correlation_heatmap(returns.corr())
 
     return vol_table, dd_table, fig
-

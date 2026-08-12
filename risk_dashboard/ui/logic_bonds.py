@@ -36,4 +36,3 @@ def ui_bond_analysis(ticker):
     })
 
     return df, fig
-

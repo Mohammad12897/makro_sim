@@ -347,4 +347,3 @@ def render_etf_selection_ui():
                 st.subheader("Kennzahlen")
                 st.json(metrics)
                 # Ende Block
-

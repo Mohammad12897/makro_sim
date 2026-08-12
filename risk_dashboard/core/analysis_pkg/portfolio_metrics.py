@@ -12,4 +12,3 @@ def aggregate_portfolio(rows, weights):
         agg[k] = sum(vals) if vals else None
 
     return agg
-

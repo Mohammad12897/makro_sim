@@ -31,4 +31,3 @@ def build_ki_table(assets: list[dict]) -> pd.DataFrame:
 
 
     return df.sort_values("KI‑Score", ascending=False)
-

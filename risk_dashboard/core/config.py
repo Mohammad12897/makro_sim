@@ -83,4 +83,3 @@ def save_profile(key: str, profile_obj: Dict[str, Any], path: Optional[Path] = N
         yaml.safe_dump(cfg_out, f, sort_keys=False, allow_unicode=True)
     # Audit
     _append_audit({"action": "save_profile", "key": key, "profile": profile_obj})
-

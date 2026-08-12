@@ -10,4 +10,3 @@ def risk_color(score):
         return "ðŸŸ¡ Mittleres Risiko"
     else:
         return "ðŸ”´ Hohes Risiko"
-

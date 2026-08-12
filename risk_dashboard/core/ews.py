@@ -114,4 +114,3 @@ def ews_for_country(country: str, params: Dict) -> str:
     """
     scores = compute_risk_scores(params)
     return ews_from_scores(scores)
-

@@ -33,4 +33,3 @@ Kategorie                ETF                                    Yahoo‑Ticker  
 Gold (physisch)          iShares Physical Gold                 SGLN.L          ✓ stabil
 Gold (Xetra)             Xetra‑Gold                            4GLD.DE         ✓ stabil
 Rohstoffe breit          WisdomTree Broad Commodities          PCOM.L          ✓ stabil
-

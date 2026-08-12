@@ -9,4 +9,3 @@ def load_etf_db():
 
 def list_etf_tickers():
     return [e["ticker"] for e in load_etf_db()]
-

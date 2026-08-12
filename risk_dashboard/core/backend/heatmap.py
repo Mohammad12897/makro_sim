@@ -31,4 +31,3 @@ def plot_correlation_heatmap(symbols):
     sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
     ax.set_title("Korrelation-Matrix")
     return fig
-

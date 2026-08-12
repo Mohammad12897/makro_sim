@@ -101,4 +101,3 @@ def validate_returns(df, expected_assets):
         errors.append("Unrealistische Renditen (>100% oder < -100%).")
 
     return errors
-

@@ -30,7 +30,7 @@ def _is_cache_fresh(path: Path) -> bool:
     return age_seconds < MAX_AGE_DAYS * 24 * 3600
 
 def _fetch_from_fred(series_id: str) -> pd.DataFrame:
-    url = "https://api.stlouisfed.org/fred/series/observations"
+    url = "<URL_REMOVED>
     params = {
         "series_id": series_id,
         "api_key": FRED_API_KEY,
@@ -77,4 +77,3 @@ def load_macro_data() -> pd.DataFrame:
 def load_market_data():
     prices = download_etf_history(["SPY"], period="10y")
     return build_market_risk_factors(prices)
-

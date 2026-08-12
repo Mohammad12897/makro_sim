@@ -9,4 +9,3 @@ logger.debug("HISTORICAL (head):")
 logger.debug(h.head())
 logger.debug("\nFORECAST (head):")
 logger.debug(f.head())
-

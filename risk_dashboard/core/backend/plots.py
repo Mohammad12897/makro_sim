@@ -32,4 +32,3 @@ def plot_efficient_frontier(mean_returns, cov_matrix, points=50):
     ax.set_title("Effizienzkurve (Efficient Frontier)")
 
     return fig
-

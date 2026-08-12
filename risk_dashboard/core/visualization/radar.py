@@ -125,4 +125,3 @@ def plot_radar(rows):
     ax.set_title("Radar-Overlay: Kennzahlenvergleich", pad=20)
 
     return fig
-

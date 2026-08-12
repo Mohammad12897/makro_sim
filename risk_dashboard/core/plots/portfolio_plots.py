@@ -14,4 +14,3 @@ def plot_portfolio(portfolio_returns):
     ax.grid(True, linestyle="--", alpha=0.4)
 
     return fig
-

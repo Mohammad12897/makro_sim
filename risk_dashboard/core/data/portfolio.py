@@ -15,4 +15,3 @@ def get_portfolio_metrics(portfolio_name: str) -> dict:
         "Diversifikation": 0.72,      # 0-1 Skala
         "Region-Exposure": 0.65,      # 0-1 Skala
     }
-

@@ -74,4 +74,3 @@ def get_country_macro(country: str) -> dict:
         "Staatsverschuldung": None,
         "Währungsstärke": None,
     })
-

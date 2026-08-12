@@ -60,4 +60,3 @@ def plot_radar_plotly(rows, mode: str = "einsteiger"):
     )
 
     return fig
-

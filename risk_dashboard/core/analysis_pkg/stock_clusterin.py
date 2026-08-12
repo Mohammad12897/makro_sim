@@ -33,4 +33,3 @@ def cluster_stocks(rows):
     df["Cluster"] = kmeans.fit_predict(X)
 
     return df
-

@@ -19,4 +19,3 @@ def dynamic_covariance(base_cov, scenario):
         cov.loc["gold", "bonds"] *= 1.2
 
     return cov
-

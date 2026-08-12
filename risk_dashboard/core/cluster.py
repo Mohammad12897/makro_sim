@@ -434,26 +434,6 @@ def laender_dashboard(land: str, presets: dict, clusters: dict, model):
 - Gesamtrisiko: {scores["total"]:.2f}
 
 ## Investment-Profil
-{investment_profile_for_cluster(
-    model.cluster_centers_[cid][0],
-    model.cluster_centers_[cid][1],
-    model.cluster_centers_[cid][2]
-)}
-"""
-
-    radar = laender_radar_plot(land, presets)
-    return md, radar
-
-def portfolio_simulator(w0: float, w1: float, w2: float, model):
-    centers = model.cluster_centers_
-
-    # Normalisieren
-    total = w0 + w1 + w2
-    w0, w1, w2 = w0/total, w1/total, w2/total
-
-    ps = w0*centers[0][0] + w1*centers[1][0] + w2*centers[2][0]
-    aut = w0*centers[0][1] + w1*centers[1][1] + w2*centers[2][1]
-    tot = w0*centers[0][2] + w1*centers[1][2] + w2*centers[2][2]
 
     profil = investment_profile_for_cluster(ps, aut, tot)
 
@@ -505,4 +485,3 @@ def country_equity_premium(total_score):
 
 def expected_equity_return(rf, beta, erp, total_score):
     return rf + beta * erp + country_equity_premium(total_score)
-

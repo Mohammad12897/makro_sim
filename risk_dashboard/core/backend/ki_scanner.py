@@ -60,4 +60,3 @@ def scan_assets(asset_string: str, profile: str, region: str):
     fig = plot_asset_radar(rows, mode="experte")
 
     return df, fig
-

@@ -72,4 +72,3 @@ def ui_portfolio_optimizer(ticker_text):
 
     except Exception as e:
         return pd.DataFrame([["Fehler", str(e)]]), None
-

@@ -66,5 +66,3 @@ def simulate_portfolio_with_rebalancing(asset_data: dict, weights: dict, freq="M
 
     merged["portfolio_rebal"] = port_ret
     return merged
-    
-

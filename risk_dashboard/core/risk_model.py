@@ -248,4 +248,3 @@ def risk_category(score: float) -> Tuple[str, str]:
         return "warnung", "yellow"
     else:
         return "kritisch", "red"
-

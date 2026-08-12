@@ -201,4 +201,3 @@ backtest_summary.to_csv(f"{OUT_DIR}/backtest_summary.csv")
 print(f"Backtest Kennzahlen gespeichert: {OUT_DIR}/backtest_summary.csv")
 
 print("Fertig.")
-

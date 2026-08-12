@@ -11,7 +11,7 @@ Dieses Dokument erklärt Schritt für Schritt, wie man das **makro_sim** Dashboa
 python -m streamlit run risk_dashboard/app.py
 ```
 
-Öffnet sich unter: http://localhost:8501
+Öffnet sich unter: <URL_REMOVED>
 
 ## 2 Überblick über die Oberfläche
 Seitenleiste (links)  

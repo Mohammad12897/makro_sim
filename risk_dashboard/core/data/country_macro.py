@@ -24,4 +24,3 @@ def get_country_macro(country: str) -> dict:
         "Zinsen": 0,
         "Arbeitslosenquote": 0,
     })
-

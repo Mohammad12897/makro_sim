@@ -114,4 +114,3 @@ Vorgefertigte Profile (Conservative, Balanced, Aggressive).
 - **total_risk** – Aggregierter Risikoscore
 
 ---
-

@@ -19,4 +19,3 @@ def test_to_naive_utc_mixed():
     df = pd.concat([s_naive.rename("n"), s_aware_conv.rename("a")], axis=1)
     assert "n" in df.columns and "a" in df.columns
     assert not df.empty
-

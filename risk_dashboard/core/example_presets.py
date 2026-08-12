@@ -11,11 +11,5 @@ EXAMPLE_PRESETS = {
 # Optional: einfache "Model"-Platzhalter mit cluster_centers_ falls du Investment-Profile per Cluster anzeigen willst
 class DummyModel:
     cluster_centers_ = np.array([
-        [0.75, 0.3, 0.8],  # Cluster 0: hohes Risiko
-        [0.5, 0.5, 0.55],  # Cluster 1: mittel
-        [0.15, 0.9, 0.2],  # Cluster 2: niedrig
-    ])
 
-CLUSTERS = {k: v.get("cluster") for k, v in EXAMPLE_PRESETS.items()}
 MODEL = DummyModel()
-

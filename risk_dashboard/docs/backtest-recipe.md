@@ -165,4 +165,3 @@ backtest-portfolio-value.png
 backtest-metrics.png
 
 backtest-weights.png
-

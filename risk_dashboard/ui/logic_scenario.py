@@ -32,4 +32,3 @@ def ui_scenario_comparison(ticker_text, scenario):
         rows.append([t, last, shocked])
 
     return pd.DataFrame(rows, columns=["Ticker", "Aktuell", "Nach Szenario"])
-

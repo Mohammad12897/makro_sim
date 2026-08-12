@@ -157,5 +157,3 @@ def create_pdf_report(
 
         if heatmap_fig is not None:
             draw_heatmap_page(pdf, heatmap_fig)
-
-

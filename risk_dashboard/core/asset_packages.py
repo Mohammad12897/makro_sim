@@ -93,4 +93,3 @@ def select_equity_package(regime, scenario, risk_score):
     if key == "low":
         return {"BND": 0.5, "GLD": 0.5}
     return {"CSPX.L": 0.5, "IMEU.L": 0.5}
-

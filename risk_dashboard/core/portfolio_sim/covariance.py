@@ -61,4 +61,3 @@ def build_asset_covariance():
         index=["equity", "bonds", "gold"],
         columns=["equity", "bonds", "gold"],
     )
-

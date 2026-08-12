@@ -208,6 +208,3 @@ def forecast_fx(steps=30):
     model_fit = model.fit()
     forecast = model_fit.forecast(steps=steps)
     return df, forecast
-
-
-

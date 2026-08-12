@@ -116,4 +116,3 @@ def build_asset_radar(selected_assets, custom_symbol, mode):
     df_lex = pd.DataFrame(lexicon_rows)
 
     return fig, df_metrics, df_lex
-

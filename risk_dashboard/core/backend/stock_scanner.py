@@ -38,4 +38,3 @@ def scan_stocks(symbols: list[str]):
         return pd.DataFrame({"Fehler": ["Keine Aktien-Daten gefunden"]})
 
     return pd.DataFrame(rows)
-

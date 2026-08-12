@@ -384,4 +384,3 @@ def build_market_risk_factors(etf_prices: pd.DataFrame):
     df["equity_trend"] = (etf_prices > ma).mean(axis=1)
 
     return df.dropna()
-

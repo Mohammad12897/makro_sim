@@ -50,4 +50,3 @@ def plot_etf_radar(rows, mode="einsteiger"):
     )
 
     return fig
-

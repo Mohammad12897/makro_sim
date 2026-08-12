@@ -9,4 +9,3 @@ presets:
         equity: 0.80
         bond: 0.20
       normalize: true
-

@@ -99,4 +99,3 @@ def convert_events_to_shocks(event_list):
         result[k] = min(1.0, result[k])
 
     return result
-

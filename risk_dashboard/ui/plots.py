@@ -38,4 +38,3 @@ def plot_radar(scores: dict):
     )
 
     return fig
-

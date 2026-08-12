@@ -7,4 +7,3 @@ try:
 except Exception as e:
     print("YAML Fehler:", e)
     sys.exit(1)
-

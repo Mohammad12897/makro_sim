@@ -144,4 +144,3 @@ def layout_cluster():
         "btn_cluster": btn_cluster,
         "cluster_out": cluster_out,
     }
-

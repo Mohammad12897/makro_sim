@@ -20,4 +20,3 @@ elif isinstance(raw, pd.DataFrame):
 import yfinance as yf
 t = yf.download("CSPX.L", period="1mo", progress=False)
 st.write("DEBUG yfinance direct columns:", t.columns.tolist())
-

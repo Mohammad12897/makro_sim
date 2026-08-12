@@ -5,7 +5,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from core.data.logging import logger
 
-JUSTETF_URL = "https://www.justetf.com/de/etf-profile.html?isin="
+JUSTETF_URL = "<URL_REMOVED>
 
 def fetch_justetf_data(isin: str):
     url = JUSTETF_URL + isin
@@ -53,4 +53,3 @@ def scan_etf_list(isins: list[str]):
 
     df = pd.DataFrame(rows)
     return df
-

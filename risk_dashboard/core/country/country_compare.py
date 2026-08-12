@@ -22,4 +22,3 @@ def compute_country_metrics(ticker):
 def compare_countries(tickers):
     rows = [compute_country_metrics(t) for t in tickers]
     return pd.DataFrame(rows)
-

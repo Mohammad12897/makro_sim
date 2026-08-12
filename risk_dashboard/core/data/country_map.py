@@ -13,4 +13,3 @@ def get_country_choices():
 
 def resolve_country(name):
     return COUNTRY_MAP[name]
-

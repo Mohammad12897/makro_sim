@@ -51,4 +51,3 @@ def plot_country_radar(rows, mode="einsteiger"):
     )
 
     return fig
-

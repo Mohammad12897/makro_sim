@@ -58,4 +58,3 @@ def get_portfolio(name):
             df = pd.DataFrame({"symbol": p["symbols"], "weight": p["weights"]})
             return df, p
     return None, None
-

@@ -60,4 +60,3 @@ def plot_scenario_radar_overlay(metrics):
     ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1))
 
     return fig
-

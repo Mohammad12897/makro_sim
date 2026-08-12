@@ -43,7 +43,7 @@ jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 kiwisolver==1.5.0
 lxml==6.1.1
--e git+ssh://git@github.com/Mohammad12897/makro_sim.git@5a449c20d893ed2b4a117cb2b1eb7bb97efe65dc#egg=makro_sim
+-e git+ssh://<EMAIL_REMOVED>/Mohammad12897/makro_sim.git@5a449c20d893ed2b4a117cb2b1eb7bb97efe65dc#egg=makro_sim
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 matplotlib==3.11.0

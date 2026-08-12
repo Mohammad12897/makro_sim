@@ -51,5 +51,3 @@ def stock_compare(t1, t2):
         md += f"**Empfehlung:** {t2} hat die bessere risikobereinigte Rendite."
 
     return md
-
-

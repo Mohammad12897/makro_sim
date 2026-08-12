@@ -77,5 +77,3 @@ def next_regime_distribution(current_regime: str, trans_matrix: pd.DataFrame) ->
         raise ValueError(f"Unbekanntes Regime: {current_regime}")
 
     return trans_matrix.loc[current_regime]
-
-

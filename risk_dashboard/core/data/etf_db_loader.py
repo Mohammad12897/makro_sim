@@ -98,4 +98,3 @@ def find_ticker_by_name(name):
         return []
     name_key = name.strip().lower()
     return [e["ticker"] for e in load_etf_db() if name_key in e.get("name", "").lower()]
-

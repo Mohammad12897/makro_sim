@@ -50,4 +50,3 @@ def plot_portfolio_radar(rows, mode="einsteiger"):
     )
 
     return fig
-

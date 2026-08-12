@@ -96,4 +96,3 @@ def auto_detect_country(ticker: str) -> str:
 
 def map_ticker_to_country(ticker: str) -> str:
     return auto_detect_country(ticker)
-

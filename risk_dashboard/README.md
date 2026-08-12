@@ -1,4 +1,4 @@
-git clone https://github.com/Mohammad12897/makro_sim.git
+git clone <URL_REMOVED>
 cd makro_sim
 python -m venv .venv
 # Windows

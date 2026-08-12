@@ -15,4 +15,3 @@ def compare_two_portfolios(p1, p2, period="5y"):
     ).dropna()
 
     return df
-

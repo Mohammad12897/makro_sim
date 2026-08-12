@@ -8,4 +8,3 @@ def compute_clusters(presets_all, k=3):
     labels = model.fit_predict(df)
     df["cluster"] = labels
     return df
-

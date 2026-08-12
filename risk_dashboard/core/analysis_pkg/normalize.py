@@ -36,4 +36,3 @@ def normalize_metrics(rows):
                 r[m + " norm"] = (val - lo) / (hi - lo)
 
     return rows
-

@@ -23,4 +23,3 @@ def mc_risk_metrics(sim):
         "cvar95": cvar95,
         "max_drawdown": max_dd,
     }
-

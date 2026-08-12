@@ -69,4 +69,3 @@ Stress-Tests
 API-Anbindung (FRED, ECB)
 
 ML-Modelle für Makro-Prognosen
-

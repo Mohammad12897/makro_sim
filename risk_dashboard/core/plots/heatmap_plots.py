@@ -8,4 +8,3 @@ def plot_risk_heatmap(presets_all):
     sns.heatmap(df, cmap="coolwarm", annot=False, ax=ax)
     ax.set_title("Risiko-Heatmap")
     return fig
-

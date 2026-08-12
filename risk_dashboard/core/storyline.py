@@ -43,16 +43,6 @@ def storyline_v3(country: str, params: Dict) -> str:
 
     # Sortierung der Dimensionen
     dims_sorted = sorted(
-        [(k, v) for k, v in scores.items() if k not in ("total")],
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-    top = dims_sorted[:3]       # höchste Risiken
-    low = dims_sorted[-2:]      # stabilste Bereiche
-
-    ps = scores["political_security"]
-    sa = scores["strategische_autonomie"]
 
     md = f"#Risiko-Storyline 3.0 - {country}\n\n"
 
@@ -122,4 +112,3 @@ def storyline_v3(country: str, params: Dict) -> str:
     md += f"Die Dimension **macro** bedeutet: {lex['macro']}\n\n"
     
     return md
-

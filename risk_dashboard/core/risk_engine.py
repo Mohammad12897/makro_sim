@@ -301,4 +301,3 @@ def detect_risk_regimes_from_scenario(scenario_df):
     df["risk_score_pca"] = compute_pca_score(df)
     df["regime_label"] = assign_regime(df["risk_score_pca"])
     return df
-

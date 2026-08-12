@@ -217,4 +217,3 @@ def build_cov_matrix(vols: np.ndarray, corr: np.ndarray = None) -> np.ndarray:
         corr = np.eye(n)
     cov = np.outer(vols, vols) * np.array(corr)
     return cov
-

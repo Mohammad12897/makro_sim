@@ -52,4 +52,3 @@ def generate_storyline(indicators: dict) -> str:
     parts = [interpret_indicator(k, v) for k, v in indicators.items()]
     text = " ".join(parts)
     return f"Die Indikatoren zeichnen folgendes Bild: {text}"
-

@@ -12,4 +12,3 @@ ASSET_MAP = {
 def resolve_asset(name_or_ticker: str) -> str:
     key = name_or_ticker.strip().lower()
     return ASSET_MAP.get(key, name_or_ticker)
-

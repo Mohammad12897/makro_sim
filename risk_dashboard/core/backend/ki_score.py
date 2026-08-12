@@ -233,4 +233,3 @@ Er basiert auf einer kombinierten Analyse von Trend, Risiko, Stabilität und Ren
 Zusammengefasst zeigt **{ticker}**, dass es aktuell **{summary}**.  
 Diese Einschätzung basiert auf Trendstärke, Risiko, Stabilität und Renditequalität.
 """
-

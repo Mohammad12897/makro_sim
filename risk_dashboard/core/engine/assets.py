@@ -232,5 +232,3 @@ def compute_radar_data(asset: Dict[str, Any],
         radar["Volatilität (stabil)"] = scale(1 / (1 + (vol or 0)), 0, 1)
 
     return radar
-
-

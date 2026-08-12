@@ -121,4 +121,3 @@ def combined_political_autonomy_heatmap(presets: Dict[str, dict]) -> List[List]:
         ])
 
     return rows
-

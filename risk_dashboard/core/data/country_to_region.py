@@ -30,4 +30,3 @@ country_to_region = {
     # Global / Sonstige
     "global": "Global", "welt": "Global", "world": "Global"
 }
-

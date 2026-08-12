@@ -32,4 +32,3 @@ def ui_crypto_analysis(ticker):
     })
 
     return df, fig
-

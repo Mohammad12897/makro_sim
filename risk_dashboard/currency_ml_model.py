@@ -147,4 +147,3 @@ stability_pred = reg_model.predict(new_currency)[0]
 
 print("Krisenwahrscheinlichkeit:", crisis_prob)
 print("Stabilitäts-Score:", stability_pred)
-

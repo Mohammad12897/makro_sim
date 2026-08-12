@@ -64,4 +64,3 @@ def optimize_ki_score(df):
         w = np.ones(len(df))
     w = w / w.sum()
     return pd.DataFrame({"symbol": df["symbol"], "weight": w})
-

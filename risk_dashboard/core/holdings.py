@@ -44,9 +44,9 @@ def load_ishares_holdings(isin: str) -> pd.DataFrame:
     }
 
     domains = [
-        "https://www.ishares.com/uk/individual/en/products",
-        "https://www.ishares.com/de/privatanleger/de/produkte",
-        "https://www.ishares.com/us/products",
+        "<URL_REMOVED>
+        "<URL_REMOVED>
+        "<URL_REMOVED>
     ]
 
     if isin not in product_map:
@@ -199,42 +199,7 @@ def load_holdings_with_fallback(etf: str, category: str, isin: Optional[str], df
 
     logger.info("Keine Holdings gefunden für %s — Demo verwenden", etf)
     demo = pd.DataFrame([
-        {"ticker": "AAPL", "weight_in_etf": 0.30},
-        {"ticker": "MSFT", "weight_in_etf": 0.30},
-        {"ticker": "NVDA", "weight_in_etf": 0.20},
-        {"ticker": "AMZN", "weight_in_etf": 0.20},
-    ])
-    try:
-        demo.to_csv(holdings_dir / f"{etf}.csv", index=False)
-    except Exception:
-        logger.debug("Konnte Demo-Holdings nicht speichern.")
-    try:
-        import streamlit as st
-        st.session_state[df_key] = demo
-    except Exception:
-        pass
-    return demo
 
-def try_relaxed_holdings(path_or_df):
-    """
-    Versucht einfache 2-Spalten-Holdings (ticker, weight_in_etf) zu akzeptieren.
-    Rückgabe: (True, df) wenn akzeptiert, sonst (False, reason_str).
-    """
-    if isinstance(path_or_df, (str, Path)):
-        try:
-            df = pd.read_csv(path_or_df)
-        except Exception as e:
-            return False, f"read failed: {e}"
-    elif isinstance(path_or_df, pd.DataFrame):
-        df = path_or_df.copy()
-    else:
-        return False, "unsupported input type"
-
-    df.columns = [c.strip() for c in df.columns]
-    cols_lower = {c.lower() for c in df.columns}
-
-    if cols_lower == {"ticker", "weight_in_etf"} or cols_lower == {"ticker", "weight"}:
-        rename_map = {}
         for c in df.columns:
             if c.lower() == "weight":
                 rename_map[c] = "weight_in_etf"

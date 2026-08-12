@@ -41,4 +41,3 @@ def correct_ticker(ticker: str) -> str:
 def validate_or_fix_ticker(ticker: str):
     fixed = correct_ticker(ticker)
     return fixed
-

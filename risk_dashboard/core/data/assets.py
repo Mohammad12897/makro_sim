@@ -203,4 +203,3 @@ def get_asset_metrics(symbol):
         "max_drawdown": calc_drawdown(series),
         "trend_sma_ratio": calc_sma_ratio(series, 50, 200),
     }
-

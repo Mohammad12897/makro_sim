@@ -11,4 +11,3 @@ def compare_portfolios(land, presets, portfolios, years, scenario):
         "Portfolio", "Mean", "Volatilität", "Sharpe", "VaR95", "CVaR95", "Max Drawdown"
     ])
     return df
-

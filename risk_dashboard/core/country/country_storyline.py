@@ -12,4 +12,3 @@ def generate_country_storyline(df):
     )
 
     return text
-

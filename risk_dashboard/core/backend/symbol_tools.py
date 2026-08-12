@@ -54,7 +54,7 @@ def detect_symbol_type(text: str) -> str:
 
 def yahoo_search_isin(ticker: str) -> str | None:
     try:
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={ticker}"
+        url = f"<URL_REMOVED>
         data = requests.get(url, timeout=5).json()
         if "quotes" in data:
             for q in data["quotes"]:
@@ -84,4 +84,3 @@ def ticker_to_isin(ticker: str) -> str | None:
     db[t] = None
     save_isin_db(db)
     return None
-

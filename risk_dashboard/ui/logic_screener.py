@@ -64,4 +64,3 @@ def ui_stock_screener(sector, country):
         "Wachstum",
         "KI‑Score"
     ]]
-

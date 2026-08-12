@@ -27,4 +27,3 @@ def backtest_portfolio(symbols: list[str], weights: list[float], period="5y"):
     portfolio.name = "Portfolio"
 
     return portfolio
-

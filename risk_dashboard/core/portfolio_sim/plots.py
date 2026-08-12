@@ -42,4 +42,3 @@ def plot_scenario_radar_overlay(metrics):
     ax.set_title("Radar-Overlay der Risiko-Szenarien")
 
     return fig
-
