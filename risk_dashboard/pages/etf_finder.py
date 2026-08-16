@@ -7,6 +7,8 @@ import numpy as np
 import plotly.express as px
 from datetime import datetime
 
+from ui.profiles_ui import detect_historical_regimes, load_and_validate_macro_data
+
 logger = logging.getLogger("risk_dashboard.pages.etf_finder")
 # Lokale Hilfsfunktionen
 
@@ -307,22 +309,55 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                 available = available[:top_n]
 
                 prices_subset = price_df[available]
+                # default result
+                result = {}
+
+                # Stelle sicher, dass regimes vorhanden ist (lade falls nötig)
                 try:
-                    from risk_dashboard.app import maybe_run_backtest
-                    result = maybe_run_backtest(run_backtest,
-                        tickers=available,
-                        prices_df=prices_subset,
-                        start=start_date,
-                        initial_cash=10000,
-                        monthly_dca=500,
-                        weights=weights
-                    )
-                except ValueError as e:
-                    logger.warning("maybe_run_backtest failed: %s", e)
-                    st.error("Backtest konnte nicht ausgeführt werden: keine gültigen Ticker in den Preisdaten.")
-                    result = {}
+                    from risk_dashboard.ui.profiles_ui import detect_historical_regimes
+
+                    # falls du eine zentrale Funktion hast, nutze die; sonst lokal erzeugen
+                    macro_df = load_and_validate_macro_data()  # falls vorhanden
+                    regimes = detect_historical_regimes(macro_df) if macro_df is not None else None
                 except Exception as e:
-                    logger.exception("Unexpected error in maybe_run_backtest: %s", e)
-                    st.error("Beim Backtest ist ein Fehler aufgetreten. Details im Log.")
-                    result = {}
+                    logger.exception("Fehler beim Laden der Regime‑Daten: %s", e)
+                    regimes = None
+
+                # Validierungen vor dem Backtest
+                if prices_subset is None or (hasattr(prices_subset, "empty") and prices_subset.empty):
+                    st.error("Keine Preisdaten für die ausgewählten ETFs.")
+                else:
+                    # available ist bereits die Liste der Ticker, die in price_df vorhanden sind
+                    portfolio_or_tickers = available  # einfache Liste reicht hier
+
+                    if not portfolio_or_tickers:
+                        st.error("Keine gültigen Ticker für Backtest.")
+                    elif regimes is None or (hasattr(regimes, "empty") and regimes.empty):
+                        st.error("Regime‑Daten fehlen oder sind leer. Backtest abgebrochen.")
+                    else:
+                        try:
+                            from risk_dashboard.utils.session_helpers import maybe_run_backtest
+                            from risk_dashboard.utils.backtest_adapter import adapter_run_backtest
+
+                            result = maybe_run_backtest(
+                                adapter_run_backtest,
+                                portfolio_or_tickers,
+                                prices=prices_subset,
+                                weights=weights,
+                                regimes=regimes,
+                                start=start_date,
+                                initial_cash=10000,
+                                monthly_dca=500,
+                                flag_key="backtest_etf_finder"
+                            ) or {}
+                        except ValueError as e:
+                            logger.warning("maybe_run_backtest failed: %s", e)
+                            st.error("Backtest konnte nicht ausgeführt werden: keine gültigen Ticker in den Preisdaten.")
+                            result = {}
+                        except Exception as e:
+                            logger.exception("Unexpected error in maybe_run_backtest: %s", e)
+                            st.error("Beim Backtest ist ein Fehler aufgetreten. Details im Log.")
+                            result = {}
+
+                # sichere Anzeige
                 st.write(result.get("metrics", {}))

@@ -3,8 +3,10 @@ import pandas as pd
 import numpy as np
 from matplotlib.pylab import var
 import pandas as pd
-from risk_dashboard.core.macro_loader import load_macro_data
+from risk_dashboard.core.macro_loader import load_and_validate_macro_data
+import logging
 
+logger = logging.getLogger(__name__)
 
 VARIABLES = [
     "BIP (Mrd USD)",
@@ -13,14 +15,20 @@ VARIABLES = [
     "Zinssatz (%)"
 ]
 
+
 def load_base_data():
-    df = pd.DataFrame()
-    df["date"] = load_macro_data("GDP")["date"]
-    df["gdp"] = load_macro_data("GDP")["value"]
-    df["cpi"] = load_macro_data("CPIAUCSL")["value"]
-    df["unrate"] = load_macro_data("UNRATE")["value"]
-    df["fedfunds"] = load_macro_data("FEDFUNDS")["value"]
-    return df
+    macro_df = load_and_validate_macro_data()
+    if macro_df is None:
+        logger.error("load_base_data: Makrodaten fehlen")
+        return pd.DataFrame()
+
+    out = pd.DataFrame()
+    out["date"] = macro_df.index if macro_df.index.name else macro_df.get("date")
+    out["gdp"] = macro_df.get("gdp") or macro_df.get("GDP")
+    out["cpi"] = macro_df.get("cpi") or macro_df.get("CPIAUCSL")
+    out["unrate"] = macro_df.get("unrate") or macro_df.get("UNRATE")
+    out["fedfunds"] = macro_df.get("fedfunds") or macro_df.get("FEDFUNDS")
+    return out
 
 SCENARIOS = {
     "Baseline": {"gdp": 0.0, "cpi": 0.0, "unrate": 0.0, "fedfunds": 0.0},

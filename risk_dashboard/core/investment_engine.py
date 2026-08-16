@@ -18,7 +18,7 @@ from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import linkage, leaves_list
 from risk_dashboard.core.market_engine import download_etf_history, build_market_risk_factors
 from risk_dashboard.core.risk_engine import compute_risk_score_v2, detect_risk_regimes, build_scenario_series
-from risk_dashboard.core.macro_loader import load_macro_data
+from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.utils import get_latest_before, ensure_date_column
 from risk_dashboard.core.asset_packages import (
     map_regime_to_key,
@@ -180,7 +180,7 @@ def apply_scenario_overlay(weights, scenario):
 # BASIS: MAKRO-TRENDS & RISK LEVEL
 # ---------------------------------------------------------
 def detect_macro_trends():
-    df = load_macro_data()
+    df = load_and_validate_macro_data()
 
     gdp = df["gdp"].pct_change().iloc[-1]
     cpi = df["cpi"].pct_change().iloc[-1]
@@ -794,7 +794,7 @@ def backtest_etf_regime_portfolio(ticker_map, period="max", scenario_df=None, sc
         new_start = max(etf_start, reg_start)
         new_end = min(etf_end, reg_end)
         if new_start > new_end:
-            st.warning("Keine Ãœberlappung zwischen ETF-Daten und Regimen.")
+            st.warning("Keine Überlappung zwischen ETF-Daten und Regimen.")
             return pd.DataFrame()
         rets = rets.loc[new_start:new_end]
         regimes = regimes.loc[new_start:new_end]

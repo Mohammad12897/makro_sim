@@ -13,8 +13,6 @@ from risk_dashboard.core.fx_engine import download_fx_history
 import requests
 from risk_dashboard.core.yf_helper import _safe_read_csv_text
 
-import logging
-
 
 from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
 
@@ -101,26 +99,84 @@ def load_fx_data():
     return df.reset_index()
 
 
-def forecast_fx_prophet(steps=60, pair="EURUSD=X", period="10y"):
+def _prepare_prophet_df(df: pd.DataFrame, value_col: str | None = None) -> pd.DataFrame:
+    """
+    Liefert DataFrame mit Spalten ['ds','y'] für Prophet.
+    value_col: optionaler Name der Spalte mit FX-Werten (z.B. 'EURUSD=X' oder 'close').
+    """
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["ds", "y"])
+
+    # Wenn Index Datetime ist, nutze ihn als ds
+    if "ds" not in df.columns:
+        if isinstance(df.index, pd.DatetimeIndex):
+            df = df.reset_index().rename(columns={df.index.name or "index": "ds"})
+        elif "date" in df.columns:
+            df["ds"] = pd.to_datetime(df["date"], errors="coerce")
+        else:
+            df = df.reset_index()
+            if "date" in df.columns:
+                df["ds"] = pd.to_datetime(df["date"], errors="coerce")
+            else:
+                # letzter Versuch: parse erste Spalte
+                first_col = df.columns[0]
+                df["ds"] = pd.to_datetime(df[first_col], errors="coerce")
+
+    # Bestimme y
+    if "y" not in df.columns:
+        if value_col and value_col in df.columns:
+            df["y"] = pd.to_numeric(df[value_col], errors="coerce")
+        else:
+            numeric_cols = df.select_dtypes(include="number").columns.tolist()
+            if numeric_cols:
+                df["y"] = df[numeric_cols[0]]
+            else:
+                # Falls alles fehlschlägt, lege y als NaN-Spalte an
+                df["y"] = pd.to_numeric(df.iloc[:, -1], errors="coerce")
+
+    # Säubere: drop NaT/NaN, sortiere
+    df = df[["ds", "y"]].dropna().sort_values("ds").reset_index(drop=True)
+    return df
+
+def forecast_fx_prophet(steps: int = 60, pair: str = "EURUSD=X", period: str = "10y"):
     """
     Prophet-basierte FX-Prognose.
-    Rückgabe: (historie_df, forecast_df)
+    Rückgabe: (historie_df, forecast_df) oder (None, None) bei Fehlern.
     """
-    df = load_fx_history(pair=pair, period=period)
+    # 1) Rohdaten holen
+    df_raw = load_fx_history(pair=pair, period=period)
+    logger.debug("forecast_fx_prophet: raw columns: %s", list(df_raw.columns) if df_raw is not None else None)
+    logger.debug("forecast_fx_prophet: raw head:\n%s", df_raw.head() if df_raw is not None else None)
 
-    # Prophet-Format
-    df = df.rename(columns={"date": "ds", "fx": "y"})
-    df["ds"] = pd.to_datetime(df["ds"])
+    if df_raw is None or df_raw.empty:
+        logger.warning("forecast_fx_prophet: keine FX-Daten vorhanden")
+        return None, None
 
-    df = validate_prophet_input(df)
+    # 2) Vorbereiten für Prophet
+    # in risk_dashboard/core/fx_forecast.py: debug-logging vor Prophet-Aufruf
+    logger.debug("forecast_fx_prophet: raw columns: %s", list(df_raw.columns) if df_raw is not None else None)
+    logger.debug("forecast_fx_prophet: prepared columns: %s", list(df_prophet.columns) if df_prophet is not None else None)
+
+    value_col = pair if pair in df_raw.columns else ("fx" if "fx" in df_raw.columns else "close")
+    df_prophet = _prepare_prophet_df(df_raw, value_col=value_col)
+
+    if df_prophet.empty:
+        logger.warning("forecast_fx_prophet: nach Vorbereitung keine Daten für Prophet")
+        return None, None
+
+    # 3) Fit und Forecast
+    try:
+        from prophet import Prophet
+    except Exception:
+        logger.exception("Prophet nicht verfügbar")
+        return None, None
 
     model = Prophet()
-    model.fit(df)
-
+    model.fit(df_prophet)
     future = model.make_future_dataframe(periods=steps, freq="D")
     forecast = model.predict(future)
 
-    return df, forecast
+    return df_prophet, forecast
 
 def forecast_fx_arima(pair: str = "EURUSD=X",
                       period: str = "10y",

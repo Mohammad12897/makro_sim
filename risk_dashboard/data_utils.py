@@ -144,6 +144,36 @@ def fetch_prices_from_yf(tickers, start="2010-01-01", end=None,
                  list(df.columns), len(df.index))
     return df
 
+def fetch_price_history_bulk(tickers: list, start=None, end=None, interval="1d") -> dict:
+    df = fetch_prices_from_yf(tickers, start=start, end=end, interval=interval, auto_adjust=True)
+    result = {}
+    for col in df.columns:
+        series = df[col].get("Adj Close") if isinstance(df[col], pd.DataFrame) else df[col]
+        result[col] = series.dropna().sort_index()
+    return result
+
+def fetch_price_history(symbol: str, period: str = "5y") -> Optional[pd.Series]:
+    return fetch_price_history_bulk([symbol], start=None, end=None, interval="1d").get(symbol)
+
+def price_history_to_prices_df(price_history: dict) -> pd.DataFrame:
+    """
+    price_history: dict[ticker] -> pd.Series (DatetimeIndex)
+    returns DataFrame indexed by date, columns = tickers (sorted)
+    """
+    if not price_history:
+        return pd.DataFrame()
+
+    # concat outer join, keys = tickers
+    df = pd.concat(price_history.values(), axis=1, keys=price_history.keys())
+    # flatten MultiIndex if present
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+    df = df.sort_index().ffill().dropna(how="all")
+    # keep only numeric columns (safety)
+    df = df.select_dtypes(include="number")
+    return df
+
+
 def extract_close_series(df, ticker):
     """
     Extrahiert die Close-Serie eines einzelnen Tickers aus einem DataFrame.

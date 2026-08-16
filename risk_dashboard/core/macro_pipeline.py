@@ -43,17 +43,40 @@ def detect_regime(macro_df: pd.DataFrame) -> str:
 # ---------------------------------------------------------
 # 2. ETF-Universum pro Regime auswählen
 # ---------------------------------------------------------
-def select_etfs_for_regime(universe: Dict[str, Dict[str, Any]], regime: str):
-    if regime == "risk_off":
-        return {k: v for k, v in universe.items() if v["asset_class"] in ["bond", "cash"]}
+def select_etfs_for_regime(universe, macro_regime):
+    """
+    Unterstützt universe als dict (ticker -> meta) oder als DataFrame.
+    Gibt ein dict zurück mit den erlaubten Einträgen für das gegebene Regime.
+    """
+    # Normalisiere universe in (key, meta) Paare
+    if isinstance(universe, dict):
+        items = universe.items()
+    else:
+        # DataFrame: index sollte 'ticker' oder numeric sein; to_dict orient=index liefert meta dicts
+        try:
+            items = universe.to_dict(orient="index").items()
+        except Exception:
+            # Fallback: iterate rows
+            items = ((row.get("ticker", idx), row.to_dict()) for idx, row in universe.iterrows())
 
-    if regime == "neutral":
-        return {k: v for k, v in universe.items() if v["asset_class"] in ["equity", "bond"]}
+    def keep(v):
+        ac = v.get("asset_class") if isinstance(v, dict) else None
+        return ac in ["equity", "bond", "cash"]
 
-    if regime == "risk_on":
-        return {k: v for k, v in universe.items() if v["asset_class"] == "equity"}
+    # Auswahl je nach macro_regime
+    if macro_regime == "risk_off":
+        wanted = {"bond", "cash"}
+    elif macro_regime == "neutral":
+        wanted = {"equity", "bond"}
+    elif macro_regime == "risk_on":
+        wanted = {"equity"}
+    else:
+        wanted = None  # kein Filter
 
-    return universe
+    if wanted is None:
+        return {k: v for k, v in items}
+
+    return {k: v for k, v in items if (isinstance(v, dict) and v.get("asset_class") in wanted)}
 
 
 # ---------------------------------------------------------
@@ -160,12 +183,21 @@ def optimize_portfolio(prices: pd.DataFrame, method="HRP"):
 # ---------------------------------------------------------
 # 4. Portfolio pro Regime bauen
 # ---------------------------------------------------------
-def build_regime_portfolio(regime: str, allowed: Dict[str, Any], method="HRP"):
+def build_regime_portfolio_old(regime: str, allowed: Dict[str, Any], method="HRP"):
     tickers = [v["ticker"] for v in allowed.values()]
     # Preise laden → später implementieren
     prices = pd.DataFrame()
     weights = optimize_portfolio(prices, method)
     return weights
+
+# macro_pipeline.py
+def build_regime_portfolio(regime: str, allowed: Dict[str, Any], prices: pd.DataFrame, method="HRP"):
+    if prices is None or prices.empty:
+        raise ValueError("build_regime_portfolio: 'prices' must be provided and non-empty")
+    tickers = [v["ticker"] for v in allowed.values()]
+    # benutze die übergebenen prices
+    weights = optimize_portfolio(prices.loc[:, tickers], method)
+    return {"tickers": tickers, "weights": weights}
 
 def allocate_cash_to_weights(cash_amount, weights):
     if not weights:

@@ -7,7 +7,7 @@ from risk_dashboard.core.etf_tools import get_etf_candidates_for_index, compute_
 from risk_dashboard.core.macro_pipeline import run_backtest
 from risk_dashboard.ui.profiles_ui import detect_historical_regimes
 from risk_dashboard.utils.persistence import load_user_tickers, save_user_tickers
-from risk_dashboard.core.macro_loader import load_macro_data
+from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 import logging
     
 logger = logging.getLogger(__name__)
@@ -82,13 +82,13 @@ def render_etf_selection_ui():
                     st.experimental_rerun()
 
     # Preset selection
-    preset = st.selectbox("Gewichtungs‑Preset", ["Balanced", "Conservative", "Aggressive"], index=0)
+    preset = st.selectbox("Gewichtungs‑Preset", ["Balanced", "Conservative", "Aggressive"], index=0, key="etf_preset_select")
     weights = get_preset_weights(preset)
 
     st.markdown(f"**Aktuelles Preset:** {preset} — Gewichte: TER {weights['ter']:.0%}, AUM {weights['aum']:.0%}, Tracking {weights['tracking']:.0%}, Replication {weights['replication']:.0%}, Liquidity {weights['liquidity']:.0%}")
 
     # Step: choose index/universe
-    index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1)
+    index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key="etf_index_choice")
 
     # Load candidates
     df_candidates = get_etf_candidates_for_index(index_choice)
@@ -210,7 +210,8 @@ def render_etf_selection_ui():
     st.subheader("Backtest der Auswahl")
     start = st.date_input("Startdatum", value=pd.to_datetime("2018-01-01"))
     end = st.date_input("Enddatum", value=pd.Timestamp.today())
-    rebalance = st.selectbox("Rebalancing", ["monthly", "quarterly", "yearly", "none"], index=0)
+    rebalance = st.selectbox("Rebalancing", ["monthly", "quarterly", "yearly", "none"], index=0, key="etf_rebalance_select")
+
 
     if st.button("Backtest starten"):
         logger.debug("DEBUG: selected:", selected)
@@ -296,19 +297,65 @@ def render_etf_selection_ui():
                     return
 
                 # Regimes
-                macro_df = load_macro_data()
+                macro_df = load_and_validate_macro_data()
                 regimes = detect_historical_regimes(macro_df) if macro_df is not None else None
                 if regimes is not None and regimes.empty:
                     logger.debug("WARN: regimes empty — skipping regime-dependent logic")
 
-                from risk_dashboard.app import maybe_run_backtest
+                from risk_dashboard.utils.session_helpers import maybe_run_backtest
+                from risk_dashboard.utils.backtest_adapter import adapter_run_backtest
+
                 logger.debug("DEBUG: maybe_run_backtest from: %s", maybe_run_backtest.__module__)
                 logger.debug("DEBUG: final check - prices columns sample:", list(prices.columns)[:20])
                 logger.debug("DEBUG: final check - user_weights_mapped keys:", list(user_weights_mapped.keys()))
 
-                # Backtest aufrufen
-                res = maybe_run_backtest(run_backtest, weights=user_weights_mapped, prices=prices, regimes=regimes,
-                                start=str(start), end=str(end), rebalance=rebalance)
+
+                # 1) Erzeuge portfolio_or_tickers aus der aktuellen Auswahl und dem Mapping
+                # Verwende nur die ausgewählten Ticker und mappe sie auf price columns
+                mapped_selected = [sel_to_price[s] for s in selected if sel_to_price.get(s)]
+                # Falls du user_weights_mapped bereits berechnet hast, nutze dessen Keys
+                if mapped_selected:
+                    portfolio_or_tickers = mapped_selected  # einfache Liste der price-column keys
+                else:
+                    portfolio_or_tickers = []
+
+                # 2) Validierungen
+                if not portfolio_or_tickers:
+                    st.error("Keine der ausgewählten Ticker konnten auf Preisspalten gemappt werden.")
+                    res = {}
+                elif prices is None or (hasattr(prices, "empty") and prices.empty):
+                    st.error("Preisdaten fehlen.")
+                    res = {}
+                elif regimes is None or (hasattr(regimes, "empty") and regimes.empty):
+                    st.error("Regime‑Daten fehlen.")
+                    res = {}
+                else:
+                    # Optional: prüfe Zeitüberlappung zwischen prices.index und regimes.index
+                    try:
+                        if hasattr(prices, "index") and hasattr(regimes, "index"):
+                            overlap = prices.index.intersection(regimes.index)
+                            if overlap.empty:
+                                st.warning("Keine Zeitüberlappung zwischen Preisdaten und Regime‑Daten. Prüfe Daten.")
+                    except Exception:
+                        logger.debug("WARN: konnte Index‑Overlap nicht prüfen")
+
+                    # 3) Backtest aufrufen via Adapter
+                    res = maybe_run_backtest(
+                        adapter_run_backtest,
+                        portfolio_or_tickers,
+                        prices=prices,                   # adapter mappt prices -> prices_df
+                        weights=user_weights_mapped,     # optional
+                        regimes=regimes,
+                        start=str(start),
+                        end=str(end),
+                        rebalance=rebalance,
+                        flag_key="backtest_etf_selection"
+                    )
+
+                    if res is None:
+                        st.info("Backtest wurde bereits in dieser Session ausgeführt.")
+                        res = {}
+
 
                 # --- Robust: Ergebnisse anzeigen, session_state updaten und Rerun-Fallback ---
                 pv = res.get("portfolio_value") if isinstance(res, dict) else None
