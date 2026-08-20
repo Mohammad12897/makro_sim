@@ -1,0 +1,11 @@
+# docs/edge_tabs_example.txt
+# Beispiel: anonymisiertes Format für edge_all_open_tabs (nur als Referenz, nicht in prod)
+
+# User's Edge browser tabs metadata
+# edge_all_open_tabs
+# pageTitle
+
+# Optional: komplettes Beispiel (auskommentiert, damit CI es nicht findet)
+# edge_all_open_tabs = [
+#   {"pageTitle":"Risk Dashboard — Profiles","pageUrl":"https://intranet.example.com","tabId":12,"isCurrent":true}
+# ]
