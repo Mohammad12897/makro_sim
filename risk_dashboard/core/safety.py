@@ -49,5 +49,5 @@ def _load_markers_from_docs(doc_path: Path, max_markers: int = 3) -> List[str]:
         logger.exception("Failed to load markers from docs")
         return DEFAULT_DUMP_MARKERS
 
-DOC_EXAMPLE = Path(__file__).resolve().parents[2] / "docs" / "edge_tabs_example.txt"
+DOC_EXAMPLE = Path(__file__).resolve().parents[1] / "docs" / "edge_tabs_example.txt"
 DUMP_MARKERS = _load_markers_from_docs(DOC_EXAMPLE)
