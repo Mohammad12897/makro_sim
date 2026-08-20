@@ -1,46 +1,53 @@
 # risk_dashboard/core/safety.py
-import re
+import logging
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import List
 
-DUMP_MARKERS = ["User's Edge browser tabs metadata", "edge_all_open_tabs", "pageTitle"]
-EDGE_BLOCK_RE = re.compile(r"(?ms)#\s*User's Edge browser tabs metadata.*$", re.IGNORECASE)
-GENERIC_DUMP_RE = re.compile(r"(?ms)edge_all_open_tabs\s*=\s*\[.*?\]\s*", re.IGNORECASE)
+logger = logging.getLogger(__name__)
 
-def sanitize_text(text: str) -> str:
-    if not text:
-        return text
-    text = EDGE_BLOCK_RE.sub("", text)
-    text = GENERIC_DUMP_RE.sub("", text)
-    text = re.sub(r"https?://\S+", "<URL_REMOVED>", text)
-    text = re.sub(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", "<EMAIL_REMOVED>", text)
-    return text
+DEFAULT_DUMP_MARKERS = [
+    "edge",
+    "tabs",
+    "example not found",
+]
 
-def sanitize_project_pastes(project_root: str, paths: Iterable[str] = None, dry_run: bool = True) -> List[Tuple[str, bool]]:
-    root = Path(project_root)
-    changed = []
-    patterns = ["**/*.py", "**/*.md", "**/*.yml", "**/*.yaml", "**/*.txt"] if paths is None else [str(p) for p in paths]
-    files = []
-    for p in patterns:
-        files.extend(root.glob(p))
-    for f in files:
-        try:
-            if not f.is_file():
+def _load_markers_from_docs(doc_path: Path, max_markers: int = 3) -> List[str]:
+    try:
+        if not doc_path.exists():
+            logger.warning("edge tabs example not found: %s", doc_path)
+            return DEFAULT_DUMP_MARKERS
+
+        text = doc_path.read_text(encoding="utf-8", errors="ignore")
+        lines = [ln.strip() for ln in text.splitlines()]
+
+        candidates = []
+        for ln in lines:
+            if not ln:
                 continue
-            text = f.read_text(encoding="utf-8", errors="ignore")
-            if not any(m.lower() in text.lower() for m in DUMP_MARKERS):
+            if ln.lstrip().startswith("#"):
                 continue
-            new = sanitize_text(text)
-            if new != text:
-                changed.append((str(f), False))
-                if not dry_run:
-                    backup = f.with_suffix(f.suffix + ".bak")
-                    backup.write_text(text, encoding="utf-8")
-                    f.write_text(new, encoding="utf-8")
-                    changed[-1] = (str(f), True)
-        except Exception:
-            continue
-    return changed
+            ln_clean = ln.strip().strip('",').strip("'")
+            if ln_clean:
+                candidates.append(ln_clean)
+            if len(candidates) >= max_markers:
+                break
 
-def startup_safety_check(project_root: str, auto_fix: bool = False) -> List[Tuple[str, bool]]:
-    return sanitize_project_pastes(project_root, dry_run=not auto_fix)
+        if not candidates:
+            logger.warning("No usable markers found in %s; falling back to defaults.", doc_path)
+            return DEFAULT_DUMP_MARKERS
+
+        # dedupe while preserving order
+        seen = set()
+        result = []
+        for r in candidates:
+            if r not in seen:
+                seen.add(r)
+                result.append(r)
+        return result
+
+    except Exception:
+        logger.exception("Failed to load markers from docs")
+        return DEFAULT_DUMP_MARKERS
+
+DOC_EXAMPLE = Path(__file__).resolve().parents[2] / "docs" / "edge_tabs_example.txt"
+DUMP_MARKERS = _load_markers_from_docs(DOC_EXAMPLE)
