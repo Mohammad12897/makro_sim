@@ -138,29 +138,35 @@ def _prepare_prophet_df(df: pd.DataFrame, value_col: str | None = None) -> pd.Da
     df = df[["ds", "y"]].dropna().sort_values("ds").reset_index(drop=True)
     return df
 
+
 def forecast_fx_prophet(steps: int = 60, pair: str = "EURUSD=X", period: str = "10y"):
     """
     Prophet-basierte FX-Prognose.
     Rückgabe: (historie_df, forecast_df) oder (None, None) bei Fehlern.
     """
+    df_prophet = None
+
     # 1) Rohdaten holen
     df_raw = load_fx_history(pair=pair, period=period)
     logger.debug("forecast_fx_prophet: raw columns: %s", list(df_raw.columns) if df_raw is not None else None)
-    logger.debug("forecast_fx_prophet: raw head:\n%s", df_raw.head() if df_raw is not None else None)
+    logger.debug("forecast_fx_prophet: raw head: %s", df_raw.head().to_dict(orient="records") if df_raw is not None else None)
 
     if df_raw is None or df_raw.empty:
         logger.warning("forecast_fx_prophet: keine FX-Daten vorhanden")
         return None, None
 
     # 2) Vorbereiten für Prophet
-    # in risk_dashboard/core/fx_forecast.py: debug-logging vor Prophet-Aufruf
-    logger.debug("forecast_fx_prophet: raw columns: %s", list(df_raw.columns) if df_raw is not None else None)
+    value_col = pair if pair in df_raw.columns else ("fx" if "fx" in df_raw.columns else "close")
+
+    try:
+        df_prophet = _prepare_prophet_df(df_raw, value_col=value_col)
+    except Exception:
+        logger.exception("forecast_fx_prophet failed during preparation")
+        return None, None
+
     logger.debug("forecast_fx_prophet: prepared columns: %s", list(df_prophet.columns) if df_prophet is not None else None)
 
-    value_col = pair if pair in df_raw.columns else ("fx" if "fx" in df_raw.columns else "close")
-    df_prophet = _prepare_prophet_df(df_raw, value_col=value_col)
-
-    if df_prophet.empty:
+    if df_prophet is None or df_prophet.empty:
         logger.warning("forecast_fx_prophet: nach Vorbereitung keine Daten für Prophet")
         return None, None
 
@@ -177,6 +183,7 @@ def forecast_fx_prophet(steps: int = 60, pair: str = "EURUSD=X", period: str = "
     forecast = model.predict(future)
 
     return df_prophet, forecast
+
 
 def forecast_fx_arima(pair: str = "EURUSD=X",
                       period: str = "10y",

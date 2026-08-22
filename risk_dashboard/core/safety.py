@@ -5,17 +5,15 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DUMP_MARKERS = [
-    "edge",
-    "tabs",
-    "example not found",
-]
+# Wenn keine Marker in der docs-Datei gefunden werden, liefern wir eine leere Liste zurück.
+# Aufrufer müssen prüfen: if not DUMP_MARKERS: -> Fallback verwenden.
+DEFAULT_DUMP_MARKERS: List[str] = []
 
 def _load_markers_from_docs(doc_path: Path, max_markers: int = 3) -> List[str]:
     try:
         if not doc_path.exists():
             logger.warning("edge tabs example not found: %s", doc_path)
-            return DEFAULT_DUMP_MARKERS
+            return []
 
         text = doc_path.read_text(encoding="utf-8", errors="ignore")
         lines = [ln.strip() for ln in text.splitlines()]
@@ -33,8 +31,8 @@ def _load_markers_from_docs(doc_path: Path, max_markers: int = 3) -> List[str]:
                 break
 
         if not candidates:
-            logger.warning("No usable markers found in %s; falling back to defaults.", doc_path)
-            return DEFAULT_DUMP_MARKERS
+            logger.warning("No usable markers found in %s; returning empty marker list.", doc_path)
+            return []
 
         # dedupe while preserving order
         seen = set()
@@ -47,7 +45,7 @@ def _load_markers_from_docs(doc_path: Path, max_markers: int = 3) -> List[str]:
 
     except Exception:
         logger.exception("Failed to load markers from docs")
-        return DEFAULT_DUMP_MARKERS
+        return []
 
 DOC_EXAMPLE = Path(__file__).resolve().parents[1] / "docs" / "edge_tabs_example.txt"
 DUMP_MARKERS = _load_markers_from_docs(DOC_EXAMPLE)

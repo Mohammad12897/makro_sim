@@ -88,7 +88,7 @@ Parameter: Start/Enddatum, Startkapital, DCA, Rebalancing‑Intervall.
 Ausgabe: Chart (kumulative Performance), Kennzahlen (CAGR, Volatilität, Sharpe, Max Drawdown), Gewichtshistorie.
 
 Rebalancing — Definition  
-Periodische Anpassung zur Wiederherstellung einer Zielallokation (z. B. 60/40).
+Periodische Anpassung zur Wiederherstellung einer Zielallokation (z.B. 60/40).
 
 Strategien
 
@@ -103,7 +103,7 @@ Cash‑flow / Contribution
 Tolerance bands (mehrstufig)
 
 Empfehlung  
-Für Privatanleger: jährlich + Schwelle 5 % als guter Kompromiss.
+Für Privatanleger: jährlich + Schwelle 5% als guter Kompromiss.
 
 ## 7 Presets und Profile
 

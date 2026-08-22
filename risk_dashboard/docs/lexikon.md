@@ -99,7 +99,7 @@ Vorgefertigte Profile (Conservative, Balanced, Aggressive).
 - **interest_rate** – Leitzins  
 - **unemployment** – Arbeitslosenquote  
 - **oil_price** – Rohölpreis  
-- **fx_rate** – Wechselkurs (z. B. USD/EUR)
+- **fx_rate** – Wechselkurs (z.B. USD/EUR)
 
 ---
 

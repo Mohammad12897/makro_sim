@@ -22,20 +22,29 @@ except Exception:
 
     st = _StreamlitShim()
 
+def _call_fn_with_safe_kwargs(fn, *args, **kwargs):
+    sig = inspect.signature(fn)
+    allowed = {
+        name for name, param in sig.parameters.items()
+        if param.kind in (param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY)
+    }
+    safe_kwargs = {k: v for k, v in kwargs.items() if k in allowed}
+    removed = [k for k in kwargs.keys() if k not in allowed]
+    if removed:
+        logger.debug("Removed unexpected kwargs for %s: %s", fn.__name__, removed)
+    return fn(*args, **safe_kwargs)
+
 def maybe_run_backtest(run_fn, *args, **kwargs):
-    """
-    Versucht run_fn auszuführen, filtert vorher alle kwargs heraus,
-    die run_fn nicht in seiner Signatur hat.
-    """
     try:
-        sig = inspect.signature(run_fn)
-        allowed = set(sig.parameters.keys())
-        # Entferne 'self' falls Methoden übergeben werden; safe_kwargs enthält nur erlaubte Keys
-        safe_kwargs = {k: v for k, v in kwargs.items() if k in allowed}
-        if len(safe_kwargs) != len(kwargs):
-            removed = set(kwargs.keys()) - set(safe_kwargs.keys())
-            logger.debug("maybe_run_backtest: entferne unbekannte kwargs %s bevor run_fn aufgerufen wird", removed)
-        return run_fn(*args, **safe_kwargs)
-    except Exception as exc:
-        logger.exception("maybe_run_backtest: run_fn raised an exception")
-        raise
+        result = _call_fn_with_safe_kwargs(run_fn, *args, **kwargs)
+        return {"ok": True, "result": result}
+    except ValueError as e:
+        msg = str(e)
+        logger.error("maybe_run_backtest: %s", msg)
+        return {"ok": False, "error": "no_price_data", "message": msg}
+    except TypeError as e:
+        logger.exception("maybe_run_backtest TypeError")
+        return {"ok": False, "error": "type_error", "message": "Interner Fehler: falsche Parameter an Backtest-Funktion."}
+    except Exception:
+        logger.exception("maybe_run_backtest: unexpected error")
+        return {"ok": False, "error": "internal_error", "message": "Backtest fehlgeschlagen. Details im Log."}

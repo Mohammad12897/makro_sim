@@ -10,6 +10,7 @@ from io import StringIO
 import requests
 import plotly.graph_objects as go
 import pandas as pd
+from datetime import date
 
 from rich import region
 import streamlit as st
@@ -23,6 +24,7 @@ from risk_dashboard.core.screening import screen_and_rank
 from risk_dashboard.core.config import load_profiles, save_profile, load_etf_universe
 from risk_dashboard.core.utils import resolve_components, analyze_portfolio_components, classify_etf
 from risk_dashboard.core.backtest import run_all_etf_backtests
+from risk_dashboard.ui.helpers  import render_backtest, normalize_ticker, detect_type, safe_backtest_call
 
 from risk_dashboard.data.etf_universes import ETF_UNIVERSES
 from risk_dashboard.core.holdings import load_ishares_holdings, etf_to_isin_map, load_holdings_with_fallback
@@ -31,12 +33,14 @@ from risk_dashboard.core.macro_pipeline import (
     select_etfs_for_regime,
     build_regime_portfolio,
     run_backtest,
+    _fetch_and_clean_prices,
     analyze_performance
 )
 
 from risk_dashboard.core.holdings import try_relaxed_holdings
 from risk_dashboard.core.etf_tools import download_prices
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
+from risk_dashboard.core.data_loader import parse_tickers
 
 logger = logging.getLogger(__name__)
 
@@ -724,7 +728,7 @@ def render_etf_tab(session_state):
 
 
     # Console logs (für dev)
-    logger.debug("DEBUG: sys.path (first 10):", sys.path[:10])
+    logger.debug("DEBUG: sys.path (first 10): %s", sys.path[:10])
     
     price_data = get_shared("price_data")
     macro_df = get_shared("macro_df")
@@ -1008,26 +1012,60 @@ def profile_form_ui() -> None:
     etf_universe, universe_warnings = load_etf_universe()
 
     ########################################################
-    # oben in der Datei: universes laden (einmalig)
-    import pandas as pd
-    from risk_dashboard.core.helpers import normalize_ticker, detect_type
-
-    etf_universe = pd.read_csv("risk_dashboard/data/etf_universe.csv")
+    
     stock_universe = pd.read_csv("risk_dashboard/data/stock_universe.csv")
-    combined_universe = pd.concat([etf_universe, stock_universe], ignore_index=True)
 
-    # universes bereits geladen: etf_universe, stock_universe, combined_universe
+    def ensure_universe_df(u):
+        if isinstance(u, pd.DataFrame):
+            return u.copy()
+        if isinstance(u, dict):
+            try:
+                df = pd.DataFrame.from_dict(u, orient="index")
+                if "ticker" not in df.columns:
+                    df = df.reset_index().rename(columns={"index": "ticker"})
+                return df.reset_index(drop=True)
+            except Exception:
+                return pd.DataFrame(u)
+        return pd.DataFrame(u)
+
+    etf_universe_df = ensure_universe_df(etf_universe)
+    stock_universe_df = ensure_universe_df(stock_universe)
+
+    # dict-Form für schnelle Lookups (falls benötigt)
+    #etf_universe_dict = etf_universe_df.set_index("ticker").to_dict(orient="index")
+    #stock_universe_dict = stock_universe_df.set_index("ticker").to_dict(orient="index")
+
+    logger.debug("etf_universe type=%s, rows=%d, cols=%s", type(etf_universe), len(etf_universe_df), list(etf_universe_df.columns)[:10])
+    logger.debug("stock_universe type=%s, rows=%d, cols=%s", type(stock_universe), len(stock_universe_df), list(stock_universe_df.columns)[:10])
+
+    combined_universe = pd.concat([etf_universe_df, stock_universe_df], ignore_index=True, sort=False)
+    if combined_universe.empty:
+        st.error("Combined universe ist leer. Bitte Universe-Loader prüfen.")
+        st.stop()
+
+    # Pflichtspalten prüfen und normalisieren
+    if "ticker" not in combined_universe.columns:
+        st.error("Universe hat keine 'ticker' Spalte. Bitte Universe-Loader prüfen.")
+        logger.error("combined_universe missing 'ticker' column; columns=%s", combined_universe.columns.tolist())
+        st.stop()
+
+    combined_universe["ticker"] = combined_universe["ticker"].astype(str).str.strip().str.upper()
+    combined_universe = combined_universe.drop_duplicates(subset=["ticker"]).reset_index(drop=True)
+
+    # UI: Multiselects mit DataFrame-Varianten
     asset_type = st.radio("Asset Type", ["ETF", "Stock", "Mixed"], index=0)
     if asset_type == "ETF":
-        chosen = st.multiselect("Wähle ETFs", etf_universe["ticker"].tolist())
+        chosen = st.multiselect("Wähle ETFs", etf_universe_df["ticker"].tolist())
     elif asset_type == "Stock":
-        chosen = st.multiselect("Wähle Aktien", stock_universe["ticker"].tolist())
+        chosen = st.multiselect("Wähle Aktien", stock_universe_df["ticker"].tolist())
     else:
         chosen = st.multiselect("Wähle Assets", combined_universe["ticker"].tolist())
 
-    # Speichere strukturierte Auswahl
+    # Speichere strukturierte Auswahl; für detect_type die dict- oder df-Variante übergeben,
+    # je nachdem, was detect_type erwartet. Hier übergeben wir DataFrames.
     st.session_state["selected_assets"] = [
-        {"ticker": normalize_ticker(t), "type": detect_type(normalize_ticker(t), etf_universe, stock_universe)}
+        {"ticker": normalize_ticker(t),
+        "type": detect_type(normalize_ticker(t), etf_universe_df, stock_universe_df)}
         for t in chosen
     ]
 
@@ -1128,44 +1166,176 @@ def profile_form_ui() -> None:
     bt = {}
     ###################################################
     from risk_dashboard.data_utils import fetch_price_history_bulk, price_history_to_prices_df
-    # sichere Verfügbarkeit prüfen
-    tickers = [a["ticker"] for a in st.session_state.get("selected_assets", [])]
-    if not tickers:
-        st.error("Keine Ticker ausgewählt.")
+    from risk_dashboard.utils.session_helpers import maybe_run_backtest
+    from risk_dashboard.utils.backtest_adapter import adapter_run_backtest  # falls benötigt
+
+    def normalize_and_unique(tickers):
+        seen = set()
+        out = []
+        for t in tickers or []:
+            if not t:
+                continue
+            tn = str(t).strip().upper()
+            if tn and tn not in seen:
+                seen.add(tn)
+                out.append(tn)
+        return out
+
+    def _get_tickers_from_portfolio_struct(p):
+        if isinstance(p, dict):
+            if "tickers" in p and p["tickers"]:
+                return list(p["tickers"])
+            if "weights" in p and isinstance(p["weights"], dict):
+                return list(p["weights"].keys())
+        if isinstance(p, (list, tuple)):
+            return list(p)
+        return []
+
+    # 1) Regimes prüfen frühzeitig (alte Logik übernommen)
+    regimes_val = st.session_state.get("regimes")
+    if not is_nonempty(regimes_val):
+        logger.warning("profile_form_ui: 'regimes' nicht definiert oder leer.")
+        st.error("Regime-Daten fehlen oder sind leer. Backtest abgebrochen.")
         st.stop()
 
-    # Lade Preise für die ausgewählten Ticker (bulk)
-    price_history = fetch_price_history_bulk(tickers)        # dict
-    prices_df = price_history_to_prices_df(price_history)    # DataFrame
-    available = [t for t in tickers if t in prices_df.columns]
+    # 2) Tickerquellen normalisieren
+    tickers_from_portfolio = normalize_and_unique(_extract_tickers_from_portfolio(portfolio))
+    logger.debug("tickers_from_portfolio: %s", tickers_from_portfolio)
 
+    tickers_ui = normalize_and_unique([a.get("ticker") for a in st.session_state.get("selected_assets", [])])
+    logger.debug("tickers_ui: %s", tickers_ui)
 
+    # 3) Entscheide, welche Ticker verwendet werden (UI bevorzugen, sonst Portfolio)
+    tickers_to_use = tickers_ui or tickers_from_portfolio
+    if not tickers_to_use:
+        st.error("Keine Ticker ausgewählt oder im Portfolio gefunden.")
+        st.stop()
+
+    # 4) Preise laden und normalisieren
+    price_history = fetch_price_history_bulk(tickers_to_use)
+    price_history = {str(k).strip().upper(): v for k, v in price_history.items()}
+    prices_df = price_history_to_prices_df(price_history)
+    if hasattr(prices_df, "columns"):
+        prices_df.columns = [str(c).strip().upper() for c in prices_df.columns]
+
+    # 5) Verfügbare Ticker prüfen
+    available = [t for t in tickers_to_use if t in (prices_df.columns.tolist() if hasattr(prices_df, "columns") else [])]
     if not available:
         st.error("Keine Preisdaten für die ausgewählten Ticker vorhanden.")
         st.stop()
 
-    # falls regimes monatlich und prices_df täglich:
-    if regimes_val is not None and not regimes_val.index.equals(prices_df.index):
+    # 6) Regimes an Preise anpassen
+    if regimes_val is not None and hasattr(prices_df, "index") and not regimes_val.index.equals(prices_df.index):
         regimes_aligned = regimes_val.reindex(prices_df.index, method="ffill")
     else:
         regimes_aligned = regimes_val
 
+    # 7) Backtest aufrufen
+    try:
+        # --- oben in der Datei sicherstellen ---
+        # from risk_dashboard.utils.backtest_adapter import adapter_run_backtest
+        # from risk_dashboard.ui.helpers import safe_backtest_call, render_backtest
+        # from risk_dashboard.core.macro_pipeline import _fetch_and_clean_prices
 
-    # Backtest aufrufen (run_backtest muss tickers und price_history akzeptieren)
+        run_disabled = False
+        # sichere Defaults
+        DEFAULT_START = "2016-01-01"
+        DEFAULT_END = date.today().isoformat()
 
-    bt = maybe_run_backtest(
-        run_backtest,
-        tickers=available,           # Liste Strings
-        prices_df=prices_df,         # DataFrame aus price_history_to_prices_df
-        regimes=regimes_aligned,         # pd.Series oder None
-        start_date=None,
-        end_date=None,
-        rebalance_freq="M",
-        transaction_costs=0.001,
-        initial_capital=1_000_000,
-        flag_key="backtest_profiles"
-    )
+        # Widgets (einmalig)
+        selected_tickers_input = st.text_input("Tickers (Komma getrennt)", "NVDA,EXS1.DE,AAPL")
+        start_date = st.date_input("Startdatum", value=DEFAULT_START)
+        end_date = st.date_input("Enddatum", value=DEFAULT_END)
 
+        # Normierte Listen / Argumente
+        ticker_list = parse_tickers(selected_tickers_input) # [t.strip().upper() for t in selected_tickers_input.split(",") if t.strip()]
+        start_arg = start_date.isoformat() if start_date else None
+        end_arg = end_date.isoformat() if end_date else None
+
+        # Preise nur laden, wenn noch nicht im Session State oder wenn Ticker/Zeitraum sich geändert haben
+        need_reload = False
+        if "prices_df" not in st.session_state:
+            need_reload = True
+        else:
+            # optional: prüfe, ob cached columns match requested tickers or Zeitraum geändert wurde
+            cached_tickers = set(st.session_state.get("prices_df").columns) if st.session_state.get("prices_df") is not None else set()
+            if not set(ticker_list).issubset(cached_tickers):
+                need_reload = True
+
+        if need_reload:
+            prices_df, removed_on_load = _fetch_and_clean_prices(ticker_list, start=start_arg, end=end_arg)
+            st.session_state["prices_df"] = prices_df
+            st.session_state["removed_on_load"] = removed_on_load
+            if removed_on_load:
+                st.warning("Beim Laden wurden folgende Ticker entfernt (keine Preisdaten): " + ", ".join(removed_on_load))
+
+        # Prepare für Backtest
+        prices = st.session_state.get("prices_df")
+        available = [t for t in ticker_list]  # bereits normalized (upper)
+
+        st.write("DEBUG available:", available)
+        st.write("DEBUG prices columns:", None if prices is None else list(prices.columns))
+
+        if prices is None or prices.empty:
+            st.warning("Preisdaten sind nicht geladen. Bitte Preise laden oder Cache prüfen.")
+            run_disabled = True
+        else:
+            # Falls prices.columns sind nicht upper, mappe case-sensitiv: suche matching columns
+            cols_upper_map = {c.upper(): c for c in prices.columns}
+            available_mapped = [cols_upper_map[t] for t in available if t in cols_upper_map]
+
+            if not available_mapped:
+                st.warning("Keine der ausgewählten Ticker in den Preisdaten vorhanden.")
+                run_disabled = True
+            else:
+                # Defaults für Weights / Regimes aus session_state oder fallback
+                user_weights_mapped = st.session_state.get("user_weights_mapped", None)
+                if user_weights_mapped is None:
+                    user_weights_mapped = {c: 1.0 / len(available_mapped) for c in available_mapped}
+
+                regimes_val = st.session_state.get("regimes_aligned", None)
+
+                st.write("DEBUG available_mapped:", available_mapped)
+                st.write("DEBUG weights:", user_weights_mapped)
+                st.write("DEBUG regimes:", None if regimes_val is None else regimes_val.head())
+
+                # Sicherer UI-Aufruf
+                result = safe_backtest_call(
+                    adapter_run_backtest,
+                    available_mapped,
+                    prices=prices[available_mapped],
+                    weights=user_weights_mapped,
+                    regimes=regimes_val,
+                    start=start_arg,
+                    end=end_arg,
+                    rebalance="monthly",
+                    initial_capital=1_000_000,
+                    flag_key="backtest_profiles"
+                ) or {}
+
+                if not result.get("ok"):
+                    st.warning(result.get("message", "Backtest fehlgeschlagen."))
+                    run_disabled = True
+                else:
+                    run_disabled = False
+                    bt = result["result"]
+                    removed = bt.get("removed_tickers", [])
+                    if removed:
+                        st.warning("Folgende Ticker wurden entfernt (keine Preisdaten): " + ", ".join(removed))
+                    render_backtest(bt)
+
+        # Run-Button
+        if st.button("Berechnen", disabled=run_disabled):
+            st.session_state["backtest_requested"] = True
+
+    except Exception:
+        logger.exception("maybe_run_backtest raised an exception")
+        st.error("Backtest fehlgeschlagen. Details im Log.")
+        bt = None
+
+    # 8) Ergebnisse verarbeiten
+    stats = None
+    pv = None
     if isinstance(bt, dict) and bt:
         pv = bt.get("portfolio_value")
         metrics = bt.get("metrics", {})
@@ -1174,100 +1344,27 @@ def profile_form_ui() -> None:
             st.session_state["last_backtest_results_csv"] = st.session_state["last_backtest_results_df"].to_csv(index=False)
         if metrics:
             st.session_state["last_metrics"] = metrics
-    else:
-        st.error("Backtest lieferte keine Ergebnisse.")
-
-    ###################################################
-
-    
-    # --- Backtest sicher aufrufen ---
-    regimes_val = st.session_state.get("regimes")
-    if not is_nonempty(regimes_val):
-        logger.warning("profile_form_ui: 'regimes' nicht definiert oder leer.")
-        st.error("Regime-Daten fehlen oder sind leer. Backtest abgebrochen.")
-    else:
-        # ensure we pass a ticker list to run_backtest
-        def _get_tickers_from_portfolio(p):
-            if isinstance(p, dict):
-                # bevorzugt: p["tickers"]
-                if "tickers" in p and p["tickers"]:
-                    return list(p["tickers"])
-                # fallback: keys of weights dict
-                if "weights" in p and isinstance(p["weights"], dict):
-                    return list(p["weights"].keys())
-            if isinstance(p, (list, tuple)):
-                return list(p)
-            return []
-
-        tickers_arg = _get_tickers_from_portfolio(portfolio)
-
-        # optional: normalize tickers to match price_data columns
-        def _normalize(s): 
-            return str(s).strip().upper()
-
-        tickers_arg = [_normalize(t) for t in tickers_arg]
-        if hasattr(price_data, "columns"):
-            price_data.columns = [ _normalize(c) for c in price_data.columns ]
-
-        if not tickers_arg:
-            st.error("Keine Ticker im Portfolio gefunden. Backtest abgebrochen.")
-        else:
-            try:
-                from risk_dashboard.utils.session_helpers import maybe_run_backtest
-                from risk_dashboard.utils.backtest_adapter import adapter_run_backtest
-
-                # tickers_arg ist eine Liste von Strings
-                bt = maybe_run_backtest(
-                    run_backtest,
-                    tickers=tickers_arg,
-                    prices_df=price_data,
-                    regimes=regimes_val,
-                    flag_key="backtest_profiles"
-                )
-
-            except Exception as e:
-                logger.exception("maybe_run_backtest raised")
-                st.error(f"Backtest fehlgeschlagen: {e}")
-
-    # 5a. Nur wenn bt gültig ist, Performance analysieren und anzeigen
-    stats = None
-    if isinstance(bt, dict) and bt:
         try:
             stats = analyze_performance(bt)
             st.write(stats)
-        except Exception as e:
-            logger.exception("analyze_performance failed: %s", e)
-            st.error("Fehler bei der Performance‑Analyse. Details im Log.")
+        except Exception:
+            logger.exception("analyze_performance failed")
     else:
+        st.error("Backtest lieferte keine Ergebnisse.")
         logger.debug("No backtest result to analyze (bt=%s)", bt)
-        
-    # 6. Ergebnisse prüfen und speichern
-    pv = bt.get("portfolio_value") if isinstance(bt, dict) else None
 
-    def _is_nonempty_df_or_series(x):
-        return x is not None and isinstance(x, (pd.DataFrame, pd.Series)) and not x.empty
-
-    if _is_nonempty_df_or_series(pv):
-        pv_df = pv.rename("portfolio_value").reset_index()
-        st.session_state["last_backtest_results_df"] = pv_df
-        st.session_state["last_backtest_results_csv"] = pv_df.to_csv(index=False)
-        logger.debug("DEBUG: backtest results stored in session_state, %d rows", len(pv_df))
-    else:
-        logger.debug("DEBUG: portfolio_value leer oder nicht vorhanden — keine CSV geschrieben")
-
-
-    # metrics sicher extrahieren und speichern (falls vorhanden)
-    metrics = bt.get("metrics") if isinstance(bt, dict) else {}
-    if metrics:
-        st.session_state["last_metrics"] = metrics
-        logger.debug("DEBUG: results stored in session_state['last_metrics']")
-    else:
-        logger.debug("DEBUG: metrics leer — keine JSON geschrieben")
-
+    ###################################################
+    from risk_dashboard.core.backtest import safe_show_backtest
     # UI Debug-Ausgaben (optional, kann entfernt werden)
     st.write("Aktuelles Makro-Regime:", macro_regime)
     st.write("Portfolio:", portfolio)
-    st.write("Backtest:", bt)
+    #st.write("Backtest:", bt)
+    try:
+        safe_show_backtest(bt)
+    except Exception as e:
+        logger.exception("safe_show_backtest failed")
+        st.error(f"Fehler beim Anzeigen der Backtest‑Ergebnisse: {e}")
+
     st.write("Performance:", stats)
 
 

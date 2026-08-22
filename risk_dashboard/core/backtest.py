@@ -349,3 +349,27 @@ def call_run_portfolio_backtest_safe(func, price_close, weights_for_backtest, ma
                 raise
 
     return func(**kwargs)
+
+def safe_show_backtest(bt):
+    import pandas as pd
+    st.write("Backtest keys:", list(bt.keys()) if isinstance(bt, dict) else type(bt))
+    if not isinstance(bt, dict):
+        st.write("Backtest is not a dict; type:", type(bt))
+        return
+    for k, v in bt.items():
+        st.write(f"key: {k}  type: {type(v)}")
+        if isinstance(v, pd.DataFrame):
+            df = v.copy()
+            # sanitize columns
+            df.columns = [f"col_{i}" if c is None or str(c).strip()=="" else str(c) for i,c in enumerate(df.columns)]
+            # coerce object columns where possible
+            for c in df.columns:
+                if df[c].dtype == "object":
+                    coerced = pd.to_numeric(df[c], errors="coerce")
+                    if coerced.notna().sum() >= int(0.9 * max(1, df[c].notna().sum())):
+                        df[c] = coerced
+                    else:
+                        df[c] = df[c].astype(str).replace("nan", pd.NA)
+            st.dataframe(df.head(200))
+        else:
+            st.write(repr(v)[:1000])

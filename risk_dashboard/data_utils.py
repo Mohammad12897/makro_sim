@@ -173,7 +173,6 @@ def price_history_to_prices_df(price_history: dict) -> pd.DataFrame:
     df = df.select_dtypes(include="number")
     return df
 
-
 def extract_close_series(df, ticker):
     """
     Extrahiert die Close-Serie eines einzelnen Tickers aus einem DataFrame.

@@ -338,18 +338,81 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                         try:
                             from risk_dashboard.utils.session_helpers import maybe_run_backtest
                             from risk_dashboard.utils.backtest_adapter import adapter_run_backtest
+                            from risk_dashboard.ui.helpers import safe_backtest_call, render_backtest
 
-                            result = maybe_run_backtest(
-                                adapter_run_backtest,
-                                portfolio_or_tickers,
-                                prices=prices_subset,
-                                weights=weights,
-                                regimes=regimes,
-                                start=start_date,
-                                initial_cash=10000,
-                                monthly_dca=500,
-                                flag_key="backtest_etf_finder"
-                            ) or {}
+                            # --- Vorbereitung: sichere Defaults und Variablen ---
+                            # Erwartet: Du hast irgendwo oben Widgets wie:
+                            # selected_tickers_input = st.text_input("Tickers (Komma getrennt)", "NVDA,EXS1.DE,AAPL")
+                            # start_date_input = st.date_input("Startdatum", value=None)   # optional
+                            # end_date_input = st.date_input("Enddatum", value=None)       # optional
+                            # user_weights_mapped = {...}  # optional, sonst None
+                            # prices_subset = <DataFrame mit Preisdaten>  # muss vorher geladen werden
+                            # regimes = <Series/DataFrame>  # optional
+
+                            # sichere Initialisierung
+                            run_disabled = False
+
+                            # parse selected tickers (falls du ein Textfeld benutzt)
+                            selected_tickers_input = globals().get("selected_tickers_input", None)
+                            if selected_tickers_input:
+                                available = [t.strip() for t in selected_tickers_input.split(",") if t.strip()]
+                            else:
+                                # falls 'available' bereits gesetzt ist (z. B. aus einer MultiSelect), benutze es
+                                available = globals().get("available", [])
+
+                            # Start / End sicher erzeugen (None bleibt None)
+                            start_date_input = globals().get("start_date_input", None)
+                            end_date_input = globals().get("end_date_input", None)
+                            start_arg = start_date_input.isoformat() if start_date_input is not None else None
+                            end_arg = end_date_input.isoformat() if end_date_input is not None else None
+
+                            # Weights mapping: falls vorhanden, sonst None
+                            user_weights_mapped = globals().get("user_weights_mapped", None)
+
+                            # prices und regimes: sichere Referenzen
+                            prices = globals().get("prices_subset", None)   # oder 'prices_df' je nach Datei
+                            regimes_val = globals().get("regimes", None)
+
+                            # --- Filter available gegen prices.columns, um KeyError zu vermeiden ---
+                            if prices is not None:
+                                available = [t for t in available if t in prices.columns]
+
+                            if not available:
+                                st.warning("Keine der ausgewählten Ticker in den Preisdaten vorhanden.")
+                                run_disabled = True
+                            else:
+                                # --- Sicherer Aufruf des Adapters via safe_backtest_call ---
+                                result = safe_backtest_call(
+                                    adapter_run_backtest,
+                                    available,                                # positional: portfolio_or_tickers (Liste ist ok)
+                                    prices=prices[available] if prices is not None else None,
+                                    weights=user_weights_mapped,              # kann None sein
+                                    regimes=regimes_val,                      # optional
+                                    start=start_arg,
+                                    end=end_arg,
+                                    rebalance="monthly",                      # oder rebalance_freq="M" je nach Adapter
+                                    initial_capital=1_000_000,
+                                    flag_key="backtest_call"
+                                ) or {}
+
+                                # --- Ergebnis prüfen und anzeigen ---
+                                if not result.get("ok"):
+                                    st.warning(result.get("message", "Backtest fehlgeschlagen."))
+                                    run_disabled = True
+                                else:
+                                    run_disabled = False
+                                    bt = result["result"]
+                                    removed = bt.get("removed_tickers", [])
+                                    if removed:
+                                        st.warning("Entfernte Ticker: " + ", ".join(removed))
+                                    render_backtest(bt)
+
+                            # Run-Button
+                            if st.button("Berechnen", disabled=run_disabled):
+                                # optional: setze ein SessionState-Flag oder trigger einen erneuten Aufruf
+                                st.session_state["backtest_requested"] = True
+
+
                         except ValueError as e:
                             logger.warning("maybe_run_backtest failed: %s", e)
                             st.error("Backtest konnte nicht ausgeführt werden: keine gültigen Ticker in den Preisdaten.")

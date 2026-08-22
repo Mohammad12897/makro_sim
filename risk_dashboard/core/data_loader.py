@@ -14,9 +14,11 @@ Erwartete externe Hilfsfunktionen (aus scripts/yf_helper.py):
 Diese müssen in deinem Projekt vorhanden sein.
 """
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional , Union
 from pathlib import Path
 import logging
+from datetime import date
+import threading
 import time
 import random
 import pandas as pd
@@ -26,6 +28,12 @@ import os
 import contextlib
 import io
 import streamlit as st
+import re
+
+logger = logging.getLogger(__name__)
+
+
+from risk_dashboard.core.safety import DUMP_MARKERS  # Liste der Marker, zentral verwaltet
 
 from risk_dashboard.data_utils import flatten_yf_dataframe
 
@@ -39,7 +47,11 @@ from risk_dashboard.core.yf_helper import (
 # Cache-Validator (wie zuvor vorgeschlagen)
 from risk_dashboard.core.ticker_cache import validate_ticker_with_cache
 
-logger = logging.getLogger(__name__)
+
+DEFAULT_START = "2016-01-01"
+DEFAULT_END = date.today().isoformat()
+YF_DOWNLOAD_TIMEOUT = 30  # Sekunden, anpassen
+CHUNK_SIZE = 10  # Anzahl Ticker pro Request, anpassen
 
 
 def filter_valid_tickers(tickers: List[str]) -> List[str]:
@@ -62,6 +74,115 @@ def filter_valid_tickers(tickers: List[str]) -> List[str]:
     # deduplizieren und Reihenfolge bewahren
     return list(dict.fromkeys(valid))
 
+def _strip_edge_metadata_from_string(s: str, markers: List[str] = DUMP_MARKERS) -> str:
+    if not s:
+        return s.strip()
+    if not markers:
+        return s.strip()
+    lower = s.lower()
+    if not any((m and m.lower() in lower) for m in markers):
+        return s.strip()
+
+    cleaned = s
+    # Entferne Zuweisungsblöcke wie: marker = [ ... ]
+    try:
+        escaped = [re.escape(m) for m in markers if m]
+        if escaped:
+            lhs = r"|".join(escaped)
+            cleaned = re.sub(r"(?ms)\b(?:" + lhs + r")\s*=\s*\[.*?\]\s*", "", cleaned)
+    except Exception:
+        pass
+
+    # Entferne unkommentierte Zeilen, die Marker enthalten
+    try:
+        marker_or = r"|".join([re.escape(m) for m in markers if m])
+        cleaned = re.sub(r"(?im)^[ \t]*(?!#).*?(?:" + marker_or + r").*\r?\n?", "", cleaned)
+    except Exception:
+        pass
+
+    # Generischer Tag-Stripper: <tag>...</tag> und einzelne opening tags
+    cleaned = re.sub(r"(?ms)<[A-Za-z0-9_:-]+(?:\s+[^>]*)?>.*?</[A-Za-z0-9_:-]+>", "", cleaned)
+    cleaned = re.sub(r"(?i)<[A-Za-z0-9_:-]+(?:\s+[^>]*)?>", "", cleaned)
+
+    # Trim und leere Zeilen entfernen
+    cleaned = "\n".join([ln for ln in (l.strip() for l in cleaned.splitlines()) if ln])
+    return cleaned.strip()
+
+def parse_tickers(raw: Union[str, List[str], tuple]) -> List[str]:
+    """
+    Bereinigt (falls Marker vorhanden), splittet und liefert Uppercase-Ticker ohne Duplikate.
+    """
+    if raw is None:
+        return []
+
+    # Wenn String: zuerst bereinigen, dann splitten
+    if isinstance(raw, str):
+        cleaned = _strip_edge_metadata_from_string(raw)
+        parts = [p.strip() for p in re.split(r"[,\n;|]+", cleaned) if p.strip()]
+    else:
+        # Liste/Tuple: Elemente bereinigen/trimmen einzeln (keine Dump-Blöcke erwartet)
+        parts = [str(t).strip() for t in raw if t and str(t).strip()]
+
+    # Normalisiere und dedupe while preserving order
+    seen = set()
+    out: List[str] = []
+    for p in parts:
+        p_up = p.upper()
+        if p_up not in seen:
+            seen.add(p_up)
+            out.append(p_up)
+    return out
+
+
+def _yf_download_with_timeout(tickers_list: List[str], yf_kwargs: dict, timeout: int = YF_DOWNLOAD_TIMEOUT):
+    """
+    Führt yf.download(**yf_kwargs) in einem Thread aus und wartet 'timeout' Sekunden.
+    Gibt das raw-Resultat zurück oder None bei Timeout.
+    Wenn yf.download eine Exception wirft, wird diese weitergereicht.
+    """
+    result = {"raw": None, "exc": None}
+
+    def target():
+        try:
+            # yfinance erwartet entweder list oder string; hier übergeben wir list
+            result["raw"] = yf.download(**yf_kwargs)
+        except Exception as e:
+            result["exc"] = e
+
+    th = threading.Thread(target=target, daemon=True)
+    th.start()
+    th.join(timeout)
+    if th.is_alive():
+        logger.warning("yf.download timed out after %s seconds for %s", timeout, tickers_list)
+        return None
+    if result["exc"]:
+        raise result["exc"]
+    return result["raw"]
+
+def _chunked(iterable: List[str], n: int):
+    for i in range(0, len(iterable), n):
+        yield iterable[i:i + n]
+
+def _parse_tickers_input_old(raw):
+    """
+    Akzeptiert: List[str] oder String mit Komma/Semikolon/Zeilenumbruch getrennt.
+    Liefert: Liste von Uppercase-Tickern ohne Duplikate.
+    """
+    import re
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        parts = [str(t).strip() for t in raw if t and str(t).strip()]
+    else:
+        parts = [p.strip() for p in re.split(r"[,\n;]+", str(raw)) if p.strip()]
+    seen = set()
+    out = []
+    for p in parts:
+        p_up = p.upper()
+        if p_up not in seen:
+            seen.add(p_up)
+            out.append(p_up)
+    return out
 
 # --- Kontextmanager: stdout/stderr temporär stummschalten ---
 @contextlib.contextmanager
@@ -88,41 +209,246 @@ def suppress_stdout_stderr():
 
 # --- Quiet fetch wrapper mit optionalem Caching ---
 @st.cache_data(ttl=60*60)  # optional: 1 Stunde cache; anpassen oder entfernen
-def fetch_prices_safe(tickers: List[str],
-                      start: Optional[str] = None,
-                      end: Optional[str] = None,
-                      interval: str = "1d",
-                      auto_adjust: bool = False,
-                      threads: bool = True) -> pd.DataFrame:
+def fetch_prices_safe(
+    tickers: Union[List[str], str],
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    interval: str = "1d",
+    auto_adjust: bool = False,
+    threads: bool = True,
+    retries: int = 2,
+    return_removed: bool = False,
+) -> Union[pd.DataFrame, Tuple[pd.DataFrame, List[str]]]:
     """
-    Lade Preisdaten für tickers; gibt flaches DataFrame mit Close/AdjClose-Spalten zurück.
+    Lade Preisdaten für tickers; gibt flaches DataFrame zurück.
+    - tickers: Liste oder String (Komma/Zeilenumbruch/; getrennt).
+    - return_removed: wenn True, zusätzlich Liste der Ticker ohne Daten zurückgeben.
     """
-    if isinstance(tickers, str):
-        tickers = [tickers]
-    tickers = [t.strip().upper() for t in tickers if t and str(t).strip()]
-    if not tickers:
+    # sichere Defaults
+    start = start or DEFAULT_START
+    end = end or DEFAULT_END
+
+    # 1) robustes Parsen der Eingabe (parse_tickers muss vorhanden sein)
+    tickers_list = parse_tickers(tickers)
+    if not tickers_list:
+        if return_removed:
+            return pd.DataFrame(), []
         return pd.DataFrame()
 
-    try:
-        raw = yf.download(
-            tickers,
+    # 2) Download in Chunks mit Retries und Timeout
+    all_raws = []
+    last_exc = None
+    for chunk in _chunked(tickers_list, CHUNK_SIZE):
+        # prepare kwargs for this chunk
+        yf_kwargs = dict(
+            tickers=chunk,
             start=start,
             end=end,
             interval=interval,
             group_by="ticker",
             auto_adjust=auto_adjust,
             threads=threads,
-            progress=False
+            progress=False,
         )
-    except Exception as e:
-        # log/handle
+
+        raw_chunk = None
+        for attempt in range(retries + 1):
+            try:
+                raw_chunk = _yf_download_with_timeout(chunk, yf_kwargs, timeout=YF_DOWNLOAD_TIMEOUT)
+                # Wenn Timeout (None) -> raise to trigger retry logic
+                if raw_chunk is None:
+                    raise TimeoutError(f"yf.download timed out for chunk {chunk}")
+                break
+            except Exception as e:
+                last_exc = e
+                logger.exception("yfinance download failed (attempt %s) for %s: %s", attempt, chunk, e)
+                if attempt < retries:
+                    time.sleep(2 ** attempt)
+        if raw_chunk is None:
+            # Alle Versuche für diesen Chunk fehlgeschlagen
+            logger.warning("All attempts failed for chunk %s", chunk)
+            # Wir fahren mit den anderen Chunks fort, aber merken uns die fehlenden Ticker
+            all_raws.append((chunk, None))
+        else:
+            all_raws.append((chunk, raw_chunk))
+
+    # Wenn kein erfolgreicher Chunk
+    if not any(raw is not None for _, raw in all_raws):
+        logger.warning("fetch_prices_safe: all attempts failed for all chunks for %s", tickers_list)
+        if return_removed:
+            return pd.DataFrame(), tickers_list
         return pd.DataFrame()
 
-    df = flatten_yf_dataframe(raw)
+    # 3) Flatten / Merge der Chunk-Resultate
+    dfs = []
+    for chunk, raw in all_raws:
+        if raw is None:
+            continue
+        try:
+            df_chunk = flatten_yf_dataframe(raw)
+        except Exception:
+            try:
+                df_chunk = pd.DataFrame(raw)
+            except Exception:
+                logger.exception("Failed to flatten yfinance chunk for %s", chunk)
+                continue
+        dfs.append(df_chunk)
+
+    if not dfs:
+        logger.warning("No dataframes produced from yfinance results for %s", tickers_list)
+        if return_removed:
+            return pd.DataFrame(), tickers_list
+        return pd.DataFrame()
+
+    # Merge/concat auf Index (Datum); Spalten sollten unterschiedliche Ticker enthalten
+    try:
+        df = pd.concat(dfs, axis=1, join="outer")
+    except Exception:
+        # Fallback: nimm erstes DF
+        df = dfs[0]
+
+    # 4) Index in Datetime umwandeln
     try:
         df.index = pd.to_datetime(df.index)
     except Exception:
         pass
+
+    # 5) Bestimme Ticker ohne Daten
+    removed: List[str] = []
+    if isinstance(df.columns, pd.MultiIndex):
+        top_level = list(dict.fromkeys([c[0] for c in df.columns]))
+        for t in tickers_list:
+            if t not in top_level:
+                removed.append(t)
+    else:
+        for t in tickers_list:
+            if t not in df.columns:
+                removed.append(t)
+            else:
+                try:
+                    if df[t].dropna().empty:
+                        removed.append(t)
+                except Exception:
+                    removed.append(t)
+
+    if removed:
+        logger.warning("Removed tickers with no data: %s", removed)
+        df = df.drop(columns=removed, errors="ignore")
+
+    if return_removed:
+        return df, removed
+    return df
+
+
+def fetch_prices_safe_old(
+    tickers: Union[List[str], str],
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    interval: str = "1d",
+    auto_adjust: bool = False,
+    threads: bool = True,
+    retries: int = 2,
+    return_removed: bool = False,
+) -> Union[pd.DataFrame, Tuple[pd.DataFrame, List[str]]]:
+    """
+    Lade Preisdaten für tickers; gibt flaches DataFrame zurück.
+    - tickers: Liste oder String (Komma/Zeilenumbruch/; getrennt).
+    - return_removed: wenn True, zusätzlich Liste der Ticker ohne Daten zurückgeben.
+    """
+    # setze Defaults wenn None
+    start = start or DEFAULT_START
+    end = end or DEFAULT_END
+
+    # 1) robustes Parsen der Eingabe
+    tickers_list = parse_tickers(tickers)
+    if not tickers_list:
+        if return_removed:
+            return pd.DataFrame(), []
+        return pd.DataFrame()
+
+    # prepare kwargs for yf.download
+    yf_kwargs = dict(
+        tickers=tickers_list,
+        start=start,
+        end=end,
+        interval=interval,
+        group_by="ticker",
+        auto_adjust=auto_adjust,
+        threads=threads,
+        progress=False,
+    )
+
+    # 2) Download mit Retries
+    raw = None
+    last_exc = None
+    for attempt in range(retries + 1):
+        try:
+            raw = yf.download(
+                tickers_list,
+                start=start,
+                end=end,
+                interval=interval,
+                group_by="ticker",
+                auto_adjust=auto_adjust,
+                threads=threads,
+                progress=False,
+            )
+            break
+        except Exception as e:
+            last_exc = e
+            logger.exception("yfinance download failed (attempt %s) for %s: %s", attempt, tickers_list, e)
+            if attempt < retries:
+                import time
+                time.sleep(2 ** attempt)
+
+    if raw is None:
+        logger.warning("fetch_prices_safe: all attempts failed for %s", tickers_list)
+        if return_removed:
+            return pd.DataFrame(), tickers_list
+        return pd.DataFrame()
+
+    # 3) Flatten / Fallbacks
+    try:
+        df = flatten_yf_dataframe(raw)
+    except Exception:
+        try:
+            df = pd.DataFrame(raw)
+        except Exception:
+            logger.exception("Failed to flatten yfinance output for %s", tickers_list)
+            if return_removed:
+                return pd.DataFrame(), tickers_list
+            return pd.DataFrame()
+
+    # 4) Index in Datetime umwandeln
+    try:
+        df.index = pd.to_datetime(df.index)
+    except Exception:
+        pass
+
+    # 5) Bestimme Ticker ohne Daten
+    removed: List[str] = []
+    if isinstance(df.columns, pd.MultiIndex):
+        top_level = list(dict.fromkeys([c[0] for c in df.columns]))
+        for t in tickers_list:
+            if t not in top_level:
+                removed.append(t)
+    else:
+        for t in tickers_list:
+            if t not in df.columns:
+                removed.append(t)
+            else:
+                try:
+                    if df[t].dropna().empty:
+                        removed.append(t)
+                except Exception:
+                    removed.append(t)
+
+    if removed:
+        logger.warning("Removed tickers with no data: %s", removed)
+        df = df.drop(columns=removed, errors="ignore")
+
+    if return_removed:
+        return df, removed
     return df
 
 def load_raw_prices_for_universe(universe: List[str],

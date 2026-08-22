@@ -1,0 +1,19 @@
+{
+  "ticker": "Kurzcode, unter dem eine Aktie oder ein ETF an der Börse gehandelt wird (z. B. NVDA, EXS1.DE).",
+  "price": "Aktueller Marktpreis des Werts.",
+  "period": "Wähle den Zeitraum, für den Kurs und Kennzahlen angezeigt werden (z. B. 1 Jahr).",
+  "return": "Prozentuale Veränderung des Preises über den gewählten Zeitraum.",
+  "volatility": "Wie stark der Kurs schwankt. Höhere Werte = größere Schwankungen.",
+  "max_drawdown": "Größter Rückgang vom Höchststand in der gewählten Periode.",
+  "sharpe": "Verhältnis von Rendite zu Risiko; höher ist besser für risikoadjustierte Rendite.",
+  "ter": "Jährliche Kosten eines ETFs. Diese Gebühren mindern die Rendite.",
+  "diversification": "Wie breit ein ETF gestreut ist. Mehr Werte = weniger Einzelrisiko.",
+  "benchmark": "Vergleichsindex, an dem die Performance gemessen wird (z. B. DAX).",
+  "weights": "Anteil eines Werts am Gesamtportfolio in Prozent.",
+  "rebalancing": "Regelmäßiges Zurücksetzen der Gewichte, z. B. monatlich oder jährlich.",
+  "backtest": "Simulation, wie dein Portfolio in der Vergangenheit gelaufen wäre. Keine Garantie für die Zukunft.",
+  "assumptions": "Annahmen wie jährliche Sparrate oder Gebühren, die die Simulation beeinflussen.",
+  "add_ticker": "Gib das Kürzel ein (z. B. NVDA oder EXS1.DE) und drücke Enter oder 'Hinzufügen'.",
+  "invalid_ticker": "Ticker nicht gefunden. Prüfe Schreibweise oder füge Börsen‑Suffix hinzu (z. B. .DE, .L).",
+  "loading": "Daten werden geladen… (kann bei vielen Werten einige Sekunden dauern)"
+}

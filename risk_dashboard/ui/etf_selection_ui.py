@@ -1,6 +1,7 @@
 # risk_dashboard/ui/etf_selection_ui.py
 import streamlit as st
 import pandas as pd
+from datetime import date
 from typing import Dict, List
 import json, os
 from risk_dashboard.core.etf_tools import get_etf_candidates_for_index, compute_etf_score_components, get_preset_weights, download_prices
@@ -8,6 +9,7 @@ from risk_dashboard.core.macro_pipeline import run_backtest
 from risk_dashboard.ui.profiles_ui import detect_historical_regimes
 from risk_dashboard.utils.persistence import load_user_tickers, save_user_tickers
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
+from risk_dashboard.core.data_loader import parse_tickers
 import logging
     
 logger = logging.getLogger(__name__)
@@ -27,25 +29,11 @@ def render_etf_selection_ui():
         # Eingabefeld
         new_ticker = st.text_input("Ticker hinzufügen", value="", placeholder="z.B. AAPL oder VWRL")
 
-        # Normalisierung: akzeptiere Liste, Dict oder String
-        def parse_tickers(raw):
-            if raw is None:
-                return []
-            if isinstance(raw, (list, tuple)):
-                tickers = [str(t).strip().upper() for t in raw if str(t).strip()]
-            else:
-                s = str(raw)
-                s = s.replace(";", ",").replace("|", ",")
-                tickers = [t.strip().upper() for t in s.split(",") if t.strip()]
-            # Entferne Duplikate, behalte Reihenfolge
-            seen = set()
-            out = []
-            for t in tickers:
-                if t and t not in seen:
-                    seen.add(t)
-                    out.append(t)
-            return out
+        # sichere Defaults
+        DEFAULT_START = "2016-01-01"
+        DEFAULT_END = date.today().isoformat()
 
+        # Normalisierung: akzeptiere Liste, Dict oder String
         # parsed_tickers ist jetzt immer eine Liste
         parsed_tickers = parse_tickers(new_ticker)
         st.write("Parsed tickers:", parsed_tickers)
@@ -62,7 +50,7 @@ def render_etf_selection_ui():
                     st.warning(f"{t} ist bereits in der Liste.")
                 else:
                     # Validierung: kurze Preisanfrage mit einer Liste
-                    test_prices = download_prices([t], start="2020-01-01", end=None)
+                    test_prices = download_prices([t], start=DEFAULT_START, end=DEFAULT_END)
                     if test_prices is None or test_prices.empty:
                         st.error(f"Ticker {t} ist ungültig oder liefert keine Daten.")
                     else:
@@ -214,7 +202,7 @@ def render_etf_selection_ui():
 
 
     if st.button("Backtest starten"):
-        logger.debug("DEBUG: selected:", selected)
+        logger.debug("DEBUG: selected: %s", selected)
         if not selected:
             st.warning("Keine ETFs ausgewählt.")
         else:
@@ -266,7 +254,7 @@ def render_etf_selection_ui():
 
                 price_cols = list(prices.columns)
                 sel_to_price = map_selected_to_pricecols(selected, price_cols, ticker_map_manual)
-                logger.debug("DEBUG: sel_to_price mapping:", sel_to_price)
+                logger.debug("DEBUG: sel_to_price mapping: %s", sel_to_price)
 
                 # Filter nur die, die gemappt wurden
                 mapped_selected = [sel_to_price[s] for s in selected if sel_to_price.get(s)]
@@ -287,7 +275,7 @@ def render_etf_selection_ui():
                 # Normalisieren (sicherstellen)
                 total = sum(user_weights_mapped.values()) or 1.0
                 user_weights_mapped = {k: v/total for k, v in user_weights_mapped.items()}
-                logger.debug("DEBUG: user_weights_mapped keys:", list(user_weights_mapped.keys()))
+                logger.debug("DEBUG: user_weights_mapped keys: %s", list(user_weights_mapped.keys()))
                 # --- Ende Mapping Block ---
 
                 missing = [k for k in user_weights_mapped.keys() if k not in price_cols]
@@ -306,8 +294,8 @@ def render_etf_selection_ui():
                 from risk_dashboard.utils.backtest_adapter import adapter_run_backtest
 
                 logger.debug("DEBUG: maybe_run_backtest from: %s", maybe_run_backtest.__module__)
-                logger.debug("DEBUG: final check - prices columns sample:", list(prices.columns)[:20])
-                logger.debug("DEBUG: final check - user_weights_mapped keys:", list(user_weights_mapped.keys()))
+                logger.debug("DEBUG: final check - prices columns sample: %s", list(prices.columns)[:20])
+                logger.debug("DEBUG: final check - user_weights_mapped keys: %s", list(user_weights_mapped.keys()))
 
 
                 # 1) Erzeuge portfolio_or_tickers aus der aktuellen Auswahl und dem Mapping
@@ -339,22 +327,79 @@ def render_etf_selection_ui():
                     except Exception:
                         logger.debug("WARN: konnte Index‑Overlap nicht prüfen")
 
-                    # 3) Backtest aufrufen via Adapter
-                    res = maybe_run_backtest(
-                        adapter_run_backtest,
-                        portfolio_or_tickers,
-                        prices=prices,                   # adapter mappt prices -> prices_df
-                        weights=user_weights_mapped,     # optional
-                        regimes=regimes,
-                        start=str(start),
-                        end=str(end),
-                        rebalance=rebalance,
-                        flag_key="backtest_etf_selection"
-                    )
+                    from risk_dashboard.ui.helpers import safe_backtest_call, render_backtest
 
-                    if res is None:
-                        st.info("Backtest wurde bereits in dieser Session ausgeführt.")
-                        res = {}
+                    # --- Vorbereitung: sichere Defaults und Variablen ---
+                    # Erwartet: Du hast irgendwo oben Widgets wie:
+                    # selected_tickers_input = st.text_input("Tickers (Komma getrennt)", "NVDA,EXS1.DE,AAPL")
+                    # start_date_input = st.date_input("Startdatum", value=None)   # optional
+                    # end_date_input = st.date_input("Enddatum", value=None)       # optional
+                    # user_weights_mapped = {...}  # optional, sonst None
+                    # prices_subset = <DataFrame mit Preisdaten>  # muss vorher geladen werden
+                    # regimes = <Series/DataFrame>  # optional
+
+                    # sichere Initialisierung
+                    run_disabled = False
+
+                    # parse selected tickers (falls du ein Textfeld benutzt)
+                    selected_tickers_input = globals().get("selected_tickers_input", None)
+                    if selected_tickers_input:
+                        available = [t.strip() for t in selected_tickers_input.split(",") if t.strip()]
+                    else:
+                        # falls 'available' bereits gesetzt ist (z. B. aus einer MultiSelect), benutze es
+                        available = globals().get("available", [])
+
+                    # Start / End sicher erzeugen (None bleibt None)
+                    start_date_input = globals().get("start_date_input", None)
+                    end_date_input = globals().get("end_date_input", None)
+                    start_arg = start_date_input.isoformat() if start_date_input is not None else None
+                    end_arg = end_date_input.isoformat() if end_date_input is not None else None
+
+                    # Weights mapping: falls vorhanden, sonst None
+                    user_weights_mapped = globals().get("user_weights_mapped", None)
+
+                    # prices und regimes: sichere Referenzen
+                    prices = globals().get("prices", None)   # oder 'prices_df' je nach Datei
+                    regimes_val = globals().get("regimes", None)
+
+                    # --- Filter available gegen prices.columns, um KeyError zu vermeiden ---
+                    if prices is not None:
+                        available = [t for t in available if t in prices.columns]
+
+                    if not available:
+                        st.warning("Keine der ausgewählten Ticker in den Preisdaten vorhanden.")
+                        run_disabled = True
+                    else:
+                        # --- Sicherer Aufruf des Adapters via safe_backtest_call ---
+                        result = safe_backtest_call(
+                            adapter_run_backtest,
+                            available,                                # positional: portfolio_or_tickers (Liste ist ok)
+                            prices=prices[available] if prices is not None else None,
+                            weights=user_weights_mapped,              # kann None sein
+                            regimes=regimes_val,                      # optional
+                            start=start_arg,
+                            end=end_arg,
+                            rebalance="monthly",                      # oder rebalance_freq="M" je nach Adapter
+                            initial_capital=1_000_000,
+                            flag_key="backtest_call"
+                        ) or {}
+
+                        # --- Ergebnis prüfen und anzeigen ---
+                        if not result.get("ok"):
+                            st.warning(result.get("message", "Backtest fehlgeschlagen."))
+                            run_disabled = True
+                        else:
+                            run_disabled = False
+                            bt = result["result"]
+                            removed = bt.get("removed_tickers", [])
+                            if removed:
+                                st.warning("Entfernte Ticker: " + ", ".join(removed))
+                            render_backtest(bt)
+
+                    # Run-Button
+                    if st.button("Berechnen", disabled=run_disabled):
+                        # optional: setze ein SessionState-Flag oder trigger einen erneuten Aufruf
+                        st.session_state["backtest_requested"] = True
 
 
                 # --- Robust: Ergebnisse anzeigen, session_state updaten und Rerun-Fallback ---
@@ -363,9 +408,9 @@ def render_etf_selection_ui():
                 wdf = res.get("weights_over_time") if isinstance(res, dict) else None
 
                 # Debug (Terminal)
-                logger.debug("DEBUG: res type:", type(res))
-                logger.debug("DEBUG: pv type/shape:", type(pv), getattr(pv, "shape", None))
-                logger.debug("DEBUG: wdf type/shape:", type(wdf), getattr(wdf, "shape", None))
+                logger.debug("DEBUG: res type: %s", type(res))
+                logger.debug("DEBUG: pv type/shape: %s  %s", type(pv), getattr(pv, "shape", None))
+                logger.debug("DEBUG: wdf type/shape: %s %s ", type(wdf), getattr(wdf, "shape", None))
 
                 # Wenn wdf vorhanden: Tabelle zeigen und session_state updaten (Slider erwarten 0-100)
                 if wdf is not None and hasattr(wdf, "empty") and not wdf.empty:

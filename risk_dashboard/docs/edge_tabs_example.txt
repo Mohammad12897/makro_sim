@@ -1,9 +1,11 @@
-# docs/edge_tabs_example.txt
+# risk_dashboard/docs/edge_tabs_example.txt
 # Beispiel: anonymisiertes Format für edge_all_open_tabs (nur als Referenz, nicht in prod)
 
-# User's Edge browser tabs metadata
-# edge_all_open_tabs
-# pageTitle
+User's Edge browser tabs metadata
+edge_all_open_tabs
+pageTitle
+<WebsiteContent_
+</WebsiteContent_
 
 # Optional: komplettes Beispiel (auskommentiert, damit CI es nicht findet)
 # edge_all_open_tabs = [

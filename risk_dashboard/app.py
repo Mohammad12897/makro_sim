@@ -77,16 +77,43 @@ try:
 except Exception:
     pass
 
+logger = logging.getLogger(__name__)
 # Safety check before any heavy imports (optional)
 AUTO_FIX = os.getenv("AUTO_FIX_PASTE_BLOCKS", "false").lower() in ("1", "true", "yes")
 
 # Import minimal safety module if vorhanden
 try:
-    from risk_dashboard.core.safety import startup_safety_check, sanitize_project_pastes
-    startup_safety_check(project_root, auto_fix=AUTO_FIX)
+    from risk_dashboard.core.safety import DUMP_MARKERS
+except Exception as e:
+    logger.warning("Could not import safety markers: %s. Continuing without safety markers.", e)
+    DUMP_MARKERS = []
+
+# Optional: implementiere startup_safety_check in safety.py oder hier eine leichte Variante
+def _default_startup_safety_check(root, markers, auto_fix=False):
+    # einfache Prüfung: suche Marker in repo; nur Warnungen, keine harte Fehler
+    import subprocess, shlex, sys
+    try:
+        if not markers:
+            logger.debug("No dump markers provided; skipping safety grep.")
+            return
+        pattern = "|".join([m.replace('"', '\\"') for m in markers])
+        cmd = f"git grep -n -E \"{pattern}\" -- ':!vendor' ':!node_modules' || true"
+        proc = subprocess.run(cmd, shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        out = proc.stdout.strip()
+        if out:
+            logger.warning("Potential dump markers found in repo:\n%s", out)
+            if auto_fix:
+                logger.info("AUTO_FIX requested but automatic fixes are not implemented here.")
+    except Exception:
+        logger.exception("startup safety check failed")
+
+# Call the check (you can replace with a more advanced startup_safety_check if you have one)
+try:
+    _default_startup_safety_check(project_root, DUMP_MARKERS, auto_fix=AUTO_FIX)
 except Exception:
-    # If not present, continue silently
-    pass
+    logger.exception("Safety check raised an exception; continuing.")
+
+
 
 # Eigene Module (lokale Projektstruktur)
 from risk_dashboard.core.data_loader import (
@@ -101,8 +128,6 @@ import os
 import pandas as pd
 import plotly.express as px
 
-
-from risk_dashboard.utils.session_helpers import maybe_run_backtest
 
 # initialisiere Flag falls nötig
 import streamlit as st

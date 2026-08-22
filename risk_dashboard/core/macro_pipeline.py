@@ -2,6 +2,7 @@
 from unittest import result
 import numpy as np
 import pandas as pd
+import yfinance as yf
 import tempfile, os, json
 import streamlit as st
 from pathlib import Path
@@ -226,47 +227,166 @@ def vol_target_leverage(port_rets, target_vol=0.10, cap=2.0, window=63):
 # ---------------------------------------------------------
 # 5. Backtest
 # ---------------------------------------------------------
-def run_backtest(tickers, prices_df, start=None, end=None,
+def _fetch_and_clean_prices(tickers, start=None, end=None):
+    valid = {}
+    removed = []
+
+    for t in tickers:
+        try:
+            df = yf.download(t, start=start, end=end, progress=False)
+        except Exception as e:
+            logger.debug("yfinance download failed for %s: %s", t, e)
+            df = None
+
+        if df is None or df.empty:
+            logger.debug("No data for %s (df is None or empty).", t)
+            removed.append(t)
+            continue
+
+        # Wenn MultiIndex-Spalten vorliegen (z.B. ('Close','NVDA')), handle das
+        series = None
+        cols = df.columns
+
+        # 1) MultiIndex-Fall: suche ('Adj Close', t) oder ('Close', t)
+        if isinstance(cols, pd.MultiIndex):
+            # Versuche zuerst ('Adj Close', ticker), dann ('Close', ticker)
+            candidates = [('Adj Close', t), ('Close', t)]
+            for cand in candidates:
+                if cand in cols:
+                    series = df[cand].dropna()
+                    break
+            # Falls nicht gefunden: versuche level 0 'Adj Close' und level 1 ticker
+            if series is None:
+                try:
+                    # xs auf level=0 (z. B. 'Adj Close') und dann Spalte ticker
+                    if 'Adj Close' in cols.get_level_values(0):
+                        tmp = df.xs('Adj Close', axis=1, level=0)
+                        if t in tmp.columns:
+                            series = tmp[t].dropna()
+                    if series is None and 'Close' in cols.get_level_values(0):
+                        tmp = df.xs('Close', axis=1, level=0)
+                        if t in tmp.columns:
+                            series = tmp[t].dropna()
+                except Exception:
+                    series = None
+
+        else:
+            # 2) Single‑level-Fall: suche 'Adj Close' oder 'Close'
+            if 'Adj Close' in cols:
+                series = df['Adj Close'].dropna()
+            elif 'Close' in cols:
+                series = df['Close'].dropna()
+            else:
+                # Falls keine erwarteten Spalten, versuche die erste numerische Spalte
+                numeric_cols = df.select_dtypes(include='number').columns
+                if len(numeric_cols) > 0:
+                    series = df[numeric_cols[0]].dropna()
+
+        # 3) Validierung der Series
+        if series is None or series.empty:
+            logger.debug("No valid price series for %s after extraction.", t)
+            removed.append(t)
+            continue
+
+        # Stelle sicher, dass Index DatetimeIndex ist
+        try:
+            if not isinstance(series.index, pd.DatetimeIndex):
+                series.index = pd.to_datetime(series.index)
+        except Exception:
+            logger.debug("Could not convert index to DatetimeIndex for %s.", t)
+
+        valid[t] = series
+
+    # Wenn nichts übrig bleibt
+    if not valid:
+        return pd.DataFrame(), removed
+
+    # concat ist robust gegenüber unterschiedlichen Indizes
+    prices_df = pd.concat(valid, axis=1)
+    # falls MultiIndex-Spalten entstehen, vereinfachen
+    if isinstance(prices_df.columns, pd.MultiIndex):
+        prices_df.columns = [c[0] for c in prices_df.columns]
+    prices_df = prices_df.sort_index().dropna(how='all')
+
+    return prices_df, removed
+
+def run_backtest(tickers=None, prices_df=None, start=None, end=None,
                  initial_cash=10000, monthly_dca=0, weights=None,
                  strategy="equal", momentum_threshold=0.0, vol_target=None, rebalance="monthly"):
-    
-    if prices_df is None or (hasattr(prices_df, "empty") and prices_df.empty):
-        raise ValueError("Keine Preisdaten übergeben (prices_df ist leer).")
-    # prüfe Spalten/Ticker
-    if not tickers:
-        raise ValueError("Keine Ticker übergeben.")
-    valid = [t for t in tickers if t in prices_df.columns]
-    if not valid:
-        raise ValueError("Keine gültigen Ticker in prices_df")
+    """
+    Entweder prices_df übergeben (vorab geladen) oder tickers übergeben, dann werden Preise geladen.
+    Rückgabe: dict mit keys: portfolio_value (Series), metrics (dict), removed_tickers (list)
+    """
+    removed_tickers = []
 
-    dates = prices_df.index
-    # ensure tickers order matches prices_df columns
+    # 1) Preise laden, falls nicht übergeben
+    if prices_df is None:
+        if not tickers:
+            raise ValueError("Keine Ticker übergeben.")
+        prices_df, removed_tickers = _fetch_and_clean_prices(tickers, start=start, end=end)
+        if prices_df.empty:
+            raise ValueError(f"Keine Preisdaten für angefragte Ticker. Entferne: {', '.join(removed_tickers)}")
+    else:
+        if prices_df.empty:
+            raise ValueError("Keine Preisdaten übergeben (prices_df ist leer).")
+
+    # 2) gültige Ticker aus prices_df ableiten
+    if tickers is None:
+        tickers = prices_df.columns.tolist()
     tickers = [t for t in tickers if t in prices_df.columns]
     if not tickers:
         raise ValueError("Keine gültigen Ticker in prices_df")
 
-    # prepare
+    # 3) Vorbereitung
+    dates = prices_df.index
     buy_dates = dca_schedule(dates, day_of_month=1) if monthly_dca > 0 else []
-    cash = initial_cash
-    positions = {t: 0.0 for t in tickers}  # shares
+    cash = float(initial_cash)
+    positions = {t: 0.0 for t in tickers}
     portfolio_values = []
 
-    # if no weights provided, equal weight on tickers
-    if weights is None or sum(weights.values()) == 0:
+    # 4) --- NEU: Gewichte einmalig setzen und normalisieren (vor initialer Allokation) ---
+    if weights is None:
         weights = {t: 1.0/len(tickers) for t in tickers}
+    else:
+        weights = {t: float(weights.get(t, 0.0)) for t in tickers}
+        s = sum(weights.values())
+        if s == 0:
+            weights = {t: 1.0/len(tickers) for t in tickers}
+        else:
+            weights = {t: w/s for t, w in weights.items()}
+    # ------------------------------------------------------------------------------
 
-    # main loop
+    # Initiale Allokation für Buy & Hold: investiere das Startkapital am ersten Handelstag
+    if strategy == "buy_and_hold":
+        # Kaufe am ersten verfügbaren Datum mit gültigen Preisen
+        # Falls das erste Datum NaNs hat, suche das erste Datum mit mindestens einem gültigen Preis
+        first_date = None
+        for d in dates:
+            row = prices_df.loc[d]
+            if not row.isna().all():
+                first_date = d
+                break
+        if first_date is None:
+            raise ValueError("Keine gültigen Preise für initialen Kauf gefunden.")
+        for t, w in weights.items():
+            price = prices_df.at[first_date, t] if t in prices_df.columns else None
+            if price is not None and not pd.isna(price) and price > 0:
+                positions[t] = (cash * w) / price
+        cash = 0.0
+
+    # 4) Gewichte: (entferne die komplette Duplikat‑Logik hier)
+    #    <-- lösche den alten Block, der weights erneut setzt/normalisiert -->
+
+    # 5) Hauptschleife
     for date in dates:
-        # DCA execution
         if date in buy_dates:
             alloc = allocate_cash_to_weights(monthly_dca, weights)
             for t, value in alloc.items():
-                price = prices_df.at[date, t]
-                if not pd.isna(price) and price > 0:
+                price = prices_df.at[date, t] if t in prices_df.columns else None
+                if price is not None and not pd.isna(price) and price > 0:
                     positions[t] += value / price
             cash -= monthly_dca
 
-        # compute portfolio value at this date
         pv = 0.0
         for t in tickers:
             price = prices_df.at[date, t]
@@ -275,79 +395,33 @@ def run_backtest(tickers, prices_df, start=None, end=None,
         total_value = pv + cash
         portfolio_values.append(total_value)
 
-        # apply vol target monthly (example): compute leverage at month end and scale positions
-        # check if this date is last trading day of month
+        # Vol target (monatlich)
         next_idx = dates.get_loc(date) + 1
         is_month_end = (next_idx == len(dates)) or (dates[next_idx].month != date.month)
-        if vol_target and is_month_end:
-            # compute returns series from portfolio_values so far
-            pv_series = pd.Series(portfolio_values, index=dates[:len(portfolio_values)])
-            port_rets = pv_series.pct_change().dropna()
+        if vol_target and is_month_end and len(portfolio_values) > 1:
+            pv_series_tmp = pd.Series(portfolio_values, index=dates[:len(portfolio_values)])
+            port_rets = pv_series_tmp.pct_change().dropna()
             lev = vol_target_leverage(port_rets, target_vol=vol_target, cap=2.0, window=63)
-            # scale positions by lev (note: this is a simplification; in real sim you d adjust cash/borrow)
-            for t in positions:
-                positions[t] *= lev
+            if lev is not None and lev > 0:
+                for t in positions:
+                    positions[t] *= lev
 
     pv_series = pd.Series(portfolio_values, index=dates)
-    # compute simple metrics
-    metrics = {
-        "final_value": float(pv_series.iloc[-1]),
-        "cagr": None,
-        "max_dd": None
-    }
-    # compute cagr and max drawdown if possible
-    try:
-        rets = pv_series.pct_change().dropna()
-        years = (pv_series.index[-1] - pv_series.index[0]).days / 365.25
-        metrics["cagr"] = (pv_series.iloc[-1] / pv_series.iloc[0]) ** (1/years) - 1 if years>0 else None
-        cummax = pv_series.cummax()
-        dd = (pv_series - cummax) / cummax
-        metrics["max_dd"] = float(dd.min())
-    except Exception:
-        pass
 
-    return {"portfolio_value": pv_series, "metrics": metrics, "weights_over_time": None}
+    # 6) Kennzahlen
+    metrics = {"final_value": None, "cagr": None, "max_dd": None}
+    if not pv_series.empty:
+        metrics["final_value"] = float(pv_series.iloc[-1])
+        try:
+            years = (pv_series.index[-1] - pv_series.index[0]).days / 365.25
+            metrics["cagr"] = (pv_series.iloc[-1] / pv_series.iloc[0]) ** (1/years) - 1 if years > 0 else None
+            cummax = pv_series.cummax()
+            dd = (pv_series - cummax) / cummax
+            metrics["max_dd"] = float(dd.min())
+        except Exception:
+            pass
 
-
-def run_backtest_old(weights, prices, regimes=None, start=None, end=None, rebalance="monthly"):
-    from risk_dashboard.core.backtest import run_portfolio_backtest
-    # Debug
-    logger.debug("DEBUG wrapper: calling run_portfolio_backtest; prices type:", type(prices), "weights:", weights)
-    # Debug-Ausgaben
-    logger.debug("DEBUG wrapper: prices type", type(prices), "shape", getattr(prices, "shape", None))
-    logger.debug("DEBUG wrapper: weights", weights, "regimes present:", regimes is not None)
-
-    # optional: slice prices nach start/end
-    if start:
-        prices = prices[prices.index >= pd.to_datetime(start)]
-    if end:
-        prices = prices[prices.index <= pd.to_datetime(end)]
-
-    # call the real backtest
-    result = run_portfolio_backtest(prices_df=prices, weights=weights, start=start, end=end, rebalance=rebalance)
-
-    pv = result.get("portfolio_value")
-    metrics = result.get("metrics", {})
-    weights_df = result.get("weights_over_time")
-
-    # write outputs only if present
-    if pv is not None and not pv.empty:
-        pv_df = pv.rename("portfolio_value").reset_index()
-        # speichere DataFrame als dict oder als CSV‑String in session_state
-        st.session_state["last_backtest_results_df"] = pv_df  # DataFrame direkt
-        st.session_state["last_backtest_results_csv"] = pv_df.to_csv(index=False)
-        logger.debug(f"DEBUG: backtest results stored in session_state, {len(pv_df)} Zeilen")
-    else:
-        logger.debug("DEBUG: portfolio_value leer — keine CSV geschrieben")
-
-    if metrics:
-        st.session_state["last_metrics"] = metrics
-        logger.debug("DEBUG: results stored in session_state['last_metrics']")
-    else:
-        logger.debug("DEBUG: metrics leer — keine JSON geschrieben")
-
-    return result
-
+    return {"portfolio_value": pv_series, "metrics": metrics, "weights_over_time": None, "removed_tickers": removed_tickers}
 
 # ---------------------------------------------------------
 # 6. Leistungsanalyse

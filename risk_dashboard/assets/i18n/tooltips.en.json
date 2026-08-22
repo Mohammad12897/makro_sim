@@ -1,0 +1,19 @@
+{
+  "ticker": "Short code under which a stock or ETF is traded (e.g. NVDA, EXS1.DE).",
+  "price": "Current market price of the asset.",
+  "period": "Select the time range for which prices and metrics are shown (e.g. 1 year).",
+  "return": "Percentage change in price over the selected period.",
+  "volatility": "How much the price fluctuates. Higher values = larger swings.",
+  "max_drawdown": "Largest decline from a peak during the selected period.",
+  "sharpe": "Ratio of return to risk; higher is better for risk‑adjusted return.",
+  "ter": "Annual cost of an ETF. These fees reduce returns.",
+  "diversification": "How broadly an ETF is spread. More holdings = less single‑stock risk.",
+  "benchmark": "Reference index used to compare performance (e.g. DAX).",
+  "weights": "Share of an asset in the total portfolio as a percentage.",
+  "rebalancing": "Regularly resetting weights, e.g. monthly or yearly.",
+  "backtest": "Simulation of how your portfolio would have performed historically. Not a guarantee of future results.",
+  "assumptions": "Assumptions such as annual savings rate or fees that affect the simulation.",
+  "add_ticker": "Enter the ticker (e.g. NVDA or EXS1.DE) and press Enter or 'Add'.",
+  "invalid_ticker": "Ticker not found. Check spelling or add exchange suffix (e.g. .DE, .L).",
+  "loading": "Loading data… (may take a few seconds for many tickers)"
+}
