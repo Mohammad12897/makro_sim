@@ -1,12 +1,16 @@
 # risk_dashboard/data_utils.py
-from typing import Optional, Sequence, Tuple, List
+import time
+import logging
+import random
+from typing import List, Optional, Any, Dict, Sequence, Tuple
 import pandas as pd
 import yfinance as yf
-import logging
-
+from requests.exceptions import RequestException
 
 logger = logging.getLogger(__name__)
 
+# low-level fetch wrapper (existierender Import)
+#from .yf_wrapper import fetch_prices_from_yf  # passe Pfad an
 
 def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     """
@@ -144,13 +148,139 @@ def fetch_prices_from_yf(tickers, start="2010-01-01", end=None,
                  list(df.columns), len(df.index))
     return df
 
-def fetch_price_history_bulk(tickers: list, start=None, end=None, interval="1d") -> dict:
-    df = fetch_prices_from_yf(tickers, start=start, end=end, interval=interval, auto_adjust=True)
-    result = {}
+def safe_fetch(
+    tickers: List[str],
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    interval: str = "1d",
+    retries: int = 2,
+    backoff_factor: float = 0.5,
+    timeout_seconds: int = 30,
+    allow_empty: bool = False,
+    cache: Optional[Dict[str, pd.DataFrame]] = None,
+    cache_key: Optional[str] = None,
+    raise_on_failure: bool = True,
+    **fetch_kwargs: Any,  # passt auto_adjust, threads, group_by, etc. durch
+) -> pd.DataFrame:
+    """
+    Robust wrapper around fetch_prices_from_yf.
+    - passt alle fetch_kwargs an die underlying Funktion durch (z.B. auto_adjust, threads)
+    - retries mit exponentiellem backoff + jitter
+    - optionaler cache (dict) zur Vermeidung mehrfacher Fetches
+    - gibt DataFrame zurück oder wirft RuntimeError (je nach raise_on_failure)
+    """
+    # optionaler Cache lookup
+    if cache is not None and cache_key is not None:
+        cached = cache.get(cache_key)
+        if cached is not None and not cached.empty:
+            logger.debug("safe_fetch: returning cached data for %s", cache_key)
+            return cached
+
+    last_exc = None
+    attempts = retries + 1
+    for attempt in range(1, attempts + 1):
+        try:
+            logger.debug(
+                "safe_fetch: attempt %d/%d tickers=%s start=%s end=%s interval=%s kwargs=%s",
+                attempt, attempts, tickers, start, end, interval, {k: fetch_kwargs.get(k) for k in ("auto_adjust","threads") if k in fetch_kwargs}
+            )
+            df = fetch_prices_from_yf(
+                tickers,
+                start=start,
+                end=end,
+                interval=interval,
+                timeout=timeout_seconds,
+                **fetch_kwargs
+            )
+            if df is not None and not df.empty:
+                # optional cache store
+                if cache is not None and cache_key is not None:
+                    cache[cache_key] = df
+                logger.debug("safe_fetch: success attempt %d rows=%d cols=%s", attempt, len(df.index), list(df.columns)[:10])
+                return df
+            logger.warning("safe_fetch: empty result on attempt %d for %s", attempt, tickers)
+        except RequestException as re:
+            last_exc = re
+            logger.warning("safe_fetch: network error on attempt %d for %s: %s", attempt, tickers, re)
+        except Exception as exc:
+            last_exc = exc
+            logger.exception("safe_fetch: unexpected error on attempt %d for %s", attempt, tickers)
+
+        # backoff with jitter
+        sleep_for = backoff_factor * (2 ** (attempt - 1))
+        jitter = random.uniform(0, sleep_for * 0.1)
+        total_sleep = sleep_for + jitter
+        logger.debug("safe_fetch: sleeping %.2fs before next attempt", total_sleep)
+        time.sleep(total_sleep)
+
+    # all attempts failed
+    logger.error("safe_fetch: all attempts failed for %s", tickers)
+    if allow_empty:
+        return pd.DataFrame()
+    if raise_on_failure:
+        raise RuntimeError(f"safe_fetch: failed to fetch prices for {tickers}") from last_exc
+    return pd.DataFrame()
+
+def fetch_price_history_bulk(
+    tickers: List[str],
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    interval: str = "1d",
+    retries: int = 2,
+    allow_empty: bool = False,
+    cache: Optional[dict] = None,
+    **fetch_kwargs: Any
+) -> Dict[str, pd.Series]:
+    """
+    Fetch price history for multiple tickers and return dict[ticker] -> Series (Adj Close or Close).
+    Uses safe_fetch to handle retries, backoff and kwargs like auto_adjust, threads.
+    """
+    cache_key = None
+    if cache is not None:
+        cache_key = f"bulk:{','.join(sorted(tickers))}:{start}:{end}:{interval}:{fetch_kwargs}"
+
+    try:
+        df = safe_fetch(
+            tickers,
+            start=start,
+            end=end,
+            interval=interval,
+            retries=retries,
+            cache=cache,
+            cache_key=cache_key,
+            **fetch_kwargs
+        )
+    except Exception as exc:
+        logger.warning("fetch_price_history_bulk: safe_fetch failed for %s: %s", tickers, exc)
+        if allow_empty:
+            return {}
+        raise
+
+    if df is None or df.empty:
+        logger.warning("fetch_price_history_bulk: fetched DataFrame is empty for %s", tickers)
+        if allow_empty:
+            return {}
+        raise ValueError("fetch_price_history_bulk: fetched prices are empty")
+
+    result: Dict[str, pd.Series] = {}
     for col in df.columns:
-        series = df[col].get("Adj Close") if isinstance(df[col], pd.DataFrame) else df[col]
-        result[col] = series.dropna().sort_index()
+        col_data = df[col]
+        if isinstance(col_data, pd.DataFrame):
+            if "Adj Close" in col_data.columns:
+                series = col_data["Adj Close"]
+            elif "Close" in col_data.columns:
+                series = col_data["Close"]
+            else:
+                numeric_cols = [c for c in col_data.columns if pd.api.types.is_numeric_dtype(col_data[c])]
+                series = col_data[numeric_cols[0]] if numeric_cols else col_data.iloc[:, 0]
+        else:
+            series = col_data
+
+        series = series.dropna().sort_index()
+        result[col] = series
+
     return result
+
 
 def fetch_price_history(symbol: str, period: str = "5y") -> Optional[pd.Series]:
     return fetch_price_history_bulk([symbol], start=None, end=None, interval="1d").get(symbol)
