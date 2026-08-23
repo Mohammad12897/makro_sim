@@ -41,6 +41,7 @@ from risk_dashboard.core.holdings import try_relaxed_holdings
 from risk_dashboard.core.etf_tools import download_prices
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.data_loader import parse_tickers
+from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR 
 
 logger = logging.getLogger(__name__)
 
@@ -1238,14 +1239,11 @@ def profile_form_ui() -> None:
         # from risk_dashboard.core.macro_pipeline import _fetch_and_clean_prices
 
         run_disabled = False
-        # sichere Defaults
-        DEFAULT_START = "2016-01-01"
-        DEFAULT_END = date.today().isoformat()
 
         # Widgets (einmalig)
         selected_tickers_input = st.text_input("Tickers (Komma getrennt)", "NVDA,EXS1.DE,AAPL")
-        start_date = st.date_input("Startdatum", value=DEFAULT_START)
-        end_date = st.date_input("Enddatum", value=DEFAULT_END)
+        start_date = st.date_input("Startdatum", value=DEFAULT_START_STR)
+        end_date = st.date_input("Enddatum", value=DEFAULT_END_STR)
 
         # Normierte Listen / Argumente
         ticker_list = parse_tickers(selected_tickers_input) # [t.strip().upper() for t in selected_tickers_input.split(",") if t.strip()]

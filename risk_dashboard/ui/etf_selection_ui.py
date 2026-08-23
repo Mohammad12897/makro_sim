@@ -10,9 +10,52 @@ from risk_dashboard.ui.profiles_ui import detect_historical_regimes
 from risk_dashboard.utils.persistence import load_user_tickers, save_user_tickers
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.data_loader import parse_tickers
+from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR 
 import logging
     
 logger = logging.getLogger(__name__)
+
+# Auswahl der Strategie
+selected_strategy = st.selectbox(
+    "Strategie",
+    options=["buy_and_hold", "equal_weight", "momentum", "monthly_rebalance"],
+    index=0
+)
+
+# Startkapital
+initial_cash = st.number_input("Startkapital", min_value=0.0, value=10000.0, step=100.0, format="%.2f")
+
+# Optional: monatliches DCA (0 = aus)
+monthly_dca = st.number_input("Monatliches DCA (0 = aus)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
+
+def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
+    manual_map = manual_map or {}
+    mapped = {}
+    price_cols_lower = {c.lower(): c for c in price_cols}
+    for s in selected_list:
+        # 1) manuelle Map prüfen
+        if s in manual_map:
+            pc = manual_map[s]
+            mapped[s] = pc if pc in price_cols else None
+            continue
+        # 2) exakte Übereinstimmung
+        if s in price_cols:
+            mapped[s] = s
+            continue
+        # 3) case-insensitive exact
+        if s.lower() in price_cols_lower:
+            mapped[s] = price_cols_lower[s.lower()]
+            continue
+        # 4) Teilstring-Match (case-insensitive)
+        s_low = s.lower()
+        candidates = [c for c in price_cols if s_low in c.lower() or c.lower() in s_low]
+        if len(candidates) == 1:
+            mapped[s] = candidates[0]
+            continue
+        # 5) kein eindeutiges Match
+        mapped[s] = None
+    return mapped
+
 
 def render_etf_selection_ui():
     """
@@ -28,10 +71,6 @@ def render_etf_selection_ui():
         st.subheader("Portfolio Eingabe")
         # Eingabefeld
         new_ticker = st.text_input("Ticker hinzufügen", value="", placeholder="z.B. AAPL oder VWRL")
-
-        # sichere Defaults
-        DEFAULT_START = "2016-01-01"
-        DEFAULT_END = date.today().isoformat()
 
         # Normalisierung: akzeptiere Liste, Dict oder String
         # parsed_tickers ist jetzt immer eine Liste
@@ -50,7 +89,7 @@ def render_etf_selection_ui():
                     st.warning(f"{t} ist bereits in der Liste.")
                 else:
                     # Validierung: kurze Preisanfrage mit einer Liste
-                    test_prices = download_prices([t], start=DEFAULT_START, end=DEFAULT_END)
+                    test_prices = download_prices([t], start=DEFAULT_START_STR, end=DEFAULT_END_STR)
                     if test_prices is None or test_prices.empty:
                         st.error(f"Ticker {t} ist ungültig oder liefert keine Daten.")
                     else:
@@ -196,10 +235,29 @@ def render_etf_selection_ui():
     
     # Backtest section
     st.subheader("Backtest der Auswahl")
-    start = st.date_input("Startdatum", value=pd.to_datetime("2018-01-01"))
+    start = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR))
     end = st.date_input("Enddatum", value=pd.Timestamp.today())
     rebalance = st.selectbox("Rebalancing", ["monthly", "quarterly", "yearly", "none"], index=0, key="etf_rebalance_select")
 
+
+    # falls prices schon geladen werden kann, sonst lade Metadaten zuerst
+    try:
+        available_etfs = list(prices.columns)
+    except NameError:
+        # Fallback: statische Liste oder leere Liste bis Preise geladen sind
+        available_etfs = ["NVDA", "EXS1.DE", "AAPL"]
+
+    # --- Widgets (oben im UI) ---
+    selected = st.multiselect("Wähle ETFs", options=available_etfs, default=["NVDA"])
+    start = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR))
+    end = st.date_input("Enddatum", value=pd.Timestamp.today())
+
+    selected_strategy = st.selectbox("Strategie", ["buy_and_hold", "equal_weight", "momentum", "monthly_rebalance"])
+    initial_cash = st.number_input("Startkapital", min_value=0.0, value=10000.0, step=100.0, format="%.2f")
+    monthly_dca = st.number_input("Monatliches DCA (0 = aus)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
+
+    # optional: user_weights (z. B. aus session_state oder ein Widget)
+    user_weights = st.session_state.get("manual_weights", {s: 1.0/len(selected) for s in selected})
 
     if st.button("Backtest starten"):
         logger.debug("DEBUG: selected: %s", selected)
@@ -210,232 +268,74 @@ def render_etf_selection_ui():
                 prices = download_prices(selected, start=str(start), end=str(end))
                 if prices is None or prices.empty:
                     st.error("Keine Preisdaten gefunden für die ausgewählten ETFs.")
-                    return
+                else:
+                    ticker_map_manual = {"CSPX.L": "EXS1.DE", "EQQQ.L": "EXS2.DE"}
+                    # MultiIndex safe handling
+                    if isinstance(prices.columns, pd.MultiIndex):
+                        try:
+                            if "close" in prices.columns.levels[1]:
+                                prices = prices.xs("close", axis=1, level=1)
+                            elif "adjclose" in prices.columns.levels[1]:
+                                prices = prices.xs("adjclose", axis=1, level=1)
+                            else:
+                                prices.columns = ["_".join(map(str, c)).strip() for c in prices.columns.values]
+                        except Exception:
+                            prices.columns = ["_".join(map(str, c)).strip() for c in prices.columns.values]
 
-                # --- Mapping selected -> price columns (automatisch + manuelle Ergänzung) ---
-                ticker_map_manual = {"CSPX.L": "EXS1.DE", "EQQQ.L": "EXS2.DE"}  # passe an
+                    price_cols = list(prices.columns)
+                    sel_to_price = map_selected_to_pricecols(selected, price_cols, manual_map=ticker_map_manual)
+                    logger.debug("DEBUG: sel_to_price mapping: %s", sel_to_price)
 
-                def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
-                    manual_map = manual_map or {}
-                    mapped = {}
-                    for s in selected_list:
-                        # 1. manuelle Map prüfen
-                        if s in manual_map:
-                            pc = manual_map[s]
-                            if pc in price_cols:
-                                mapped[s] = pc
-                                continue
-                        # 2. exakte Übereinstimmung
-                        if s in price_cols:
-                            mapped[s] = s
-                            continue
-                        # 3. Teilstring-Match (case-insensitive)
-                        s_low = s.lower()
-                        candidates = [c for c in price_cols if s_low in c.lower() or c.lower() in s_low]
-                        if len(candidates) == 1:
-                            mapped[s] = candidates[0]
-                            continue
-                        # 4. kein eindeutiges Match
-                        mapped[s] = None
-                    return mapped
+                    # mapped_selected: nur price-column keys, die existieren
+                    mapped_selected = [sel_to_price[s] for s in selected if sel_to_price.get(s)]
+                    if not mapped_selected:
+                        st.error("Keine der ausgewählten Ticker konnten eindeutig auf Preisspalten gemappt werden.")
+                        return
 
-                # Falls prices MultiIndex-Spalten hat: flattenen / close auswählen
-                if isinstance(prices.columns, pd.MultiIndex):
-                    # Versuch: 'close' Ebene extrahieren, sonst flatten
-                    try:
-                        if 'close' in prices.columns.levels[1]:
-                            prices = prices.xs('close', axis=1, level=1)
-                        elif 'adjclose' in prices.columns.levels[1]:
-                            prices = prices.xs('adjclose', axis=1, level=1)
+                    # Sicherstellen, dass user_weights existiert (Default: equal)
+                    if not isinstance(user_weights, dict):
+                        user_weights = {s: 1.0 / len(selected) for s in selected}
+
+                    # Remappe user_weights auf price-column keys
+                    user_weights_mapped = {}
+                    for s, w in user_weights.items():
+                        pc = sel_to_price.get(s)
+                        if pc:
+                            user_weights_mapped[pc] = user_weights_mapped.get(pc, 0.0) + float(w)
                         else:
-                            prices.columns = ['_'.join(map(str, c)).strip() for c in prices.columns.values]
-                    except Exception:
-                        prices.columns = ['_'.join(map(str, c)).strip() for c in prices.columns.values]
+                            logger.debug("WARN: Kein Mapping für %s; wird ignoriert.", s)
 
-                price_cols = list(prices.columns)
-                sel_to_price = map_selected_to_pricecols(selected, price_cols, ticker_map_manual)
-                logger.debug("DEBUG: sel_to_price mapping: %s", sel_to_price)
+                    # Normalisieren
+                    total = sum(user_weights_mapped.values()) or 1.0
+                    user_weights_mapped = {k: v / total for k, v in user_weights_mapped.items()}
+                    logger.debug("DEBUG: user_weights_mapped keys: %s", list(user_weights_mapped.keys()))
 
-                # Filter nur die, die gemappt wurden
-                mapped_selected = [sel_to_price[s] for s in selected if sel_to_price.get(s)]
-                if not mapped_selected:
-                    st.error("Keine der ausgewählten Ticker konnten auf Preisspalten gemappt werden.")
+                    # Safety: prüfen, dass gewichtete Keys in price_cols sind
+                    missing = [k for k in user_weights_mapped.keys() if k not in price_cols]
+                    if missing:
+                        logger.error("mapped weight keys not in prices.columns: %s", missing)
+                        st.error("Interner Fehler: Gewichte konnten nicht auf Preisspalten abgebildet werden.")
+                        return
+
+                    # Backtest aufrufen mit den tatsächlich vorhandenen Spalten
+                    prices_for_bt = prices.loc[:, mapped_selected]
+                    res = run_backtest(
+                        prices_df=prices_for_bt,
+                        strategy=selected_strategy,
+                        initial_cash=initial_cash,
+                        monthly_dca=monthly_dca,
+                        weights=user_weights_mapped if user_weights_mapped else None
+                    )
+
+                    # Ergebnis anzeigen
+                    if res and isinstance(res, dict):
+                        st.line_chart(res["portfolio_value"])
+                        st.write(res["metrics"])
+                        st.dataframe(pd.DataFrame(res.get("trades", [])))
+                        csv = pd.DataFrame(res.get("trades", [])).to_csv(index=False)
+                        st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
+                    else:
+                        st.error("Backtest lieferte kein Ergebnis.")
+
+                    # Ende des neuen Backtest‑Flows: Funktion beenden, damit alter Code nicht weiterläuft
                     return
-
-                # --- Remappe user_weights (keys: selected) auf price-column keys ---
-                # user_weights muss vorher existieren (z. B. aus session_state oder Default-Gewichten)
-                user_weights_mapped = {}
-                for s, w in user_weights.items():
-                    pc = sel_to_price.get(s)
-                    if pc:
-                        user_weights_mapped[pc] = user_weights_mapped.get(pc, 0.0) + w
-                    else:
-                        logger.debug(f"WARN: Kein Mapping für {s}; wird ignoriert.")
-
-                # Normalisieren (sicherstellen)
-                total = sum(user_weights_mapped.values()) or 1.0
-                user_weights_mapped = {k: v/total for k, v in user_weights_mapped.items()}
-                logger.debug("DEBUG: user_weights_mapped keys: %s", list(user_weights_mapped.keys()))
-                # --- Ende Mapping Block ---
-
-                missing = [k for k in user_weights_mapped.keys() if k not in price_cols]
-                if missing:
-                    logger.debug("ERROR: mapped weight keys not in prices.columns:", missing)
-                    st.error("Interner Fehler: Gewichte konnten nicht auf Preisspalten abgebildet werden.")
-                    return
-
-                # Regimes
-                macro_df = load_and_validate_macro_data()
-                regimes = detect_historical_regimes(macro_df) if macro_df is not None else None
-                if regimes is not None and regimes.empty:
-                    logger.debug("WARN: regimes empty — skipping regime-dependent logic")
-
-                from risk_dashboard.utils.session_helpers import maybe_run_backtest
-                from risk_dashboard.utils.backtest_adapter import adapter_run_backtest
-
-                logger.debug("DEBUG: maybe_run_backtest from: %s", maybe_run_backtest.__module__)
-                logger.debug("DEBUG: final check - prices columns sample: %s", list(prices.columns)[:20])
-                logger.debug("DEBUG: final check - user_weights_mapped keys: %s", list(user_weights_mapped.keys()))
-
-
-                # 1) Erzeuge portfolio_or_tickers aus der aktuellen Auswahl und dem Mapping
-                # Verwende nur die ausgewählten Ticker und mappe sie auf price columns
-                mapped_selected = [sel_to_price[s] for s in selected if sel_to_price.get(s)]
-                # Falls du user_weights_mapped bereits berechnet hast, nutze dessen Keys
-                if mapped_selected:
-                    portfolio_or_tickers = mapped_selected  # einfache Liste der price-column keys
-                else:
-                    portfolio_or_tickers = []
-
-                # 2) Validierungen
-                if not portfolio_or_tickers:
-                    st.error("Keine der ausgewählten Ticker konnten auf Preisspalten gemappt werden.")
-                    res = {}
-                elif prices is None or (hasattr(prices, "empty") and prices.empty):
-                    st.error("Preisdaten fehlen.")
-                    res = {}
-                elif regimes is None or (hasattr(regimes, "empty") and regimes.empty):
-                    st.error("Regime‑Daten fehlen.")
-                    res = {}
-                else:
-                    # Optional: prüfe Zeitüberlappung zwischen prices.index und regimes.index
-                    try:
-                        if hasattr(prices, "index") and hasattr(regimes, "index"):
-                            overlap = prices.index.intersection(regimes.index)
-                            if overlap.empty:
-                                st.warning("Keine Zeitüberlappung zwischen Preisdaten und Regime‑Daten. Prüfe Daten.")
-                    except Exception:
-                        logger.debug("WARN: konnte Index‑Overlap nicht prüfen")
-
-                    from risk_dashboard.ui.helpers import safe_backtest_call, render_backtest
-
-                    # --- Vorbereitung: sichere Defaults und Variablen ---
-                    # Erwartet: Du hast irgendwo oben Widgets wie:
-                    # selected_tickers_input = st.text_input("Tickers (Komma getrennt)", "NVDA,EXS1.DE,AAPL")
-                    # start_date_input = st.date_input("Startdatum", value=None)   # optional
-                    # end_date_input = st.date_input("Enddatum", value=None)       # optional
-                    # user_weights_mapped = {...}  # optional, sonst None
-                    # prices_subset = <DataFrame mit Preisdaten>  # muss vorher geladen werden
-                    # regimes = <Series/DataFrame>  # optional
-
-                    # sichere Initialisierung
-                    run_disabled = False
-
-                    # parse selected tickers (falls du ein Textfeld benutzt)
-                    selected_tickers_input = globals().get("selected_tickers_input", None)
-                    if selected_tickers_input:
-                        available = [t.strip() for t in selected_tickers_input.split(",") if t.strip()]
-                    else:
-                        # falls 'available' bereits gesetzt ist (z. B. aus einer MultiSelect), benutze es
-                        available = globals().get("available", [])
-
-                    # Start / End sicher erzeugen (None bleibt None)
-                    start_date_input = globals().get("start_date_input", None)
-                    end_date_input = globals().get("end_date_input", None)
-                    start_arg = start_date_input.isoformat() if start_date_input is not None else None
-                    end_arg = end_date_input.isoformat() if end_date_input is not None else None
-
-                    # Weights mapping: falls vorhanden, sonst None
-                    user_weights_mapped = globals().get("user_weights_mapped", None)
-
-                    # prices und regimes: sichere Referenzen
-                    prices = globals().get("prices", None)   # oder 'prices_df' je nach Datei
-                    regimes_val = globals().get("regimes", None)
-
-                    # --- Filter available gegen prices.columns, um KeyError zu vermeiden ---
-                    if prices is not None:
-                        available = [t for t in available if t in prices.columns]
-
-                    if not available:
-                        st.warning("Keine der ausgewählten Ticker in den Preisdaten vorhanden.")
-                        run_disabled = True
-                    else:
-                        # --- Sicherer Aufruf des Adapters via safe_backtest_call ---
-                        result = safe_backtest_call(
-                            adapter_run_backtest,
-                            available,                                # positional: portfolio_or_tickers (Liste ist ok)
-                            prices=prices[available] if prices is not None else None,
-                            weights=user_weights_mapped,              # kann None sein
-                            regimes=regimes_val,                      # optional
-                            start=start_arg,
-                            end=end_arg,
-                            rebalance="monthly",                      # oder rebalance_freq="M" je nach Adapter
-                            initial_capital=1_000_000,
-                            flag_key="backtest_call"
-                        ) or {}
-
-                        # --- Ergebnis prüfen und anzeigen ---
-                        if not result.get("ok"):
-                            st.warning(result.get("message", "Backtest fehlgeschlagen."))
-                            run_disabled = True
-                        else:
-                            run_disabled = False
-                            bt = result["result"]
-                            removed = bt.get("removed_tickers", [])
-                            if removed:
-                                st.warning("Entfernte Ticker: " + ", ".join(removed))
-                            render_backtest(bt)
-
-                    # Run-Button
-                    if st.button("Berechnen", disabled=run_disabled):
-                        # optional: setze ein SessionState-Flag oder trigger einen erneuten Aufruf
-                        st.session_state["backtest_requested"] = True
-
-
-                # --- Robust: Ergebnisse anzeigen, session_state updaten und Rerun-Fallback ---
-                pv = res.get("portfolio_value") if isinstance(res, dict) else None
-                metrics = res.get("metrics", {}) if isinstance(res, dict) else {}
-                wdf = res.get("weights_over_time") if isinstance(res, dict) else None
-
-                # Debug (Terminal)
-                logger.debug("DEBUG: res type: %s", type(res))
-                logger.debug("DEBUG: pv type/shape: %s  %s", type(pv), getattr(pv, "shape", None))
-                logger.debug("DEBUG: wdf type/shape: %s %s ", type(wdf), getattr(wdf, "shape", None))
-
-                # Wenn wdf vorhanden: Tabelle zeigen und session_state updaten (Slider erwarten 0-100)
-                if wdf is not None and hasattr(wdf, "empty") and not wdf.empty:
-                    st.subheader("Gewichte über Zeit")
-                    st.dataframe(wdf.fillna(0).round(4))
-                    last_weights = wdf.iloc[-1].to_dict()
-                    s = sum(last_weights.values()) or 1.0
-                    last_weights = {k: (v / s) * 100 for k, v in last_weights.items()}
-                    st.session_state["manual_weights"] = last_weights
-                else:
-                    st.write("Keine Rebalancing‑Schnappschüsse vorhanden.")
-
-                # Chart und Kennzahlen
-                if pv is None or (hasattr(pv, "empty") and pv.empty):
-                    st.error("Backtest lieferte keine Portfolio‑Zeitreihe.")
-                else:
-                    st.subheader("Kumulative Performance")
-                    try:
-                        #st.line_chart((pv / pv.iloc[0]).fillna(method="ffill"))
-                        st.line_chart((pv / pv.iloc[0]).ffill())
-                    except Exception as e:
-                        logger.debug("WARN: line_chart failed:", e)
-                        #st.write((pv / pv.iloc[0]).fillna(method="ffill"))
-                        st.write((pv / pv.iloc[0]).ffill())
-
-                st.subheader("Kennzahlen")
-                st.json(metrics)
-                # Ende Block

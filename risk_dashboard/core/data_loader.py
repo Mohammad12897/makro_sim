@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 from risk_dashboard.core.safety import DUMP_MARKERS  # Liste der Marker, zentral verwaltet
 
 from risk_dashboard.data_utils import flatten_yf_dataframe
+from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR 
 
 # Externe Helfer (sollten in scripts/yf_helper.py existieren)
 from risk_dashboard.core.yf_helper import (
@@ -48,8 +49,6 @@ from risk_dashboard.core.yf_helper import (
 from risk_dashboard.core.ticker_cache import validate_ticker_with_cache
 
 
-DEFAULT_START = "2016-01-01"
-DEFAULT_END = date.today().isoformat()
 YF_DOWNLOAD_TIMEOUT = 30  # Sekunden, anpassen
 CHUNK_SIZE = 10  # Anzahl Ticker pro Request, anpassen
 
@@ -225,8 +224,8 @@ def fetch_prices_safe(
     - return_removed: wenn True, zusätzlich Liste der Ticker ohne Daten zurückgeben.
     """
     # sichere Defaults
-    start = start or DEFAULT_START
-    end = end or DEFAULT_END
+    start = start or DEFAULT_START_STR
+    end = end or DEFAULT_END_STR
 
     # 1) robustes Parsen der Eingabe (parse_tickers muss vorhanden sein)
     tickers_list = parse_tickers(tickers)
@@ -356,8 +355,8 @@ def fetch_prices_safe_old(
     - return_removed: wenn True, zusätzlich Liste der Ticker ohne Daten zurückgeben.
     """
     # setze Defaults wenn None
-    start = start or DEFAULT_START
-    end = end or DEFAULT_END
+    start = start or DEFAULT_START_STR
+    end = end or DEFAULT_END_STR
 
     # 1) robustes Parsen der Eingabe
     tickers_list = parse_tickers(tickers)

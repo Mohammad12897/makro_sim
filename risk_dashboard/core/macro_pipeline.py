@@ -343,6 +343,7 @@ def run_backtest(tickers=None, prices_df=None, start=None, end=None,
     cash = float(initial_cash)
     positions = {t: 0.0 for t in tickers}
     portfolio_values = []
+    trades = []   # <-- hier initialisieren
 
     # 4) --- NEU: Gewichte einmalig setzen und normalisieren (vor initialer Allokation) ---
     if weights is None:
@@ -371,7 +372,9 @@ def run_backtest(tickers=None, prices_df=None, start=None, end=None,
         for t, w in weights.items():
             price = prices_df.at[first_date, t] if t in prices_df.columns else None
             if price is not None and not pd.isna(price) and price > 0:
-                positions[t] = (cash * w) / price
+                qty = (cash * w) / price
+                positions[t] = qty
+                trades.append({"date": first_date, "ticker": t, "side": "buy", "qty": qty, "price": price, "cash_change": -qty*price})
         cash = 0.0
 
     # 4) Gewichte: (entferne die komplette Duplikat‑Logik hier)
@@ -384,7 +387,9 @@ def run_backtest(tickers=None, prices_df=None, start=None, end=None,
             for t, value in alloc.items():
                 price = prices_df.at[date, t] if t in prices_df.columns else None
                 if price is not None and not pd.isna(price) and price > 0:
-                    positions[t] += value / price
+                    qty = value / price
+                    positions[t] += qty
+                    trades.append({"date": date, "ticker": t, "side": "buy", "qty": qty, "price": price, "cash_change": -qty*price})
             cash -= monthly_dca
 
         pv = 0.0
@@ -421,7 +426,15 @@ def run_backtest(tickers=None, prices_df=None, start=None, end=None,
         except Exception:
             pass
 
-    return {"portfolio_value": pv_series, "metrics": metrics, "weights_over_time": None, "removed_tickers": removed_tickers}
+    return {
+        "portfolio_value": pv_series,
+        "metrics": metrics,
+        "weights_over_time": None,
+        "removed_tickers": removed_tickers,
+        "trades": trades
+    }
+
+
 
 # ---------------------------------------------------------
 # 6. Leistungsanalyse
