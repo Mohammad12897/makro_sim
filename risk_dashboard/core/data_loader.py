@@ -14,7 +14,7 @@ Erwartete externe Hilfsfunktionen (aus scripts/yf_helper.py):
 Diese müssen in deinem Projekt vorhanden sein.
 """
 
-from typing import List, Tuple, Optional , Union
+from typing import List, Tuple, Optional , Union, Dict
 from pathlib import Path
 import logging
 from datetime import date
@@ -29,6 +29,11 @@ import contextlib
 import io
 import streamlit as st
 import re
+
+#from datetime import datetime
+
+from risk_dashboard.core.etf_tools import download_prices
+from risk_dashboard.config import DEFAULT_START_STR
 
 logger = logging.getLogger(__name__)
 
@@ -162,26 +167,6 @@ def _chunked(iterable: List[str], n: int):
     for i in range(0, len(iterable), n):
         yield iterable[i:i + n]
 
-def _parse_tickers_input_old(raw):
-    """
-    Akzeptiert: List[str] oder String mit Komma/Semikolon/Zeilenumbruch getrennt.
-    Liefert: Liste von Uppercase-Tickern ohne Duplikate.
-    """
-    import re
-    if raw is None:
-        return []
-    if isinstance(raw, list):
-        parts = [str(t).strip() for t in raw if t and str(t).strip()]
-    else:
-        parts = [p.strip() for p in re.split(r"[,\n;]+", str(raw)) if p.strip()]
-    seen = set()
-    out = []
-    for p in parts:
-        p_up = p.upper()
-        if p_up not in seen:
-            seen.add(p_up)
-            out.append(p_up)
-    return out
 
 # --- Kontextmanager: stdout/stderr temporär stummschalten ---
 @contextlib.contextmanager
@@ -339,117 +324,6 @@ def fetch_prices_safe(
     return df
 
 
-def fetch_prices_safe_old(
-    tickers: Union[List[str], str],
-    start: Optional[str] = None,
-    end: Optional[str] = None,
-    interval: str = "1d",
-    auto_adjust: bool = False,
-    threads: bool = True,
-    retries: int = 2,
-    return_removed: bool = False,
-) -> Union[pd.DataFrame, Tuple[pd.DataFrame, List[str]]]:
-    """
-    Lade Preisdaten für tickers; gibt flaches DataFrame zurück.
-    - tickers: Liste oder String (Komma/Zeilenumbruch/; getrennt).
-    - return_removed: wenn True, zusätzlich Liste der Ticker ohne Daten zurückgeben.
-    """
-    # setze Defaults wenn None
-    start = start or DEFAULT_START_STR
-    end = end or DEFAULT_END_STR
-
-    # 1) robustes Parsen der Eingabe
-    tickers_list = parse_tickers(tickers)
-    if not tickers_list:
-        if return_removed:
-            return pd.DataFrame(), []
-        return pd.DataFrame()
-
-    # prepare kwargs for yf.download
-    yf_kwargs = dict(
-        tickers=tickers_list,
-        start=start,
-        end=end,
-        interval=interval,
-        group_by="ticker",
-        auto_adjust=auto_adjust,
-        threads=threads,
-        progress=False,
-    )
-
-    # 2) Download mit Retries
-    raw = None
-    last_exc = None
-    for attempt in range(retries + 1):
-        try:
-            raw = yf.download(
-                tickers_list,
-                start=start,
-                end=end,
-                interval=interval,
-                group_by="ticker",
-                auto_adjust=auto_adjust,
-                threads=threads,
-                progress=False,
-            )
-            break
-        except Exception as e:
-            last_exc = e
-            logger.exception("yfinance download failed (attempt %s) for %s: %s", attempt, tickers_list, e)
-            if attempt < retries:
-                import time
-                time.sleep(2 ** attempt)
-
-    if raw is None:
-        logger.warning("fetch_prices_safe: all attempts failed for %s", tickers_list)
-        if return_removed:
-            return pd.DataFrame(), tickers_list
-        return pd.DataFrame()
-
-    # 3) Flatten / Fallbacks
-    try:
-        df = flatten_yf_dataframe(raw)
-    except Exception:
-        try:
-            df = pd.DataFrame(raw)
-        except Exception:
-            logger.exception("Failed to flatten yfinance output for %s", tickers_list)
-            if return_removed:
-                return pd.DataFrame(), tickers_list
-            return pd.DataFrame()
-
-    # 4) Index in Datetime umwandeln
-    try:
-        df.index = pd.to_datetime(df.index)
-    except Exception:
-        pass
-
-    # 5) Bestimme Ticker ohne Daten
-    removed: List[str] = []
-    if isinstance(df.columns, pd.MultiIndex):
-        top_level = list(dict.fromkeys([c[0] for c in df.columns]))
-        for t in tickers_list:
-            if t not in top_level:
-                removed.append(t)
-    else:
-        for t in tickers_list:
-            if t not in df.columns:
-                removed.append(t)
-            else:
-                try:
-                    if df[t].dropna().empty:
-                        removed.append(t)
-                except Exception:
-                    removed.append(t)
-
-    if removed:
-        logger.warning("Removed tickers with no data: %s", removed)
-        df = df.drop(columns=removed, errors="ignore")
-
-    if return_removed:
-        return df, removed
-    return df
-
 def load_raw_prices_for_universe(universe: List[str],
                                  period: str = "max",
                                  auto_adjust: bool = False,
@@ -595,3 +469,49 @@ def load_raw_prices_for_universe(universe: List[str],
     logger.info("Final ungültige Ticker: %s", invalid_tickers)
 
     return combined, invalid_tickers
+
+
+def load_price_data(etf_universe, *args, **kwargs) -> pd.DataFrame:
+    """
+    Accepts either:
+      - a dict mapping id -> {"ticker": "...", ...}
+      - a list of ticker strings
+    Returns a DataFrame of price series with tickers as columns.
+    This function normalizes tickers, maps common index aliases to Yahoo tickers,
+    and delegates the actual download to download_prices.
+    """
+    # Accept list input and convert to expected dict format
+    if isinstance(etf_universe, list):
+        etf_universe = {t: {"ticker": t} for t in etf_universe}
+
+    # Defensive: ensure values have 'ticker'
+    tickers: List[str] = []
+    for v in (etf_universe.values() if isinstance(etf_universe, dict) else []):
+        if isinstance(v, dict) and "ticker" in v:
+            tickers.append(v["ticker"])
+
+    # Fallback: if no tickers, try to interpret keys as tickers
+    if not tickers and isinstance(etf_universe, dict):
+        tickers = list(etf_universe.keys())
+
+    # final normalization
+    tickers = [str(t).strip().upper() for t in tickers if t]
+
+    # Map common index aliases to Yahoo tickers BEFORE any fetch/cache
+    INDEX_MAP = {
+        "DAX": "^GDAXI",
+        "SP500": "^SPX",
+        "NASDAQ": "^NDX",
+        "EUROSTOXX50": "^STOXX50E",
+    }
+    tickers = [INDEX_MAP.get(t, t) for t in tickers]
+
+    if not tickers:
+        logger.warning("load_price_data: no tickers to download")
+        return pd.DataFrame()
+
+    # Delegate to download_prices (which should call safe_fetch internally)
+    start = kwargs.get("start", DEFAULT_START_STR)
+    end = kwargs.get("end", None)
+    prices = download_prices(tickers, start=start, end=end)
+    return prices
