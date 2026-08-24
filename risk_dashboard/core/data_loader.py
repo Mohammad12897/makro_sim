@@ -30,10 +30,9 @@ import io
 import streamlit as st
 import re
 
-#from datetime import datetime
+from datetime import datetime
 
 from risk_dashboard.core.etf_tools import download_prices
-from risk_dashboard.config import DEFAULT_START_STR
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ logger = logging.getLogger(__name__)
 from risk_dashboard.core.safety import DUMP_MARKERS  # Liste der Marker, zentral verwaltet
 
 from risk_dashboard.data_utils import flatten_yf_dataframe
-from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR 
+from risk_dashboard.config import DEFAULT_START_STR
 
 # Externe Helfer (sollten in scripts/yf_helper.py existieren)
 from risk_dashboard.core.yf_helper import (
@@ -210,7 +209,7 @@ def fetch_prices_safe(
     """
     # sichere Defaults
     start = start or DEFAULT_START_STR
-    end = end or DEFAULT_END_STR
+    end = end or datetime.today().strftime("%Y-%m-%d")
 
     # 1) robustes Parsen der Eingabe (parse_tickers muss vorhanden sein)
     tickers_list = parse_tickers(tickers)
