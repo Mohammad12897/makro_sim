@@ -27,7 +27,7 @@ from risk_dashboard.core.asset_packages import (
 
 from functools import lru_cache
 
-from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
+from risk_dashboard.data_utils import flatten_yf_dataframe, safe_fetch
 
 
 @lru_cache(maxsize=32)
@@ -94,9 +94,9 @@ def load_etf_prices(tickers: List[str], start: Optional[str]=None, end: Optional
 
     # zentrale Funktion verwenden
     try:
-        data = fetch_prices_from_yf(tickers, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
+        data = safe_fetch(tickers, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
     except Exception as e:
-        logger.exception("fetch_prices_from_yf failed: %s", e)
+        logger.exception("safe_fetch failed: %s", e)
         st.error("Fehler beim Laden der ETF‑Preise.")
         return pd.DataFrame()
 

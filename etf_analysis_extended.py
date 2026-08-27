@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
 
-from risk_dashboard.data_utils import fetch_prices_from_yf
+from risk_dashboard.data_utils import safe_fetch
+from risk_dashboard.config import DEFAULT_START_STR
 
 # robustes Styling: versuche seaborn, sonst fallback auf matplotlib default
 try:
@@ -22,7 +23,7 @@ except Exception:
 
 # === Konfiguration ===
 ETFS = ["SPY","IEFA","EEM","AGG","VNQ"]   # passe hier deine Liste an
-START = "2016-01-01"
+START = DEFAULT_START_STR
 ANN_FACTOR = 252
 REBALANCE_FREQ = "YE"  # 'YE' = yearly; alternatives: 'Q' quarterly, 'M' monthly
 
@@ -54,7 +55,7 @@ def compute_total_return(prices, dividends):
 print("Lade Daten...")
 
 # fetch_prices_quiet liefert flaches DataFrame mit Spalten = TICKER (Uppercase)
-data = fetch_prices_from_yf(ETFS, start=START, end=None, auto_adjust=True, threads=False)
+data = safe_fetch(ETFS, start=START, end=None, auto_adjust=True, threads=False)
 
 # Falls du explizit Adj Close erwartest, prüfe und wähle:
 if "ADJ CLOSE" in (c.upper() for c in data.columns):
@@ -69,7 +70,7 @@ else:
 # Sicherstellen: DataFrame mit Spalten = ETFS
 prices = prices[ETFS].dropna(how="all")
 
-# tÃƒÆ’Ã‚Â¤gliche Renditen
+# Renditen
 rets = prices.pct_change().dropna()
 
 # === Kennzahlen pro ETF ===

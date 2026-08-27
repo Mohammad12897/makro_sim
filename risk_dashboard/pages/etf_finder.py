@@ -8,6 +8,7 @@ import plotly.express as px
 from datetime import datetime
 
 from ui.profiles_ui import detect_historical_regimes, load_and_validate_macro_data
+from risk_dashboard.config import DEFAULT_START_STR
 
 logger = logging.getLogger("risk_dashboard.pages.etf_finder")
 # Lokale Hilfsfunktionen
@@ -84,7 +85,7 @@ st.title("ETF Finder")
 
 with st.sidebar:
     st.header("Einstellungen")
-    start_date = st.date_input("Startdatum", value=pd.to_datetime("2010-01-01"))
+    start_date = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR))
     ter_threshold = st.slider("Max TER (%)", 0.0, 2.0, 0.5, 0.01)
     min_aum_mio = st.number_input("Min AUM (Mio)", value=50)
     score_weights = {
@@ -139,7 +140,7 @@ if st.button("Screen & Rank"):
         st.warning("Bitte mindestens einen Ticker angeben.")
     else:
         with st.spinner("Preise laden..."):
-            price_df = load_price_data_cached(filtered_tickers, start="2010-01-01")
+            price_df = load_price_data_cached(filtered_tickers, start=DEFAULT_START_STR)
  
         if price_df is None or price_df.empty:
             st.error("Keine Preisdaten verfügbar.")
@@ -261,7 +262,7 @@ weights = st.session_state.get("etf_finder_weights", {})
 # Stelle sicher, dass price_df definiert ist; falls nicht, lade es defensiv
 if 'price_df' not in globals() or price_df is None:
     try:
-        price_df = load_price_data_cached(filtered_tickers, start="2010-01-01")
+        price_df = load_price_data_cached(filtered_tickers, start=DEFAULT_START_STR)
     except Exception as e:
         logger.warning("load_price_data_cached failed while ensuring price_df: %s", e)
         st.error("Preisdaten konnten nicht geladen werden. Bitte überprüfe die Tickerliste.")

@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 # sonst z.B.:
 from risk_dashboard.core.utils import get_latest_before, ensure_date_column, ensure_date_series, normalize_price_df
 
-from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
+from risk_dashboard.data_utils import flatten_yf_dataframe, safe_fetch
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -184,12 +184,12 @@ def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=
     try:
         # zentrale Funktion: wenn period angegeben, kann start/end None sein
         if start is None and end is None and period is not None:
-            df = fetch_prices_from_yf(ticker, start=None, end=None, interval="1d", auto_adjust=True, threads=False)
+            df = safe_fetch(ticker, start=None, end=None, interval="1d", auto_adjust=True, threads=False)
         else:
-            df = fetch_prices_from_yf(ticker, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
+            df = safe_fetch(ticker, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
 
         if df is None or df.empty:
-            logger.debug("fetch_prices_from_yf returned empty for %s", ticker)
+            logger.debug("safe_fetch returned empty for %s", ticker)
             return None
 
         # Falls MultiIndex defensiv flattenen

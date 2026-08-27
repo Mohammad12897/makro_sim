@@ -8,16 +8,18 @@ import numpy as np
 
 
 # falls du flatten direkt brauchst:
-from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
+from risk_dashboard.data_utils import flatten_yf_dataframe, safe_fetch
+from risk_dashboard.config import DEFAULT_START_STR
 
 
 logger = logging.getLogger(__name__)
 
-# Placeholder ETF_CANDIDATES import (user can fill risk_dashboard/config/etf_candidates.py)
+# Lade ETF_CANDIDATES zentral aus config; falls nicht vorhanden, Fallback auf leeres Dict
 try:
-    from risk_dashboard.config.etf_candidates import ETF_CANDIDATES
+    from risk_dashboard.config import ETF_CANDIDATES  # zentraler Ort
 except Exception:
-    ETF_CANDIDATES = {}
+    ETF_CANDIDATES: Dict[str, Any] = {}
+    logger.debug("No ETF_CANDIDATES found in config; using empty fallback.")
 
 def get_etf_candidates_for_index(index_name: str) -> pd.DataFrame:
     """Return candidates DataFrame with standardized columns."""
@@ -179,29 +181,57 @@ def compute_etf_score_components(row: Dict[str, Any]) -> Dict[str, float]:
 _price_cache = {}
 
 
-def download_prices(tickers: List[str], start: str = "2018-01-01", end: str = None) -> pd.DataFrame:
-    """Download Close prices for tickers using centralized fetch_prices_from_yf."""
+def download_prices(
+    tickers: List[str],
+    start: str = DEFAULT_START_STR,
+    end: str = None
+) -> pd.DataFrame:
+    """Download Close prices for tickers using centralized safe_fetch."""
+    # normalize start/end
+    start = start or DEFAULT_START_STR
     end = end or datetime.today().strftime("%Y-%m-%d")
-    key = (tuple(sorted([t.upper() for t in tickers])), start, end)
+
+    # normalize and map index aliases
+    INDEX_MAP = {
+        "DAX": "^GDAXI",
+        "SP500": "^SPX",
+        "NASDAQ": "^NDX",
+        "EUROSTOXX50": "^STOXX50E",
+    }
+    tickers = [t.strip() for t in tickers if t and t.strip()]
+    tickers = [INDEX_MAP.get(t.upper(), t.upper()) for t in tickers]
+
+    # cache key should use mapped tickers
+    key = (tuple(sorted(tickers)), start, end)
     if key in _price_cache:
         return _price_cache[key]
 
-    # Verwende zentrale Funktion; sie gibt flaches DataFrame mit Uppercase-Spalten zurück
-    try:
-        df = fetch_prices_from_yf(tickers, start=start, end=end, interval="1d")
-    except Exception as e:
-        logger.exception("fetch_prices_from_yf failed: %s", e)
+    if not tickers:
+        logger.warning("download_prices: empty tickers list; nothing to download")
         return pd.DataFrame()
 
-    # Falls fetch_prices_from_yf aus irgendeinem Grund MultiIndex liefert, flattenen
+    try:
+        df = safe_fetch(
+            tickers,
+            start=start,
+            end=end,
+            interval="1d",
+            auto_adjust=True,
+            threads=False,
+            retries=3,
+            backoff_factor=1.0
+        )
+    except Exception as e:
+        logger.exception("safe_fetch failed: %s", e)
+        return pd.DataFrame()
+
+    # flatten MultiIndex if necessary
     if isinstance(df.columns, pd.MultiIndex):
         try:
             df = flatten_yf_dataframe(df)
         except Exception:
-            # fallback: leave as-is
             pass
 
-    # Säubere Spaltennamen
     df.columns = [str(c).strip() for c in df.columns]
     _price_cache[key] = df
     return df

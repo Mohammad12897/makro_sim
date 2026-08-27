@@ -81,6 +81,8 @@ logger = logging.getLogger(__name__)
 # Safety check before any heavy imports (optional)
 AUTO_FIX = os.getenv("AUTO_FIX_PASTE_BLOCKS", "false").lower() in ("1", "true", "yes")
 
+from risk_dashboard.config import DEFAULT_START_STR
+
 # Import minimal safety module if vorhanden
 try:
     from risk_dashboard.core.safety import DUMP_MARKERS
@@ -1392,7 +1394,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
 
     # Use top-level get_investment_package and generate_investment_package
     try:
-        prices_df, missing_total_prices, mapping = load_etf_universe_prices(start="2018-01-01")
+        prices_df, missing_total_prices, mapping = load_etf_universe_prices(start=DEFAULT_START_STR)
     except Exception:
         logging.getLogger(__name__).exception("load_etf_universe_prices schlug fehl")
         prices_df, missing_total_prices, mapping = pd.DataFrame(), [], {}

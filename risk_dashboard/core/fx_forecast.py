@@ -14,7 +14,7 @@ import requests
 from risk_dashboard.core.yf_helper import _safe_read_csv_text
 
 
-from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
+from risk_dashboard.data_utils import flatten_yf_dataframe, safe_fetch
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +38,14 @@ def load_fx_history(pair: str = "EURUSD=X", period: str = "10y") -> pd.DataFrame
     """
     # 1) Versuche zentrale Funktion
     try:
-        df = fetch_prices_from_yf(pair, start=None, end=None, interval="1d")
+        df = safe_fetch(pair, start=None, end=None, interval="1d")
     except Exception as e:
-        logger.warning("fetch_prices_from_yf error for %s: %s", pair, e)
+        logger.warning("safe_fetch error for %s: %s", pair, e)
         df = pd.DataFrame()
 
     # 2) Fallbacks falls leer
     if df is None or df.empty:
-        logger.info("fetch_prices_from_yf returned empty for %s, trying fallbacks...", pair)
+        logger.info("safe_fetch returned empty for %s, trying fallbacks...", pair)
         # (Behalte hier deine bestehenden pandas_datareader / HTTP CSV Fallbacks unverändert)
         # ... (kopiere den bisherigen Fallback‑Block aus deiner Datei)
         # Wenn alle Fallbacks fehlschlagen:

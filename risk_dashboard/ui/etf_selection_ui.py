@@ -10,7 +10,7 @@ from risk_dashboard.ui.profiles_ui import detect_historical_regimes
 from risk_dashboard.utils.persistence import load_user_tickers, save_user_tickers
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.data_loader import parse_tickers
-from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR 
+from risk_dashboard.config import DEFAULT_START_STR
 import logging
     
 logger = logging.getLogger(__name__)
@@ -70,7 +70,12 @@ def render_etf_selection_ui():
     with st.sidebar:
         st.subheader("Portfolio Eingabe")
         # Eingabefeld
-        new_ticker = st.text_input("Ticker hinzufügen", value="", placeholder="z.B. AAPL oder VWRL")
+        new_ticker = st.text_input(
+            "Ticker hinzufügen",
+            value="",
+            placeholder="z.B. AAPL oder VWRL",
+            key="ticker_add_input"
+        )
 
         # Normalisierung: akzeptiere Liste, Dict oder String
         # parsed_tickers ist jetzt immer eine Liste
@@ -89,13 +94,15 @@ def render_etf_selection_ui():
                     st.warning(f"{t} ist bereits in der Liste.")
                 else:
                     # Validierung: kurze Preisanfrage mit einer Liste
-                    test_prices = download_prices([t], start=DEFAULT_START_STR, end=DEFAULT_END_STR)
+                    test_prices = download_prices([t], start=DEFAULT_START_STR, end=None)
                     if test_prices is None or test_prices.empty:
                         st.error(f"Ticker {t} ist ungültig oder liefert keine Daten.")
                     else:
                         st.session_state.user_tickers.append(t)
                         save_user_tickers(st.session_state.user_tickers)
                         st.success(f"{t} hinzugefügt.")
+                        # lokal: dieser einzelne Test war erfolgreich
+                        single_ticker_ok = True
 
         # Anzeige und Entfernen
         if st.session_state.user_tickers:
@@ -252,9 +259,53 @@ def render_etf_selection_ui():
     start = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR))
     end = st.date_input("Enddatum", value=pd.Timestamp.today())
 
-    selected_strategy = st.selectbox("Strategie", ["buy_and_hold", "equal_weight", "momentum", "monthly_rebalance"])
-    initial_cash = st.number_input("Startkapital", min_value=0.0, value=10000.0, step=100.0, format="%.2f")
-    monthly_dca = st.number_input("Monatliches DCA (0 = aus)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
+    # statt: if prices_loaded: show controls else: hide controls
+    # mache:
+    # einfache Definition: geladen, wenn DataFrame nicht leer
+   # oben in der Datei (Imports)
+    from risk_dashboard.core.etl import load_etf_universe_prices
+    from risk_dashboard.data.etf_universes import ETF_UNIVERSES
+    
+
+    # irgendwo im UI-Flow, bevor Widgets gerendert werden
+    prices_df, missing_total, mapping = load_etf_universe_prices(start=DEFAULT_START_STR)
+
+    # Preise geladen wenn DataFrame mindestens eine Spalte hat und nicht leer ist
+    prices_loaded = (not prices_df.empty) and (prices_df.shape[1] >= 1)
+    # strengere Variante: nur wenn keine config_keys fehlen
+    # prices_loaded = (not prices_df.empty) and (len(missing_total) == 0)
+
+    controls_disabled = not prices_loaded
+
+    # Widgets: immer anzeigen, aber ggf. deaktiviert
+    STRATEGIES = ["buy_and_hold", "equal_weight", "momentum", "monthly_rebalance"]
+    default_idx = 0
+
+    selected_strategy = st.selectbox(
+        "Strategie",
+        options=STRATEGIES,
+        index=default_idx,
+        disabled=controls_disabled
+    )
+    initial_cash = st.number_input(
+        "Startkapital",
+        min_value=0.0,
+        value=10000.0,
+        step=100.0,
+        format="%.2f",
+        disabled=controls_disabled
+    )
+    monthly_dca = st.number_input(
+        "Monatliches DCA (0 = aus)",
+        min_value=0.0,
+        value=0.0,
+        step=10.0,
+        format="%.2f",
+        disabled=controls_disabled
+    )
+
+    if not prices_loaded:
+        st.warning("Preisdaten konnten nicht geladen werden. Controls sind deaktiviert.")
 
     # optional: user_weights (z. B. aus session_state oder ein Widget)
     user_weights = st.session_state.get("manual_weights", {s: 1.0/len(selected) for s in selected})

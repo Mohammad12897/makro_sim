@@ -5,20 +5,20 @@ from typing import List
 import logging
 
 
-from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
+from risk_dashboard.data_utils import flatten_yf_dataframe, safe_fetch
 
 logger = logging.getLogger(__name__)
 
 
 def download_fx_history(tickers, period="10y") -> pd.DataFrame:
     """
-    Lade FX History für tickers über zentrale fetch_prices_from_yf.
+    Lade FX History für tickers über zentrale safe_fetch.
     Liefert DataFrame mit DatetimeIndex und Spalten pro Ticker.
     """
     try:
-        df = fetch_prices_from_yf(tickers, start=None, end=None, interval="1d")
+        df = safe_fetch(tickers, start=None, end=None, interval="1d")
     except Exception as e:
-        logger.exception("fetch_prices_from_yf failed: %s", e)
+        logger.exception("safe_fetch failed: %s", e)
         return pd.DataFrame()
 
     if df is None or df.empty:

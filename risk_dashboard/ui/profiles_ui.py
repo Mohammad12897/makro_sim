@@ -881,8 +881,17 @@ def load_price_data(etf_universe, *args, **kwargs):
     # final normalization
     tickers = [str(t).strip().upper() for t in tickers if t]
 
+    # Map common index aliases to Yahoo tickers BEFORE any fetch/cache
+    INDEX_MAP = {
+        "DAX": "^GDAXI",
+        "SP500": "^SPX",
+        "NASDAQ": "^NDX",
+        "EUROSTOXX50": "^STOXX50E",
+    }
+    tickers = [INDEX_MAP.get(t, t) for t in tickers]
+
     # original behavior: download_prices / download_prices wrapper
-    prices = download_prices(tickers, start="2010-01-01")
+    prices = download_prices(tickers, start=DEFAULT_START_STR)
     return prices
 
 
@@ -1107,8 +1116,19 @@ def profile_form_ui() -> None:
     macro_regime = detect_regime(macro_df)
     allowed = select_etfs_for_regime(etf_universe, macro_regime)
 
-    # --- Portfolio bauen (stelle sicher, dass build_regime_portfolio prices verwendet) ---
-    portfolio = build_regime_portfolio(macro_regime, allowed, prices=price_data, method="HRP")
+    # in profiles_ui.py, direkt vor build_regime_portfolio(...)
+    if price_data is None or price_data.empty:
+        logger.warning("profile_form_ui: price_data fehlt oder ist leer; Abbruch build_regime_portfolio")
+        st.warning("Preisdaten konnten nicht geladen werden. Bitte überprüfe die Verbindung oder wähle andere ETFs.")
+        return  # oder: continue mit alternativer UI-Route
+    try:
+        # --- Portfolio bauen (stelle sicher, dass build_regime_portfolio prices verwendet) ---
+        portfolio = build_regime_portfolio(macro_regime, allowed, prices=price_data, method="HRP")
+    except ValueError as e:
+        logger.exception("build_regime_portfolio fehlgeschlagen: %s", e)
+        st.error("Portfolio konnte nicht erstellt werden: Preisdaten fehlen oder sind unvollständig.")
+        return
+
     st.session_state["selected_portfolio"] = portfolio
 
     # --- Session reads (konsistent aus session_state) ---

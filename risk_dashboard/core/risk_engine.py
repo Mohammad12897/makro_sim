@@ -6,6 +6,7 @@ from scipy.stats import zscore
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+from risk_dashboard.config import DEFAULT_START_STR
 
 # ---------------------------------------------------------
 # 1) Normalisierung
@@ -133,7 +134,7 @@ def compute_raw_risk_score():
     Ersetze die Dummy‑Logik durch deine echte Feature‑Extraktion / PCA / Modell.
     """
     # Beispiel: Erzeuge Dummy‑Zeitreihe (ersetzen durch echte Daten)
-    dates = pd.date_range("2020-01-01", periods=24, freq="QE")
+    dates = pd.date_range(DEFAULT_START_STR, periods=24, freq="QE")
     raw_scores = np.random.normal(loc=0.0, scale=1.0, size=len(dates))
 
     df = pd.DataFrame({"risk_score_pca": raw_scores}, index=dates)

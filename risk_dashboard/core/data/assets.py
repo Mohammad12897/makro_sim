@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Optional
 import logging
 
-from risk_dashboard.data_utils import fetch_prices_from_yf, flatten_yf_dataframe
+from risk_dashboard.data_utils import safe_fetch, flatten_yf_dataframe
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def fetch_price_history(symbol: str, period: str = "5y") -> Optional[pd.Series]:
                 break
 
         # zentrale Fetch-Funktion verwenden
-        df = fetch_prices_from_yf(symbol, start=None, end=None, interval="1d", auto_adjust=True)
+        df = safe_fetch(symbol, start=None, end=None, interval="1d", auto_adjust=True)
 
         if df is None or df.empty:
             return None

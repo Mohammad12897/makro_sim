@@ -10,7 +10,7 @@ import io
 import pandas as pd
 import yfinance as yf
 
-from risk_dashboard.data_utils import flatten_yf_dataframe, fetch_prices_from_yf
+from risk_dashboard.data_utils import flatten_yf_dataframe, safe_fetch
 # weitere lokale Hilfen wie wait_for_rate_slot, CACHE_DIR, CACHE_TTL_SECONDS etc. bleiben unverändert
 # oben in risk_dashboard/core/yf_helper.py
 from risk_dashboard.core.utils import _ensure_date_fx_columns
@@ -93,11 +93,11 @@ def download_one_with_backoff(ticker: str, period: str = "max", retries: int = R
         logger.debug("Sleeping %.2fs before next attempt for %s", sleep, ticker)
         time.sleep(sleep)
 
-    # 2) Fallback: zentrale fetch_prices_from_yf (statt direktem yf.download)
+    # 2) Fallback: zentrale safe_fetch (statt direktem yf.download)
     try:
         wait_for_rate_slot()
-        logger.info("Fallback: fetch_prices_from_yf() for %s", ticker)
-        df = fetch_prices_from_yf(ticker, start=None, end=None, interval="1d")
+        logger.info("Fallback: safe_fetch() for %s", ticker)
+        df = safe_fetch(ticker, start=None, end=None, interval="1d")
         if df is not None and not df.empty:
             # Falls MultiIndex defensiv flattenen
             if isinstance(df.columns, pd.MultiIndex):
@@ -111,7 +111,7 @@ def download_one_with_backoff(ticker: str, period: str = "max", retries: int = R
                 logger.debug("Could not write cache for %s", ticker)
             return df
     except Exception as e:
-        logger.warning("Fallback fetch_prices_from_yf Exception for %s: %s", ticker, e)
+        logger.warning("Fallback safe_fetch Exception for %s: %s", ticker, e)
 
     return None
 
@@ -121,12 +121,12 @@ def download_batch_with_backoff(tickers: List[str], period: str = "max", retries
     if not tickers:
         return pd.DataFrame()
 
-    # 1) Versuche Batch-Download via zentrale Funktion (fetch_prices_from_yf kann Listen akzeptieren)
+    # 1) Versuche Batch-Download via zentrale Funktion (safe_fetch kann Listen akzeptieren)
     for attempt in range(1, retries + 1):
         try:
             wait_for_rate_slot()
             logger.info("Batch download attempt %d for %d tickers", attempt, len(tickers))
-            df = fetch_prices_from_yf(tickers, start=None, end=None, interval="1d")
+            df = safe_fetch(tickers, start=None, end=None, interval="1d")
             if df is None:
                 logger.warning("Batch fetch returned None for %s", tickers)
                 time.sleep(pause * (1 + attempt * 0.5))

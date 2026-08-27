@@ -1,13 +1,17 @@
 # risk_dashboard/data_utils.py
-import time
-import logging
-import random
+import time, random, logging
 from typing import List, Optional, Any, Dict, Sequence, Tuple
 import pandas as pd
 import yfinance as yf
 from requests.exceptions import RequestException
+from datetime import datetime
+import logging
 
 logger = logging.getLogger(__name__)
+
+from risk_dashboard.config import DEFAULT_START_STR
+#from .yf_wrapper import fetch_prices_from_yf  # passe Pfad an
+
 
 # low-level fetch wrapper (existierender Import)
 #from .yf_wrapper import fetch_prices_from_yf  # passe Pfad an
@@ -99,7 +103,7 @@ def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
 def _normalize_tickers(tickers: Sequence[str]) -> List[str]:
     return [t.strip().upper() for t in tickers if t and str(t).strip()]
 
-def fetch_prices_from_yf(tickers, start="2010-01-01", end=None,
+def fetch_prices_from_yf(tickers, start=DEFAULT_START_STR, end=None,
                          interval: str = "1d", auto_adjust: bool = False,
                          threads: bool = False, **kwargs) -> pd.DataFrame:
     """
@@ -160,16 +164,20 @@ def safe_fetch(
     cache: Optional[Dict[str, pd.DataFrame]] = None,
     cache_key: Optional[str] = None,
     raise_on_failure: bool = True,
-    **fetch_kwargs: Any,  # passt auto_adjust, threads, group_by, etc. durch
+    **fetch_kwargs: Any,
 ) -> pd.DataFrame:
-    """
-    Robust wrapper around fetch_prices_from_yf.
-    - passt alle fetch_kwargs an die underlying Funktion durch (z.B. auto_adjust, threads)
-    - retries mit exponentiellem backoff + jitter
-    - optionaler cache (dict) zur Vermeidung mehrfacher Fetches
-    - gibt DataFrame zurück oder wirft RuntimeError (je nach raise_on_failure)
-    """
-    # optionaler Cache lookup
+    # Defaults im Body setzen (nicht in Signatur)
+    start = start or DEFAULT_START_STR
+    end = end or datetime.today().strftime("%Y-%m-%d")
+
+    # Guard: leere Tickerliste
+    if not tickers:
+        logger.debug("safe_fetch: received empty tickers list")
+        if allow_empty:
+            return pd.DataFrame()
+        raise ValueError("safe_fetch: tickers list is empty")
+
+    # Cache lookup
     if cache is not None and cache_key is not None:
         cached = cache.get(cache_key)
         if cached is not None and not cached.empty:
@@ -182,7 +190,8 @@ def safe_fetch(
         try:
             logger.debug(
                 "safe_fetch: attempt %d/%d tickers=%s start=%s end=%s interval=%s kwargs=%s",
-                attempt, attempts, tickers, start, end, interval, {k: fetch_kwargs.get(k) for k in ("auto_adjust","threads") if k in fetch_kwargs}
+                attempt, attempts, tickers, start, end, interval,
+                {k: fetch_kwargs.get(k) for k in ("auto_adjust","threads") if k in fetch_kwargs}
             )
             df = fetch_prices_from_yf(
                 tickers,
@@ -193,12 +202,11 @@ def safe_fetch(
                 **fetch_kwargs
             )
             if df is not None and not df.empty:
-                # optional cache store
                 if cache is not None and cache_key is not None:
                     cache[cache_key] = df
                 logger.debug("safe_fetch: success attempt %d rows=%d cols=%s", attempt, len(df.index), list(df.columns)[:10])
                 return df
-            logger.warning("safe_fetch: empty result on attempt %d for %s", attempt, tickers)
+            logger.debug("safe_fetch: empty result on attempt %d for %s", attempt, tickers)
         except RequestException as re:
             last_exc = re
             logger.warning("safe_fetch: network error on attempt %d for %s: %s", attempt, tickers, re)
@@ -213,7 +221,6 @@ def safe_fetch(
         logger.debug("safe_fetch: sleeping %.2fs before next attempt", total_sleep)
         time.sleep(total_sleep)
 
-    # all attempts failed
     logger.error("safe_fetch: all attempts failed for %s", tickers)
     if allow_empty:
         return pd.DataFrame()
@@ -347,7 +354,7 @@ def extract_close_series(df, ticker):
     return pd.Series(dtype=float)
 
 def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
-                                 start: str = "2010-01-01",
+                                 start: str = DEFAULT_START_STR,
                                  end: Optional[str] = None,
                                  auto_adjust: bool = False,
                                  threads: bool = True,

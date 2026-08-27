@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import logging
 
-from risk_dashboard.data_utils import fetch_prices_from_yf, flatten_yf_dataframe
+from risk_dashboard.data_utils import safe_fetch, flatten_yf_dataframe
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------
 def fetch_prices(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
     """
-    Lädt historische Kursdaten über zentrale fetch_prices_from_yf.
+    Lädt historische Kursdaten über zentrale safe_fetch.
     Rückgabe: DataFrame mit DatetimeIndex oder None.
     """
     if not ticker:
@@ -26,7 +26,7 @@ def fetch_prices(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
 
     try:
         # zentrale Funktion verwenden; auto_adjust True entspricht vorherigem Verhalten
-        df = fetch_prices_from_yf(ticker, start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), interval="1d", auto_adjust=True, threads=False)
+        df = safe_fetch(ticker, start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), interval="1d", auto_adjust=True, threads=False)
 
         if df is None or df.empty:
             return None

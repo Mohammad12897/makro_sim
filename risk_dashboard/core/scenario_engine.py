@@ -5,6 +5,7 @@ from matplotlib.pylab import var
 import pandas as pd
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 import logging
+from risk_dashboard.config import DEFAULT_START_STR
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ def apply_shock(df, shocks):
         df_sim[var] = df_sim[var] * (1 + shock)
     return df_sim
 
-def generate_date_range(start="2026-01-01", periods=24, freq="ME"):
+def generate_date_range(start=DEFAULT_START_STR, periods=24, freq="ME"):
     # Map legacy aliases to supported offsets
     if isinstance(freq, str):
         freq_map = {"M": "ME", "Q": "QE", "A": "YE"}
@@ -63,7 +64,7 @@ def generate_date_range(start="2026-01-01", periods=24, freq="ME"):
 # ---------------------------------------------------------
 # 1. BASELINE-SZENARIO
 # ---------------------------------------------------------
-def build_baseline_scenario(start="2026-01-01", periods=24):
+def build_baseline_scenario(start=DEFAULT_START_STR, periods=24):
     dates = generate_date_range(start, periods)
 
     data = []
@@ -91,7 +92,7 @@ def build_baseline_scenario(start="2026-01-01", periods=24):
 # 2. BENUTZERDEFINIERTES SZENARIO
 # ---------------------------------------------------------
 def build_scenario(
-    start="2026-01-01",
+    start=DEFAULT_START_STR,
     periods=24,
     bip_shock=0.95,
     inflation_shock=1.3,

@@ -6,7 +6,8 @@ import yfinance as yf
 from pathlib import Path
 import logging
 
-from risk_dashboard.data_utils import fetch_prices_from_yf
+from risk_dashboard.data_utils import safe_fetch
+from risk_dashboard.config import DEFAULT_START_STR
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +59,12 @@ def load_returns_csv(filename: str, expected_assets: list = None) -> pd.DataFram
     return df
 
 
-def load_yahoo_returns(ticker, start="2010-01-01", end=None):
+def load_yahoo_returns(ticker, start=DEFAULT_START_STR, end=None):
     """
     Lädt historische Renditen von Yahoo Finance.
     """
     
-    df = fetch_prices_from_yf(ticker, start=start, end=end, auto_adjust=False, threads=False)
+    df = safe_fetch(ticker, start=start, end=end, auto_adjust=False, threads=False)
 
     # Spaltennamen sind Uppercase; prüfe Varianten
     if "ADJ CLOSE" in df.columns:

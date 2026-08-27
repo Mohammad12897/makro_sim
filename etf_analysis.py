@@ -4,18 +4,19 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from risk_dashboard.data_utils import fetch_prices_from_yf
+from risk_dashboard.data_utils import safe_fetch
+from risk_dashboard.config import DEFAULT_START_STR
 
 # Beispiel-ETFs (anpassen)
 etfs = ["SPY","IEFA","EEM","AGG","VNQ"]
 
 # Zeitraum
-start = "2016-01-01"
+start = DEFAULT_START_STR
 end = None
 
 # Daten laden
 # statt direktem yf.download: benutze fetch_prices_quiet
-data = fetch_prices_from_yf(etfs, start=start, end=end, auto_adjust=True, threads=False)
+data = safe_fetch(etfs, start=start, end=end, auto_adjust=True, threads=False)
 
 
 # tÃ¤gliche Renditen

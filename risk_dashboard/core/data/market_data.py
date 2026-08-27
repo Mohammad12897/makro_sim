@@ -4,16 +4,17 @@ import numpy as np
 import logging
 
 from risk_dashboard.core.data.ticker_validation import validate_or_fix_ticker
-from risk_dashboard.data_utils import fetch_prices_from_yf, flatten_yf_dataframe
+from risk_dashboard.data_utils import safe_fetch, flatten_yf_dataframe
+from risk_dashboard.config import DEFAULT_START_STR
 
 logger = logging.getLogger(__name__)
 
-def load_asset_series(ticker, start="2010-01-01", end=None):
+def load_asset_series(ticker, start=DEFAULT_START_STR, end=None):
     ticker = validate_or_fix_ticker(ticker)
     if ticker is None:
         raise ValueError("Ticker ungültig oder delisted.")
 
-    df = fetch_prices_from_yf(ticker, start=start, end=end, interval="1d", auto_adjust=False)
+    df = safe_fetch(ticker, start=start, end=end, interval="1d", auto_adjust=False)
     if df is None or df.empty:
         raise ValueError(f"Keine Daten für {ticker}")
 
