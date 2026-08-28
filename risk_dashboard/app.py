@@ -642,14 +642,13 @@ except Exception:
     logging.getLogger(__name__).exception("profile_form_ui konnte nicht geladen werden")
 
 # --- ETF Auswahl UI oben auf der Seite ---
-try:
-    import logging
-    from risk_dashboard.ui.etf_selection_ui import render_etf_selection_ui
-    # Optional: in einem Container, damit es visuell getrennt ist
-    with st.container():
+if not st.session_state.get("etf_selection_ui_rendered", False):
+    try:
+        from risk_dashboard.ui.etf_selection_ui import render_etf_selection_ui
         render_etf_selection_ui()
-except Exception as _e:
-    logging.getLogger(__name__).exception("Fehler beim Rendern der ETF Auswahl UI oben: %s", _e)
+        st.session_state["etf_selection_ui_rendered"] = True
+    except Exception as _e:
+        logging.getLogger(__name__).exception("Fehler beim Rendern der ETF Auswahl UI oben: %s", _e)
 
 
 MACRO_LABELS = {
@@ -1604,7 +1603,7 @@ with tab_lexikon:
     st.header("Makro-Lexikon")
     st.write("Ein Nachschlagewerk für alle wichtigen Begriffe, Modelle, Datenquellen und Investment-Zusammenhänge.")
 
-    query = st.text_input("Begriff suchen:")
+    query = st.text_input("Begriff suchen:", key="lexikon_query")
 
     results = search_glossary(query)
 
@@ -1620,11 +1619,3 @@ with tab_lexikon:
 
     st.markdown('---')
     st.subheader('ETF Auswahl')
-    # --- ETF Auswahl UI oben auf der Seite ---
-    try:
-        import logging
-        from risk_dashboard.ui.etf_selection_ui import render_etf_selection_ui
-        with st.container():
-            render_etf_selection_ui()
-    except Exception as _e:
-        logging.getLogger(__name__).exception("Fehler beim Rendern der ETF Auswahl UI oben: %s", _e)
