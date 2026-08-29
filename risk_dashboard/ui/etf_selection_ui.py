@@ -57,51 +57,64 @@ def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
         mapped[s] = None
     return mapped
 
-
 def render_etf_selection_ui(prefix: str = "etf") -> None:
     asset_key = f"{prefix}_asset_type"
+
+    # globale user tickers und asset type initialisieren
     st.session_state.setdefault("user_tickers", [])
     st.session_state.setdefault(asset_key, "ETF")
 
+    # stable input key immer anlegen (verhindert, dass der Key beim Rerun fehlt)
     stable_input_key = f"{prefix}_ticker_input"
     st.session_state.setdefault(stable_input_key, "")
-    st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
 
-    # Debug (temporär)
-    st.write("DBG asset_key:", asset_key)
-    st.write("DBG stable_input_key present:", stable_input_key in st.session_state)
-
-
-    # ensure per-asset storage keys exist (so state shape is stable)
+    # per-asset storage keys (einmalig) — sorgt für stabile session_state-Form
     for at in ("ETF", "Stock", "Mixed"):
         st.session_state.setdefault(f"{prefix}_user_tickers_{at}", [])
 
-    # Header belongs to main area
+    # Header (Hauptbereich)
     st.header("ETF Auswahl und Explainable Scoring")
 
+    # Optional: temporäre Debug-Ausgaben (entfernen, wenn stabil)
+    st.write("DBG asset_key:", asset_key)
+    st.write("DBG stable_input_key present:", stable_input_key in st.session_state)
 
-    # Sidebar block (stable order and keys)
-
+    # ---------------- Sidebar (stabile Reihenfolge und Keys) ----------------
     with st.sidebar:
         st.subheader("Portfolio Eingabe")
-        # 2) always call text_input early
+
+        # namespaced radio (stable) — MUSS vor allen anderen Widgets stehen
+        asset_type = st.radio(
+            "Asset Type",
+            ["ETF", "Stock", "Mixed"],
+            index=["ETF", "Stock", "Mixed"].index(st.session_state[asset_key]),
+            key=asset_key
+        )
+
+        # stable input widget (immer aufrufen)
         st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
+
+        # stable add button (immer mit stabilem Key)
         if st.button("Hinzufügen", key=f"{prefix}_add_button"):
             raw_val = st.session_state.get(stable_input_key, "") or ""
-            parsed = parse_tickers(raw_val)
-            # append logic...
+            try:
+                parsed = parse_tickers(raw_val)
+            except Exception as e:
+                st.error(f"Fehler beim Parsen der Ticker: {e}")
+                parsed = []
+
             per_asset_key = f"{prefix}_user_tickers_{st.session_state.get(asset_key,'ETF')}"
             st.session_state.setdefault(per_asset_key, [])
             for t in parsed:
                 t_norm = normalize_ticker(t)
-                if t_norm not in st.session_state[per_asset_key]:
+                if t_norm and t_norm not in st.session_state[per_asset_key]:
                     st.session_state[per_asset_key].append(t_norm)
-                if t_norm not in st.session_state["user_tickers"]:
+                if t_norm and t_norm not in st.session_state["user_tickers"]:
                     st.session_state["user_tickers"].append(t_norm)
             save_user_tickers(st.session_state["user_tickers"])
             st.session_state[stable_input_key] = ""
 
-        # Render per-asset lists in fixed order (only show items for current asset)
+        # Render per-asset lists in fixed order (nur aktive Asset-Liste anzeigen)
         for at in ("ETF", "Stock", "Mixed"):
             lst_key = f"{prefix}_user_tickers_{at}"
             items = st.session_state.get(lst_key, [])
@@ -117,16 +130,18 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
                         save_user_tickers(st.session_state["user_tickers"])
                         st.experimental_rerun()
 
-
+    # Debug nach Sidebar (temporär)
     st.write("DEBUG after sidebar; asset_type:", st.session_state.get(asset_key))
-    st.write("DEBUG stable_input_value:", st.session_state.get(f"{prefix}_ticker_input"))
+    st.write("DEBUG stable_input_value:", st.session_state.get(stable_input_key))
 
-
-    # --- Main area continues below (preserve existing logic) ---
-    # Example: Preset selection (namespaced)
+    # ---------------- Hauptbereich (restlicher Code) ----------------
     preset = st.selectbox("Gewichtungs‑Preset", ["Balanced", "Conservative", "Aggressive"], index=0, key=f"{prefix}_preset_select")
     weights = get_preset_weights(preset)
-    st.markdown(f"**Aktuelles Preset:** {preset} — Gewichte: TER {weights['ter']:.0%}, AUM {weights['aum']:.0%}, Tracking {weights['tracking']:.0%}, Replication {weights['replication']:.0%}, Liquidity {weights['liquidity']:.0%}")
+    st.markdown(
+        f"**Aktuelles Preset:** {preset} — Gewichte: TER {weights['ter']:.0%}, "
+        f"AUM {weights['aum']:.0%}, Tracking {weights['tracking']:.0%}, "
+        f"Replication {weights['replication']:.0%}, Liquidity {weights['liquidity']:.0%}"
+    )
 
     index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key=f"{prefix}_index_choice")
     df_candidates = get_etf_candidates_for_index(index_choice)
@@ -134,10 +149,12 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
         st.warning("Keine vordefinierten Kandidaten für diesen Index. Bitte konfiguriere ETF_CANDIDATES.")
         return
 
-    # Füge user tickers als einfache Zeilen hinzu (falls noch nicht vorhanden)
+    # user tickers in Kandidatenliste ergänzen (falls noch nicht vorhanden)
     for t in st.session_state.get("user_tickers", []):
         if t not in df_candidates["ticker"].values:
             df_candidates = pd.concat([df_candidates, pd.DataFrame([{"ticker": t}])], ignore_index=True)
+
+    # ... restlicher Code wie Score-Berechnung, DataFrame-Ausgabe etc.
 
     # Compute explainable scores using current preset weights
     # We adapt compute_etf_score_components to use preset weights by temporarily overriding PRESETS if needed.
