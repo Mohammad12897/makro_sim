@@ -645,7 +645,7 @@ except Exception:
 if not st.session_state.get("etf_selection_ui_rendered", False):
     try:
         from risk_dashboard.ui.etf_selection_ui import render_etf_selection_ui
-        render_etf_selection_ui()
+        render_etf_selection_ui(prefix="etf")
         st.session_state["etf_selection_ui_rendered"] = True
     except Exception as _e:
         logging.getLogger(__name__).exception("Fehler beim Rendern der ETF Auswahl UI oben: %s", _e)

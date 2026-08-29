@@ -57,12 +57,12 @@ def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
         mapped[s] = None
     return mapped
 
+
 def render_etf_selection_ui(prefix: str = "etf") -> None:
     asset_key = f"{prefix}_asset_type"
     st.session_state.setdefault("user_tickers", [])
     st.session_state.setdefault(asset_key, "ETF")
 
-    # 1) ensure stable input key exists
     stable_input_key = f"{prefix}_ticker_input"
     st.session_state.setdefault(stable_input_key, "")
 
