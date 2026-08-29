@@ -1007,7 +1007,7 @@ def profile_form_ui() -> None:
             defaults.update(CATEGORY_DEFAULTS.get(category, {}))
 
     st.markdown("**Profilname**")
-    profile_name = st.text_input("Profilname", value=defaults.get("display_name", "" if selected == "<Neu>" else selected), help=TOOLTIPS["profile_name"])
+    profile_name = st.text_input("Profilname", value=defaults.get("display_name", "" if selected == "<Neu>" else selected), help=TOOLTIPS["profile_name"],key="profile_name_input")
 
     st.markdown("**Asset Allocation (in %)**")
     eq = st.number_input("Equity (%)", min_value=0.0, max_value=100.0, value=float(defaults.get("equity_pct", 0)), help=TOOLTIPS["equity_pct"])
@@ -1063,22 +1063,10 @@ def profile_form_ui() -> None:
     combined_universe = combined_universe.drop_duplicates(subset=["ticker"]).reset_index(drop=True)
 
     # UI: Multiselects mit DataFrame-Varianten
-    asset_type = st.radio("Asset Type", ["ETF", "Stock", "Mixed"], index=0)
-    if asset_type == "ETF":
-        chosen = st.multiselect("Wähle ETFs", etf_universe_df["ticker"].tolist())
-    elif asset_type == "Stock":
-        chosen = st.multiselect("Wähle Aktien", stock_universe_df["ticker"].tolist())
-    else:
-        chosen = st.multiselect("Wähle Assets", combined_universe["ticker"].tolist())
-
-    # Speichere strukturierte Auswahl; für detect_type die dict- oder df-Variante übergeben,
-    # je nachdem, was detect_type erwartet. Hier übergeben wir DataFrames.
-    st.session_state["selected_assets"] = [
-        {"ticker": normalize_ticker(t),
-        "type": detect_type(normalize_ticker(t), etf_universe_df, stock_universe_df)}
-        for t in chosen
-    ]
-
+    # Asset Type Auswahl (einmalig, key in session_state)
+    
+    # Asset Type (einmalig, key in session_state)
+    
     #############################################
 
 
@@ -1261,7 +1249,7 @@ def profile_form_ui() -> None:
         run_disabled = False
 
         # Widgets (einmalig)
-        selected_tickers_input = st.text_input("Tickers (Komma getrennt)", "NVDA,EXS1.DE,AAPL")
+        selected_tickers_input = st.text_input("Tickers (Komma getrennt)", "NVDA,EXS1.DE,AAPL", key="selected_tickers_input")
         start_date = st.date_input("Startdatum", value=DEFAULT_START_STR)
         end_date = st.date_input("Enddatum", value=DEFAULT_END_STR)
 
@@ -1419,16 +1407,21 @@ def profile_form_ui() -> None:
     ####################################################################################
     with col_d:
         if st.button("Screen Top 10"):
-            # Wähle Universe je nach asset_type
-            universe_meta = etf_universe if asset_type == "ETF" else stock_universe if asset_type == "Stock" else combined_universe
+            asset_type_for_screen = st.session_state.get(asset_key, "ETF")
+            universe_meta = etf_universe if asset_type_for_screen == "ETF" else stock_universe if asset_type_for_screen == "Stock" else combined_universe
 
-            # Bulk-Preise laden (effizient)
             tickers_list = universe_meta["ticker"].tolist()
-            price_history = fetch_price_history_bulk(tickers_list, start=None, end=None, interval="1d")
+            try:
+                price_history = fetch_price_history_bulk(tickers_list, start=None, end=None, interval="1d")
+            except Exception as e:
+                logger.exception("price fetch failed: %s", e)
+                st.warning("Preisdaten konnten nicht geladen werden; einige UI‑Elemente sind deaktiviert.")
+                price_history = None
 
             selected, scores = screen_and_rank(universe_meta, price_history, top_n=10)
             st.session_state["screen_selected"] = selected
             st.write("Top 10:", selected)
+
     ####################################################################################
     resolved_holdings = resolve_components(st.session_state.selected_etfs, etf_universe)
 
@@ -1494,7 +1487,7 @@ def profile_form_ui() -> None:
                     
     # --- Expander: komplette Referenztabelle mit Suche ---
     with st.expander("Wichtige Kennzahlen (Kurzreferenz)"):
-        query = st.text_input("Kennzahl suchen", value="")
+        query = st.text_input("Kennzahl suchen", value="", key="kennzahl_query")
         if query:
             hits = attr_df[attr_df["Attribut"].str.contains(query, case=False, na=False)]
             st.table(hits)
