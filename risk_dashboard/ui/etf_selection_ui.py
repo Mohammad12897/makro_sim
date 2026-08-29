@@ -10,6 +10,7 @@ from risk_dashboard.ui.profiles_ui import detect_historical_regimes
 from risk_dashboard.utils.persistence import load_user_tickers, save_user_tickers
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.data_loader import parse_tickers
+from risk_dashboard.ui.helpers import normalize_ticker
 from risk_dashboard.config import DEFAULT_START_STR
 import logging
     
@@ -56,93 +57,100 @@ def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
         mapped[s] = None
     return mapped
 
+def render_etf_selection_ui(prefix: str = "etf") -> None:
+    asset_key = f"{prefix}_asset_type"
+    st.session_state.setdefault("user_tickers", [])
+    st.session_state.setdefault(asset_key, "ETF")
 
-def render_etf_selection_ui():
-    """
-    Explainable ETF selection UI with presets and Top-N auto-select.
-    """
+    # Test im Code (temporär) — prüft, ob parse_tickers stabil ist
+    try:
+        _ = parse_tickers("AAPL,MSFT")
+    except Exception as e:
+        st.error(f"parse_tickers raised: {e}")
+
+    # ensure per-asset storage keys exist (so state shape is stable)
+    for at in ("ETF", "Stock", "Mixed"):
+        st.session_state.setdefault(f"{prefix}_user_tickers_{at}", [])
+
+    # Header belongs to main area
     st.header("ETF Auswahl und Explainable Scoring")
 
-    # Sidebar / Portfolio Eingabe: Ticker hinzufügen
-    if "user_tickers" not in st.session_state:
-        st.session_state.user_tickers = []
 
+    st.write("DEBUG start render_etf_selection_ui")
+    st.write("DEBUG asset_key:", asset_key)
+    st.write("DEBUG stable_input_key present:", f"{prefix}_ticker_input" in st.session_state)
+    st.write("DEBUG session_state keys:", sorted(list(st.session_state.keys())))
+    st.write("DEBUG per-asset lists:", {k: st.session_state.get(k) for k in st.session_state.keys() if k.startswith(f"{prefix}_user_tickers_")})
+
+
+    # Sidebar block (stable order and keys)
     with st.sidebar:
         st.subheader("Portfolio Eingabe")
-        # Eingabefeld
-        new_ticker = st.text_input(
-            "Ticker hinzufügen",
-            value="",
-            placeholder="z.B. AAPL oder VWRL",
-            key="ticker_add_input"
+
+        # namespaced radio (stable)
+        asset_type = st.radio(
+            "Asset Type",
+            ["ETF", "Stock", "Mixed"],
+            index=["ETF", "Stock", "Mixed"].index(st.session_state[asset_key]),
+            key=asset_key
         )
 
-        # Normalisierung: akzeptiere Liste, Dict oder String
-        # parsed_tickers ist jetzt immer eine Liste
-        parsed_tickers = parse_tickers(new_ticker)
-        st.write("Parsed tickers:", parsed_tickers)
+        # stable input widget (always present)
+        stable_input_key = f"{prefix}_ticker_input"
+        st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
 
-        # Preise laden (immer Liste übergeben)
-        from risk_dashboard.ui.profiles_ui import load_price_data
-        prices = load_price_data(parsed_tickers)
+        # stable add button
+        if st.button("Hinzufügen", key=f"{prefix}_add_button"):
+            raw_val = st.session_state.get(stable_input_key, "") or ""
+            parsed = parse_tickers(raw_val)
+            per_asset_key = f"{prefix}_user_tickers_{st.session_state.get(asset_key,'ETF')}"
+            st.session_state.setdefault(per_asset_key, [])
+            for t in parsed:
+                t_norm = normalize_ticker(t)
+                if t_norm not in st.session_state[per_asset_key]:
+                    st.session_state[per_asset_key].append(t_norm)
+                if t_norm not in st.session_state["user_tickers"]:
+                    st.session_state["user_tickers"].append(t_norm)
+            save_user_tickers(st.session_state["user_tickers"])
+            st.session_state[stable_input_key] = ""
 
-        # Hinzufügen-Button: validiere mit download_prices und arbeite mit der Liste
-        if st.button("Hinzufügen"):
-            t = new_ticker.strip().upper()
-            if t:
-                if t in st.session_state.user_tickers:
-                    st.warning(f"{t} ist bereits in der Liste.")
-                else:
-                    # Validierung: kurze Preisanfrage mit einer Liste
-                    test_prices = download_prices([t], start=DEFAULT_START_STR, end=None)
-                    if test_prices is None or test_prices.empty:
-                        st.error(f"Ticker {t} ist ungültig oder liefert keine Daten.")
-                    else:
-                        st.session_state.user_tickers.append(t)
-                        save_user_tickers(st.session_state.user_tickers)
-                        st.success(f"{t} hinzugefügt.")
-                        # lokal: dieser einzelne Test war erfolgreich
-                        single_ticker_ok = True
+        # Render per-asset lists in fixed order (only show items for current asset)
+        for at in ("ETF", "Stock", "Mixed"):
+            lst_key = f"{prefix}_user_tickers_{at}"
+            items = st.session_state.get(lst_key, [])
+            if at == st.session_state.get(asset_key) and items:
+                st.write("Eigene Ticker (aktuell):")
+                for t in list(items):
+                    cols = st.columns([8, 1])
+                    cols[0].write(t)
+                    if cols[1].button("x", key=f"{prefix}_rm_{at}_{t}"):
+                        st.session_state[lst_key].remove(t)
+                        if t in st.session_state["user_tickers"]:
+                            st.session_state["user_tickers"].remove(t)
+                        save_user_tickers(st.session_state["user_tickers"])
+                        st.experimental_rerun()
 
-        # Anzeige und Entfernen
-        if st.session_state.user_tickers:
-            st.write("Eigene Ticker:")
-            for t in list(st.session_state.user_tickers):
-                cols = st.columns([8,1])
-                cols[0].write(t)
-                if cols[1].button("x", key=f"rm_{t}"):
-                    st.session_state.user_tickers.remove(t)
-                    save_user_tickers(st.session_state.user_tickers)
-                    st.experimental_rerun()
 
-    # Preset selection
-    preset = st.selectbox("Gewichtungs‑Preset", ["Balanced", "Conservative", "Aggressive"], index=0, key="etf_preset_select")
+    st.write("DEBUG after sidebar; asset_type:", st.session_state.get(asset_key))
+    st.write("DEBUG stable_input_value:", st.session_state.get(f"{prefix}_ticker_input"))
+
+
+    # --- Main area continues below (preserve existing logic) ---
+    # Example: Preset selection (namespaced)
+    preset = st.selectbox("Gewichtungs‑Preset", ["Balanced", "Conservative", "Aggressive"], index=0, key=f"{prefix}_preset_select")
     weights = get_preset_weights(preset)
-
     st.markdown(f"**Aktuelles Preset:** {preset} — Gewichte: TER {weights['ter']:.0%}, AUM {weights['aum']:.0%}, Tracking {weights['tracking']:.0%}, Replication {weights['replication']:.0%}, Liquidity {weights['liquidity']:.0%}")
 
-    # Step: choose index/universe
-    index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key="etf_index_choice")
-
-    # Load candidates
+    index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key=f"{prefix}_index_choice")
     df_candidates = get_etf_candidates_for_index(index_choice)
     if df_candidates.empty:
         st.warning("Keine vordefinierten Kandidaten für diesen Index. Bitte konfiguriere ETF_CANDIDATES.")
         return
 
-    
-    # df_candidates = get_etf_candidates_for_index(index_choice)  # bestehend
     # Füge user tickers als einfache Zeilen hinzu (falls noch nicht vorhanden)
     for t in st.session_state.get("user_tickers", []):
-        if t not in df_candidates["ticker"].astype(str).tolist():
-            df_candidates = pd.concat([df_candidates, pd.DataFrame([{
-                "ticker": t,
-                "name": t,
-                "domicile": None,
-                "expense_ratio": None,
-                "aum": None,
-                "replication": None
-            }])], ignore_index=True)
+        if t not in df_candidates["ticker"].values:
+            df_candidates = pd.concat([df_candidates, pd.DataFrame([{"ticker": t}])], ignore_index=True)
 
     # Compute explainable scores using current preset weights
     # We adapt compute_etf_score_components to use preset weights by temporarily overriding PRESETS if needed.
