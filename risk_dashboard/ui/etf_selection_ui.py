@@ -65,6 +65,7 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
 
     stable_input_key = f"{prefix}_ticker_input"
     st.session_state.setdefault(stable_input_key, "")
+    st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
 
     # Debug (temporär)
     st.write("DBG asset_key:", asset_key)

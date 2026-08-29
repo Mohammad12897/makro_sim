@@ -1,4 +1,4 @@
-﻿# risk_dashboard/app.py
+# risk_dashboard/app.py
 # $env:PYTHONPATH="C:\Projects\makro_sim"
 # $env:FRED_API_KEY = "5b75a1beb133f4e4aa6b8929ca39a762"
 # setx FRED_API_KEY "5b75a1beb133f4e4aa6b8929ca39a762"
