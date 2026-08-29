@@ -62,11 +62,14 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
     st.session_state.setdefault("user_tickers", [])
     st.session_state.setdefault(asset_key, "ETF")
 
-    # Test im Code (temporär) — prüft, ob parse_tickers stabil ist
-    try:
-        _ = parse_tickers("AAPL,MSFT")
-    except Exception as e:
-        st.error(f"parse_tickers raised: {e}")
+    # 1) ensure stable input key exists
+    stable_input_key = f"{prefix}_ticker_input"
+    st.session_state.setdefault(stable_input_key, "")
+
+    # Debug (temporär)
+    st.write("DBG asset_key:", asset_key)
+    st.write("DBG stable_input_key present:", stable_input_key in st.session_state)
+
 
     # ensure per-asset storage keys exist (so state shape is stable)
     for at in ("ETF", "Stock", "Mixed"):
@@ -76,33 +79,16 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
     st.header("ETF Auswahl und Explainable Scoring")
 
 
-    st.write("DEBUG start render_etf_selection_ui")
-    st.write("DEBUG asset_key:", asset_key)
-    st.write("DEBUG stable_input_key present:", f"{prefix}_ticker_input" in st.session_state)
-    st.write("DEBUG session_state keys:", sorted(list(st.session_state.keys())))
-    st.write("DEBUG per-asset lists:", {k: st.session_state.get(k) for k in st.session_state.keys() if k.startswith(f"{prefix}_user_tickers_")})
-
-
     # Sidebar block (stable order and keys)
+
     with st.sidebar:
         st.subheader("Portfolio Eingabe")
-
-        # namespaced radio (stable)
-        asset_type = st.radio(
-            "Asset Type",
-            ["ETF", "Stock", "Mixed"],
-            index=["ETF", "Stock", "Mixed"].index(st.session_state[asset_key]),
-            key=asset_key
-        )
-
-        # stable input widget (always present)
-        stable_input_key = f"{prefix}_ticker_input"
+        # 2) always call text_input early
         st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
-
-        # stable add button
         if st.button("Hinzufügen", key=f"{prefix}_add_button"):
             raw_val = st.session_state.get(stable_input_key, "") or ""
             parsed = parse_tickers(raw_val)
+            # append logic...
             per_asset_key = f"{prefix}_user_tickers_{st.session_state.get(asset_key,'ETF')}"
             st.session_state.setdefault(per_asset_key, [])
             for t in parsed:
