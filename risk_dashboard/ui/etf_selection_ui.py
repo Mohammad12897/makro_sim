@@ -13,6 +13,23 @@ from risk_dashboard.core.data_loader import parse_tickers
 from risk_dashboard.ui.helpers import normalize_ticker
 from risk_dashboard.config import DEFAULT_START_STR
 import logging
+
+##################
+from logging.handlers import RotatingFileHandler
+import uuid
+
+LOGFILE = os.path.join(os.path.dirname(__file__), "..", "logs", "ui_debug.log")
+os.makedirs(os.path.dirname(LOGFILE), exist_ok=True)
+
+logger = logging.getLogger("risk_dashboard.ui.etf_selection_ui")
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    handler = RotatingFileHandler(LOGFILE, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s [run=%(run_id)s seq=%(seq)d] %(message)s")
+    handler.setFormatter(fmt)
+    logger.addHandler(handler)
+
+###################
     
 logger = logging.getLogger(__name__)
 
@@ -57,7 +74,35 @@ def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
         mapped[s] = None
     return mapped
 
+import time
 def render_etf_selection_ui(prefix: str = "etf") -> None:
+
+    #############################################
+    # in render_etf_selection_ui(...)
+    st.session_state.setdefault("_ui_run_id", str(uuid.uuid4()))
+    st.session_state.setdefault("_ui_seq", 0)
+
+    def next_seq():
+        st.session_state["_ui_seq"] += 1
+        return st.session_state["_ui_seq"]
+
+    # LoggerAdapter für run_id/seq
+    class _Adapter(logging.LoggerAdapter):
+        def process(self, msg, kwargs):
+            extra = self.extra.copy()
+            extra.update(kwargs.pop("extra", {}))
+            kwargs["extra"] = extra
+            return msg, kwargs
+
+    log = _Adapter(logger, {"run_id": st.session_state["_ui_run_id"], "seq": 0})
+
+    WATCH_KEYS = [asset_key, stable_input_key, "user_tickers", f"{prefix}_user_tickers_ETF", f"{prefix}_user_tickers_Stock"]
+
+    def snapshot(keys):
+        return {k: st.session_state.get(k) for k in keys}
+
+    ##########################################
+
     asset_key = f"{prefix}_asset_type"
 
     # globale user tickers und asset type initialisieren
@@ -67,6 +112,8 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
     # stable input key immer anlegen (verhindert, dass der Key beim Rerun fehlt)
     stable_input_key = f"{prefix}_ticker_input"
     st.session_state.setdefault(stable_input_key, "")
+
+    seq = next_seq(); log.debug("stable keys set", extra={"seq": seq, "keys": list(st.session_state.keys())})
 
     # per-asset storage keys (einmalig) — sorgt für stabile session_state-Form
     for at in ("ETF", "Stock", "Mixed"):
@@ -78,6 +125,10 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
     # Optional: temporäre Debug-Ausgaben (entfernen, wenn stabil)
     st.write("DBG asset_key:", asset_key)
     st.write("DBG stable_input_key present:", stable_input_key in st.session_state)
+
+    
+    st.write("DBG stable_input_value:", st.session_state.get(stable_input_key))
+    st.write("DBG session_state keys:", sorted(list(st.session_state.keys())))
 
     # ---------------- Sidebar (stabile Reihenfolge und Keys) ----------------
     with st.sidebar:
@@ -91,44 +142,75 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
             key=asset_key
         )
 
+        seq = next_seq(); log.info("asset_type selected", extra={"seq": seq, "asset_type": st.session_state[asset_key]})
+
         # stable input widget (immer aufrufen)
         st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
 
         # stable add button (immer mit stabilem Key)
+        # Annahme: next_seq(), log (LoggerAdapter) und snapshot(keys) sind definiert,
+        # sowie WATCH_KEYS = [asset_key, stable_input_key, "user_tickers", f"{prefix}_user_tickers_ETF", f"{prefix}_user_tickers_Stock"]
+
         if st.button("Hinzufügen", key=f"{prefix}_add_button"):
+            # seq + before snapshot
+            seq = next_seq()
+            before = snapshot(WATCH_KEYS)
+            log.info("add_button pressed", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq})
+
+            # raw_val zuerst lesen
             raw_val = st.session_state.get(stable_input_key, "") or ""
+            seq = next_seq(); log.debug("stable_input read", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "raw_val": raw_val})
+
+            # parse sicher ausführen
             try:
                 parsed = parse_tickers(raw_val)
+                seq = next_seq(); log.debug("parsed tickers", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "parsed": parsed})
             except Exception as e:
+                seq = next_seq(); log.exception("parse_tickers failed", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq})
                 st.error(f"Fehler beim Parsen der Ticker: {e}")
                 parsed = []
 
+            # apply changes
             per_asset_key = f"{prefix}_user_tickers_{st.session_state.get(asset_key,'ETF')}"
             st.session_state.setdefault(per_asset_key, [])
             for t in parsed:
                 t_norm = normalize_ticker(t)
+                seq = next_seq(); log.debug("processing parsed ticker", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "t_norm": t_norm})
                 if t_norm and t_norm not in st.session_state[per_asset_key]:
                     st.session_state[per_asset_key].append(t_norm)
                 if t_norm and t_norm not in st.session_state["user_tickers"]:
                     st.session_state["user_tickers"].append(t_norm)
+
             save_user_tickers(st.session_state["user_tickers"])
             st.session_state[stable_input_key] = ""
 
+            # after snapshot + diff log
+            after = snapshot(WATCH_KEYS)
+            seq = next_seq(); log.info("session_state diff after add", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "before": before, "after": after})
+
+
         # Render per-asset lists in fixed order (nur aktive Asset-Liste anzeigen)
-        for at in ("ETF", "Stock", "Mixed"):
-            lst_key = f"{prefix}_user_tickers_{at}"
-            items = st.session_state.get(lst_key, [])
-            if at == st.session_state.get(asset_key) and items:
-                st.write("Eigene Ticker (aktuell):")
-                for t in list(items):
-                    cols = st.columns([8, 1])
-                    cols[0].write(t)
-                    if cols[1].button("x", key=f"{prefix}_rm_{at}_{t}"):
-                        st.session_state[lst_key].remove(t)
-                        if t in st.session_state["user_tickers"]:
-                            st.session_state["user_tickers"].remove(t)
-                        save_user_tickers(st.session_state["user_tickers"])
-                        st.experimental_rerun()
+        try:
+            for at in ("ETF", "Stock", "Mixed"):
+                seq = next_seq(); log.debug("per-asset loop start", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "at": at})
+                lst_key = f"{prefix}_user_tickers_{at}"
+                items = st.session_state.get(lst_key, [])
+                seq = next_seq(); log.debug("lst_key/items snapshot", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "lst_key": lst_key, "items_len": len(items) if items is not None else None})
+
+                if at == st.session_state.get(asset_key) and items:
+                    st.write("Eigene Ticker (aktuell):")
+                    for t in list(items):
+                        cols = st.columns([8, 1])
+                        cols[0].write(t)
+                        if cols[1].button("x", key=f"{prefix}_rm_{at}_{t}"):
+                            seq = next_seq(); log.info("remove ticker pressed", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "ticker": t, "lst_key": lst_key})
+                            st.session_state[lst_key].remove(t)
+                            if t in st.session_state.get("user_tickers", []):
+                                st.session_state["user_tickers"].remove(t)
+                            save_user_tickers(st.session_state["user_tickers"])
+                            st.experimental_rerun()
+        except Exception:
+            seq = next_seq(); log.exception("exception in per-asset loop", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq})
 
     # Debug nach Sidebar (temporär)
     st.write("DEBUG after sidebar; asset_type:", st.session_state.get(asset_key))
