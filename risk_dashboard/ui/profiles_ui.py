@@ -1407,16 +1407,20 @@ def profile_form_ui() -> None:
     ####################################################################################
     with col_d:
         if st.button("Screen Top 10"):
-            asset_type_for_screen = st.session_state.get(asset_key, "ETF")
+            # Lese namespaceten asset key (prefix "etf" verwendet)
+            asset_type_for_screen = st.session_state.get("etf_asset_type", "ETF")
             universe_meta = etf_universe if asset_type_for_screen == "ETF" else stock_universe if asset_type_for_screen == "Stock" else combined_universe
 
+            # Bulk-Preise laden (effizient)
             tickers_list = universe_meta["ticker"].tolist()
             try:
+                # heavy work (after sidebar)
                 price_history = fetch_price_history_bulk(tickers_list, start=None, end=None, interval="1d")
             except Exception as e:
                 logger.exception("price fetch failed: %s", e)
                 st.warning("Preisdaten konnten nicht geladen werden; einige UI‑Elemente sind deaktiviert.")
                 price_history = None
+
 
             selected, scores = screen_and_rank(universe_meta, price_history, top_n=10)
             st.session_state["screen_selected"] = selected
