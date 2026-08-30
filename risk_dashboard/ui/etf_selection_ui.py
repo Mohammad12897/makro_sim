@@ -1,6 +1,6 @@
 """
-Minimal stub for etf_selection_ui.
-Fill in UI logic incrementally. Do NOT paste any browser dump or large text blocks.
+Sauberer Platzhalter für etf_selection_ui.
+Keine Browser‑Dumps oder große Textblöcke einfügen.
 """
 import streamlit as st
 import logging
