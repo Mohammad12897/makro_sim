@@ -4,7 +4,10 @@ import json
 import logging
 import requests
 import pandas as pd
+import streamlit as st
 from typing import Optional
+import io, os
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +138,6 @@ def load_holdings_with_fallback(etf: str, category: str, isin: Optional[str], df
                 except Exception:
                     logger.debug("Could not save iShares holdings to disk for %s", etf)
                 try:
-                    import streamlit as st
                     st.session_state[df_key] = hdf
                 except Exception:
                     pass
@@ -184,7 +186,6 @@ def load_holdings_with_fallback(etf: str, category: str, isin: Optional[str], df
                     logger.debug("Could not save normalized holdings for %s", etf)
 
                 try:
-                    import streamlit as st
                     st.session_state[df_key] = df
                 except Exception:
                     pass
@@ -209,7 +210,6 @@ def load_holdings_with_fallback(etf: str, category: str, isin: Optional[str], df
     except Exception:
         logger.debug("Konnte Demo-Holdings nicht speichern.")
     try:
-        import streamlit as st
         st.session_state[df_key] = demo
     except Exception:
         pass
@@ -256,3 +256,132 @@ def try_relaxed_holdings(path_or_df):
         return True, df
 
     return False, "not a relaxed holdings format"
+
+@st.cache_data(ttl=3600)
+def fetch_from_api(ticker: str, api_key: str) -> pd.DataFrame:
+    url = "https://apidata.fin2dev.com/v1/etfholdings"  # Beispiel
+    params = {"key": api_key, "ticker": ticker}
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status()
+    data = r.json().get("result", {}).get("holdings", [])
+    rows = []
+    for h in data:
+        try:
+            rows.append({"ticker": h["ticker"], "weight_in_etf": float(h.get("percent_value", 0)) / 100.0})
+        except Exception:
+            continue
+    return pd.DataFrame(rows)
+
+def _normalize_weight_column(df: pd.DataFrame) -> pd.DataFrame:
+    candidates = {
+        "ticker": ["ticker", "holding", "symbol"],
+        "weight": ["weight_in_etf", "weight", "percent", "percent_value"]
+    }
+    tcol = next((c for c in candidates["ticker"] if c in df.columns), None)
+    wcol = next((c for c in candidates["weight"] if c in df.columns), None)
+    if tcol is None or wcol is None:
+        logger.debug("Could not find ticker/weight columns: cols=%s", list(df.columns))
+        return pd.DataFrame()
+    out = df[[tcol, wcol]].rename(columns={tcol: "ticker", wcol: "weight_in_etf"}).copy()
+    out["weight_in_etf"] = pd.to_numeric(out["weight_in_etf"], errors="coerce")
+    out = out.dropna(subset=["ticker"])
+    if (out["weight_in_etf"].abs() > 1).any():
+        out["weight_in_etf"] = out["weight_in_etf"] / 100.0
+    return out[["ticker", "weight_in_etf"]]
+
+@st.cache_data(ttl=3600)
+def fetch_from_provider_csv(ticker: str) -> pd.DataFrame:
+    provider_template = os.environ.get("HOLDINGS_PROVIDER_URL")
+    if not provider_template:
+        logger.debug("No HOLDINGS_PROVIDER_URL configured; skipping provider CSV fetch")
+        return pd.DataFrame()
+
+    csv_url = provider_template.format(ticker=ticker)
+    # local file handling
+    if csv_url.startswith("file://"):
+        parsed = urlparse(csv_url)
+        path = parsed.path
+        # Windows: path may start with /C:/..., remove leading slash if present
+        if os.name == "nt" and path.startswith("/") and len(path) > 2 and path[2] == ":":
+            path = path.lstrip("/")
+        # also handle percent-encoding
+        path = os.path.normpath(path)
+        if not os.path.exists(path):
+            logger.warning("Local holdings file not found for %s: %s", ticker, path)
+            return pd.DataFrame()
+        try:
+            df = pd.read_csv(path, encoding="utf8")
+        except Exception as e:
+            logger.warning("Failed to read local holdings file %s: %s", path, e)
+            return pd.DataFrame()
+    else:
+        # HTTP(S) provider
+        try:
+            r = requests.get(csv_url, timeout=10)
+            r.raise_for_status()
+        except Exception as e:
+            logger.warning("fetch_from_provider_csv failed for %s: %s", ticker, e)
+            return pd.DataFrame()
+        try:
+            df = pd.read_csv(io.StringIO(r.text))
+        except Exception as e:
+            logger.warning("Failed to parse CSV from %s: %s", csv_url, e)
+            return pd.DataFrame()
+
+    return _normalize_weight_column(df)
+
+def get_holdings_for_etf(ticker: str, api_key: str | None = None) -> pd.DataFrame:
+    if api_key:
+        try:
+            df = fetch_from_api(ticker, api_key)
+            if not df.empty:
+                return df
+        except Exception as e:
+            logger.warning("fetch_from_api failed for %s: %s", ticker, e)
+    # provider CSV fallback (only if configured)
+    try:
+        df = fetch_from_provider_csv(ticker)
+        if not df.empty:
+            return df
+    except Exception as e:
+        logger.warning("fetch_from_provider_csv failed for %s: %s", ticker, e)
+    return pd.DataFrame()
+
+def get_etf_holdings(ticker: str, api_key: str | None = None) -> pd.DataFrame:
+    """Versucht API -> CSV -> etf_scraper. Gibt DataFrame oder pd.DataFrame() zurück."""
+    # 1. API
+    try:
+        if api_key:
+            df = fetch_from_api(ticker, api_key)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                logger.debug("Holdings from API for %s: %d rows", ticker, len(df))
+                return df
+    except Exception as e:
+        logger.exception("API holdings failed for %s: %s", ticker, e)
+
+    # 2. Provider CSV
+    try:
+        df = fetch_from_provider_csv(ticker)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            logger.debug("Holdings from provider CSV for %s: %d rows", ticker, len(df))
+            return df
+    except Exception as e:
+        logger.exception("Provider CSV failed for %s: %s", ticker, e)
+
+    # 3. etf_scraper fallback
+    try:
+        from etf_scraper import ETFScraper
+        s = ETFScraper()
+        hdf = s.query_holdings(ticker)
+        if hdf is None or len(hdf) == 0:
+            logger.warning("etf_scraper returned no holdings for %s", ticker)
+            return pd.DataFrame()
+        df = pd.DataFrame({"ticker": hdf["ticker"], "weight_in_etf": hdf["weight"] / 100.0})
+        logger.debug("Holdings from etf_scraper for %s: %d rows", ticker, len(df))
+        return df
+    except Exception as e:
+        logger.exception("etf_scraper fallback failed for %s: %s", ticker, e)
+
+    # Fallback: leeres DF
+    logger.warning("No holdings found for %s (all sources failed)", ticker)
+    return pd.DataFrame()

@@ -2,6 +2,7 @@
 import time, random, logging
 from typing import List, Optional, Any, Dict, Sequence, Tuple
 import pandas as pd
+import streamlit as st
 import yfinance as yf
 from requests.exceptions import RequestException
 from datetime import datetime
@@ -10,11 +11,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 from risk_dashboard.config import DEFAULT_START_STR
-#from .yf_wrapper import fetch_prices_from_yf  # passe Pfad an
 
 
-# low-level fetch wrapper (existierender Import)
-#from .yf_wrapper import fetch_prices_from_yf  # passe Pfad an
+@st.cache_data(ttl=3600)
+def cached_download_prices(tickers, start, end, **kwargs):
+    from risk_dashboard.core.etf_tools import download_prices
+    return download_prices(tickers, start=start, end=end, **kwargs)
 
 def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     """

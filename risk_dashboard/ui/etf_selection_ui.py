@@ -12,6 +12,7 @@ from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.data_loader import parse_tickers
 from risk_dashboard.ui.helpers import normalize_ticker
 from risk_dashboard.config import DEFAULT_START_STR
+from risk_dashboard.data_utils import cached_download_prices
 import logging
 
 ##################
@@ -74,13 +75,27 @@ def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
         mapped[s] = None
     return mapped
 
+
 import time
-def render_etf_selection_ui(prefix: str = "etf") -> None:
+def render_etf_selection_ui(prefix="etf"):
+    asset_key = f"{prefix}_asset_type"
+    stable_input_key = f"{prefix}_ticker_input"
 
     #############################################
-    # in render_etf_selection_ui(...)
+    # Defaults sicher setzen
     st.session_state.setdefault("_ui_run_id", str(uuid.uuid4()))
     st.session_state.setdefault("_ui_seq", 0)
+    st.session_state.setdefault("user_tickers", [])
+    st.session_state.setdefault(asset_key, "ETF")
+    st.session_state.setdefault(stable_input_key, "")
+
+    # einmalige Initialisierung (nur Setup, keine Widgets)
+    init_key = f"{prefix}_ui_initialized"
+    if not st.session_state.get(init_key, False):
+        # migrations, defaults, leichte Prefetches
+        st.session_state[init_key] = True
+        logging.getLogger(__name__).info("etf_selection_ui initial setup done")
+
 
     def next_seq():
         st.session_state["_ui_seq"] += 1
@@ -104,43 +119,24 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
         return {k: st.session_state.get(k) for k in resolved}
 
     ##########################################
-
-    asset_key = f"{prefix}_asset_type"
-
-    # globale user tickers und asset type initialisieren
-    st.session_state.setdefault("user_tickers", [])
-    st.session_state.setdefault(asset_key, "ETF")
-
-    # stable input key immer anlegen (verhindert, dass der Key beim Rerun fehlt)
-    stable_input_key = f"{prefix}_ticker_input"
-    st.session_state.setdefault(stable_input_key, "")
-
     WATCH_KEYS = [
         lambda: asset_key,
         lambda: stable_input_key,
         "user_tickers",
         lambda: f"{prefix}_user_tickers_ETF",
         lambda: f"{prefix}_user_tickers_Stock",
+        lambda: f"{prefix}_user_tickers_Mixed",
     ]
 
-
     seq = next_seq(); log.debug("stable keys set", extra={"seq": seq, "keys": list(st.session_state.keys())})
-
+    
     # per-asset storage keys (einmalig) — sorgt für stabile session_state-Form
     for at in ("ETF", "Stock", "Mixed"):
         st.session_state.setdefault(f"{prefix}_user_tickers_{at}", [])
 
-    # Header (Hauptbereich)
+        # Header (Hauptbereich)
     st.header("ETF Auswahl und Explainable Scoring")
-
-    # Optional: temporäre Debug-Ausgaben (entfernen, wenn stabil)
-    st.write("DBG asset_key:", asset_key)
-    st.write("DBG stable_input_key present:", stable_input_key in st.session_state)
-
     
-    st.write("DBG stable_input_value:", st.session_state.get(stable_input_key))
-    st.write("DBG session_state keys:", sorted(list(st.session_state.keys())))
-
     # ---------------- Sidebar (stabile Reihenfolge und Keys) ----------------
     with st.sidebar:
         st.subheader("Portfolio Eingabe")
@@ -152,22 +148,16 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
             index=["ETF", "Stock", "Mixed"].index(st.session_state[asset_key]),
             key=asset_key
         )
-
         seq = next_seq(); log.info("asset_type selected", extra={"seq": seq, "asset_type": st.session_state[asset_key]})
 
         # stable input widget (immer aufrufen)
         st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
 
         # stable add button (immer mit stabilem Key)
-        # Annahme: next_seq(), log (LoggerAdapter) und snapshot(keys) sind definiert,
-        # sowie WATCH_KEYS = [asset_key, stable_input_key, "user_tickers", f"{prefix}_user_tickers_ETF", f"{prefix}_user_tickers_Stock"]
-        
         if st.button("Hinzufügen", key=f"{prefix}_add_button"):
-            # seq + before snapshot
             seq = next_seq(); log.info("add_button pressed", extra={"seq": seq})
             before = snapshot(WATCH_KEYS)
             seq = next_seq(); log.debug("before snapshot", extra={"seq": seq, "before": before})
-
 
             # raw_val zuerst lesen
             raw_val = st.session_state.get(stable_input_key, "") or ""
@@ -200,7 +190,6 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
             # after snapshot + diff log
             after = snapshot(WATCH_KEYS)
             seq = next_seq(); log.info("session_state diff after add", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "before": before, "after": after})
-
 
         # Render per-asset lists in fixed order (nur aktive Asset-Liste anzeigen)
         try:
@@ -239,10 +228,38 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
     )
 
     index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key=f"{prefix}_index_choice")
+    # Kandidaten einmalig laden
     df_candidates = get_etf_candidates_for_index(index_choice)
+
     if df_candidates.empty:
-        st.warning("Keine vordefinierten Kandidaten für diesen Index. Bitte konfiguriere ETF_CANDIDATES.")
+        st.warning("Keine vordefinierten Kandidaten für diesen Index.")
+        new_etfs = st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)")
+        if st.button("Kandidaten speichern"):
+            from risk_dashboard.etf_candidates import add_etf_candidates
+            add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
+            st.experimental_rerun()
         return
+
+    # user tickers ergänzen
+    for t in st.session_state.get("user_tickers", []):
+        if t not in df_candidates["ticker"].values:
+            df_candidates = pd.concat([df_candidates, pd.DataFrame([{"ticker": t}])], ignore_index=True)
+
+    # Holdings import
+    from risk_dashboard.core.holdings import get_holdings_for_etf
+
+    # Kandidaten / Ticker rendern (Expander pro Ticker)
+    for idx, row in df_candidates.iterrows():
+        ticker = row["ticker"]
+        with st.expander(f"{ticker}", expanded=False):
+            cols = st.columns([6, 2])
+            cols[0].write(f"Ticker: **{ticker}**")
+            if cols[1].button("Holdings laden", key=f"load_holdings_{ticker}"):
+                df_hold = get_holdings_for_etf(ticker, api_key=st.secrets.get("HOLDINGS_API_KEY"))
+                if df_hold.empty:
+                    st.warning("Keine Holdings gefunden.")
+                else:
+                    st.dataframe(df_hold)
 
     # user tickers in Kandidatenliste ergänzen (falls noch nicht vorhanden)
     for t in st.session_state.get("user_tickers", []):
@@ -383,6 +400,7 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
     # prices_loaded = (not prices_df.empty) and (len(missing_total) == 0)
 
     controls_disabled = not prices_loaded
+    # controls_disabled = True
 
     # Widgets: immer anzeigen, aber ggf. deaktiviert
     STRATEGIES = ["buy_and_hold", "equal_weight", "momentum", "monthly_rebalance"]
@@ -424,27 +442,35 @@ def render_etf_selection_ui(prefix: str = "etf") -> None:
         else:
             with st.spinner("Lade Preise und führe Backtest aus..."):
                 seq = next_seq(); log.debug("about to call download_prices", extra={"seq": seq, "selected": selected})
-                prices = download_prices(selected, start=str(start), end=str(end))
+                prices = cached_download_prices(selected, start=str(start), end=str(end))
                 seq = next_seq(); log.debug("download_prices returned", extra={"seq": seq, "prices_shape": getattr(prices, "shape", None)})
                 if prices is None or prices.empty:
                     st.error("Keine Preisdaten gefunden für die ausgewählten ETFs.")
+                    if st.button("Erneut versuchen"):
+                        st.experimental_rerun()
+                    uploaded = st.file_uploader("CSV mit Preisdaten hochladen (Date mit Datum und Close)", type=["csv"])
+                    if uploaded is not None:
+                        df = pd.read_csv(uploaded, parse_dates=["Date"]).set_index("Date")
+                        prices = df  # weiterverarbeiten
+                    else:
+                        return
                 else:
                     ticker_map_manual = {"CSPX.L": "EXS1.DE", "EQQQ.L": "EXS2.DE"}
                     # MultiIndex safe handling
                     if isinstance(prices.columns, pd.MultiIndex):
                         try:
-                            if "close" in prices.columns.levels[1]:
+                            if "close" in [c.lower() for c in prices.columns.levels[1]]:
                                 prices = prices.xs("close", axis=1, level=1)
-                            elif "adjclose" in prices.columns.levels[1]:
+                            elif "adjclose" in [c.lower() for c in prices.columns.levels[1]]:
                                 prices = prices.xs("adjclose", axis=1, level=1)
                             else:
                                 prices.columns = ["_".join(map(str, c)).strip() for c in prices.columns.values]
-                        except Exception:
+                        except Exception as e:
+                            log.exception("multiindex handling failed", extra={"error": str(e)})
                             prices.columns = ["_".join(map(str, c)).strip() for c in prices.columns.values]
-
                     price_cols = list(prices.columns)
                     sel_to_price = map_selected_to_pricecols(selected, price_cols, manual_map=ticker_map_manual)
-                    logger.debug("DEBUG: sel_to_price mapping: %s", sel_to_price)
+                    logger.debug("sel_to_price mapping: %s", sel_to_price)
 
                     # mapped_selected: nur price-column keys, die existieren
                     mapped_selected = [sel_to_price[s] for s in selected if sel_to_price.get(s)]

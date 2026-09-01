@@ -1,4 +1,4 @@
-# risk_dashboard/app.py
+﻿# risk_dashboard/app.py
 # $env:PYTHONPATH="C:\Projects\makro_sim"
 # $env:FRED_API_KEY = "5b75a1beb133f4e4aa6b8929ca39a762"
 # setx FRED_API_KEY "5b75a1beb133f4e4aa6b8929ca39a762"
@@ -642,13 +642,19 @@ except Exception:
     logging.getLogger(__name__).exception("profile_form_ui konnte nicht geladen werden")
 
 # --- ETF Auswahl UI oben auf der Seite ---
-if not st.session_state.get("etf_selection_ui_rendered", False):
-    try:
-        from risk_dashboard.ui.etf_selection_ui import render_etf_selection_ui
-        render_etf_selection_ui(prefix="etf")
-        st.session_state["etf_selection_ui_rendered"] = True
-    except Exception as _e:
-        logging.getLogger(__name__).exception("Fehler beim Rendern der ETF Auswahl UI oben: %s", _e)
+
+# einmalige Initialisierung (falls nötig)
+if not st.session_state.get("etf_selection_ui_initialized", False):
+    # nur Setup, keine Widgets
+    st.session_state["etf_selection_ui_initialized"] = True
+    logging.getLogger(__name__).debug("etf_selection_ui initial setup done")
+
+# immer rendern
+try:
+    from risk_dashboard.ui.etf_selection_ui import render_etf_selection_ui
+    render_etf_selection_ui(prefix="etf")
+except Exception as _e:
+    logging.getLogger(__name__).exception("Fehler beim Rendern der ETF Auswahl UI oben: %s", _e)
 
 
 MACRO_LABELS = {
