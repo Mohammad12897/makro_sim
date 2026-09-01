@@ -106,3 +106,4 @@ repo_backup/
 src/makro-sim/
 scripts/
 scripts/
+.streamlit/secrets.toml
