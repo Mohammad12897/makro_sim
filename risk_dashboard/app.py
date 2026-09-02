@@ -29,7 +29,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional, Any, Dict
-
+import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 
@@ -90,6 +90,17 @@ except Exception as e:
     logger.warning("Could not import safety markers: %s. Continuing without safety markers.", e)
     DUMP_MARKERS = []
 
+# initialisierung vor allen Widgets
+for prefix in ("etf", "stock", "mixed"):
+    asset_key = f"{prefix}_asset_type"
+    stable_input_key = f"{prefix}_ticker_input"
+    if asset_key not in st.session_state:
+        st.session_state[asset_key] = "ETF"
+    if stable_input_key not in st.session_state:
+        st.session_state[stable_input_key] = ""
+# danach rufe render_etf_selection_ui(prefix="etf") etc.
+
+
 # Optional: implementiere startup_safety_check in safety.py oder hier eine leichte Variante
 def _default_startup_safety_check(root, markers, auto_fix=False):
     # einfache Prüfung: suche Marker in repo; nur Warnungen, keine harte Fehler
@@ -116,7 +127,6 @@ except Exception:
     logger.exception("Safety check raised an exception; continuing.")
 
 
-
 # Eigene Module (lokale Projektstruktur)
 from risk_dashboard.core.data_loader import (
     load_raw_prices_for_universe,
@@ -132,7 +142,6 @@ import plotly.express as px
 
 
 # initialisiere Flag falls nötig
-import streamlit as st
 if "backtest_ran" not in st.session_state:
     st.session_state["backtest_ran"] = False
 
@@ -1214,23 +1223,160 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
     st.subheader("Backtest 2.0 mit echten ETF-Daten")
     st.info("Hinweis: Hier werden beispielhafte ETF-Ticker verwendet. Du kannst sie später anpassen.")
 
+
+    from risk_dashboard.data_utils import fetch_prices_quiet_with_used
+    from risk_dashboard.core.holdings import get_holdings_for_etf, map_holdings_to_pricecols
+
+    # --- Konfiguration / Defaults ---
+    start = DEFAULT_START_STR
+    end = None
+
+    # Beispiel: wenn du mehrere ETF‑Sets testen willst, iteriere später über ticker_map.
     ticker_map = {
         "Low Risk": ["CSPX.L", "EUNL.DE"],
         "Medium Risk": ["IMEU.L", "IQQ0.DE"],
         "High Risk": ["AGGG.L", "SGLN.L"],
     }
 
-    try:
+    # Wähle hier den ETF, dessen Holdings du laden willst (ein String, nicht ticker_map)
+    etf_ticker = "CSPX.L"  # <-- Korrigiert: einzelner ETF-Ticker
+
+    # Load holdings
+    hold = get_holdings_for_etf(etf_ticker, api_key=None)
+    holdings_list = list(dict.fromkeys(hold["ticker"].astype(str).tolist())) if not hold.empty else []
+
+    # Universe: entweder Holdings oder Fallback auf alle ETF-Ticker aus ticker_map
+    tickers_for_universe = holdings_list or [t for group in ticker_map.values() for t in group]
+
+    # Preise laden
+    used, prices = fetch_prices_quiet_with_used(tickers_for_universe, start=start, end=end)
+
+    # Mapping versuchen
+    mapped_cols, missing = map_holdings_to_pricecols(holdings_list, prices.columns)
+
+
+   # --- Safety: remove any accidental browser dump from file manually before running ---
+
+    # Ensure session keys are initialized BEFORE widgets that use them
+    if stable_input_key not in st.session_state:
+        st.session_state[stable_input_key] = ""
+
+    # (sidebar code creates the widget)
+    st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
+
+    # --- Mapping UI block (after mapped_cols, missing computed) ---
+    if "manual_map" not in st.session_state:
+        st.session_state.manual_map = {}
+
+    # initialize holding_to_price from any existing mapping
+    holding_to_price = {h: c for h, c in zip(holdings_list, mapped_cols)} if mapped_cols else {}
+
+    # guard: prices must exist
+    if prices is None or getattr(prices, "empty", True):
+        st.error("Keine Preisdaten verfügbar. Prüfe Ticker und Datenquelle.")
+    else:
+        # optional upload fallback
+        uploaded = st.file_uploader("Upload holdings CSV (optional)", type=["csv"])
+        if uploaded is not None:
+            try:
+                uploaded_df = pd.read_csv(uploaded)
+                if "ticker" in uploaded_df.columns:
+                    hold = uploaded_df
+                    holdings_list = list(dict.fromkeys(hold["ticker"].astype(str).tolist()))
+                    # recompute mapping and rerun so UI updates
+                    mapped_cols, missing = map_holdings_to_pricecols(holdings_list, prices.columns)
+                    holding_to_price = {h: c for h, c in zip(holdings_list, mapped_cols)} if mapped_cols else {}
+                    st.experimental_rerun()
+                else:
+                    st.error("Hochgeladene CSV enthält keine Spalte 'ticker'.")
+            except Exception as e:
+                st.error(f"Fehler beim Einlesen der Datei: {e}")
+
+        if missing:
+            st.warning(f"Automatisches Mapping fehlgeschlagen für: {missing}")
+            cols = ["<skip>"] + list(prices.columns)
+            manual_map_local = {}
+            for h in missing:
+                default = st.session_state.manual_map.get(h, "<skip>")
+                choice = st.selectbox(f"Map {h} →", options=cols, index=cols.index(default) if default in cols else 0, key=f"map_{h}")
+                if choice and choice != "<skip>":
+                    manual_map_local[h] = choice
+
+            # use a distinct key for the button
+            if st.button("Apply manual mapping", key="apply_manual_mapping"):
+                for h, c in manual_map_local.items():
+                    holding_to_price[h] = c
+                    st.session_state.manual_map[h] = c
+
+                # rebuild weights
+                weights_by_pricecol = {}
+                for _, row in hold.iterrows():
+                    hh = str(row["ticker"])
+                    w = float(row.get("weight_in_etf", 0.0) or 0.0)
+                    price_col = holding_to_price.get(hh)
+                    if price_col:
+                        weights_by_pricecol[price_col] = weights_by_pricecol.get(price_col, 0.0) + w
+
+                if not weights_by_pricecol:
+                    st.error("Nach Anwendung des manuellen Mappings wurden keine Price‑Spalten gefunden.")
+                else:
+                    unique_cols = list(weights_by_pricecol.keys())
+                    missing_cols = [c for c in unique_cols if c not in prices.columns]
+                    if missing_cols:
+                        st.error(f"Die folgenden Price‑Spalten fehlen in den Preisdaten: {missing_cols}")
+                    else:
+                        prices_for_bt = prices.loc[:, unique_cols]
+                        weights_by_ticker = {col: float(w) for col, w in weights_by_pricecol.items()}
+                        total = sum(weights_by_ticker.values())
+                        if total > 0:
+                            weights_by_ticker = {t: w / total for t, w in weights_by_ticker.items()}
+
+                        st.session_state.prices_for_bt = prices_for_bt
+                        st.session_state.weights_by_ticker = weights_by_ticker
+                        st.success("Manuelles Mapping angewendet.")
+
+                        ##############################################
+                        st.write("DEBUG keys: Manuelles Mapping :", list(st.session_state.keys()))
+                        st.write("DEBUG prices_for_bt present:Manuelles Mapping :", "prices_for_bt" in st.session_state)
+                        st.write("DEBUG weights_by_ticker:Manuelles Mapping :", st.session_state.get("weights_by_ticker"))
+                        if "prices_for_bt" in st.session_state:
+                            st.write("prices_for_bt columns:", st.session_state.prices_for_bt.columns.tolist())
+                        if "weights_by_ticker" in st.session_state:
+                            st.write("weights_by_ticker (sum):", sum(st.session_state.weights_by_ticker.values()))
+                        ##############################################
+                        st.experimental_rerun()
+    # --- Danach: Backtest aufrufen (wie bisher) ---
+
+    if "prices_for_bt" in st.session_state and "weights_by_ticker" in st.session_state:
+        from risk_dashboard.core.macro_pipeline import run_backtest
+        prices_for_bt = st.session_state.prices_for_bt
+        weights_by_ticker = st.session_state.weights_by_ticker
+        ##############################################
+        st.write("DEBUG keys:", list(st.session_state.keys()))
+        st.write("DEBUG prices_for_bt present:", "prices_for_bt" in st.session_state)
+        st.write("DEBUG weights_by_ticker:", st.session_state.get("weights_by_ticker"))
+        if "prices_for_bt" in st.session_state:
+            st.write("prices_for_bt columns:", st.session_state.prices_for_bt.columns.tolist())
+        if "weights_by_ticker" in st.session_state:
+            st.write("weights_by_ticker (sum):", sum(st.session_state.weights_by_ticker.values()))
+        ##############################################
+
+        if prices_for_bt.empty or not weights_by_ticker:
+            st.error("Backtest nicht möglich: keine Daten.")
+            bt_etf = pd.DataFrame()
+        else:
+            bt_etf = run_backtest(tickers=list(weights_by_ticker.keys()),
+                                prices_df=prices_for_bt,
+                                start=start, end=end,
+                                weights=weights_by_ticker)
+    else:
         bt_etf = backtest_etf_regime_portfolio(
             ticker_map,
             period="10y",
             scenario_df=scenario_df,
             scenario_regimes=scenario_regimes
-        )
-    except Exception:
-        logging.getLogger(__name__).exception("backtest_etf_regime_portfolio schlug fehl")
-        bt_etf = pd.DataFrame()
-
+        ) 
+    
     st.write("DEBUG etf_prices:", etf_prices)
     st.write("DEBUG bt_etf (vor Anpassung):", bt_etf)
 
