@@ -77,18 +77,21 @@ def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
 
 
 import time
+
 def render_etf_selection_ui(prefix="etf"):
     asset_key = f"{prefix}_asset_type"
     stable_input_key = f"{prefix}_ticker_input"
 
     #############################################
-    # Defaults sicher setzen
+    # Defaults sicher setzen (nur vor Widget-Erzeugung)
     st.session_state.setdefault("_ui_run_id", str(uuid.uuid4()))
     st.session_state.setdefault("_ui_seq", 0)
     st.session_state.setdefault("user_tickers", [])
     st.session_state.setdefault(asset_key, "ETF")
+    # setdefault stellt sicher, dass der Key existiert, ohne ihn nach Widget-Instanziierung zu ändern
     st.session_state.setdefault(stable_input_key, "")
 
+    
     # einmalige Initialisierung (nur Setup, keine Widgets)
     init_key = f"{prefix}_ui_initialized"
     if not st.session_state.get(init_key, False):
@@ -151,7 +154,14 @@ def render_etf_selection_ui(prefix="etf"):
         seq = next_seq(); log.info("asset_type selected", extra={"seq": seq, "asset_type": st.session_state[asset_key]})
 
         # stable input widget (immer aufrufen)
-        st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
+        # st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
+        # --- Widget: Textinput (liest initialen Wert aus session_state)
+        etf_val = st.text_input(
+            "Ticker hinzufügen",
+            key=stable_input_key,
+            placeholder="z.B. AAPL oder VWRL",
+            value=st.session_state.get(stable_input_key, "")
+        )
 
         # stable add button (immer mit stabilem Key)
         if st.button("Hinzufügen", key=f"{prefix}_add_button"):
@@ -185,7 +195,6 @@ def render_etf_selection_ui(prefix="etf"):
 
             seq = next_seq(); log.debug("after parse", extra={"seq": seq, "parsed": parsed})
             save_user_tickers(st.session_state["user_tickers"])
-            st.session_state[stable_input_key] = ""
 
             # after snapshot + diff log
             after = snapshot(WATCH_KEYS)
