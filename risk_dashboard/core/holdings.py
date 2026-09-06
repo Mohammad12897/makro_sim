@@ -5,11 +5,12 @@ import logging
 import requests
 import pandas as pd
 import streamlit as st
-from typing import Optional
+from typing import Optional, Iterable, Sequence, Tuple, List
 import io, os
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
 
 etf_to_isin_map = {
     # iShares
@@ -123,6 +124,63 @@ def read_table(path: Path) -> pd.DataFrame:
     except Exception as e:
         logger.exception("read_table: all attempts failed for %s: %s", path, e)
         raise
+
+
+def map_holdings_to_pricecols(holdings: Iterable, price_columns: Sequence[str]) -> Tuple[List[str], List[str]]:
+    """
+    Fallback-Implementation:
+    - holdings: Liste/Iterable von holdings-Objekten oder dicts oder Strings (z.B. ticker)
+    - price_columns: sequence of column names (z.B. prices.columns)
+    Rückgabe:
+      mapped_cols: Liste der Spalten/Keys, die in price_columns gefunden wurden (in gleicher Reihenfolge wie holdings)
+      missing: Liste der holdings, die nicht gemappt werden konnten
+    Hinweis: Ersetze durch die echte Implementierung sobald verfügbar.
+    """
+    try:
+        price_set = {str(c).upper() for c in price_columns}
+        mapped = []
+        missing = []
+
+        # Unterstütze verschiedene holdings-Formate: dict mit 'ticker', tuple, oder plain string
+        for h in holdings:
+            cand = None
+            # dict-like
+            try:
+                if isinstance(h, dict):
+                    cand = h.get("ticker") or h.get("symbol") or h.get("isin") or h.get("id")
+                elif hasattr(h, "ticker"):
+                    cand = getattr(h, "ticker")
+                else:
+                    cand = str(h)
+            except Exception:
+                cand = str(h)
+
+            if cand is None:
+                missing.append(h)
+                continue
+
+            cand_norm = str(cand).strip().upper()
+            # direkte Übereinstimmung
+            if cand_norm in price_set:
+                mapped.append(cand_norm)
+            else:
+                # heuristik: prüfe Varianten (mit/ohne .DE, L, etc.)
+                alt = cand_norm.replace(".DE", "").replace(".L", "")
+                found = None
+                for pc in price_set:
+                    if alt and alt in pc:
+                        found = pc
+                        break
+                if found:
+                    mapped.append(found)
+                else:
+                    missing.append(cand_norm)
+
+        return mapped, missing
+    except Exception:
+        logger.exception("map_holdings_to_pricecols fallback failed")
+        return [], list(holdings)
+
 
 def load_holdings_with_fallback(etf: str, category: str, isin: Optional[str], df_key: str, holdings_dir: Path) -> pd.DataFrame:
     etf = (etf or "").strip()

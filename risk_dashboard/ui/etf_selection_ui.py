@@ -12,7 +12,9 @@ from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.data_loader import parse_tickers
 from risk_dashboard.ui.helpers import normalize_ticker
 from risk_dashboard.config import DEFAULT_START_STR
-from risk_dashboard.data_utils import cached_download_prices
+from risk_dashboard.data_utils import cached_download_prices, do_add_tickers
+from risk_dashboard.data_utils import safe_rerun, analyze_callback
+from risk_dashboard.core.holdings import map_holdings_to_pricecols
 import logging
 
 ##################
@@ -73,11 +75,9 @@ def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
             continue
         # 5) kein eindeutiges Match
         mapped[s] = None
-    return mapped
-
+    return mapped  
 
 import time
-
 def render_etf_selection_ui(prefix="etf"):
     asset_key = f"{prefix}_asset_type"
     stable_input_key = f"{prefix}_ticker_input"
@@ -132,14 +132,58 @@ def render_etf_selection_ui(prefix="etf"):
     ]
 
     seq = next_seq(); log.debug("stable keys set", extra={"seq": seq, "keys": list(st.session_state.keys())})
-    
+
+    def add_ticker_callback(prefix, asset_key, stable_input_key):
+        seq = next_seq(); log.info("add_button pressed", extra={"seq": seq})
+        before = snapshot(WATCH_KEYS)
+
+        raw_val = (st.session_state.get(stable_input_key, "") or "").strip()
+        seq = next_seq(); log.debug("stable_input read", extra={"seq": seq, "raw_val": raw_val})
+
+        # prices dynamisch holen (Option B)
+        prices = st.session_state.get("prices_for_bt")  # Key an dein Projekt anpassen
+
+        if raw_val:
+            # do_add_tickers macht Mapping + session_state updates; prices kann None sein
+            mapped, missing = do_add_tickers([raw_val], prefix, asset_key, prices=prices)
+            seq = next_seq(); log.info("added ticker", extra={"seq": seq, "ticker": raw_val, "mapped": mapped, "missing": missing})
+            st.session_state[stable_input_key] = ""
+
+            if prices is None:
+                # freundlich informieren, Mapping erfolgt später, falls nötig
+                st.warning("Preisdaten noch nicht geladen. Mapping wird durchgeführt, sobald Preisdaten verfügbar sind.")
+
+        # parse / normalize / apply weitere Änderungen falls nötig
+        try:
+            parsed = parse_tickers(raw_val)
+            seq = next_seq(); log.debug("parsed tickers", extra={"seq": seq, "parsed": parsed})
+        except Exception:
+            seq = next_seq(); log.exception("parse_tickers failed", extra={"seq": seq})
+            st.error("Fehler beim Parsen der Ticker")
+            parsed = []
+
+        per_asset_key = f"{prefix}_user_tickers_{st.session_state.get(asset_key,'ETF')}"
+        st.session_state.setdefault(per_asset_key, [])
+        st.session_state.setdefault("user_tickers", [])
+        for t in parsed:
+            t_norm = normalize_ticker(t)
+            if t_norm and t_norm not in st.session_state[per_asset_key]:
+                st.session_state[per_asset_key].append(t_norm)
+            if t_norm and t_norm not in st.session_state["user_tickers"]:
+                st.session_state["user_tickers"].append(t_norm)
+
+        save_user_tickers(st.session_state["user_tickers"])
+        after = snapshot(WATCH_KEYS)
+        seq = next_seq(); log.info("session_state diff after add", extra={"seq": seq, "before": before, "after": after})
+        safe_rerun()
+
     # per-asset storage keys (einmalig) — sorgt für stabile session_state-Form
     for at in ("ETF", "Stock", "Mixed"):
         st.session_state.setdefault(f"{prefix}_user_tickers_{at}", [])
 
         # Header (Hauptbereich)
     st.header("ETF Auswahl und Explainable Scoring")
-    
+
     # ---------------- Sidebar (stabile Reihenfolge und Keys) ----------------
     with st.sidebar:
         st.subheader("Portfolio Eingabe")
@@ -153,52 +197,22 @@ def render_etf_selection_ui(prefix="etf"):
         )
         seq = next_seq(); log.info("asset_type selected", extra={"seq": seq, "asset_type": st.session_state[asset_key]})
 
-        # stable input widget (immer aufrufen)
-        # st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
-        # --- Widget: Textinput (liest initialen Wert aus session_state)
         etf_val = st.text_input(
             "Ticker hinzufügen",
             key=stable_input_key,
             placeholder="z.B. AAPL oder VWRL",
             value=st.session_state.get(stable_input_key, "")
         )
+            
+        st.button("Analysieren", on_click=analyze_callback, key="analyze_button")
 
         # stable add button (immer mit stabilem Key)
-        if st.button("Hinzufügen", key=f"{prefix}_add_button"):
-            seq = next_seq(); log.info("add_button pressed", extra={"seq": seq})
-            before = snapshot(WATCH_KEYS)
-            seq = next_seq(); log.debug("before snapshot", extra={"seq": seq, "before": before})
-
-            # raw_val zuerst lesen
-            raw_val = st.session_state.get(stable_input_key, "") or ""
-            seq = next_seq(); log.debug("stable_input read", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "raw_val": raw_val})
-
-            # parse sicher ausführen
-            try:
-                parsed = parse_tickers(raw_val)
-                seq = next_seq(); log.debug("parsed tickers", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "parsed": parsed})
-            except Exception as e:
-                seq = next_seq(); log.exception("parse_tickers failed", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq})
-                st.error(f"Fehler beim Parsen der Ticker: {e}")
-                parsed = []
-
-            # apply changes
-            per_asset_key = f"{prefix}_user_tickers_{st.session_state.get(asset_key,'ETF')}"
-            st.session_state.setdefault(per_asset_key, [])
-            for t in parsed:
-                t_norm = normalize_ticker(t)
-                seq = next_seq(); log.debug("processing parsed ticker", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "t_norm": t_norm})
-                if t_norm and t_norm not in st.session_state[per_asset_key]:
-                    st.session_state[per_asset_key].append(t_norm)
-                if t_norm and t_norm not in st.session_state["user_tickers"]:
-                    st.session_state["user_tickers"].append(t_norm)
-
-            seq = next_seq(); log.debug("after parse", extra={"seq": seq, "parsed": parsed})
-            save_user_tickers(st.session_state["user_tickers"])
-
-            # after snapshot + diff log
-            after = snapshot(WATCH_KEYS)
-            seq = next_seq(); log.info("session_state diff after add", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "before": before, "after": after})
+        st.button(
+            "Hinzufügen",
+            on_click=add_ticker_callback,
+            args=(prefix, asset_key, stable_input_key),
+            key=f"{prefix}_add_button"
+        )
 
         # Render per-asset lists in fixed order (nur aktive Asset-Liste anzeigen)
         try:
@@ -206,6 +220,8 @@ def render_etf_selection_ui(prefix="etf"):
                 seq = next_seq(); log.debug("per-asset loop start", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "at": at})
                 lst_key = f"{prefix}_user_tickers_{at}"
                 items = st.session_state.get(lst_key, [])
+                if items:
+                    st.write(f"**{at}**: {', '.join(items)}")
                 seq = next_seq(); log.debug("lst_key/items snapshot", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "lst_key": lst_key, "items_len": len(items) if items is not None else None})
 
                 if at == st.session_state.get(asset_key) and items:
@@ -453,15 +469,44 @@ def render_etf_selection_ui(prefix="etf"):
                 seq = next_seq(); log.debug("about to call download_prices", extra={"seq": seq, "selected": selected})
                 prices = cached_download_prices(selected, start=str(start), end=str(end))
                 seq = next_seq(); log.debug("download_prices returned", extra={"seq": seq, "prices_shape": getattr(prices, "shape", None)})
-                if prices is None or prices.empty:
+
+                # Prüfen, ob Preisdaten vorhanden sind
+                if prices is None or (hasattr(prices, "empty") and prices.empty):
                     st.error("Keine Preisdaten gefunden für die ausgewählten ETFs.")
+
+                    # Retry-Button: ruft einen sicheren Rerun auf
                     if st.button("Erneut versuchen"):
-                        st.experimental_rerun()
-                    uploaded = st.file_uploader("CSV mit Preisdaten hochladen (Date mit Datum und Close)", type=["csv"])
-                    if uploaded is not None:
-                        df = pd.read_csv(uploaded, parse_dates=["Date"]).set_index("Date")
-                        prices = df  # weiterverarbeiten
+                        try:
+                            safe_rerun()
+                        except Exception:
+                            st.experimental_rerun()
+
+                    # CSV-Uploader für Preisdaten
+                    uploaded_prices = st.file_uploader(
+                        "CSV mit Preisdaten hochladen (Date mit Datum und Close)",
+                        type=["csv"],
+                        key=f"prices_uploader_{prefix}"
+                    )
+                    if uploaded_prices is not None:
+                        try:
+                            df = pd.read_csv(uploaded_prices, parse_dates=["Date"])
+                            if "Date" not in df.columns:
+                                st.error("Die CSV muss eine Spalte 'Date' enthalten.")
+                            else:
+                                df = df.set_index("Date").sort_index()
+                                # Optional: prüfe auf 'Close' Spalte oder andere erwartete Spalten
+                                if "Close" not in df.columns and df.shape[1] == 1:
+                                    # Wenn nur eine Spalte vorhanden ist, nehme sie als Close an
+                                    df.columns = ["Close"]
+                                st.session_state["prices_for_bt"] = df
+                                prices = df  # lokale Variable aktualisieren für den weiteren Ablauf
+                                st.success("Preisdaten erfolgreich hochgeladen.")
+                        except Exception as e:
+                            st.exception(e)
+                            st.error(f"Fehler beim Einlesen der Preisdaten: {e}")
+                            # nicht returnen, damit die UI weiter funktioniert
                     else:
+                        # Wenn noch nichts hochgeladen wurde, abbrechen / Funktion verlassen
                         return
                 else:
                     ticker_map_manual = {"CSPX.L": "EXS1.DE", "EQQQ.L": "EXS2.DE"}

@@ -2,21 +2,220 @@
 import time, random, logging
 from typing import List, Optional, Any, Dict, Sequence, Tuple
 import pandas as pd
+from risk_dashboard.core.holdings import map_holdings_to_pricecols
 import streamlit as st
 import yfinance as yf
 from requests.exceptions import RequestException
 from datetime import datetime
+from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
 
-from risk_dashboard.config import DEFAULT_START_STR
+from pathlib import Path
 
+DEFAULT_MARKERS_FILE = Path(__file__).parents[1] / "docs" / "default_edge_markers.txt"
+DOCS_EXAMPLE = Path(__file__).parents[1] / "docs" / "edge_tabs_example.txt"
+from risk_dashboard.config import DEFAULT_START_STR
 
 @st.cache_data(ttl=3600)
 def cached_download_prices(tickers, start, end, **kwargs):
     from risk_dashboard.core.etf_tools import download_prices
     return download_prices(tickers, start=start, end=end, **kwargs)
+
+
+def safe_rerun_OLD():
+    """
+    Versucht st.experimental_rerun(); falls nicht vorhanden, erzwingt einen Rerun
+    durch Ändern der Query-Parameter (sicherer Fallback).
+    """
+    # 1) Direkter Versuch (wenn verfügbar)
+    try:
+        rerun_fn = getattr(st, "experimental_rerun", None)
+        if callable(rerun_fn):
+            rerun_fn()
+            return
+    except Exception:
+        # Falls Aufruf unerwartet fehlschlägt, weiter zum Fallback
+        pass
+
+    # 2) Fallback: toggle eines session flags + set query param (erzwingt Neuladen)
+    try:
+        # toggle ein Flag (kann in App-Logik genutzt werden)
+        st.session_state["_rerun_requested"] = not st.session_state.get("_rerun_requested", False)
+        # setze einen Zeitstempel in den Query-Params, das löst ein Re-Run aus
+        params = st.experimental_get_query_params()
+        params["_r"] = [str(int(time.time()))]
+        st.experimental_set_query_params(**params)
+    except Exception:
+        # letzter Ausweg: schreibe eine Warnung, aber verhindere Absturz
+        st.warning("Rerun konnte nicht automatisch ausgelöst werden; bitte Seite manuell neu laden.")
+
+import inspect
+from types import SimpleNamespace
+from collections import deque
+
+def safe_rerun():
+    """
+    Robust rerun helper for multiple Streamlit versions.
+    - prefer st.experimental_rerun()
+    - otherwise raise RerunException with a minimal rerun_data object if required
+    """
+
+    # 1) Preferred API (most versions)
+    if hasattr(st, "experimental_rerun"):
+        try:
+            st.experimental_rerun()
+            return
+        except Exception:
+            # fall through to fallback
+            pass
+
+    # 2) Fallback: import RerunException from likely locations
+    RerunException = None
+    for mod_path in (
+        "streamlit.runtime.scriptrunner.script_runner",
+        "streamlit.runtime.scriptrunner",
+        "streamlit.script_runner",
+    ):
+        try:
+            mod = __import__(mod_path, fromlist=["RerunException"])
+            RerunException = getattr(mod, "RerunException", None)
+            if RerunException:
+                break
+        except Exception:
+            RerunException = None
+
+    if RerunException is None:
+        raise RuntimeError("safe_rerun: rerun not available in this Streamlit installation")
+
+    # 3) Inspect constructor: does it require rerun_data?
+    try:
+        sig = inspect.signature(RerunException.__init__)
+        params = list(sig.parameters.keys())
+    except Exception:
+        params = []
+
+    if "rerun_data" in params:
+        # Build a minimal duck-typed rerun_data object expected by Streamlit internals.
+        # It must provide fragment_id_queue (deque-like). Use SimpleNamespace for duck-typing.
+        rerun_data = SimpleNamespace(fragment_id_queue=deque())
+        # Raise with the constructed object
+        raise RerunException(rerun_data)
+    else:
+        # constructor takes no rerun_data param
+        raise RerunException()
+
+def run_analysis():
+    logging.info("Analyse gestartet")
+    # Beispiel: Dummy-Ergebnis
+    return {"status": "ok", "tickers": st.session_state.get("user_tickers", [])}
+
+def analyze_callback():
+    if st.session_state.get("_analyzing"):
+        return
+    st.session_state["_analyzing"] = True
+    try:
+        # lange Analyse hier (oder delegiere an cached function)
+        result = run_analysis()  # blockierend, aber in Callback
+        st.session_state["analysis_result"] = result
+    except Exception:
+        logging.exception("analysis failed")
+    finally:
+        st.session_state["_analyzing"] = False
+        safe_rerun()
+
+def do_add_tickers(holdings_list, prefix, asset_key, prices=None):
+    """
+    Reine Verarbeitungsfunktion.
+    - Ändert st.session_state (Tickerlisten, mapping), ruft kein safe_rerun().
+    - Gibt (mapped_cols, missing) zurück für UI-Feedback.
+    """
+    import streamlit as st
+    # normalize input
+    holdings = [str(h).strip() for h in holdings_list if str(h).strip()]
+    if not holdings:
+        return [], []
+
+    # mapping nur wenn prices vorhanden
+    mapped_cols, missing = [], []
+    if prices is not None:
+        try:
+            mapped_cols, missing = map_holdings_to_pricecols(holdings, prices.columns)
+        except Exception:
+            mapped_cols, missing = [], holdings[:]  # fallback: alles missing
+
+    holding_to_price = {h: c for h, c in zip(holdings, mapped_cols)} if mapped_cols else {}
+
+    # session list key
+    list_key = f"{prefix}_user_tickers_{st.session_state.get(asset_key, 'ETF')}"
+    lst = st.session_state.setdefault(list_key, [])
+    existing_upper = {x.upper() for x in lst}
+    for h in holdings:
+        if h.upper() not in existing_upper:
+            lst.append(h)
+            existing_upper.add(h.upper())
+    st.session_state[list_key] = lst
+
+    # store mapping info
+    st.session_state[f"{prefix}_holding_to_price"] = holding_to_price
+    st.session_state[f"{prefix}_holding_missing"] = missing
+
+    return mapped_cols, missing
+
+def add_ticker_callback_old(prefix: str, asset_key: str, stable_input_key: str, prices=None):
+    """
+    Button-Callback: liest das einzelne Eingabefeld, ruft do_add_tickers und safe_rerun().
+    """
+    raw = (st.session_state.get(stable_input_key, "") or "").strip()
+    if not raw:
+        return
+    try:
+        do_add_tickers([raw], prefix, asset_key, prices=prices)
+    except Exception:
+        logger.exception("Fehler beim Hinzufügen des Tickers")
+    # Feld leeren (sicher im Callback)
+    st.session_state[stable_input_key] = ""
+    # UI neu rendern (robuster Fallback)
+    safe_rerun()
+
+def _load_edge_markers():
+    # Versuche zuerst die projektinterne docs-Datei
+    try:
+        text = DOCS_EXAMPLE.read_text(encoding="utf-8")
+        markers = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+        return markers
+    except Exception:
+        # Fallback: separate, kontrollierte Datei mit harmlosen Markern
+        try:
+            text = DEFAULT_MARKERS_FILE.read_text(encoding="utf-8")
+            return [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+        except Exception:
+            # Letzter Rückfall: keine Marker
+            return []
+
+
+def sanitize_session_state():
+    """
+    Entfernt nur eindeutig verdächtige session_state-Keys, die
+    große Strings mit den in docs definierten Markern enthalten.
+    Wird einmalig beim App-Start aufgerufen.
+    """
+    markers = _load_edge_markers()
+    removed = []
+    for k in list(st.session_state.keys()):
+        v = st.session_state.get(k)
+        if not isinstance(v, str):
+            continue
+        # konservative Heuristik: Marker + sehr große Länge
+        if any(marker in v for marker in markers) and len(v) > 2000:
+            st.session_state.pop(k, None)
+            removed.append(k)
+            logging.warning("sanitize_session_state removed suspicious key %s (len=%d)", k, len(v))
+    if removed:
+        logging.info("sanitize_session_state removed keys: %s", removed)
+
+
 
 def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     """

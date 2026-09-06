@@ -190,14 +190,18 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
     if uploaded is not None:
         try:
             df = pd.read_csv(uploaded)
-            logger.debug("Loaded portfolio from uploader shape=%s columns=%s", getattr(df, "shape", None), list(df.columns))
+            log.debug("Loaded portfolio from uploader shape=%s columns=%s", getattr(df, "shape", None), list(df.columns))
+            # Optional: einfache Validierung
+            if "ticker" not in [c.lower() for c in df.columns]:
+                st.warning("Die CSV enthält keine Spalte 'ticker' (Groß-/Kleinschreibung beachten).")
             st.session_state[session_key] = df
+            st.success("Portfolio erfolgreich geladen.")
             return df
-        except Exception:
-            logger.exception("Failed to parse uploaded portfolio CSV")
+        except Exception as e:
+            log.exception("Failed to parse uploaded portfolio CSV: %s", e)
             st.error("Fehler beim Einlesen der hochgeladenen CSV.")
             return pd.DataFrame()
-
+        
     # 3. Fallback: Datei auf Disk
     disk_path = Path("risk_dashboard/data/portfolio.csv")  # oder holdings/portfolio.csv
     logger.debug("Trying to load CSV from %s exists=%s", disk_path, disk_path.exists())

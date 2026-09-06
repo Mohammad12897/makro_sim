@@ -1,7 +1,5 @@
 ﻿# risk_dashboard/app.py
 # $env:PYTHONPATH="C:\Projects\makro_sim"
-# $env:FRED_API_KEY = "5b75a1beb133f4e4aa6b8929ca39a762"
-# setx FRED_API_KEY "5b75a1beb133f4e4aa6b8929ca39a762"
 # im aktivierten venv
 # python -m pip install --upgrade pip
 # python -m pip install plotly pandas yfinance streamlit
@@ -22,49 +20,93 @@
 # python -m streamlit run .\risk_dashboard\app.py --server.runOnSave=false
 
 # risk_dashboard/app.py
+# --- Logging must be configured before importing streamlit or other app modules ---
 import os
 import sys
-import locale
 import logging
+import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional, Any, Dict
-import streamlit as st
-import numpy as np
-import plotly.graph_objects as go
 
-print(">>> APP STARTED: TOP OF app.py", flush=True)
-
-# Ensure project root is on sys.path so "scripts" package is importable
+# Project root and output dirs (unchanged)
 project_root = Path(__file__).resolve().parents[1]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-
 out_dir = project_root / "data" / "backtests"
 out_dir.mkdir(parents=True, exist_ok=True)
 
-
+# Logging directory and file
 LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
-log_file = os.path.join(LOG_DIR, "app.log")
+log_file = os.path.join(LOG_DIR, "app_exceptions.log")
 
+# Root logger basic config (only once)
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.DEBUG)
+root_logger.propagate = False  # avoid double propagation
 
-fh = RotatingFileHandler(log_file, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
-fh.setLevel(logging.DEBUG)
 fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-fh.setFormatter(fmt)
-root_logger.addHandler(fh)
 
-sh = logging.StreamHandler()
-sh.setLevel(logging.INFO)
-sh.setFormatter(fmt)
-root_logger.addHandler(sh)
+# Add RotatingFileHandler only if not present
+if not any(isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", "").endswith("app_exceptions.log") for h in root_logger.handlers):
+    fh = RotatingFileHandler(log_file, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(fmt)
+    root_logger.addHandler(fh)
 
+# Add StreamHandler only if not present
+if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+    sh = logging.StreamHandler()
+    sh.setLevel(logging.INFO)
+    sh.setFormatter(fmt)
+    root_logger.addHandler(sh)
+
+# Reduce noisy third-party loggers
 logging.getLogger("yfinance").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
+# Uncaught exceptions -> log file
+def _log_unhandled_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    logging.getLogger(__name__).exception("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+sys.excepthook = _log_unhandled_exception
+
+def _thread_excepthook(args):
+    logging.getLogger(__name__).exception("Uncaught thread exception", exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
+
+# Python 3.8+: set thread excepthook
+threading.excepthook = _thread_excepthook
+
+# Quick test write (will create file if writable)
+try:
+    logging.getLogger(__name__).info("LOGGING INITIALIZED: writing test entry")
+    with open(log_file, "a", encoding="utf-8") as _f:
+        _f.write("LOG FILE WRITE TEST\n")
+except Exception:
+    # If this fails, we'll detect it below with file existence checks
+    pass
+
+# --- Now import streamlit and the rest of your app modules ---
+import locale
+import logging as _logging  # keep alias if needed
+import streamlit as st
+# other imports follow...
+from typing import Optional, Any, Dict
+
+import numpy as np
+import plotly.graph_objects as go
+from risk_dashboard.data_utils import do_add_tickers, safe_rerun, fetch_prices_quiet_with_used, sanitize_session_state
+print(">>> APP STARTED: TOP OF app.py", flush=True)
+
+
+def add_ticker_callback():
+    # ... verarbeite input, update st.session_state ...
+    st.session_state[stable_input_key] = ""
+    from risk_dashboard.data_utils import safe_rerun
+    safe_rerun()
 
 # UTF-8 erzwingen (sicher)
 try:
@@ -89,6 +131,8 @@ try:
 except Exception as e:
     logger.warning("Could not import safety markers: %s. Continuing without safety markers.", e)
     DUMP_MARKERS = []
+
+sanitize_session_state ()
 
 # initialisierung vor allen Widgets
 for prefix in ("etf", "stock", "mixed"):
@@ -436,10 +480,26 @@ elif choice == "Backtest Rezept":
 elif choice == "Upload":
     st.header("Portfolio Upload")
     st.markdown("**Portfolio-CSV (Ticker, Menge, Preis, market_value optional)**")
+   
+    # in profiles_ui.py (Upload-Handler)
     uploaded = st.file_uploader("Hochladen (CSV, max 200MB)", type=["csv"], accept_multiple_files=False)
     if uploaded:
-        bytes_data = uploaded.read()
-        st.success(f"Datei empfangen: {uploaded.name} ({len(bytes_data)} bytes)")
+        size_bytes = uploaded.getbuffer().nbytes
+        # nur Preview lesen (erste 4 KB)
+        uploaded.seek(0)
+        preview = uploaded.read(4096).decode(errors="ignore")
+        if len(preview) > 2000:
+            preview = preview[:2000] + "...[truncated]"
+        st.session_state["uploaded_preview"] = preview
+        st.success(f"Datei empfangen: {uploaded.name} ({size_bytes} bytes)")
+
+        # CSV sicher parsen (seek zurück)
+        try:
+            uploaded.seek(0)
+            df = pd.read_csv(uploaded)
+            # validierung hier: Spalten, types, max rows
+        except Exception as e:
+            st.error(f"CSV konnte nicht gelesen werden: {e}")
         # Validierung / Parsing hier
 elif choice == "Holdings Analyse":
     st.header("Holdings Analyse")
@@ -664,6 +724,7 @@ try:
     render_etf_selection_ui(prefix="etf")
 except Exception as _e:
     logging.getLogger(__name__).exception("Fehler beim Rendern der ETF Auswahl UI oben: %s", _e)
+    st.error("Interner Fehler beim Rendern. Details im Log.")
 
 
 MACRO_LABELS = {
@@ -1224,7 +1285,6 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
     st.info("Hinweis: Hier werden beispielhafte ETF-Ticker verwendet. Du kannst sie später anpassen.")
 
 
-    from risk_dashboard.data_utils import fetch_prices_quiet_with_used
     from risk_dashboard.core.holdings import get_holdings_for_etf, map_holdings_to_pricecols
 
     # --- Konfiguration / Defaults ---
@@ -1281,12 +1341,12 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
             try:
                 uploaded_df = pd.read_csv(uploaded)
                 if "ticker" in uploaded_df.columns:
-                    hold = uploaded_df
-                    holdings_list = list(dict.fromkeys(hold["ticker"].astype(str).tolist()))
-                    # recompute mapping and rerun so UI updates
-                    mapped_cols, missing = map_holdings_to_pricecols(holdings_list, prices.columns)
-                    holding_to_price = {h: c for h, c in zip(holdings_list, mapped_cols)} if mapped_cols else {}
-                    st.experimental_rerun()
+                    holdings_list = list(dict.fromkeys(uploaded_df["ticker"].astype(str).tolist()))
+                    mapped_cols, missing = do_add_tickers(holdings_list, prefix, asset_key, prices=prices)
+                    if missing:
+                        st.warning(f"Einige Ticker konnten nicht gemappt werden: {missing}")
+                    # UI sofort aktualisieren
+                    safe_rerun()
                 else:
                     st.error("Hochgeladene CSV enthält keine Spalte 'ticker'.")
             except Exception as e:
@@ -1335,40 +1395,30 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                         st.session_state.weights_by_ticker = weights_by_ticker
                         st.success("Manuelles Mapping angewendet.")
 
-                        ##############################################
-                        st.write("DEBUG keys: Manuelles Mapping :", list(st.session_state.keys()))
-                        st.write("DEBUG prices_for_bt present:Manuelles Mapping :", "prices_for_bt" in st.session_state)
-                        st.write("DEBUG weights_by_ticker:Manuelles Mapping :", st.session_state.get("weights_by_ticker"))
-                        if "prices_for_bt" in st.session_state:
-                            st.write("prices_for_bt columns:", st.session_state.prices_for_bt.columns.tolist())
-                        if "weights_by_ticker" in st.session_state:
-                            st.write("weights_by_ticker (sum):", sum(st.session_state.weights_by_ticker.values()))
-                        ##############################################
-                        st.experimental_rerun()
+                        # st.experimental_rerun()
+                        safe_rerun()
     # --- Danach: Backtest aufrufen (wie bisher) ---
 
     if "prices_for_bt" in st.session_state and "weights_by_ticker" in st.session_state:
         from risk_dashboard.core.macro_pipeline import run_backtest
         prices_for_bt = st.session_state.prices_for_bt
         weights_by_ticker = st.session_state.weights_by_ticker
-        ##############################################
-        st.write("DEBUG keys:", list(st.session_state.keys()))
-        st.write("DEBUG prices_for_bt present:", "prices_for_bt" in st.session_state)
-        st.write("DEBUG weights_by_ticker:", st.session_state.get("weights_by_ticker"))
-        if "prices_for_bt" in st.session_state:
-            st.write("prices_for_bt columns:", st.session_state.prices_for_bt.columns.tolist())
-        if "weights_by_ticker" in st.session_state:
-            st.write("weights_by_ticker (sum):", sum(st.session_state.weights_by_ticker.values()))
-        ##############################################
-
         if prices_for_bt.empty or not weights_by_ticker:
             st.error("Backtest nicht möglich: keine Daten.")
             bt_etf = pd.DataFrame()
         else:
-            bt_etf = run_backtest(tickers=list(weights_by_ticker.keys()),
-                                prices_df=prices_for_bt,
-                                start=start, end=end,
-                                weights=weights_by_ticker)
+            import traceback
+            try:
+                bt_etf = run_backtest(tickers=list(weights_by_ticker.keys()),
+                                                prices_df=prices_for_bt,
+                                                start=start, end=end,
+                                                weights=weights_by_ticker)
+            except Exception:
+                logging.getLogger("risk_dashboard.core").exception("run_backtest failed")
+                st.error("Backtest fehlgeschlagen. Details im Log.")
+                st.write(traceback.format_exc())  # nur temporär zum Debug
+                bt_etf = pd.DataFrame()
+
     else:
         bt_etf = backtest_etf_regime_portfolio(
             ticker_map,

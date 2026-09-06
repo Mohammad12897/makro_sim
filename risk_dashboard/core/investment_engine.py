@@ -195,7 +195,6 @@ def detect_macro_trends():
     }
 
 
-
 def classify_risk_level():
     """
     Risk Score 2.0 in Kategorien einteilen.
@@ -401,7 +400,6 @@ def risk_parity_weights(returns_df: pd.DataFrame):
     return weights.to_dict()
 
 
-
 def build_regime_risk_parity_portfolio(low, medium, high, period="10y"):
     # 1) Tickerliste bauen
     tickers = list(set(low + medium + high))
@@ -430,73 +428,16 @@ def build_regime_risk_parity_portfolio(low, medium, high, period="10y"):
 
     return rp_struct, rets, missing
 
-
 def hrp_weights(returns_df: pd.DataFrame):
     """
-    Returns: dict key->weight (sums to 1) or {} bei Fehlern.
+    Returns: dict ticker->weight (sums to 1) or {} bei Fehlern.
     Annahme: returns_df enthält Renditen (columns = tickers).
     """
-    # 1) Grundchecks
-    returns_df = returns_df.dropna(how="all", axis=1)
-    if returns_df.shape[1] == 0:
-        st.warning("HRP— keine gültigen Spalten in returns_df.")
-        return {}
-
-    # 2) Korrelations- und Distanzmatrix
-    corr = returns_df.corr().fillna(0.0).clip(-1, 1)
-    # Distanz nach Lopez de Prado (sqrt(0.5*(1-corr)))
-    dist_mat = np.sqrt(0.5 * (1.0 - corr.values))
-
-    # 3) safe: falls dist_mat quadratisch -> kondensieren
-    try:
-        if dist_mat.ndim == 2 and dist_mat.shape[0] == dist_mat.shape[1]:
-            condensed = squareform(dist_mat)  # NxN -> condensed vector
-        else:
-            condensed = np.asarray(dist_mat)
-    except Exception as e:
-        st.error(f"HRP— Fehler beim Erzeugen der kondensierten Distanz: {e}")
-        return {}
-
-    # 4) linkage erzeugen (hier single linkage als Beispiel)
-    try:
-        Z = linkage(condensed, method="single")
-    except Exception as e:
-        st.error(f"HRP— Fehler beim Clustering/linkage: {e}")
-        return {}
-
-    # 5) Reihenfolge der Blätter
-    try:
-        order = leaves_list(Z)
-    except Exception as e:
-        st.error(f"HRP— Fehler beim Ermitteln der leaves: {e}")
-        return {}
-
-    # 6) Kovarianz und geordnete Kovarianz
-    cov = returns_df.cov().fillna(0.0)
-    ordered_cov = cov.iloc[order, order]
-
-    # 7) einfache HRPâ€‘Gewichte (vereinfachte Implementierung)
-    # Hier ein sehr einfaches rekursives Split-Verfahren (Platzhalter für vollständige HRP)
-    # Ziel: Gewichte pro Ticker (index names)
-    tickers = ordered_cov.index.tolist()
-    n = len(tickers)
-    if n == 0:
-        return {}
-
-    # einfache Gleichgewichtung als Fallback (du kannst hier die echte HRP-Logik einsetzen)
-    weights = {t: 1.0 / n for t in tickers}
-
-    # 8) Map zurück auf originale Spaltenreihenfolge
-    # Wenn du die Gewichte in originaler Reihenfolge brauchst:
-    result = {t: float(weights.get(t, 0.0)) for t in returns_df.columns}
-    # Normieren (sicherheitshalber)
-    s = sum(result.values()) or 1.0
-    result = {k: v / s for k, v in result.items()}
-
-    return result
 
     def _get_cluster_var(cov_mat, cluster_items):
         sub = cov_mat.loc[cluster_items, cluster_items]
+        if sub.shape[0] == 0:
+            return 0.0
         w = np.ones(len(sub)) / len(sub)
         return float(np.dot(w, np.dot(sub.values, w)))
 
@@ -509,7 +450,11 @@ def hrp_weights(returns_df: pd.DataFrame):
 
         var_left = _get_cluster_var(cov_mat, left)
         var_right = _get_cluster_var(cov_mat, right)
-        alpha_left = 1 - var_left / (var_left + var_right)
+        # Schutz gegen Division durch 0
+        if (var_left + var_right) == 0:
+            alpha_left = 0.5
+        else:
+            alpha_left = 1 - var_left / (var_left + var_right)
         alpha_right = 1 - alpha_left
 
         w_left = _hrp_alloc(cov_mat, left)
@@ -522,10 +467,64 @@ def hrp_weights(returns_df: pd.DataFrame):
             w[k] = v * alpha_right
         return w
 
-    items = list(ordered.columns)
-    w = _hrp_alloc(ordered, items)
+    # 1) Grundchecks
+    if not isinstance(returns_df, pd.DataFrame):
+        raise TypeError("hrp_weights expects a pandas DataFrame")
+    returns_df = returns_df.dropna(how="all", axis=1)
+    if returns_df.shape[1] == 0:
+        return {}
+
+    # 2) Korrelationsmatrix
+    corr = returns_df.corr().fillna(0.0).clip(-1, 1)
+
+    # 3) Distanzmatrix (Lopez de Prado)
+    dist_mat = np.sqrt(0.5 * (1.0 - corr.values))
+    # squareform akzeptiert eine quadratische symmetrische Matrix und gibt condensed vector
+    try:
+        condensed = squareform(dist_mat)
+    except Exception:
+        # falls squareform fehlschlägt, versuche fallback: pdist-like vector
+        # aber in der Regel sollte squareform mit symmetrischer Matrix funktionieren
+        condensed = None
+
+    # 4) linkage
+    try:
+        if condensed is not None:
+            Z = linkage(condensed, method="single")
+        else:
+            # fallback: flatten upper triangle manually
+            Z = linkage(squareform(dist_mat), method="single")
+    except Exception:
+        # Wenn Clustering fehlschlägt, gib einfache Gleichgewichtung zurück
+        tickers = returns_df.columns.tolist()
+        n = len(tickers)
+        return {t: 1.0 / n for t in tickers}
+
+    # 5) Reihenfolge der Blätter
+    try:
+        order = leaves_list(Z)
+    except Exception:
+        tickers = returns_df.columns.tolist()
+        n = len(tickers)
+        return {t: 1.0 / n for t in tickers}
+
+    # 6) Kovarianz und geordnete Kovarianz
+    cov = returns_df.cov().fillna(0.0)
+    ordered = cov.iloc[order, order]
+    tickers_ordered = ordered.index.tolist()
+
+    # 7) HRP Rekursion
+    w = _hrp_alloc(ordered, tickers_ordered)
     s = sum(w.values()) or 1.0
-    return {k: v / s for k, v in w.items()}
+    normalized = {k: float(v / s) for k, v in w.items()}
+
+    # 8) Map zurück auf originale Spaltenreihenfolge
+    result = {t: normalized.get(t, 0.0) for t in returns_df.columns}
+    # Normieren (Sicherheit)
+    s2 = sum(result.values()) or 1.0
+    result = {k: v / s2 for k, v in result.items()}
+
+    return result
 
     
 def build_regime_hrp_portfolio(low, medium, high, rets):
