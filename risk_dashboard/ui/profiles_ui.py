@@ -19,7 +19,7 @@ import tempfile, os, json
 import logging, inspect, pathlib
 
 
-from data_utils import price_history_to_prices_df
+from risk_dashboard.data_utils import fetch_price_history_bulk, price_history_to_prices_df
 from risk_dashboard.core.screening import screen_and_rank
 from risk_dashboard.core.config import load_profiles, save_profile, load_etf_universe
 from risk_dashboard.core.utils import resolve_components, analyze_portfolio_components, classify_etf
@@ -1039,30 +1039,44 @@ def profile_form_ui() -> None:
     macro_regime = detect_regime(macro_df)
     allowed = select_etfs_for_regime(etf_universe, macro_regime)
 
-    # in profiles_ui.py, direkt vor build_regime_portfolio(...)
-    if price_data is None or price_data.empty:
-        logger.warning("profile_form_ui: price_data fehlt oder ist leer; Abbruch build_regime_portfolio")
-        st.warning("Preisdaten konnten nicht geladen werden. Bitte überprüfe die Verbindung oder wähle andere ETFs.")
-        return  # oder: continue mit alternativer UI-Route
-    try:
-        # --- Portfolio bauen (stelle sicher, dass build_regime_portfolio prices verwendet) ---
-        portfolio = build_regime_portfolio(macro_regime, allowed, prices=price_data, method="HRP")
-    except ValueError as e:
-        logger.exception("build_regime_portfolio fehlgeschlagen: %s", e)
-        st.error("Portfolio konnte nicht erstellt werden: Preisdaten fehlen oder sind unvollständig.")
-        return
+    # Defensive Prüfung auf Preisdaten
+    logger.debug(
+        "profile_form_ui: entering portfolio build; price_data type=%s empty=%s keys=%s",
+        type(price_data),
+        getattr(price_data, "empty", None),
+        getattr(price_data, "columns", None),
+    )
 
-    st.session_state["selected_portfolio"] = portfolio
-
-    # --- Session reads (konsistent aus session_state) ---
-    price_data = st.session_state.get("price_data", pd.DataFrame())
-    portfolio = st.session_state.get("selected_portfolio", {})
-
-    # --- Validierung price_data ---
+    # Defensive Prüfung auf Preisdaten
     if not is_nonempty(price_data):
-        st.error("Preisdaten fehlen. Bitte lade Preisdaten.")
-        st.stop()
+        logger.warning("profile_form_ui: price_data fehlt oder ist leer; zeige Upload-UI")
+        st.warning("Preisdaten konnten nicht geladen werden. Bitte überprüfe die Verbindung oder wähle andere ETFs.")
 
+        uploaded_prices = st.file_uploader(
+            "CSV mit Preisdaten hochladen (Date mit Datum und Close)",
+            type=["csv"],
+            key="prices_uploader_profile"
+        )
+        if uploaded_prices is not None:
+            try:
+                df = pd.read_csv(uploaded_prices, parse_dates=["Date"]).set_index("Date").sort_index()
+                if "Close" not in df.columns and df.shape[1] == 1:
+                    df.columns = ["Close"]
+                st.session_state["price_data"] = df
+                price_data = df
+                st.success("Preisdaten erfolgreich hochgeladen.")
+            except Exception as e:
+                logger.exception("Fehler beim Einlesen der Preisdaten: %s", e)
+                st.error("Fehler beim Einlesen der Preisdaten.")
+        # kein return hier — Nutzer kann Upload durchführen; Portfolio wird gebaut, sobald price_data vorhanden ist
+    else:
+        try:
+            portfolio = build_regime_portfolio(macro_regime, allowed, prices=price_data, method="HRP")
+        except ValueError as e:
+            logger.exception("build_regime_portfolio fehlgeschlagen: %s", e)
+            st.error("Portfolio konnte nicht erstellt werden: Preisdaten fehlen oder sind unvollständig.")
+        else:
+            st.session_state["selected_portfolio"] = portfolio
  
     # 3. Ticker extrahieren (anpassbar an dein Portfolio-Format)
     def _extract_tickers_from_portfolio(p):
@@ -1109,7 +1123,6 @@ def profile_form_ui() -> None:
 
     bt = {}
     ###################################################
-    from risk_dashboard.data_utils import fetch_price_history_bulk, price_history_to_prices_df
     from risk_dashboard.utils.session_helpers import maybe_run_backtest
     from risk_dashboard.utils.backtest_adapter import adapter_run_backtest  # falls benötigt
 

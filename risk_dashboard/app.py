@@ -102,11 +102,23 @@ from risk_dashboard.data_utils import do_add_tickers, safe_rerun, fetch_prices_q
 print(">>> APP STARTED: TOP OF app.py", flush=True)
 
 
-def add_ticker_callback():
-    # ... verarbeite input, update st.session_state ...
-    st.session_state[stable_input_key] = ""
-    from risk_dashboard.data_utils import safe_rerun
-    safe_rerun()
+def add_ticker_callback(prefix, asset_key, stable_input_key):
+    if st.session_state.get("_processing_add", False):
+        return
+    st.session_state["_processing_add"] = True
+    try:
+        raw_val = (st.session_state.get(stable_input_key, "") or "").strip()
+        prices = st.session_state.get("prices_for_bt")
+        if raw_val:
+            mapped, missing = do_add_tickers([raw_val], prefix, asset_key, prices=prices)
+            st.session_state[stable_input_key] = ""
+            # Feedback
+            if missing:
+                st.warning(f"Automatisches Mapping fehlgeschlagen für: {missing}")
+    finally:
+        st.session_state["_processing_add"] = False
+        safe_rerun()
+
 
 # UTF-8 erzwingen (sicher)
 try:
@@ -1352,51 +1364,63 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
             except Exception as e:
                 st.error(f"Fehler beim Einlesen der Datei: {e}")
 
+        # --- Manual mapping UI (missing contains tickers that couldn't be auto-mapped) ---
         if missing:
             st.warning(f"Automatisches Mapping fehlgeschlagen für: {missing}")
             cols = ["<skip>"] + list(prices.columns)
-            manual_map_local = {}
+            # Erzeuge persistente Selectboxes (Werte landen in st.session_state["map_<ticker>"])
             for h in missing:
-                default = st.session_state.manual_map.get(h, "<skip>")
-                choice = st.selectbox(f"Map {h} →", options=cols, index=cols.index(default) if default in cols else 0, key=f"map_{h}")
-                if choice and choice != "<skip>":
-                    manual_map_local[h] = choice
+                default = st.session_state.get("manual_map", {}).get(h, "<skip>")
+                st.selectbox(f"Map {h} →", options=cols, index=cols.index(default) if default in cols else 0, key=f"map_{h}")
 
-            # use a distinct key for the button
+            # Apply manual mapping
             if st.button("Apply manual mapping", key="apply_manual_mapping"):
-                for h, c in manual_map_local.items():
-                    holding_to_price[h] = c
-                    st.session_state.manual_map[h] = c
-
-                # rebuild weights
-                weights_by_pricecol = {}
-                for _, row in hold.iterrows():
-                    hh = str(row["ticker"])
-                    w = float(row.get("weight_in_etf", 0.0) or 0.0)
-                    price_col = holding_to_price.get(hh)
-                    if price_col:
-                        weights_by_pricecol[price_col] = weights_by_pricecol.get(price_col, 0.0) + w
-
-                if not weights_by_pricecol:
-                    st.error("Nach Anwendung des manuellen Mappings wurden keine Price‑Spalten gefunden.")
+                if st.session_state.get("_processing_apply_mapping"):
+                    st.info("Mapping wird bereits verarbeitet...")
                 else:
-                    unique_cols = list(weights_by_pricecol.keys())
-                    missing_cols = [c for c in unique_cols if c not in prices.columns]
-                    if missing_cols:
-                        st.error(f"Die folgenden Price‑Spalten fehlen in den Preisdaten: {missing_cols}")
-                    else:
-                        prices_for_bt = prices.loc[:, unique_cols]
-                        weights_by_ticker = {col: float(w) for col, w in weights_by_pricecol.items()}
-                        total = sum(weights_by_ticker.values())
-                        if total > 0:
-                            weights_by_ticker = {t: w / total for t, w in weights_by_ticker.items()}
+                    st.session_state["_processing_apply_mapping"] = True
+                    try:
+                        manual_map = st.session_state.get("manual_map", {})
+                        for h in missing:
+                            choice = st.session_state.get(f"map_{h}", "<skip>")
+                            if choice and choice != "<skip>":
+                                manual_map[h] = choice
+                        st.session_state["manual_map"] = manual_map
 
-                        st.session_state.prices_for_bt = prices_for_bt
-                        st.session_state.weights_by_ticker = weights_by_ticker
-                        st.success("Manuelles Mapping angewendet.")
+                        # Update holding_to_price
+                        for h, c in manual_map.items():
+                            holding_to_price[h] = c
 
-                        # st.experimental_rerun()
-                        safe_rerun()
+                        # Rebuild weights_by_pricecol
+                        weights_by_pricecol = {}
+                        for _, row in hold.iterrows():
+                            hh = str(row["ticker"])
+                            w = float(row.get("weight_in_etf", 0.0) or 0.0)
+                            price_col = holding_to_price.get(hh)
+                            if price_col:
+                                weights_by_pricecol[price_col] = weights_by_pricecol.get(price_col, 0.0) + w
+
+                        if not weights_by_pricecol:
+                            st.error("Nach Anwendung des manuellen Mappings wurden keine Price‑Spalten gefunden.")
+                        else:
+                            unique_cols = list(weights_by_pricecol.keys())
+                            missing_cols = [c for c in unique_cols if c not in prices.columns]
+                            if missing_cols:
+                                st.error(f"Die folgenden Price‑Spalten fehlen in den Preisdaten: {missing_cols}")
+                            else:
+                                prices_for_bt = prices.loc[:, unique_cols]
+                                weights_by_ticker = {col: float(w) for col, w in weights_by_pricecol.items()}
+                                total = sum(weights_by_ticker.values())
+                                if total > 0:
+                                    weights_by_ticker = {t: w / total for t, w in weights_by_ticker.items()}
+
+                                st.session_state["prices_for_bt"] = prices_for_bt
+                                st.session_state["weights_by_ticker"] = weights_by_ticker
+                                st.success("Manuelles Mapping angewendet.")
+                                safe_rerun()
+                    finally:
+                        st.session_state["_processing_apply_mapping"] = False
+
     # --- Danach: Backtest aufrufen (wie bisher) ---
 
     if "prices_for_bt" in st.session_state and "weights_by_ticker" in st.session_state:

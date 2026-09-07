@@ -42,26 +42,21 @@ Bereinigung_edge.png
 Git_commit_hook.bat
 test_edge.txt
 warn_edgeBlock.ps1
-risk_dashboard/config.yaml
+risk_dashboard/docs/default_edge_markers.txt
 makro_sim/Bereinigung_edge.txt
 makro_sim/remove_edge_block.ps1
 makro_sim/Bereinigung_edge.png
 makro_sim/Bereinigung_edge.txt
 makro_sim/remove_edge_block.ps1
 makro_sim/Bereinigung_edge.png
-risk_dashboard/config.yaml
-risk_dashboard/config.yaml
+risk_dashboard/docs/edge_tabs_example.txt
 makro_sim/Bereinigung_edge.txt
 makro_sim/Git_commit_hook.bat
 makro_sim/remove_edge_block.ps1
 risk_dashboard/config.yaml
 makro_sim/makro_sim/
 risk_dashboard/config.yaml
-risk_dashboard/config.yaml
 
-# ignore backups
-
-# ignore local backups
 *.bak
 .venv
 

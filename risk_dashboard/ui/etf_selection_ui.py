@@ -482,11 +482,7 @@ def render_etf_selection_ui(prefix="etf"):
                             st.experimental_rerun()
 
                     # CSV-Uploader für Preisdaten
-                    uploaded_prices = st.file_uploader(
-                        "CSV mit Preisdaten hochladen (Date mit Datum und Close)",
-                        type=["csv"],
-                        key=f"prices_uploader_{prefix}"
-                    )
+                    uploaded_prices = st.file_uploader("CSV mit Preisdaten hochladen ...", type=["csv"], key=f"prices_uploader_{prefix}")
                     if uploaded_prices is not None:
                         try:
                             df = pd.read_csv(uploaded_prices, parse_dates=["Date"])
@@ -494,20 +490,17 @@ def render_etf_selection_ui(prefix="etf"):
                                 st.error("Die CSV muss eine Spalte 'Date' enthalten.")
                             else:
                                 df = df.set_index("Date").sort_index()
-                                # Optional: prüfe auf 'Close' Spalte oder andere erwartete Spalten
+                                # Wenn nur eine Spalte vorhanden ist, als Close interpretieren
                                 if "Close" not in df.columns and df.shape[1] == 1:
-                                    # Wenn nur eine Spalte vorhanden ist, nehme sie als Close an
                                     df.columns = ["Close"]
+                                # Optional: weitere Validierung hier (z. B. Datentypen)
                                 st.session_state["prices_for_bt"] = df
-                                prices = df  # lokale Variable aktualisieren für den weiteren Ablauf
+                                # lokale Variable optional aktualisieren, falls du sie weiter unten noch brauchst
+                                prices = df
                                 st.success("Preisdaten erfolgreich hochgeladen.")
                         except Exception as e:
-                            st.exception(e)
+                            log.exception("Fehler beim Einlesen der Preisdaten", extra={"error": str(e)})
                             st.error(f"Fehler beim Einlesen der Preisdaten: {e}")
-                            # nicht returnen, damit die UI weiter funktioniert
-                    else:
-                        # Wenn noch nichts hochgeladen wurde, abbrechen / Funktion verlassen
-                        return
                 else:
                     ticker_map_manual = {"CSPX.L": "EXS1.DE", "EQQQ.L": "EXS2.DE"}
                     # MultiIndex safe handling

@@ -163,22 +163,6 @@ def do_add_tickers(holdings_list, prefix, asset_key, prices=None):
 
     return mapped_cols, missing
 
-def add_ticker_callback_old(prefix: str, asset_key: str, stable_input_key: str, prices=None):
-    """
-    Button-Callback: liest das einzelne Eingabefeld, ruft do_add_tickers und safe_rerun().
-    """
-    raw = (st.session_state.get(stable_input_key, "") or "").strip()
-    if not raw:
-        return
-    try:
-        do_add_tickers([raw], prefix, asset_key, prices=prices)
-    except Exception:
-        logger.exception("Fehler beim Hinzufügen des Tickers")
-    # Feld leeren (sicher im Callback)
-    st.session_state[stable_input_key] = ""
-    # UI neu rendern (robuster Fallback)
-    safe_rerun()
-
 def _load_edge_markers():
     # Versuche zuerst die projektinterne docs-Datei
     try:
