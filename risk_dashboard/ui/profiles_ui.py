@@ -41,7 +41,7 @@ from risk_dashboard.core.macro_pipeline import (
 from risk_dashboard.core.holdings import try_relaxed_holdings
 from risk_dashboard.core.etf_tools import download_prices
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
-from risk_dashboard.core.data_loader import parse_tickers
+from risk_dashboard.core.data_loader import parse_tickers, load_price_data
 from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR 
 
 logger = logging.getLogger(__name__)
@@ -191,7 +191,7 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
     if uploaded is not None:
         try:
             df = pd.read_csv(uploaded)
-            log.debug("Loaded portfolio from uploader shape=%s columns=%s", getattr(df, "shape", None), list(df.columns))
+            logger.debug("Loaded portfolio from uploader shape=%s columns=%s", getattr(df, "shape", None), list(df.columns))
             # Optional: einfache Validierung
             if "ticker" not in [c.lower() for c in df.columns]:
                 st.warning("Die CSV enthält keine Spalte 'ticker' (Groß-/Kleinschreibung beachten).")
@@ -199,7 +199,7 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
             st.success("Portfolio erfolgreich geladen.")
             return df
         except Exception as e:
-            log.exception("Failed to parse uploaded portfolio CSV: %s", e)
+            logger.exception("Failed to parse uploaded portfolio CSV: %s", e)
             st.error("Fehler beim Einlesen der hochgeladenen CSV.")
             return pd.DataFrame()
         
@@ -789,48 +789,6 @@ def apply_preset(keys: list, etf_universe: dict):
         st.warning(f"Preset enthält nicht verfügbare ETFs: {', '.join(missing)}")
     st.session_state.selected_etfs = [k for k in keys if k in etf_universe]
 
-# in risk_dashboard/ui/profiles_ui.py: ersetze die alte load_price_data durch diese Version
-def load_price_data(etf_universe, *args, **kwargs):
-    """
-    Accepts either:
-      - a dict mapping id -> {"ticker": "...", ...}
-      - a list of ticker strings
-    Returns a DataFrame of price series with tickers as columns.
-    """
-    # Accept list input and convert to expected dict format
-    if isinstance(etf_universe, list):
-        etf_universe = {t: {"ticker": t} for t in etf_universe}
-
-    # Defensive: ensure values have 'ticker'
-    tickers = []
-    for v in (etf_universe.values() if isinstance(etf_universe, dict) else []):
-        if isinstance(v, dict) and "ticker" in v:
-            tickers.append(v["ticker"])
-        else:
-            # skip malformed entries
-            continue
-
-    # Fallback: if no tickers, try to interpret keys as tickers
-    if not tickers and isinstance(etf_universe, dict):
-        tickers = [k for k in etf_universe.keys()]
-
-    # final normalization
-    tickers = [str(t).strip().upper() for t in tickers if t]
-
-    # Map common index aliases to Yahoo tickers BEFORE any fetch/cache
-    INDEX_MAP = {
-        "DAX": "^GDAXI",
-        "SP500": "^SPX",
-        "NASDAQ": "^NDX",
-        "EUROSTOXX50": "^STOXX50E",
-    }
-    tickers = [INDEX_MAP.get(t, t) for t in tickers]
-
-    # original behavior: download_prices / download_prices wrapper
-    prices = download_prices(tickers, start=DEFAULT_START_STR)
-    return prices
-
-
 def detect_historical_regimes(
     macro_df: Optional[pd.DataFrame],
     required_cols: Sequence[str] = ("inflation", "gdp", "volatility"),
@@ -1068,6 +1026,7 @@ def profile_form_ui() -> None:
                 st.error("Fehler beim Einlesen der Preisdaten.")
 
     # 3) Portfolio nur bauen, wenn price_data jetzt nonempty ist
+    portfolio = st.session_state.get("selected_portfolio")  # kann None sein
     if is_nonempty(price_data):
         try:
             portfolio = build_regime_portfolio(macro_regime, allowed, prices=price_data, method="HRP")
@@ -1077,8 +1036,6 @@ def profile_form_ui() -> None:
             portfolio = None
         else:
             st.session_state["selected_portfolio"] = portfolio
-    else:
-        portfolio = st.session_state.get("selected_portfolio")  # fallback, falls vorher gesetzt
 
     # 4) Sicherer Umgang mit portfolio vor der Extraktion
     if not portfolio:

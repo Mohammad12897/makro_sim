@@ -14,7 +14,7 @@ Erwartete externe Hilfsfunktionen (aus scripts/yf_helper.py):
 Diese müssen in deinem Projekt vorhanden sein.
 """
 
-from typing import List, Tuple, Optional , Union, Dict
+from typing import List, Tuple, Optional , Union, Dict, Any
 from pathlib import Path
 import logging
 from datetime import date
@@ -470,24 +470,21 @@ def load_raw_prices_for_universe(universe: List[str],
     return combined, invalid_tickers
 
 
-def load_price_data(etf_universe, *args, **kwargs) -> pd.DataFrame:
+def load_price_data(etf_universe: Any, *args, **kwargs) -> Optional[pd.DataFrame]:
     """
-    Accepts either:
-      - a dict mapping id -> {"ticker": "...", ...}
-      - a list of ticker strings
-    Returns a DataFrame of price series with tickers as columns.
-    This function normalizes tickers, maps common index aliases to Yahoo tickers,
-    and delegates the actual download to download_prices.
+    Normalize etf_universe and download prices.
+    Returns a DataFrame or None if no tickers / download empty.
     """
-    # Accept list input and convert to expected dict format
+    # normalize list -> dict
     if isinstance(etf_universe, list):
         etf_universe = {t: {"ticker": t} for t in etf_universe}
 
     # Defensive: ensure values have 'ticker'
     tickers: List[str] = []
-    for v in (etf_universe.values() if isinstance(etf_universe, dict) else []):
-        if isinstance(v, dict) and "ticker" in v:
-            tickers.append(v["ticker"])
+    if isinstance(etf_universe, dict):
+        for v in etf_universe.values():
+            if isinstance(v, dict) and "ticker" in v:
+                tickers.append(v["ticker"])
 
     # Fallback: if no tickers, try to interpret keys as tickers
     if not tickers and isinstance(etf_universe, dict):
@@ -495,22 +492,21 @@ def load_price_data(etf_universe, *args, **kwargs) -> pd.DataFrame:
 
     # final normalization
     tickers = [str(t).strip().upper() for t in tickers if t]
+    if not tickers:
+        logger.warning("load_price_data: no tickers to download; returning None")
+        return None
 
     # Map common index aliases to Yahoo tickers BEFORE any fetch/cache
-    INDEX_MAP = {
-        "DAX": "^GDAXI",
-        "SP500": "^SPX",
-        "NASDAQ": "^NDX",
-        "EUROSTOXX50": "^STOXX50E",
-    }
+    INDEX_MAP = {"DAX":"^GDAXI","SP500":"^SPX","NASDAQ":"^NDX","EUROSTOXX50":"^STOXX50E"}
     tickers = [INDEX_MAP.get(t, t) for t in tickers]
-
-    if not tickers:
-        logger.warning("load_price_data: no tickers to download")
-        return pd.DataFrame()
 
     # Delegate to download_prices (which should call safe_fetch internally)
     start = kwargs.get("start", DEFAULT_START_STR)
     end = kwargs.get("end", None)
     prices = download_prices(tickers, start=start, end=end)
+
+    if prices is None or getattr(prices, "empty", True):
+        logger.warning("load_price_data: download returned empty; returning None")
+        return None
+
     return prices
