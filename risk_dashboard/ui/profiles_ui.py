@@ -8,6 +8,7 @@ import traceback
 from typing import Dict, Any, Tuple, Optional, List, Sequence
 from io import StringIO
 import requests
+from core.data import portfolio
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import date
@@ -1039,15 +1040,12 @@ def profile_form_ui() -> None:
     macro_regime = detect_regime(macro_df)
     allowed = select_etfs_for_regime(etf_universe, macro_regime)
 
-    # Defensive Prüfung auf Preisdaten
-    logger.debug(
-        "profile_form_ui: entering portfolio build; price_data type=%s empty=%s keys=%s",
-        type(price_data),
-        getattr(price_data, "empty", None),
-        getattr(price_data, "columns", None),
-    )
+    # 1) price_data konsistent aus session_state lesen / initial laden
+    price_data = st.session_state.get("price_data")
+    logger.debug("profile_form_ui: entering portfolio build; price_data type=%s empty=%s shape=%s",
+                type(price_data), getattr(price_data, "empty", None), getattr(price_data, "shape", None))
 
-    # Defensive Prüfung auf Preisdaten
+    # 2) Wenn keine Preisdaten vorhanden sind, Upload anbieten (kein sofortiger return)
     if not is_nonempty(price_data):
         logger.warning("profile_form_ui: price_data fehlt oder ist leer; zeige Upload-UI")
         st.warning("Preisdaten konnten nicht geladen werden. Bitte überprüfe die Verbindung oder wähle andere ETFs.")
@@ -1068,17 +1066,27 @@ def profile_form_ui() -> None:
             except Exception as e:
                 logger.exception("Fehler beim Einlesen der Preisdaten: %s", e)
                 st.error("Fehler beim Einlesen der Preisdaten.")
-        # kein return hier — Nutzer kann Upload durchführen; Portfolio wird gebaut, sobald price_data vorhanden ist
-    else:
+
+    # 3) Portfolio nur bauen, wenn price_data jetzt nonempty ist
+    if is_nonempty(price_data):
         try:
             portfolio = build_regime_portfolio(macro_regime, allowed, prices=price_data, method="HRP")
         except ValueError as e:
             logger.exception("build_regime_portfolio fehlgeschlagen: %s", e)
             st.error("Portfolio konnte nicht erstellt werden: Preisdaten fehlen oder sind unvollständig.")
+            portfolio = None
         else:
             st.session_state["selected_portfolio"] = portfolio
- 
-    # 3. Ticker extrahieren (anpassbar an dein Portfolio-Format)
+    else:
+        portfolio = st.session_state.get("selected_portfolio")  # fallback, falls vorher gesetzt
+
+    # 4) Sicherer Umgang mit portfolio vor der Extraktion
+    if not portfolio:
+        logger.debug("No selected_portfolio available; skipping ticker extraction")
+        st.info("Kein Portfolio verfügbar. Bitte lade Preisdaten oder wähle ein Portfolio.")
+        st.stop()
+
+    # 5. Ticker extrahieren (anpassbar an dein Portfolio-Format)
     def _extract_tickers_from_portfolio(p):
         # dict mit bekannten keys
         if isinstance(p, dict):
@@ -1110,7 +1118,7 @@ def profile_form_ui() -> None:
             return tickers
         return []
     
-    # --- Ticker extrahieren und prüfen ---
+    # jetzt ist portfolio gesetzt, sichere Extraktion
     tickers = _extract_tickers_from_portfolio(portfolio)
     if not tickers:
         st.warning("Kein Portfolio mit Tickers gefunden.")
