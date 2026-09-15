@@ -714,11 +714,31 @@ st.title("Macroeconomic Risk Dashboard")
 try:
 
     # zentral: Index auswählen und Universe einmalig laden
+
+    # app.py (einmalig, zentral)
+    ss = st.session_state
     prefix = "profile"
-    
-    index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key=f"{prefix}_index_choice")
+    # DEV Debug: session keys anzeigen
+    if ss.get("DEBUG"):
+        st.write("session_state keys:", list(ss.keys()))
+        logger.debug("session_state keys: %s", list(ss.keys()))
+
+    index_choice = st.selectbox(
+        "Index / Universe wählen",
+        list(UNIVERSE_PATHS.keys()),
+        index=1,
+        key=f"{prefix}_index_choice"
+    )
+
+    index_choice = st.selectbox(
+        "Index / Universe wählen",
+        list(UNIVERSE_PATHS.keys()),
+        key=f"{prefix}_index_choice"
+    )
+
     path_index_choice = UNIVERSE_PATHS[index_choice]
     etf_universe, universe_warnings = load_etf_universe(path_index_choice)
+    # load shared data...
 
     # initialisiere shared session_state falls nötig
     if "macro_df" not in st.session_state:

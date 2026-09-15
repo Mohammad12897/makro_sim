@@ -401,24 +401,10 @@ def render_etf_tab(session_state=None):
     if not df.empty:
         st.dataframe(df)
 
-    auto_portfolio_value = compute_portfolio_value(df) if not df.empty else 0.0
-    portfolio_value = st.number_input("Gesamtportfolio (leer = Summe der Marktwerte)",
-                                    value=float(auto_portfolio_value), format="%.2f")
-
-    tickers = df["ticker"].astype(str).str.upper().unique().tolist() if not df.empty else []
-    selected_etfs = st.multiselect("Aus Portfolio wähle ETF(s) zur Aufschlüsselung", options=tickers, key="selected_etfs")
-
-    # Wichtige session Werte
+    # ganz oben in der Funktion
     prefix = ss.get("prefix", "profile")
-    etf_universe = ss.get("etf_universe", {}) or {}
-    price_data = ss.get("price_data")
-    macro_df = ss.get("macro_df")
-    index_choice = st.session_state.get(f"{prefix}_index_choice") or st.session_state.get("index_choice")
-    path_index_choice = UNIVERSE_PATHS.get(index_choice)
-    if path_index_choice is None:
-        logger.error("Kein path_index_choice für index_choice=%s", index_choice)
 
-    # Annahme: ss = st.session_state wurde oben gesetzt
+    # Portfolio Input
     auto_portfolio_value = compute_portfolio_value(df) if not df.empty else 0.0
     portfolio_value = st.number_input(
         "Gesamtportfolio (leer = Summe der Marktwerte)",
@@ -426,9 +412,9 @@ def render_etf_tab(session_state=None):
         format="%.2f",
         key=f"{prefix}_portfolio_value"
     )
-    # optional in session speichern
     ss["portfolio_value"] = float(portfolio_value)
 
+    # Auswahl aus Portfolio
     tickers = df["ticker"].astype(str).str.upper().unique().tolist() if not df.empty else []
     selected_from_portfolio = st.multiselect(
         "Aus Portfolio wähle ETF(s) zur Aufschlüsselung",
@@ -436,39 +422,43 @@ def render_etf_tab(session_state=None):
         key=f"{prefix}_portfolio_selected_etfs"
     )
 
-    # --- Universe prüfen und ggf. Test‑Universe setzen ---
-    # Annahme: ss = st.session_state, prefix ist gesetzt
+    # Session Werte
+    etf_universe = ss.get("etf_universe", {}) or {}
+    price_data = ss.get("price_data")
+    macro_df = ss.get("macro_df")
+    index_choice = ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
+    path_index_choice = UNIVERSE_PATHS.get(index_choice)
+    if path_index_choice is None:
+        logger.error("Kein path_index_choice für index_choice=%s", index_choice)
+
     # 1) Universe prüfen und ggf. Test‑Universe setzen
     if not etf_universe:
         if ALLOW_TEST_UNIVERSE:
             etf_universe = {t: {"ticker": t} for t in ["VWRL.L", "CSPX.L"]}
+            ss["etf_universe"] = etf_universe
             logger.info("Using test universe (dev mode)")
         else:
             st.info("Keine vordefinierten ETFs gefunden. Bitte füge Kandidaten im Profil hinzu.")
             if st.button("Profil öffnen: Kandidaten hinzufügen", key=f"{prefix}_open_profile_editor"):
-                st.session_state["show_profile_editor"] = True
+                ss["show_profile_editor"] = True
                 safe_rerun()
-            return  # early return: kein weiteres Rendering ohne Universe
+            return
 
-    # 2) Jetzt, da etf_universe vorhanden ist, Optionen bauen
-    etf_universe = ss.get("etf_universe", {}) or {}
-    # optional: normalisiere Keys, wenn du das erwartest (z.B. Uppercase)
-    # etf_universe = {k.upper(): v for k, v in etf_universe.items()}
-
-    etf_options = {k: v.get("display_name", k) for k, v in etf_universe.items()}
+    # 2) Optionen bauen
+    etf_options = {k: v.get("display_name", k) for k, v in ss.get("etf_universe", {}).items()}
     options = list(etf_options.keys())
 
-    # 3) Filtere alte Defaults auf gültige Optionen (vermeidet StreamlitAPIException)
-    prev_selected = ss.get("selected_etfs", [])
-    valid_selected = [v for v in prev_selected if v in options]
-    if valid_selected != prev_selected:
-        logger.debug("Filtered selected_etfs to current universe: %s -> %s", prev_selected, valid_selected)
-        ss["selected_etfs"] = valid_selected
+    # 3) Defaults defensiv filtern
+    raw_selected = ss.get("selected_etfs", []) or []
+    logger.debug("raw selected_etfs before filter: %s", raw_selected)
+    logger.debug("etf_universe keys sample: %s", list(etf_universe.keys())[:50])
 
-    # Filter defaults
-    defaults = [v for v in ss.get("selected_etfs", []) if v in options]
-
-    # 4) Defensive UI: falls options leer, Navigation anbieten
+    defaults = [v for v in raw_selected if v in options]
+    if len(defaults) != len(raw_selected):
+        logger.warning("Filtered invalid selected_etfs: %s -> %s", raw_selected, defaults)
+        ss["selected_etfs"] = defaults
+    
+    # 4) Defensive UI falls options leer
     if not options:
         st.info("Keine vordefinierten ETFs gefunden. Bitte füge Kandidaten im Profil hinzu.")
         if st.button("Profil öffnen: Kandidaten hinzufügen", key=f"{prefix}_open_profile_editor"):
@@ -476,23 +466,17 @@ def render_etf_tab(session_state=None):
             safe_rerun()
         return
 
-    # Debug logs vor dem Widget
-    logger.debug("etf_universe keys (sample): %s", list(etf_universe.keys())[:50])
-    logger.debug("selected_etfs (raw): %s", ss.get("selected_etfs"))
-    logger.debug("options len: %d, defaults filtered: %s", len(options), defaults)
-
-    # 5) Multiselect mit gefilterten Defaults und eindeutigen Keys
+    # 5) Multiselect mit gefilterten Defaults
     selected_etfs = st.multiselect(
         "Wähle erlaubte ETFs (optional)",
         options=options,
-        format_func=lambda k: etf_options.get(k, k),
         default=defaults,
         key=f"{prefix}_selected_etfs",
         help="Wähle ETFs aus dem vordefinierten Universe."
     )
     ss["selected_etfs"] = selected_etfs
 
-    # 6) Debug nur bei Flag
+    # Debug nur bei Flag
     if ss.get("DEBUG"):
         st.write("DEBUG price_path:", globals().get("price_path"))
         st.write("DEBUG macro_path:", globals().get("macro_path"))
@@ -738,6 +722,7 @@ def profile_form_ui(
     prefix: str = "profile",
 ) -> None:
 
+    ss = st.session_state
     # Session state defaults (einmalig)
     if "new_ticker" not in st.session_state:
         st.session_state["new_ticker"] = ""
@@ -952,14 +937,24 @@ def profile_form_ui(
     else:
         macro_regime = None
 
-    # If caller didn't provide index_choice, show selector locally
+
+    # Debug globaler Session-Status (nur dev)
+    if ss.get("DEBUG"):
+        st.write("profile_form_ui session_state keys:", list(ss.keys()))
+        logger.debug("profile_form_ui session_state keys: %s", list(ss.keys()))
+
+    # Wenn du einen DuplicateKey vermutest, logge direkt vor der selectbox
+    logger.debug("About to render index selectbox with key=%s", f"{prefix}_local_index_choice")
     if index_choice is None:
         index_choice = st.selectbox(
             "Index / Universe wählen",
-            ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"],
+            list(UNIVERSE_PATHS.keys()),
             index=1,
-            key=f"{prefix}_index_choice"
+            key=f"{prefix}_local_index_choice"
         )
+
+    # ab hier: index_choice ist gesetzt und darf verwendet werden
+    path_index_choice = UNIVERSE_PATHS.get(index_choice)
 
     # Safe logging: etf_universe may be None or dict
     try:
@@ -1773,17 +1768,60 @@ def profile_form_ui(
         st.warning(f"Summe Equity+Bonds+Cash = {total:.2f}%. Empfohlen: 100%. Nutze Auto-normalize oder passe Werte an.")
 
 
-    index_choice = st.selectbox("Index / Universe wählen", list(UNIVERSE_PATHS.keys()), index=1, key=f"{prefix}_index_choice")
-    path_index_choice = UNIVERSE_PATHS[index_choice]
+    # index_choice = st.selectbox("Index / Universe wählen", list(UNIVERSE_PATHS.keys()), index=1, key=f"{prefix}_index_choice")
+    # path_index_choice = UNIVERSE_PATHS[index_choice]
 
+    def save_handler(key: str, profile_obj: dict, prefix: str):
+        ss = st.session_state
+        try:
+            save_profile(key, profile_obj)  # deine bestehende Persistenzfunktion
+            st.success(f"Profil '{profile_obj['display_name']}' gespeichert.")
+            ss["profile_selected"] = key
 
+            # path_index_choice sicher ermitteln
+            path_index_choice = ss.get("path_index_choice") or UNIVERSE_PATHS.get(
+                ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
+            )
+
+            # Universe neu laden, falls möglich
+            if path_index_choice:
+                new_universe, warnings = load_etf_universe(path_index_choice)
+                # optional: normalisieren new_universe = {k.upper(): v for k,v in new_universe.items()}
+                ss["etf_universe"] = new_universe
+
+                # Filtere selected_etfs auf gültige Keys
+                prev = ss.get("selected_etfs", [])
+                valid_etfs = [k for k in prev if k in new_universe]
+                # Falls du neu hinzugefügte tickers hast, füge sie hinzu (falls verfügbar)
+                # tickers muss im Scope sein oder übergeben werden; sonst weglassen
+                # for t in tickers:
+                #     if t in new_universe and t not in valid_etfs:
+                #         valid_etfs.append(t)
+                ss["selected_etfs"] = valid_etfs
+                logger.debug("selected_etfs nach Reload gefiltert: %s", valid_etfs)
+            else:
+                logger.warning("path_index_choice nicht verfügbar; Universe nicht neu geladen")
+
+            # Cleanup + Rerun
+            ss["show_profile_editor"] = False
+            ss.pop("combined_universe", None)
+            ss.pop("price_data", None)
+            safe_rerun()
+            return
+
+        except Exception as e:
+            logger.exception("Fehler beim Speichern des Profils: %s", e)
+            st.error("Fehler beim Speichern des Profils. Siehe Log.")
+
+    # Annahme: ss = st.session_state wurde oben in profile_form_ui gesetzt
     col_save, col_delete = st.columns(2)
     with col_save:
-        if st.button("Profil speichern"):
+        if st.button("Profil speichern", key=f"{prefix}_save_profile"):
             key = (profile_name or selected or "custom_profile").strip().lower().replace(" ", "_")
-            allowed_instruments = st.session_state.get("selected_etfs", [])
+            allowed_instruments = ss.get("selected_etfs", [])
             if not allowed_instruments:
                 allowed_instruments = [s.strip() for s in allowed_text.split(",") if s.strip()]
+
             profile_obj: Dict[str, Any] = {
                 "display_name": profile_name or key,
                 "category": category,
@@ -1796,40 +1834,52 @@ def profile_form_ui(
                 "allowed_instruments": allowed_instruments,
                 "notes": notes,
             }
+
             try:
+                # Persistieren
                 save_profile(key, profile_obj)
                 st.success(f"Profil '{profile_obj['display_name']}' gespeichert.")
-                st.session_state["profile_selected"] = key
-    
-                # 1) Stelle sicher, dass path_index_choice definiert ist
-                path_index_choice = locals().get("path_index_choice") or st.session_state.get("path_index_choice")
+                ss["profile_selected"] = key
+
+                # 1) path_index_choice sicher ermitteln
+                path_index_choice = locals().get("path_index_choice") or ss.get("path_index_choice")
                 if not path_index_choice:
-                    index_choice = st.session_state.get(f"{prefix}_index_choice") or st.session_state.get("index_choice")
+                    index_choice = ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
                     path_index_choice = UNIVERSE_PATHS.get(index_choice)
-    
+
                 # 2) Neu laden, nur wenn path_index_choice vorhanden
                 if path_index_choice:
                     new_universe, warnings = load_etf_universe(path_index_choice)
-                    st.session_state["etf_universe"] = new_universe
-    
-                    # ⚠️ Filtere alte Auswahl auf gültige Optionen
-                    valid_etfs = [k for k in st.session_state.get("selected_etfs", []) if k in new_universe]
-                    st.session_state["selected_etfs"] = valid_etfs
+                    ss["etf_universe"] = new_universe
+
+                    # Filtere alte Auswahl auf gültige Optionen
+                    prev_selected = ss.get("selected_etfs", []) or []
+                    valid_etfs = [k for k in prev_selected if k in new_universe]
+
+                    # Falls neu hinzugefügte Ticker vorhanden sind: aus session oder aus allowed_instruments ableiten
+                    # Variante A: neu hinzugefügte Ticker wurden in ss["new_tickers"] gespeichert
+                    new_tickers = ss.get("new_tickers", [])  # optional
+                    # Variante B: oder nimm allowed_instruments als Quelle
+                    for t in (new_tickers or allowed_instruments):
+                        if t in new_universe and t not in valid_etfs:
+                            valid_etfs.append(t)
+
+                    ss["selected_etfs"] = valid_etfs
                     logger.debug("selected_etfs nach Reload gefiltert: %s", valid_etfs)
                 else:
                     logger.warning("path_index_choice nicht verfügbar; Universe nicht neu geladen")
-    
+
                 # 3) Cleanup + Rerun
-                st.session_state["show_profile_editor"] = False
-                st.session_state.pop("combined_universe", None)
-                st.session_state.pop("price_data", None)
+                ss["show_profile_editor"] = False
+                ss.pop("combined_universe", None)
+                ss.pop("price_data", None)
                 safe_rerun()
                 return
 
             except Exception as e:
                 logger.exception("Fehler beim Speichern des Profils: %s", e)
                 st.error("Fehler beim Speichern des Profils. Siehe Log.")
-                
+            
     with col_delete:
         if selected != "<Neu>" and st.button("Profil löschen"):
             cfg = load_profiles()
