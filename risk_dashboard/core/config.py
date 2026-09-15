@@ -16,7 +16,7 @@ def _append_audit(entry: Dict[str, Any]) -> None:
     with AUDIT_LOG_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-def load_etf_universe(path="risk_dashboard/config/etf_universe.yaml"):
+def load_etf_universe(path="risk_dashboard/data/etf_universe.yaml"):
 
     warnings = []
 

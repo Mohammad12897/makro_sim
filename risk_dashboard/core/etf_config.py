@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = Path(__file__).parents[1] / "config" / "etf_universe.yaml"
+CONFIG_PATH = Path(__file__).parents[1] / "data" / "etf_universe.yaml"
 
 def load_etf_universe(path: Path = CONFIG_PATH) -> Dict[str, Dict[str, Any]]:
     with open(path, "r", encoding="utf-8") as f:

@@ -135,7 +135,7 @@ logger = logging.getLogger(__name__)
 # Safety check before any heavy imports (optional)
 AUTO_FIX = os.getenv("AUTO_FIX_PASTE_BLOCKS", "false").lower() in ("1", "true", "yes")
 
-from risk_dashboard.config import DEFAULT_START_STR
+from risk_dashboard.config import DEFAULT_START_STR, UNIVERSE_PATHS
 
 # Import minimal safety module if vorhanden
 try:
@@ -186,6 +186,7 @@ except Exception:
 # Eigene Module (lokale Projektstruktur)
 from risk_dashboard.core.data_loader import (
     load_raw_prices_for_universe,
+    load_price_data,
     filter_valid_tickers
 )
 from risk_dashboard.core.ticker_cache import validate_ticker_with_cache
@@ -572,7 +573,7 @@ from risk_dashboard.core.regime_model import (
 )
 from risk_dashboard.core.etl import load_etf_universe_prices
 from risk_dashboard.core.asset_packages import parse_etf_input
-from risk_dashboard.ui.profiles_ui import profile_form_ui, compute_portfolio_value, compute_etf_breakdown, load_price_data
+from risk_dashboard.ui.profiles_ui import profile_form_ui, render_etf_tab
 from risk_dashboard.core.weights import compute_abs_weights
 from risk_dashboard.data.etf_universes import ETF_UNIVERSES
 from risk_dashboard.core.regime_hmm import fit_hmm_regimes, map_hmm_states_to_labels
@@ -706,19 +707,40 @@ def render_sidebar(available_etfs):
         key="opt_method",
     )
 
-
-    etf_universe, universe_warnings = load_etf_universe()
-    if "price_data" not in st.session_state:
-        st.session_state["price_data"] = load_price_data(etf_universe)
-    if "macro_df" not in st.session_state:
-        st.session_state["macro_df"] = load_and_validate_macro_data()
-
 render_sidebar(AVAILABLE_ETF)
 
 st.title("Macroeconomic Risk Dashboard")
 
 try:
-    profile_form_ui()
+
+    # zentral: Index auswählen und Universe einmalig laden
+    prefix = "profile"
+    
+    index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key=f"{prefix}_index_choice")
+    path_index_choice = UNIVERSE_PATHS[index_choice]
+    etf_universe, universe_warnings = load_etf_universe(path_index_choice)
+
+    # initialisiere shared session_state falls nötig
+    if "macro_df" not in st.session_state:
+        st.session_state["macro_df"] = load_and_validate_macro_data()
+    if "price_data" not in st.session_state:
+        st.session_state["price_data"] = load_price_data(etf_universe)
+
+    # Übergabe an profile_form_ui
+
+    if st.session_state.get("show_profile_editor", False):
+        profile_form_ui(
+                etf_universe=etf_universe,
+                universe_warnings=universe_warnings,
+                macro_df=st.session_state.get("macro_df"),
+                price_data=st.session_state.get("price_data"),
+                index_choice=index_choice,
+                prefix=prefix
+            )
+    else:
+        render_etf_tab()
+
+
 except Exception:
     logging.getLogger(__name__).exception("profile_form_ui konnte nicht geladen werden")
 

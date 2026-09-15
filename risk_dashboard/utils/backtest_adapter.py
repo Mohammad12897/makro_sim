@@ -16,54 +16,85 @@ def _extract_tickers(arg: Any):
         return list(arg)
     return []
 
-def adapter_run_backtest(*args, **kwargs):
-    # 1) extract tickers from first positional arg if present
-    if args:
+def adapter_run_backtest(portfolio_or_tickers, *args, **kwargs):
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # 1) normalize tickers: accept positional list or kwargs["tickers"]
+    tickers = None
+    if isinstance(portfolio_or_tickers, (list, tuple)):
+        tickers = list(portfolio_or_tickers)
+    elif isinstance(portfolio_or_tickers, str):
+        tickers = [portfolio_or_tickers]
+    else:
+        tickers = kwargs.get("tickers")
+
+    # fallback: try args[0] if still None
+    if not tickers and args:
         first = args[0]
-        tickers = _extract_tickers(first)  # implementiere passend
-        if tickers:
-            kwargs.setdefault("tickers", tickers)
+        if isinstance(first, (list, tuple)):
+            tickers = list(first)
+        elif isinstance(first, str):
+            tickers = [first]
 
-    # 2) map 'prices' -> 'prices_df'
-    if "prices" in kwargs and "prices_df" not in kwargs:
-        kwargs["prices_df"] = kwargs.pop("prices")
+    if not tickers:
+        return {"ok": False, "message": "Keine Ticker übergeben", "result": {}}
 
-    # 3) unify start/end names
-    if "start_date" in kwargs and "start" not in kwargs:
-        kwargs["start"] = kwargs.pop("start_date")
-    if "end_date" in kwargs and "end" not in kwargs:
-        kwargs["end"] = kwargs.pop("end_date")
+    # 2) map prices -> prices_df (avoid truthiness check on DataFrame)
+    prices_df = kwargs.get("prices", None)
+    if prices_df is None:
+        prices_df = kwargs.get("prices_df", None)
+    logger.debug("adapter_run_backtest: prices_df present=%s shape=%s",
+                    prices_df is not None, getattr(prices_df, "shape", None))
 
-    # 4) map initial_capital -> initial_cash
-    if "initial_capital" in kwargs and "initial_cash" not in kwargs:
-        kwargs["initial_cash"] = kwargs.pop("initial_capital")
+    # 3) unify weights names
+    weights = kwargs.get("weights") or kwargs.get("user_weights") or kwargs.get("portfolio_weights")
 
-    # 5) map rebalance_freq -> rebalance (optional mapping)
-    if "rebalance_freq" in kwargs and "rebalance" not in kwargs:
-        freq = kwargs.pop("rebalance_freq")
-        if isinstance(freq, str) and freq.upper() == "M":
-            kwargs["rebalance"] = "monthly"
+    # 4) unify start/end and initial cash
+    start = kwargs.get("start") or kwargs.get("start_date")
+    end = kwargs.get("end") or kwargs.get("end_date")
+    initial_cash = kwargs.get("initial_cash", 10000)
+
+    # 5) quick sanity
+    if prices_df is None:
+        return {"ok": False, "message": "Preisdaten fehlen (prices/prices_df ist None)", "result": {}}
+    if getattr(prices_df, "empty", False):
+        return {"ok": False, "message": "Preisdaten sind leer", "result": {}}
+        missing = [t for t in tickers if t not in prices_df.columns]
+        if missing:
+            return {"ok": False, "message": f"Fehlende Preisspalten: {missing}", "result": {}}
+
+    # optional: normalize weights if provided as dict and sum != 1
+    if isinstance(weights, dict):
+        try:
+            total_w = sum(float(v) for v in weights.values())
+        except Exception:
+            logger.debug("adapter_run_backtest: weights not numeric")
+            total_w = None
+        if total_w:
+            if abs(total_w - 1.0) > 1e-6:
+                logger.debug("adapter_run_backtest: normalizing weights sum=%s", total_w)
+                weights = {k: float(v) / total_w for k, v in weights.items()}
+
+        # 6) call run_backtest (adapt params as needed)
+        try:
+            res = run_backtest(
+                tickers=tickers,
+                prices_df=prices_df,
+                start=start,
+                end=end,
+                initial_cash=initial_cash,
+                monthly_dca=kwargs.get("monthly_dca", 0),
+                weights=weights,
+                strategy=kwargs.get("strategy", "equal"),
+                rebalance=kwargs.get("rebalance", "monthly"),
+            )
+        except Exception as e:
+            logger.exception("run_backtest failed")
+            return {"ok": False, "message": f"run_backtest error: {e}", "result": {}}
+
+        # 7) normalize return envelope expected by UI
+        if isinstance(res, dict):
+            return {"ok": True, "message": "ok", "result": res}
         else:
-            kwargs["rebalance"] = freq
-
-    if "tickers" not in kwargs or not kwargs["tickers"]:
-        raise ValueError("adapter_run_backtest: keine Ticker gefunden")
-
-    result = run_backtest(
-        tickers=kwargs.get("tickers"),
-        prices_df=kwargs.get("prices_df"),
-        start=kwargs.get("start"),
-        end=kwargs.get("end"),
-        initial_cash=kwargs.get("initial_cash", 10000),
-        monthly_dca=kwargs.get("monthly_dca", 0),
-        weights=kwargs.get("weights"),
-        strategy=kwargs.get("strategy", "equal"),
-        momentum_threshold=kwargs.get("momentum_threshold", 0.0),
-        vol_target=kwargs.get("vol_target"),
-        rebalance=kwargs.get("rebalance", "monthly")
-    )
-
-    # ensure dict return
-    if isinstance(result, dict):
-        return result
-    return {"portfolio_value": result, "metrics": {}, "removed_tickers": []}
+            return {"ok": True, "message": "ok", "result": {"portfolio_value": res}}

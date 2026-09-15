@@ -1,4 +1,5 @@
 # risk_dashboard/pages/etf_finder.py
+import inspect
 import os
 import logging
 import streamlit as st
@@ -337,7 +338,6 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                         st.error("Regime‑Daten fehlen oder sind leer. Backtest abgebrochen.")
                     else:
                         try:
-                            from risk_dashboard.utils.session_helpers import maybe_run_backtest
                             from risk_dashboard.utils.backtest_adapter import adapter_run_backtest
                             from risk_dashboard.ui.helpers import safe_backtest_call, render_backtest
 
@@ -382,10 +382,18 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                                 st.warning("Keine der ausgewählten Ticker in den Preisdaten vorhanden.")
                                 run_disabled = True
                             else:
+
+                                logger.debug("PRE ADAPTER CALL: selected_etfs=%s", available)
+                                logger.debug("PRE ADAPTER CALL: pd_shared present=%s shape=%s", prices is not None, getattr(prices, "shape", None))
+                                logger.debug("PRE ADAPTER CALL: user_weights_mapped=%s", user_weights_mapped)
+
+                                logger.debug("adapter_run_backtest signature: %s", inspect.signature(adapter_run_backtest))
+                                #logger.debug("incoming kwargs keys: %s", list(kwargs.keys()))
+
                                 # --- Sicherer Aufruf des Adapters via safe_backtest_call ---
                                 result = safe_backtest_call(
                                     adapter_run_backtest,
-                                    available,                                # positional: portfolio_or_tickers (Liste ist ok)
+                                    available,                                # positional: portfolio_or_tickers
                                     prices=prices[available] if prices is not None else None,
                                     weights=user_weights_mapped,              # kann None sein
                                     regimes=regimes_val,                      # optional
@@ -394,32 +402,82 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                                     rebalance="monthly",                      # oder rebalance_freq="M" je nach Adapter
                                     initial_capital=1_000_000,
                                     flag_key="backtest_call"
-                                ) or {}
+                                )
 
-                                # --- Ergebnis prüfen und anzeigen ---
+                                # --- Einheitliche Normalisierung des Ergebnisses ---
+                                if result is None:
+                                    logger.debug("safe_backtest_call returned None")
+                                    result = {"ok": False, "message": "Interner Fehler: kein Ergebnis vom Backtest.", "result": {}}
+
+                                # Envelope behandeln und Payload extrahieren
+                                payload = result.get("result", {}) or {}
                                 if not result.get("ok"):
                                     st.warning(result.get("message", "Backtest fehlgeschlagen."))
                                     run_disabled = True
                                 else:
                                     run_disabled = False
-                                    bt = result["result"]
-                                    removed = bt.get("removed_tickers", [])
-                                    if removed:
-                                        st.warning("Entfernte Ticker: " + ", ".join(removed))
-                                    render_backtest(bt)
+
+                                # --- Logging (einmalig) ---
+                                logger.debug("BACKTEST CALL ARGS: available=%s weights=%s start=%s end=%s",
+                                            available, user_weights_mapped, start_arg, end_arg)
+                                logger.debug("BACKTEST RESULT ENVELOPE: %s", repr(result)[:2000])
+
+                                pv = payload.get("portfolio_value")
+                                metrics = payload.get("metrics", {})
+
+                                try:
+                                    nunique = pv.nunique() if hasattr(pv, "nunique") else None
+                                    std = float(pv.std()) if hasattr(pv, "std") else None
+                                    logger.debug("portfolio_value type=%s shape=%s nunique=%s std=%s",
+                                                type(pv), getattr(pv, "shape", None), nunique, std)
+                                except Exception:
+                                    logger.exception("Error inspecting portfolio_value")
+
+                                # --- Defensive: konstantes Portfolio erkennen ---
+                                def is_constant_portfolio(pv):
+                                    if pv is None:
+                                        return True
+                                    if isinstance(pv, pd.Series):
+                                        try:
+                                            return pv.nunique() == 1 or float(pv.std()) == 0.0
+                                        except Exception:
+                                            return True
+                                    if isinstance(pv, pd.DataFrame):
+                                        try:
+                                            return all(float(pv[c].std()) == 0.0 for c in pv.columns)
+                                        except Exception:
+                                            return True
+                                    return True
+
+                                # --- Ergebnisbehandlung und Rendering ---
+                                if not payload:
+                                    st.warning("Kein Backtest‑Ergebnis verfügbar.")
+                                    run_disabled = True
+                                else:
+                                    # konstantes Portfolio + cagr==0 -> wahrscheinlich kein valides Ergebnis
+                                    if is_constant_portfolio(pv) and metrics.get("cagr", None) in (0.0, np.float64(0.0)):
+                                        st.warning("Backtest lieferte keine aussagekräftigen Ergebnisse. Preisdaten, Gewichte oder Strategie prüfen.")
+                                        run_disabled = True
+                                    else:
+                                        removed = payload.get("removed_tickers", []) or []
+                                        if removed:
+                                            st.warning("Folgende Ticker wurden entfernt (keine Preisdaten): " + ", ".join(removed))
+                                        # render_backtest erwartet ein dict/envelope; rendern nur hier einmal
+                                        render_backtest(payload)
+                                        run_disabled = False
 
                             # Run-Button
-                            if st.button("Berechnen", disabled=run_disabled):
+                            if st.button("Berechnen", key="btn_backtest_requested",disabled=run_disabled):
                                 # optional: setze ein SessionState-Flag oder trigger einen erneuten Aufruf
                                 st.session_state["backtest_requested"] = True
 
 
                         except ValueError as e:
-                            logger.warning("maybe_run_backtest failed: %s", e)
+                            logger.warning("safe_backtest_call failed: %s", e)
                             st.error("Backtest konnte nicht ausgeführt werden: keine gültigen Ticker in den Preisdaten.")
                             result = {}
                         except Exception as e:
-                            logger.exception("Unexpected error in maybe_run_backtest: %s", e)
+                            logger.exception("Unexpected error in safe_backtest_call: %s", e)
                             st.error("Beim Backtest ist ein Fehler aufgetreten. Details im Log.")
                             result = {}
 

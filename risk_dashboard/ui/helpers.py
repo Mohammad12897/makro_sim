@@ -29,22 +29,39 @@ def passes_liquidity(meta_row: dict, min_volume: int = 10000) -> bool:
         return int(vol) >= int(min_volume)
     except Exception:
         return False
+        
 
 def render_backtest(bt):
-    pv = bt["portfolio_value"]
-    metrics = bt["metrics"]
-    removed = bt.get("removed_tickers", [])
+    # Defensive handling: bt may be None, an envelope, or a raw backtest dict
+    if bt is None:
+        st.warning("Kein Backtest Ergebnis vorhanden.")
+        return
+
+    # If an envelope was passed, unpack it
+    if isinstance(bt, dict) and "ok" in bt and "result" in bt:
+        if not bt.get("ok"):
+            st.warning(bt.get("message", "Backtest fehlgeschlagen."))
+            return
+        bt = bt.get("result") or {}
+
+    # Now bt should be a dict with keys like 'portfolio_value', 'metrics', 'removed_tickers'
+    pv = bt.get("portfolio_value") if isinstance(bt, dict) else None
+    metrics = bt.get("metrics", {}) if isinstance(bt, dict) else {}
+    removed = bt.get("removed_tickers", []) if isinstance(bt, dict) else []
 
     if removed:
-        st.warning("Folgende Ticker wurden entfernt (keine Preisdaten): " + ", ".join(removed))
+        st.warning("Folgende Ticker wurden entfernt (keine Preisdaten): "  ", ".join(removed))
+
+    if not metrics and (pv is None or (hasattr(pv, "empty") and pv.empty)):
+        st.warning("Backtest lieferte keine Ergebnisse.")
+        return
 
     st.subheader("Backtest Ergebnis")
-
     st.metric("Finaler Wert", f"{metrics.get('final_value', 0):.2f}")
     st.write("CAGR:", f"{metrics.get('cagr'):.2%}" if metrics.get("cagr") else "n/a")
     st.write("Max Drawdown:", f"{metrics.get('max_dd'):.2%}" if metrics.get("max_dd") else "n/a")
 
-    if pv is not None and not pv.empty:
+    if pv is not None and hasattr(pv, "empty") and not pv.empty:
         df = pv.reset_index()
         df.columns = ["date", "value"]
         chart = alt.Chart(df).mark_line().encode(
@@ -54,16 +71,34 @@ def render_backtest(bt):
         st.altair_chart(chart, use_container_width=True)
 
 def safe_backtest_call(fn, *args, prices_df=None, available=None, **kwargs):
-    # Filter
+     # Filter
+    removed = []
     if prices_df is not None and available is not None:
+        original_available = list(available)
         available = [t for t in available if t in prices_df.columns]
+        removed = [t for t in original_available if t not in available]
         if not available:
-            return {"ok": False, "message": "Keine der ausgewählten Ticker in den Preisdaten vorhanden.", "result": {}}
+            # Return envelope with removed tickers information
+            return {"ok": False, "message": "Keine der ausgewählten Ticker in den Preisdaten vorhanden.", "result": {"removed_tickers": removed}}
         kwargs["prices_df"] = prices_df[available]
-
-    # Debug log
+ 
+     # Debug log
     logger.debug("safe_backtest_call calling %s with args=%s kwargs_keys=%s", fn.__name__, args, list(kwargs.keys()))
 
     res = maybe_run_backtest(fn, *args, **kwargs) or {}
-    return res
 
+    # Ensure removed_tickers is present in the returned envelope/result
+    if isinstance(res, dict):
+        # If envelope already present, ensure result dict exists
+        if "result" not in res or res["result"] is None:
+            res["result"] = {}
+        # merge removed tickers (preserve any existing list)
+        existing_removed = res["result"].get("removed_tickers", [])
+        # combine and deduplicate while preserving order
+        combined = []
+        for t in (existing_removed + removed):
+            if t not in combined:
+                combined.append(t)
+        if combined:
+            res["result"]["removed_tickers"] = combined
+    return res

@@ -184,20 +184,27 @@ def optimize_portfolio(prices: pd.DataFrame, method="HRP"):
 # ---------------------------------------------------------
 # 4. Portfolio pro Regime bauen
 # ---------------------------------------------------------
-def build_regime_portfolio_old(regime: str, allowed: Dict[str, Any], method="HRP"):
-    tickers = [v["ticker"] for v in allowed.values()]
-    # Preise laden → später implementieren
-    prices = pd.DataFrame()
-    weights = optimize_portfolio(prices, method)
-    return weights
-
 # macro_pipeline.py
 def build_regime_portfolio(regime: str, allowed: Dict[str, Any], prices: pd.DataFrame, method="HRP"):
-    if prices is None or prices.empty:
+    """
+    Build a portfolio for the given regime using the provided prices.
+    Raises ValueError if prices missing or required tickers not present.
+    """
+    if prices is None or getattr(prices, "empty", True):
         raise ValueError("build_regime_portfolio: 'prices' must be provided and non-empty")
+
+    # expected tickers from allowed
     tickers = [v["ticker"] for v in allowed.values()]
-    # benutze die übergebenen prices
-    weights = optimize_portfolio(prices.loc[:, tickers], method)
+
+    # defensive: ensure tickers exist in prices columns
+    missing = [t for t in tickers if t not in prices.columns]
+    if missing:
+        raise ValueError(f"build_regime_portfolio: missing price columns for tickers: {missing}")
+
+    # use only the available columns in the requested order
+    prices_for_opt = prices.loc[:, tickers]
+
+    weights = optimize_portfolio(prices_for_opt, method)
     return {"tickers": tickers, "weights": weights}
 
 def allocate_cash_to_weights(cash_amount, weights):

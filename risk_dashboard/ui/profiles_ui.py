@@ -7,6 +7,7 @@ import sys
 import traceback
 from typing import Dict, Any, Tuple, Optional, List, Sequence
 from io import StringIO
+import numpy as np
 import requests
 import plotly.graph_objects as go
 import pandas as pd
@@ -41,7 +42,8 @@ from risk_dashboard.core.holdings import try_relaxed_holdings
 from risk_dashboard.core.etf_tools import download_prices
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.data_loader import parse_tickers, load_price_data
-from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR 
+from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR, ALLOW_TEST_UNIVERSE,UNIVERSE_PATHS
+from risk_dashboard.data_utils import safe_rerun
 
 logger = logging.getLogger(__name__)
 
@@ -369,10 +371,15 @@ def _extract_tickers_from_portfolio(p):
     return []
     
 
-def render_etf_tab(session_state):
+def render_etf_tab(session_state=None):
     # --- Dashboard‑Dokumentation / Gebrauchsanweisung ---
-    # defensive: accept either st.session_state or a plain dict-like object
-    ss = session_state or {}
+    # --- Beginn bereinigter Abschnitt in render_etf_tab ---
+    ss = st.session_state
+    ss.setdefault("user_weights_mapped", {})
+    ss.setdefault("run_in_progress", False)
+    ss.setdefault("DEBUG", False)
+
+    # Dokumentation Expander (unverändert)
     with st.expander("📘 Dashboard‑Beschreibung und Gebrauchsanweisung"):
         DOC_PATH = Path(__file__).resolve().parents[1] / "docs" / "dashboard_guide.md"
         if DOC_PATH.exists():
@@ -380,229 +387,215 @@ def render_etf_tab(session_state):
         else:
             st.write("Dokumentation nicht gefunden. Bitte lege docs/dashboard_guide.md an.")
 
-    st.header("ETF vs Aktie — Absolute Gewichte (Live)")
-    with st.expander("Kurzhilfe"):
-        st.markdown(
-            "ETF = Korb aus Wertpapieren (eigener Ticker). "
-            "Absolute Gewicht = Marktwert Position / Gesamtportfolio. "
-            "Bei ETFs: ETF_abs * weight_in_etf = absolutes Gewicht der Underlyings."
-        )
-    st.markdown("---")
-
-    # --- Status-Legende ---
-    st.markdown("""
-    ### 🔍 Status-Legende
-    🟢 **iShares (UK/US)** – echte Holdings verfügbar  
-    🟡 **Vanguard / Amundi / Xtrackers / EU / US / UK** – keine iShares-CSV, Demo-Holdings  
-    🔴 **Cash / Nicht-ETF** – keine Holdings  
-    ---
-    """)
-
-    # Portfolio Input (unverändert)
+    # Portfolio laden (defensiv)
     df = ss.get("portfolio_df", pd.DataFrame())
     if df.empty:
-        # falls caller ein frisches df übergeben hat, zeige Upload-UI
-        # verwende (sicher):
-        loaded_df = None
         try:
             loaded_df = load_portfolio_from_ui_or_disk()
-        except Exception as e:
-            logger.exception("load_portfolio_from_ui_or_disk failed: %s", e)
-        if loaded_df is not None and isinstance(loaded_df, pd.DataFrame) and not loaded_df.empty:
-            df = loaded_df
-        # sonst bleibt df unveränder
-        if not df.empty:
-            ss["portfolio_df"] = df
+            if isinstance(loaded_df, pd.DataFrame) and not loaded_df.empty:
+                df = loaded_df
+                ss["portfolio_df"] = df
+        except Exception:
+            logger.exception("load_portfolio_from_ui_or_disk failed")
 
     if not df.empty:
         st.dataframe(df)
+
     auto_portfolio_value = compute_portfolio_value(df) if not df.empty else 0.0
-    portfolio_value = st.number_input("Gesamtportfolio (leer = Summe der Marktwerte)", value=float(auto_portfolio_value), format="%.2f")
+    portfolio_value = st.number_input("Gesamtportfolio (leer = Summe der Marktwerte)",
+                                    value=float(auto_portfolio_value), format="%.2f")
 
     tickers = df["ticker"].astype(str).str.upper().unique().tolist() if not df.empty else []
-    selected_etfs = st.multiselect("Aus Portfolio wähle ETF(s) zur Aufschlüsselung", options=tickers)
+    selected_etfs = st.multiselect("Aus Portfolio wähle ETF(s) zur Aufschlüsselung", options=tickers, key="selected_etfs")
 
-    holdings_map: Dict[str, pd.DataFrame] = {}
-    holdings_dir.mkdir(parents=True, exist_ok=True)
-
-    etf_to_isin_map = ss.get("etf_to_isin_map", globals().get("etf_to_isin_map", {}))
-
-    # Debug (temporär)
-    st.write("DEBUG price_path:", price_path)
-    st.write("DEBUG macro_path:", macro_path)
-    st.write("price_path exists:", price_path.exists())
-    st.write("macro_path exists:", macro_path.exists())
-
-    # --- Wichtige Werte aus session_state lesen (keine Loader aufrufen) ---
+    # Wichtige session Werte
     prefix = ss.get("prefix", "profile")
-    index_choice = ss.get("index_choice")  # kann None sein; UI darf das anzeigen
     etf_universe = ss.get("etf_universe", {}) or {}
-    universe_warnings = ss.get("universe_warnings")
     price_data = ss.get("price_data")
     macro_df = ss.get("macro_df")
+    index_choice = st.session_state.get(f"{prefix}_index_choice") or st.session_state.get("index_choice")
+    path_index_choice = UNIVERSE_PATHS.get(index_choice)
+    if path_index_choice is None:
+        logger.error("Kein path_index_choice für index_choice=%s", index_choice)
 
-    # Falls index_choice nicht gesetzt ist, zeige lokale Auswahl (nur UI, kein Laden)
-    if not index_choice:
-        index_choice = st.selectbox(
-            "Index / Universe wählen",
-            ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"],
-            index=1,
-            key=f"{prefix}_index_choice_local"
-        )
-        # schreibe die Auswahl optional zurück in session_state, falls gewünscht
-        ss["index_choice"] = index_choice
+    # Annahme: ss = st.session_state wurde oben gesetzt
+    auto_portfolio_value = compute_portfolio_value(df) if not df.empty else 0.0
+    portfolio_value = st.number_input(
+        "Gesamtportfolio (leer = Summe der Marktwerte)",
+        value=float(auto_portfolio_value),
+        format="%.2f",
+        key=f"{prefix}_portfolio_value"
+    )
+    # optional in session speichern
+    ss["portfolio_value"] = float(portfolio_value)
 
-    # Informative Hinweise, wenn Daten fehlen (keine Abbrüche hier)
+    tickers = df["ticker"].astype(str).str.upper().unique().tolist() if not df.empty else []
+    selected_from_portfolio = st.multiselect(
+        "Aus Portfolio wähle ETF(s) zur Aufschlüsselung",
+        options=tickers,
+        key=f"{prefix}_portfolio_selected_etfs"
+    )
+
+    # --- Universe prüfen und ggf. Test‑Universe setzen ---
+    # Annahme: ss = st.session_state, prefix ist gesetzt
+    # 1) Universe prüfen und ggf. Test‑Universe setzen
     if not etf_universe:
-        st.info("Keine vordefinierten ETFs gefunden. Bitte füge Kandidaten hinzu oder nutze das Test‑Universe.")
-        new_etfs = st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)", key=f"{prefix}_new_etfs_input")
-        if st.button("Kandidaten speichern", key=f"{prefix}_save_candidates"):
-            add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
-            st.experimental_rerun()
-        if st.button("Test‑Universe verwenden", key=f"{prefix}_use_test_universe"):
-            ss["etf_universe"] = {t: {"ticker": t} for t in ["VWRL.L", "CSPX.L"]}
-            st.experimental_rerun()
+        if ALLOW_TEST_UNIVERSE:
+            etf_universe = {t: {"ticker": t} for t in ["VWRL.L", "CSPX.L"]}
+            logger.info("Using test universe (dev mode)")
+        else:
+            st.info("Keine vordefinierten ETFs gefunden. Bitte füge Kandidaten im Profil hinzu.")
+            if st.button("Profil öffnen: Kandidaten hinzufügen", key=f"{prefix}_open_profile_editor"):
+                st.session_state["show_profile_editor"] = True
+                safe_rerun()
+            return  # early return: kein weiteres Rendering ohne Universe
 
-    if price_data is None:
-        st.warning("Preisdaten (price_data) fehlen. Bitte lade Preisdaten in der Profil‑Ansicht oder nutze Upload.")
-    if macro_df is None:
-        st.warning("Makrodaten (macro_df) fehlen. Bitte lade Makrodaten in der Profil‑Ansicht.")
+    # 2) Jetzt, da etf_universe vorhanden ist, Optionen bauen
+    etf_universe = ss.get("etf_universe", {}) or {}
+    # optional: normalisiere Keys, wenn du das erwartest (z.B. Uppercase)
+    # etf_universe = {k.upper(): v for k, v in etf_universe.items()}
 
-    
-    ##################################################################
-    ss = st.session_state
-    ss.setdefault("user_weights_mapped", {})
+    etf_options = {k: v.get("display_name", k) for k, v in etf_universe.items()}
+    options = list(etf_options.keys())
 
-    st.markdown("### KI Vorschläge")
+    # 3) Filtere alte Defaults auf gültige Optionen (vermeidet StreamlitAPIException)
+    prev_selected = ss.get("selected_etfs", [])
+    valid_selected = [v for v in prev_selected if v in options]
+    if valid_selected != prev_selected:
+        logger.debug("Filtered selected_etfs to current universe: %s -> %s", prev_selected, valid_selected)
+        ss["selected_etfs"] = valid_selected
+
+    # Filter defaults
+    defaults = [v for v in ss.get("selected_etfs", []) if v in options]
+
+    # 4) Defensive UI: falls options leer, Navigation anbieten
+    if not options:
+        st.info("Keine vordefinierten ETFs gefunden. Bitte füge Kandidaten im Profil hinzu.")
+        if st.button("Profil öffnen: Kandidaten hinzufügen", key=f"{prefix}_open_profile_editor"):
+            ss["show_profile_editor"] = True
+            safe_rerun()
+        return
+
+    # Debug logs vor dem Widget
+    logger.debug("etf_universe keys (sample): %s", list(etf_universe.keys())[:50])
+    logger.debug("selected_etfs (raw): %s", ss.get("selected_etfs"))
+    logger.debug("options len: %d, defaults filtered: %s", len(options), defaults)
+
+    # 5) Multiselect mit gefilterten Defaults und eindeutigen Keys
+    selected_etfs = st.multiselect(
+        "Wähle erlaubte ETFs (optional)",
+        options=options,
+        format_func=lambda k: etf_options.get(k, k),
+        default=defaults,
+        key=f"{prefix}_selected_etfs",
+        help="Wähle ETFs aus dem vordefinierten Universe."
+    )
+    ss["selected_etfs"] = selected_etfs
+
+    # 6) Debug nur bei Flag
+    if ss.get("DEBUG"):
+        st.write("DEBUG price_path:", globals().get("price_path"))
+        st.write("DEBUG macro_path:", globals().get("macro_path"))
+
+    # Annahme: ss = st.session_state; prefix ist gesetzt; logger importiert
+    # --- KI Vorschläge mit eindeutigen Keys ---
     col1, col2, col3 = st.columns(3)
-
     with col1:
-        if st.button("KI Vorschlag: Konservativ"):
-            ss["user_weights_mapped"] = {
-                "EXS1.DE": 0.45, "DAX": 0.20, "MBG": 0.20,
-                "AAPL": 0.05, "NVDA": 0.05, "BTC": 0.05
-            }
-            st.experimental_rerun = getattr(st, "experimental_rerun", None)
-            if callable(st.experimental_rerun):
-                st.experimental_rerun()
-
+        if st.button("KI Vorschlag: Konservativ", key=f"{prefix}_ki_conservative"):
+            ss["user_weights_mapped"] = {"CASH": 0.2, "BOND": 0.5, "EQUITY": 0.3}  # Beispiel
+            safe_rerun()
     with col2:
-        if st.button("KI Vorschlag: Ausgewogen"):
-            ss["user_weights_mapped"] = {
-                "EXS1.DE": 0.35, "DAX": 0.15, "MBG": 0.10,
-                "NVDA": 0.20, "AAPL": 0.15, "BTC": 0.05
-            }
-            st.experimental_rerun = getattr(st, "experimental_rerun", None)
-            if callable(st.experimental_rerun):
-                st.experimental_rerun()
-
+        if st.button("KI Vorschlag: Ausgewogen", key=f"{prefix}_ki_balanced"):
+            ss["user_weights_mapped"] = {"CASH": 0.1, "BOND": 0.4, "EQUITY": 0.5}
+            safe_rerun()
     with col3:
-        if st.button("KI Vorschlag: Wachstum"):
-            ss["user_weights_mapped"] = {
-                "NVDA": 0.35, "AAPL": 0.25, "EXS1.DE": 0.20,
-                "DAX": 0.05, "MBG": 0.00, "BTC": 0.15
-            }
-            st.experimental_rerun = getattr(st, "experimental_rerun", None)
-            if callable(st.experimental_rerun):
-                st.experimental_rerun()
+        if st.button("KI Vorschlag: Wachstum", key=f"{prefix}_ki_growth"):
+            ss["user_weights_mapped"] = {"CASH": 0.0, "BOND": 0.2, "EQUITY": 0.8}
+            safe_rerun()
 
-    # Sichtbar machen und editierbar
-    st.markdown("**Aktuelle Gewichtung (kann vor Berechnung angepasst werden)**")
-    st.json(ss["user_weights_mapped"])
+    # Defensive defaults for session keys
+    ss.setdefault("user_weights_mapped", {})
+    ss.setdefault("run_in_progress", False)
+    ss.setdefault("selected_etfs", [])
 
-    # Optional: einfache Editierbarkeit (Textfeld mit JSON)
-    weights_text = st.text_area("Gewichte als JSON bearbeiten", value=json.dumps(ss["user_weights_mapped"], indent=2), height=120)
+    st.json(ss.get("user_weights_mapped", {}))
+
+    # JSON Editor (defensiv): value aus session holen, nicht direkt aus st.json-Ausgabe
+    weights_text = st.text_area(
+        "Gewichte als JSON bearbeiten",
+        value=json.dumps(ss.get("user_weights_mapped", {}), indent=2),
+        height=120,
+        key=f"{prefix}_weights_text"
+    )
     try:
         parsed = json.loads(weights_text)
-        # Validierung: Summiert sich zu ~1.0?
-        total = sum(parsed.values()) if isinstance(parsed, dict) else 0
+        total = sum(parsed.values()) if isinstance(parsed, dict) else 0.0
         st.write(f"Summe Gewichte: {total:.4f}")
-        if st.button("Übernehme geänderte Gewichte"):
+        if st.button("Übernehme geänderte Gewichte", key=f"{prefix}_apply_weights"):
             ss["user_weights_mapped"] = {k: float(v) for k, v in parsed.items()}
-            st.experimental_rerun = getattr(st, "experimental_rerun", None)
-            if callable(st.experimental_rerun):
-                st.experimental_rerun()
+            safe_rerun()
     except Exception as e:
         st.error("Ungültiges JSON: " + str(e))
 
-    st.markdown("---")
-    ###########################################
-    
-    
-    
-    #############################################
-    # --- Sanity checks: nur ausführen, wenn price_data und weights vorhanden sind ---
-    user_weights_mapped = ss.get("user_weights_mapped", None)
-    if price_data is not None and user_weights_mapped:
-        try:
-            from risk_dashboard.data_utils import sanity_backtest
-            pv, port_rets = sanity_backtest(price_data, user_weights_mapped, start=DEFAULT_START_STR, end='2026-09-09')
-            logger.debug("sanity port_value tail:\n%s", pv.tail().to_string())
-            logger.debug("sanity stats: %s", port_rets.describe().to_string())
-        except Exception as e:
-            logger.exception("Sanity backtest failed: %s", e)
-            st.warning("Sanity Backtest fehlgeschlagen: " + str(e))
+    # --- Berechnen Button (defensiv) ---
+    # ensure selected_etfs variable exists in scope (from earlier multiselect)
+    selected_etfs = ss.get("selected_etfs", [])
 
-    ################################################
-
-
-    # Holdings / Backtest Button (wie bisher) — nutzt shared data via ss
-    if "run_in_progress" not in ss:
-        ss["run_in_progress"] = False
-
-    ss.setdefault("run_in_progress", False)
-
-    # Button (disabled wenn bereits in Arbeit)
-    if st.button("Berechnen", key="btn_etf_calculate", disabled=ss["run_in_progress"]):
+    if st.button("Berechnen", key=f"{prefix}_btn_etf_calculate", disabled=ss["run_in_progress"]):
         ss["run_in_progress"] = True
-        st.experimental_rerun = getattr(st, "experimental_rerun", None)  # defensive
-        pd_shared = ss.get("price_data")
-        md_shared = ss.get("macro_df")
-        user_weights_mapped = ss.get("user_weights_mapped", {})
-        if not user_weights_mapped:
-            st.warning("Keine Gewichte gesetzt. Wähle einen KI‑Vorschlag oder gib Gewichte ein.")
-        else:
-            # loggen und validieren
-            logger.debug("Using weights: %s", user_weights_mapped)
-            ss["run_in_progress"] = True
-            try:
-                with st.spinner("Backtests laufen, bitte warten…"):
-                    # optional: st.progress für Fortschritt, wenn run_all_etf_backtests Rückmeldungen liefert
+        try:
+            pd_shared = ss.get("price_data")
+            md_shared = ss.get("macro_df")
+            user_weights_mapped = ss.get("user_weights_mapped", {})
 
-                    logger.debug("BACKTEST INPUT: price_data shape=%s cols=%s na_counts=%s",
-                                getattr(price_data, "shape", None),
-                                list(price_data.columns)[:20],
-                                price_data.isna().sum().to_dict() if price_data is not None else None)
-                    logger.debug("BACKTEST INPUT: weights=%s", repr(user_weights_mapped))
-                    logger.debug("BACKTEST INPUT: macro_df present=%s", macro_df is not None)
-
-                    # from risk_dashboard.core.backtest import run_all_etf_backtests
-                    try:
-                        from risk_dashboard.core.backtest import run_all_etf_backtests
-                        logger.debug("run_all_etf_backtests is callable: %s", callable(run_all_etf_backtests))
-                    
-                        st.write("DEBUG: Backtest start — price_data present:", price_data is not None)
-
-                        out = run_all_etf_backtests(
-                            selected_etfs=selected_etfs,
-                            holdings_dir=holdings_dir,
-                            etf_to_isin_map=etf_to_isin_map,
-                            price_data=pd_shared,
-                            macro_df=md_shared,
-                            backtest_dir=Path("risk_dashboard/data/backtests"),
-                            portfolio_value=ss.get("portfolio_value", 100000.0),
-                            threads=False,  # safe on Windows
-                        )
-                        st.success("Backtests abgeschlossen.")
-                        st.json(out)
-                    except Exception:
-                        logger.exception("Import run_all_etf_backtests failed") 
-            except Exception as e:
-                logger.exception("Backtest failed: %s", e)
-                st.error(f"Backtest fehlgeschlagen: {e}")
-            finally:
+            # Validierungen
+            if pd_shared is None or md_shared is None:
+                st.error("Preisdaten oder Makrodaten fehlen.")
                 ss["run_in_progress"] = False
-    st.markdown("---")
+                return
+
+            if not user_weights_mapped:
+                st.warning("Keine Gewichte gesetzt.")
+                ss["run_in_progress"] = False
+                return
+
+            # Sanity Check
+            from risk_dashboard.data_utils import sanity_backtest
+            ok, msg = sanity_backtest(pd_shared, user_weights_mapped, min_rows=60)
+            if not ok:
+                st.error("Sanity Check fehlgeschlagen: " + msg)
+                ss["run_in_progress"] = False
+                return
+
+            # Debug log der Inputs
+            logger.debug(
+                "Backtest inputs: selected_etfs=%s, user_weights=%s, price_data_keys=%s",
+                selected_etfs,
+                user_weights_mapped,
+                None if pd_shared is None else list(pd_shared.columns)[:10]
+            )
+
+            with st.spinner("Backtests laufen, bitte warten…"):
+                from risk_dashboard.core.backtest import run_all_etf_backtests
+                out = run_all_etf_backtests(
+                    selected_etfs=selected_etfs,
+                    holdings_dir=holdings_dir,
+                    etf_to_isin_map=etf_to_isin_map,
+                    price_data=pd_shared,
+                    macro_df=md_shared,
+                    backtest_dir=Path("risk_dashboard/data/backtests"),
+                    portfolio_value=ss.get("portfolio_value", 100000.0),
+                    threads=False,
+                )
+
+            st.success("Backtests abgeschlossen.")
+            st.json(out)
+
+        except Exception as e:
+            logger.exception("Backtest failed: %s", e)
+            st.error(f"Backtest fehlgeschlagen: {e}")
+        finally:
+            ss["run_in_progress"] = False
 
 def load_attribute_table_try(paths):
     for p in paths:
@@ -819,6 +812,102 @@ def profile_form_ui(
         logger.exception("Failed to load stock_universe.csv: %s", e)
         stock_universe = None
 
+    def build_combined_universe(etf_universe, stock_universe):
+        """
+        Robust: akzeptiert DataFrame, dict (ticker->meta) oder list(dict).
+        Liefert ein DataFrame mit Spalte 'ticker' und 'asset_type' oder None.
+        """
+        parts = []
+
+        def to_df(obj, asset_type):
+            # None -> None
+            if obj is None:
+                return None
+            # already a DataFrame
+            if isinstance(obj, pd.DataFrame):
+                df = obj.copy()
+                df["asset_type"] = asset_type
+                # ensure ticker column exists
+                if "ticker" not in df.columns:
+                    # try to infer from index or keys
+                    if df.index.nlevels == 1:
+                        df = df.reset_index().rename(columns={df.index.name or 0: "ticker"})
+                    else:
+                        raise ValueError(f"DataFrame for {asset_type} has no 'ticker' column")
+                df["ticker"] = df["ticker"].astype(str)
+                return df
+            # dict mapping ticker -> meta
+            if isinstance(obj, dict):
+                rows = []
+                for k, v in obj.items():
+                    # if v is dict with metadata, merge
+                    if isinstance(v, dict):
+                        row = {"ticker": str(k)}
+                        row.update(v)
+                    else:
+                        row = {"ticker": str(k), "meta": v}
+                    rows.append(row)
+                df = pd.DataFrame(rows)
+                df["asset_type"] = asset_type
+                return df
+            # list of dicts (rows)
+            if isinstance(obj, (list, tuple)):
+                try:
+                    df = pd.DataFrame(obj)
+                    if "ticker" not in df.columns:
+                        raise ValueError(f"List for {asset_type} has no 'ticker' field")
+                    df["asset_type"] = asset_type
+                    df["ticker"] = df["ticker"].astype(str)
+                    return df
+                except Exception:
+                    raise
+            # unknown type
+            raise TypeError(f"Unsupported universe type: {type(obj)} for {asset_type}")
+
+        # convert both universes
+        try:
+            df_etf = to_df(etf_universe, "ETF")
+        except Exception as e:
+            logger.exception("Failed to coerce etf_universe to DataFrame: %s", e)
+            df_etf = None
+
+        try:
+            df_stock = to_df(stock_universe, "Stock")
+        except Exception as e:
+            logger.exception("Failed to coerce stock_universe to DataFrame: %s", e)
+            df_stock = None
+
+        if df_etf is not None:
+            parts.append(df_etf)
+        if df_stock is not None:
+            parts.append(df_stock)
+
+        if not parts:
+            return None
+
+        combined = pd.concat(parts, ignore_index=True, sort=False)
+        combined = combined.drop_duplicates(subset=["ticker"], keep="first").reset_index(drop=True)
+        combined["ticker"] = combined["ticker"].astype(str)
+        return combined
+
+
+    def debug_universe_shape(name, obj):
+        if obj is None:
+            logger.debug("%s is None", name)
+        elif isinstance(obj, pd.DataFrame):
+            logger.debug("%s is DataFrame columns=%s rows=%s", name, list(obj.columns), len(obj))
+        elif isinstance(obj, dict):
+            logger.debug("%s is dict with %d keys; sample keys=%s", name, len(obj), list(obj.keys())[:10])
+        elif isinstance(obj, (list, tuple)):
+            logger.debug("%s is list/tuple len=%d sample0=%s", name, len(obj), obj[0] if obj else None)
+        else:
+            logger.debug("%s is %s", name, type(obj))
+
+    debug_universe_shape("etf_universe", etf_universe)
+    debug_universe_shape("stock_universe", stock_universe)
+
+    st.session_state["combined_universe"] = build_combined_universe(etf_universe, stock_universe)
+
     # prefer explicit None-checks; avoid "or" with DataFrame objects
     if macro_df is None:
         macro_df = st.session_state.get("macro_df")
@@ -881,17 +970,72 @@ def profile_form_ui(
     except Exception:
         logger.exception("Error while logging etf_universe")
 
-    # If universe empty: allow user to add candidates or use test universe
-    if not etf_universe:
-        st.info("Keine vordefinierten ETFs gefunden. Bitte füge Kandidaten hinzu oder nutze das Test‑Universe.")
-        new_etfs = st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)", key="new_etfs_input")
-        if st.button("Kandidaten speichern"):
-            add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
-            st.experimental_rerun()
-        if st.button("Test‑Universe verwenden"):
-            etf_universe = {t: {"ticker": t} for t in ["VWRL.L", "CSPX.L"]}
-            st.experimental_rerun()
+    def render_candidate_editor(prefix: str, index_choice: str, asset_type: str):
+        new_key = f"{prefix}_new_etfs_input"
+        save_key = f"{prefix}_save_candidates"
+        st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)", key=new_key)
+        if st.button("Kandidaten speichern", key=save_key):
+            raw = st.session_state.get(new_key, "")
+            tickers = [t.strip().upper() for t in raw.split(",") if t.strip()]
+            if not tickers:
+                st.warning("Keine gültigen Ticker eingegeben.")
+                return
 
+            try:
+                # tickers: Liste der neu eingegebenen Ticker (bereits .upper() normalisiert)
+                add_etf_candidates(index_choice, tickers, asset_type=asset_type)
+
+                # 1) Universe neu laden (falls add_etf_candidates nicht automatisch updated)
+                path_index_choice = st.session_state.get("path_index_choice") or UNIVERSE_PATHS.get(index_choice)
+                if path_index_choice:
+                    new_universe, warnings = load_etf_universe(path_index_choice)
+                    # optional: normalisiere keys
+                    new_universe = {k.upper(): v for k, v in new_universe.items()}
+                    st.session_state["etf_universe"] = new_universe
+                else:
+                    # Fallback: erweitere vorhandenes Universe
+                    eu = st.session_state.get("etf_universe", {})
+                    for t in tickers:
+                        eu.setdefault(t.upper(), {"ticker": t.upper()})
+                    st.session_state["etf_universe"] = eu
+
+                # 2) Filter / Merge selected_etfs
+                prev = st.session_state.get("selected_etfs", [])
+                prev_norm = [p.upper().strip() for p in prev]
+                valid = [p for p in prev_norm if p in st.session_state["etf_universe"]]
+                # füge neu hinzu, damit Nutzer sie sofort sieht
+                for t in tickers:
+                    if t in st.session_state["etf_universe"] and t not in valid:
+                        valid.append(t)
+                st.session_state["selected_etfs"] = valid
+
+                # 3) Caches invalidieren + Rerun
+                st.session_state.pop("combined_universe", None)
+                st.session_state.pop("price_data", None)
+                st.session_state["show_profile_editor"] = False
+                safe_rerun()
+                return
+            except Exception as e:
+                logger.exception("Fehler beim Hinzufügen von Kandidaten: %s", e)
+                st.error("Fehler beim Hinzufügen der Kandidaten. Siehe Log.")
+                return
+
+    # If universe empty: allow user to add candidates or use test universe
+    # profiles_ui.py (oder wo Test‑Universe gesetzt wird)
+    if not etf_universe:
+        if ALLOW_TEST_UNIVERSE:
+            # Dev only: set test universe
+            etf_universe = {t: {"ticker": t} for t in ["VWRL.L", "CSPX.L"]}
+            logger.info("Using test universe (dev mode)")
+        else:
+            # Production: force user action
+            st.info("Keine vordefinierten ETFs gefunden. Bitte füge Kandidaten hinzu.")
+            # show input widgets but do NOT auto-populate
+            # Aufruf nur einmal pro gewünschtem Editor:
+            render_candidate_editor(prefix="etf", index_choice="global", asset_type="ETF")
+            # Wenn du wirklich zwei Editoren willst, rufe mit unterschiedlichen prefix/index_choice auf:
+            # render_candidate_editor(prefix="stock", index_choice="stocks", asset_type="Stock")
+            
     # price_data: fallback to session_state, loader only as last resort
 
     # 1) Fallback aus session_state, aber ohne "or" mit DataFrame
@@ -991,7 +1135,8 @@ def profile_form_ui(
                     st.session_state["price_data"] = df
                     price_data = df
                     st.success("Preisdaten erfolgreich hochgeladen.")
-                    st.experimental_rerun()
+                    # st.experimental_rerun()
+                    safe_rerun()
                 else:
                     st.error("Hochgeladene Datei enthält keine gültigen Preisdaten.")
             except Exception as e:
@@ -1045,7 +1190,6 @@ def profile_form_ui(
 
     bt = {}
     
-    from risk_dashboard.utils.session_helpers import maybe_run_backtest
     from risk_dashboard.utils.backtest_adapter import adapter_run_backtest  # falls benötigt
 
     def normalize_and_unique(tickers):
@@ -1119,63 +1263,211 @@ def profile_form_ui(
         run_disabled = False
 
         # Widgets (einmalig)
+        
+        # --- Vorbereitung / Widgets (unverändert) ---
         selected_tickers_input = st.text_input("Tickers (Komma getrennt)", "NVDA,EXS1.DE,AAPL", key="selected_tickers_input")
+        # ... start_date / end_date etc.
+        # --- Detect ticker list changes and reset caches if needed ---
+        ticker_list = parse_tickers(selected_tickers_input)  # e.g. ['NVDA','EXS1.DE','AAPL','DAX']
+        ticker_list_upper = [t.upper() for t in ticker_list]
+
+        prev_tickers = st.session_state.get("last_selected_tickers_upper")
+        if prev_tickers != ticker_list_upper:
+            logger.debug("Ticker list changed: %s -> %s", prev_tickers, ticker_list_upper)
+            # Invalidate caches that depend on the ticker universe
+            for k in ("prices_df","available_mapped","user_weights_mapped","regimes_aligned","removed_on_load","last_backtest_results_df"):
+                st.session_state.pop(k, None)
+            # store new value
+            st.session_state["last_selected_tickers_upper"] = ticker_list_upper
+            # mark that we need to (re)load prices
+            st.session_state["need_price_reload"] = True
+        else:
+            # keep previous flag if present
+            st.session_state.setdefault("need_price_reload", False)
+
+        # --- Optional: alias map for common index names ---
+        ALIAS_MAP = {
+            "DAX": ["DAX", "XDAX.DE", "XUDE.DE"],
+            "S&P": ["SPX", "SP500", "CSPX.L"],
+            # weitere Aliase hier
+        }
+
+        def find_best_column_for_alias(alias_upper: str, cols_upper_map: dict, alias_map: dict = ALIAS_MAP):
+            # 1) exact match
+            if alias_upper in cols_upper_map:
+                return cols_upper_map[alias_upper]
+
+            # 2) explicit alias candidates from alias_map
+            candidates = alias_map.get(alias_upper, [])
+            for cand in candidates:
+                if cand.upper() in cols_upper_map:
+                    return cols_upper_map[cand.upper()]
+
+            # 3) contains match (e.g., 'DAX' -> 'XDAX.DE')
+            for cu, orig in cols_upper_map.items():
+                if alias_upper in cu:
+                    return orig
+
+            # 4) suffix/prefix heuristics (e.g., endswith '.DE' variants)
+            for cu, orig in cols_upper_map.items():
+                if cu.startswith(alias_upper) or cu.endswith(alias_upper):
+                    return orig
+
+            return None
+
+        def align_regimes_to_tickers(regimes, available_mapped):
+            """
+            regimes: DataFrame (index=time, columns=ticker-like) OR dict/list (custom)
+            available_mapped: list of actual price column names (case sensitive)
+            returns: regimes subset reindexed to available_mapped or None
+            """
+            if regimes is None:
+                return None
+
+            # If regimes is a DataFrame: keep only matching columns (exact match)
+            if isinstance(regimes, pd.DataFrame):
+                keep = [c for c in available_mapped if c in regimes.columns]
+                if not keep:
+                    return None
+                # reindex columns in the same order as available_mapped
+                return regimes.reindex(columns=keep)
+
+            # If regimes is a dict mapping ticker->series or similar:
+            if isinstance(regimes, dict):
+                out = {}
+                for c in available_mapped:
+                    if c in regimes:
+                        out[c] = regimes[c]
+                    else:
+                        # try uppercase match
+                        for k in list(regimes.keys()):
+                            if k.upper() == c.upper():
+                                out[c] = regimes[k]
+                                break
+                return pd.DataFrame(out) if out else None
+
+            # If regimes is a list or other structure, implement domain-specific alignment
+            try:
+                # fallback: try to coerce to DataFrame
+                df = pd.DataFrame(regimes)
+                keep = [c for c in available_mapped if c in df.columns]
+                return df.reindex(columns=keep) if keep else None
+            except Exception:
+                logger.exception("align_regimes_to_tickers: unsupported regimes format")
+                return None
+
+        # --- Preise nur laden / aktualisieren wenn nötig ---
+        def _normalize_col_map(df):
+            return {c.upper(): c for c in (df.columns if df is not None else [])}
+
+        # current cached prices
+        cached_prices = st.session_state.get("prices_df")  # DataFrame or None
+        cached_cols_upper = _normalize_col_map(cached_prices)
+
+        # decide if we need a full reload or only to fetch missing tickers
+        requested_upper = [t.upper() for t in ticker_list]
+        missing_in_cache = [t for t in requested_upper if t not in cached_cols_upper]
+
         start_date = st.date_input("Startdatum", value=DEFAULT_START_STR)
         end_date = st.date_input("Enddatum", value=DEFAULT_END_STR)
-
-        # Normierte Listen / Argumente
-        ticker_list = parse_tickers(selected_tickers_input) # [t.strip().upper() for t in selected_tickers_input.split(",") if t.strip()]
         start_arg = start_date.isoformat() if start_date else None
         end_arg = end_date.isoformat() if end_date else None
 
-        # Preise nur laden, wenn noch nicht im Session State oder wenn Ticker/Zeitraum sich geändert haben
         need_reload = False
-        if "prices_df" not in st.session_state:
+        # if no cache at all -> reload
+        if cached_prices is None or getattr(cached_prices, "empty", True):
             need_reload = True
-        else:
-            # optional: prüfe, ob cached columns match requested tickers or Zeitraum geändert wurde
-            cached_tickers = set(st.session_state.get("prices_df").columns) if st.session_state.get("prices_df") is not None else set()
-            if not set(ticker_list).issubset(cached_tickers):
+        # if any requested ticker missing -> try to fetch only missing tickers
+        elif missing_in_cache:
+            # try to fetch only the missing tickers (safer than assuming alias matches)
+            try:
+                # _fetch_and_clean_prices should accept a list of tickers and return (df, removed)
+                new_prices, removed_on_load = _fetch_and_clean_prices([t for t in ticker_list if t.upper() in missing_in_cache],
+                                                                    start=start_arg, end=end_arg)
+                # merge new_prices into cached_prices (align on index)
+                if new_prices is not None and not new_prices.empty:
+                    # ensure column names in new_prices match the original case mapping
+                    # new_prices columns are expected to be the tickers as returned by the loader
+                    if cached_prices is None or getattr(cached_prices, "empty", True):
+                        merged = new_prices
+                    else:
+                        merged = cached_prices.join(new_prices, how="outer")
+                    st.session_state["prices_df"] = merged
+                    st.session_state.setdefault("removed_on_load", []).extend(removed_on_load or [])
+                else:
+                    # if fetch failed for missing tickers, mark for full reload
+                    need_reload = True
+            except Exception:
+                logger.exception("Fetching missing tickers failed; will attempt full reload")
                 need_reload = True
 
+        # if flagged, do a full reload for all requested tickers
         if need_reload:
             prices_df, removed_on_load = _fetch_and_clean_prices(ticker_list, start=start_arg, end=end_arg)
             st.session_state["prices_df"] = prices_df
-            st.session_state["removed_on_load"] = removed_on_load
-            if removed_on_load:
-                st.warning("Beim Laden wurden folgende Ticker entfernt (keine Preisdaten): " + ", ".join(removed_on_load))
+            st.session_state["removed_on_load"] = removed_on_load or []
 
-        # Prepare für Backtest
+        # now prepare for backtest using the (possibly updated) prices_df
         prices = st.session_state.get("prices_df")
-        available = [t for t in ticker_list]  # bereits normalized (upper)
+        available = [t.upper() for t in ticker_list]  # normalized upper-case list
 
         st.write("DEBUG available:", available)
         st.write("DEBUG prices columns:", None if prices is None else list(prices.columns))
 
-        if prices is None or prices.empty:
+        # defensive checks before using prices
+        if prices is None or getattr(prices, "empty", True):
             st.warning("Preisdaten sind nicht geladen. Bitte Preise laden oder Cache prüfen.")
             run_disabled = True
         else:
-            # Falls prices.columns sind nicht upper, mappe case-sensitiv: suche matching columns
+            # map requested tickers to actual price columns (case-insensitive)
             cols_upper_map = {c.upper(): c for c in prices.columns}
-            available_mapped = [cols_upper_map[t] for t in available if t in cols_upper_map]
+            available_mapped = []
+            for t in available:
+                mapped = None
+                if t in cols_upper_map:
+                    mapped = cols_upper_map[t]
+                else:
+                    mapped = find_best_column_for_alias(t, cols_upper_map)
+                if mapped:
+                    available_mapped.append(mapped)
+                else:
+                    logger.debug("Ticker %s not found in prices.columns", t)
+
+            # after available_mapped is known
+            regimes = st.session_state.get("regimes")  # original regimes computed on macro_df
+            regimes_aligned = None
+            if regimes is not None:
+                try:
+                    # if regimes is a DataFrame with tickers as columns
+                    if isinstance(regimes, pd.DataFrame):
+                        # keep only columns that exist in available_mapped (case sensitive)
+                        keep = [c for c in available_mapped if c in regimes.columns]
+                        regimes_aligned = regimes[keep] if keep else None
+                    else:
+                        # if regimes is dict/list, implement appropriate alignment logic
+                        regimes_aligned = align_regimes_to_tickers(regimes, available_mapped)
+                except Exception:
+                    logger.exception("Failed to align regimes")
+                    regimes_aligned = None
 
             if not available_mapped:
                 st.warning("Keine der ausgewählten Ticker in den Preisdaten vorhanden.")
                 run_disabled = True
             else:
                 # Defaults für Weights / Regimes aus session_state oder fallback
-                user_weights_mapped = st.session_state.get("user_weights_mapped", None)
-                if user_weights_mapped is None:
+                user_weights_mapped = st.session_state.get("user_weights_mapped")
+                if user_weights_mapped is None or set(user_weights_mapped.keys()) != set(available_mapped):
+                    # create equal weights for the current mapped assets
                     user_weights_mapped = {c: 1.0 / len(available_mapped) for c in available_mapped}
+                    st.session_state["user_weights_mapped"] = user_weights_mapped
 
                 regimes_val = st.session_state.get("regimes_aligned", None)
 
                 st.write("DEBUG available_mapped:", available_mapped)
                 st.write("DEBUG weights:", user_weights_mapped)
-                st.write("DEBUG regimes:", None if regimes_val is None else regimes_val.head())
+                st.write("DEBUG regimes:", None if regimes_val is None else (regimes_val.head() if hasattr(regimes_val, "head") else regimes_val))
 
-                # Sicherer UI-Aufruf
+                # Sicherer UI-Aufruf (defensiv)
                 result = safe_backtest_call(
                     adapter_run_backtest,
                     available_mapped,
@@ -1187,25 +1479,71 @@ def profile_form_ui(
                     rebalance="monthly",
                     initial_capital=1_000_000,
                     flag_key="backtest_profiles"
-                ) or {}
+                )
+                # --- Normalize None -> envelope (einheitlich) ---
+                if result is None:
+                    logger.debug("safe_backtest_call returned None")
+                    result = {"ok": False, "message": "Interner Fehler: kein Ergebnis vom Backtest.", "result": {}}
 
+                # If envelope present, handle ok flag and extract payload once
                 if not result.get("ok"):
                     st.warning(result.get("message", "Backtest fehlgeschlagen."))
-                    run_disabled = True
+                    payload = result.get("result", {}) or {}
                 else:
-                    run_disabled = False
-                    bt = result["result"]
-                    removed = bt.get("removed_tickers", [])
-                    if removed:
-                        st.warning("Folgende Ticker wurden entfernt (keine Preisdaten): " + ", ".join(removed))
-                    render_backtest(bt)
+                    payload = result.get("result", {}) or {}
+
+                # --- Logging einmalig nach dem Call ---
+                logger.debug("BACKTEST CALL ARGS: available_mapped=%s weights=%s start=%s end=%s",
+                            available_mapped, user_weights_mapped, start_arg, end_arg)
+                logger.debug("BACKTEST RESULT ENVELOPE: %s", repr(result)[:2000])
+
+                pv = payload.get("portfolio_value")
+                metrics = payload.get("metrics", {})
+
+                logger.debug("portfolio_value type=%s shape=%s",
+                            type(pv), getattr(pv, "shape", None))
+                # optional: more introspection guarded by hasattr
+                try:
+                    nunique = pv.nunique() if hasattr(pv, "nunique") else None
+                    std = float(pv.std()) if hasattr(pv, "std") else None
+                    logger.debug("portfolio_value nunique=%s std=%s", nunique, std)
+                except Exception:
+                    logger.exception("Error inspecting portfolio_value")
+
+                # --- Defensive check: constant portfolio detection ---
+                def is_constant_portfolio(pv):
+                    if pv is None:
+                        return True
+                    if isinstance(pv, pd.Series):
+                        try:
+                            return pv.nunique() == 1 or float(pv.std()) == 0.0
+                        except Exception:
+                            return True
+                    if isinstance(pv, pd.DataFrame):
+                        try:
+                            return all(float(pv[c].std()) == 0.0 for c in pv.columns)
+                        except Exception:
+                            return True
+                    return True
+
+                # Decide whether to render
+                if not payload:
+                    st.warning("Kein Backtest Ergebnis verfügbar.")
+                else:
+                    # if portfolio is constant and metrics indicate no returns, warn and skip render
+                    if is_constant_portfolio(pv) and metrics.get("cagr", None) in (0.0, np.float64(0.0)):
+                        st.warning("Backtest lieferte keine aussagekräftigen Ergebnisse. Preisdaten, Gewichte oder Strategie prüfen.")
+                        # optional: show debug info or a button to force render for inspection
+                    else:
+                        render_backtest(payload)
+
 
         # Run-Button
         if st.button("Berechnen", key="btn_etf_requested", disabled=run_disabled):
             st.session_state["backtest_requested"] = True
 
     except Exception:
-        logger.exception("maybe_run_backtest raised an exception")
+        logger.exception("safe_backtest_call raised an exception")
         st.error("Backtest fehlgeschlagen. Details im Log.")
         bt = None
 
@@ -1278,7 +1616,12 @@ def profile_form_ui(
         if st.button("Screen Top 10"):
             # Lese namespaceten asset key (prefix "etf" verwendet)
             asset_type_for_screen = st.session_state.get("etf_asset_type", "ETF")
-            universe_meta = etf_universe if asset_type_for_screen == "ETF" else stock_universe if asset_type_for_screen == "Stock" else combined_universe
+            if asset_type_for_screen == "ETF":
+                universe_meta = etf_universe
+            elif asset_type_for_screen == "Stock":
+                universe_meta = stock_universe
+            else:
+                universe_meta = st.session_state.get("combined_universe")  # bereits gebaut
 
             # Bulk-Preise laden (effizient)
             tickers_list = universe_meta["ticker"].tolist()
@@ -1395,7 +1738,7 @@ def profile_form_ui(
     ###############
     # Hier könnte man weitere Abschnitte hinzufügen, z. B.: 
     #
-    render_etf_tab(st.session_state)
+    # render_etf_tab(st.session_state)
 
     
     st.markdown("**Erlaubte Instrumente / Ausschlüsse (alternativ)**")
@@ -1429,6 +1772,11 @@ def profile_form_ui(
     if abs(total - 100) > 0.5:
         st.warning(f"Summe Equity+Bonds+Cash = {total:.2f}%. Empfohlen: 100%. Nutze Auto-normalize oder passe Werte an.")
 
+
+    index_choice = st.selectbox("Index / Universe wählen", list(UNIVERSE_PATHS.keys()), index=1, key=f"{prefix}_index_choice")
+    path_index_choice = UNIVERSE_PATHS[index_choice]
+
+
     col_save, col_delete = st.columns(2)
     with col_save:
         if st.button("Profil speichern"):
@@ -1448,10 +1796,40 @@ def profile_form_ui(
                 "allowed_instruments": allowed_instruments,
                 "notes": notes,
             }
-            save_profile(key, profile_obj)
-            st.success(f"Profil '{profile_obj['display_name']}' gespeichert.")
-            st.session_state.profile_selected = key
+            try:
+                save_profile(key, profile_obj)
+                st.success(f"Profil '{profile_obj['display_name']}' gespeichert.")
+                st.session_state["profile_selected"] = key
+    
+                # 1) Stelle sicher, dass path_index_choice definiert ist
+                path_index_choice = locals().get("path_index_choice") or st.session_state.get("path_index_choice")
+                if not path_index_choice:
+                    index_choice = st.session_state.get(f"{prefix}_index_choice") or st.session_state.get("index_choice")
+                    path_index_choice = UNIVERSE_PATHS.get(index_choice)
+    
+                # 2) Neu laden, nur wenn path_index_choice vorhanden
+                if path_index_choice:
+                    new_universe, warnings = load_etf_universe(path_index_choice)
+                    st.session_state["etf_universe"] = new_universe
+    
+                    # ⚠️ Filtere alte Auswahl auf gültige Optionen
+                    valid_etfs = [k for k in st.session_state.get("selected_etfs", []) if k in new_universe]
+                    st.session_state["selected_etfs"] = valid_etfs
+                    logger.debug("selected_etfs nach Reload gefiltert: %s", valid_etfs)
+                else:
+                    logger.warning("path_index_choice nicht verfügbar; Universe nicht neu geladen")
+    
+                # 3) Cleanup + Rerun
+                st.session_state["show_profile_editor"] = False
+                st.session_state.pop("combined_universe", None)
+                st.session_state.pop("price_data", None)
+                safe_rerun()
+                return
 
+            except Exception as e:
+                logger.exception("Fehler beim Speichern des Profils: %s", e)
+                st.error("Fehler beim Speichern des Profils. Siehe Log.")
+                
     with col_delete:
         if selected != "<Neu>" and st.button("Profil löschen"):
             cfg = load_profiles()

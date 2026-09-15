@@ -4,17 +4,14 @@ import pandas as pd
 from datetime import date
 from typing import Dict, List
 import json, os
-from risk_dashboard.core.etf_tools import get_etf_candidates_for_index, compute_etf_score_components, get_preset_weights, download_prices
+from risk_dashboard.core.etf_tools import get_etf_candidates_for_index, compute_etf_score_components, get_preset_weights
 from risk_dashboard.core.macro_pipeline import run_backtest
-from risk_dashboard.ui.profiles_ui import detect_historical_regimes
-from risk_dashboard.utils.persistence import load_user_tickers, save_user_tickers
-from risk_dashboard.core.macro_loader import load_and_validate_macro_data
+from risk_dashboard.utils.persistence import save_user_tickers
 from risk_dashboard.core.data_loader import parse_tickers
 from risk_dashboard.ui.helpers import normalize_ticker
 from risk_dashboard.config import DEFAULT_START_STR
 from risk_dashboard.data_utils import cached_download_prices, do_add_tickers
 from risk_dashboard.data_utils import safe_rerun, analyze_callback
-from risk_dashboard.core.holdings import map_holdings_to_pricecols
 import logging
 
 ##################
@@ -235,7 +232,8 @@ def render_etf_selection_ui(prefix="etf"):
                             if t in st.session_state.get("user_tickers", []):
                                 st.session_state["user_tickers"].remove(t)
                             save_user_tickers(st.session_state["user_tickers"])
-                            st.experimental_rerun()
+                            # st.experimental_rerun()
+                            safe_rerun()
         except Exception:
             seq = next_seq(); log.exception("exception in per-asset loop", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq})
 
@@ -262,7 +260,8 @@ def render_etf_selection_ui(prefix="etf"):
         if st.button("Kandidaten speichern"):
             from risk_dashboard.etf_candidates import add_etf_candidates
             add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
-            st.experimental_rerun()
+            # st.experimental_rerun()
+            safe_rerun()
         return
 
     # user tickers ergänzen
@@ -479,7 +478,8 @@ def render_etf_selection_ui(prefix="etf"):
                         try:
                             safe_rerun()
                         except Exception:
-                            st.experimental_rerun()
+                            # st.experimental_rerun()
+                            safe_rerun()
 
                     # CSV-Uploader für Preisdaten
                     uploaded_prices = st.file_uploader("CSV mit Preisdaten hochladen ...", type=["csv"], key=f"prices_uploader_{prefix}")

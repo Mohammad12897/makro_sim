@@ -1,6 +1,18 @@
 # risk_dashboard/config.py
 from datetime import date
 import pandas as pd
+import os
+
+
+# config.py
+ALLOW_TEST_UNIVERSE = os.getenv("RISK_DASHBOARD_ALLOW_TEST_UNIVERSE", "false").lower() == "true"
+
+UNIVERSE_PATHS = {
+    "EURO STOXX 50": "risk_dashboard/data/universe_eurostoxx.yaml",
+    "NASDAQ 100": "risk_dashboard/data/universe_nasdaq.yaml",
+    "Nikkei 225": "risk_dashboard/data/universe_nikkei.yaml",
+}
+
 
 # Strings als Canonical Defaults (lesbar in Configs)
 DEFAULT_START_STR = "2016-01-01"

@@ -1,18 +1,21 @@
 # risk_dashboard/data_utils.py
 import time, random, logging
 from typing import List, Optional, Any, Dict, Sequence, Tuple
+import numpy as np
 import pandas as pd
-from risk_dashboard.core.holdings import map_holdings_to_pricecols
 import streamlit as st
 import yfinance as yf
 from requests.exceptions import RequestException
 from datetime import datetime
 from pathlib import Path
-import logging
+import inspect
+from types import SimpleNamespace
+from collections import deque
+
+from risk_dashboard.core.holdings import map_holdings_to_pricecols
 
 logger = logging.getLogger(__name__)
 
-from pathlib import Path
 
 DEFAULT_MARKERS_FILE = Path(__file__).parents[1] / "docs" / "default_edge_markers.txt"
 DOCS_EXAMPLE = Path(__file__).parents[1] / "docs" / "edge_tabs_example.txt"
@@ -23,88 +26,25 @@ def cached_download_prices(tickers, start, end, **kwargs):
     from risk_dashboard.core.etf_tools import download_prices
     return download_prices(tickers, start=start, end=end, **kwargs)
 
-
-def safe_rerun_OLD():
-    """
-    Versucht st.experimental_rerun(); falls nicht vorhanden, erzwingt einen Rerun
-    durch Ändern der Query-Parameter (sicherer Fallback).
-    """
-    # 1) Direkter Versuch (wenn verfügbar)
-    try:
-        rerun_fn = getattr(st, "experimental_rerun", None)
-        if callable(rerun_fn):
-            rerun_fn()
-            return
-    except Exception:
-        # Falls Aufruf unerwartet fehlschlägt, weiter zum Fallback
-        pass
-
-    # 2) Fallback: toggle eines session flags + set query param (erzwingt Neuladen)
-    try:
-        # toggle ein Flag (kann in App-Logik genutzt werden)
-        st.session_state["_rerun_requested"] = not st.session_state.get("_rerun_requested", False)
-        # setze einen Zeitstempel in den Query-Params, das löst ein Re-Run aus
-        params = st.experimental_get_query_params()
-        params["_r"] = [str(int(time.time()))]
-        st.experimental_set_query_params(**params)
-    except Exception:
-        # letzter Ausweg: schreibe eine Warnung, aber verhindere Absturz
-        st.warning("Rerun konnte nicht automatisch ausgelöst werden; bitte Seite manuell neu laden.")
-
-import inspect
-from types import SimpleNamespace
-from collections import deque
-
 def safe_rerun():
     """
     Robust rerun helper for multiple Streamlit versions.
-    - prefer st.experimental_rerun()
-    - otherwise raise RerunException with a minimal rerun_data object if required
+    - Prefer st.experimental_rerun() when available.
+    - Otherwise set a session flag that the main router can observe.
     """
-
-    # 1) Preferred API (most versions)
-    if hasattr(st, "experimental_rerun"):
+    # 1) Preferred API
+    rerun_fn = getattr(st, "experimental_rerun", None)
+    if callable(rerun_fn):
         try:
-            st.experimental_rerun()
-            return
+            rerun_fn()
+            return True
         except Exception:
-            # fall through to fallback
+            # fall back to session-flag approach
             pass
 
-    # 2) Fallback: import RerunException from likely locations
-    RerunException = None
-    for mod_path in (
-        "streamlit.runtime.scriptrunner.script_runner",
-        "streamlit.runtime.scriptrunner",
-        "streamlit.script_runner",
-    ):
-        try:
-            mod = __import__(mod_path, fromlist=["RerunException"])
-            RerunException = getattr(mod, "RerunException", None)
-            if RerunException:
-                break
-        except Exception:
-            RerunException = None
-
-    if RerunException is None:
-        raise RuntimeError("safe_rerun: rerun not available in this Streamlit installation")
-
-    # 3) Inspect constructor: does it require rerun_data?
-    try:
-        sig = inspect.signature(RerunException.__init__)
-        params = list(sig.parameters.keys())
-    except Exception:
-        params = []
-
-    if "rerun_data" in params:
-        # Build a minimal duck-typed rerun_data object expected by Streamlit internals.
-        # It must provide fragment_id_queue (deque-like). Use SimpleNamespace for duck-typing.
-        rerun_data = SimpleNamespace(fragment_id_queue=deque())
-        # Raise with the constructed object
-        raise RerunException(rerun_data)
-    else:
-        # constructor takes no rerun_data param
-        raise RerunException()
+    # 2) Fallback: set a session flag that the app's main loop checks
+    st.session_state["_rerun_requested"] = True
+    return False
 
 def run_analysis():
     logging.info("Analyse gestartet")
@@ -131,7 +71,6 @@ def do_add_tickers(holdings_list, prefix, asset_key, prices=None):
     - Ändert st.session_state (Tickerlisten, mapping), ruft kein safe_rerun().
     - Gibt (mapped_cols, missing) zurück für UI-Feedback.
     """
-    import streamlit as st
     # normalize input
     holdings = [str(h).strip() for h in holdings_list if str(h).strip()]
     if not holdings:
@@ -198,8 +137,6 @@ def sanitize_session_state():
             logging.warning("sanitize_session_state removed suspicious key %s (len=%d)", k, len(v))
     if removed:
         logging.info("sanitize_session_state removed keys: %s", removed)
-
-
 
 def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     """
@@ -538,7 +475,7 @@ def extract_close_series(df, ticker):
 
     return pd.Series(dtype=float)
 
-def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
+def fetch_prices_quiet_with_used_old(tickers: Sequence[str] | str,
                                  start: str = DEFAULT_START_STR,
                                  end: Optional[str] = None,
                                  auto_adjust: bool = False,
@@ -601,3 +538,221 @@ def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
     df = df.sort_index()
     logger.debug("fetch_prices_quiet_with_used returning used=%s df.shape=%s", used, df.shape)
     return used, df
+
+
+from multiprocessing import Process, Queue
+import traceback
+
+def _worker_download(q, tickers, start, end, auto_adjust, threads):
+    try:
+        raw = yf.download(tickers, start=start, end=end, progress=False,
+                          group_by="ticker", auto_adjust=auto_adjust, threads=threads)
+        q.put(("ok", raw))
+    except Exception as e:
+        q.put(("err", traceback.format_exc()))
+
+def safe_yf_download(tickers, start, end, auto_adjust=False, threads=False, timeout=60):
+    q = Queue()
+    p = Process(target=_worker_download, args=(q, tickers, start, end, auto_adjust, threads))
+    p.start()
+    p.join(timeout)
+    if p.is_alive():
+        p.terminate()
+        p.join()
+        logger.error("yf.download timed out and was terminated")
+        return None, pd.DataFrame()
+    if q.empty():
+        logger.error("yf.download worker returned no result")
+        return None, pd.DataFrame()
+    status, payload = q.get()
+    if status == "ok":
+        return payload  # raw DataFrame
+    else:
+        logger.error("yf.download worker error: %s", payload)
+        return None, pd.DataFrame()
+
+
+def _normalize_yf_raw(raw, tickers, auto_adjust=False) -> pd.DataFrame:
+    """
+    Normalize yfinance raw download output to DataFrame with columns = uppercased tickers.
+    Handles MultiIndex (ticker, field) and single-level DataFrame/Series.
+    """
+    if raw is None:
+        raise ValueError("raw is None")
+
+    # Series -> DataFrame
+    if isinstance(raw, pd.Series):
+        df = raw.to_frame()
+        df.columns = [tickers[0].upper()]
+        return df
+
+    # MultiIndex columns
+    if isinstance(raw.columns, pd.MultiIndex):
+        cols = raw.columns
+        lvl0 = cols.get_level_values(0)
+        lvl1 = cols.get_level_values(1)
+        field_candidates = ['Close', 'Adj Close', 'close', 'adj close', 'AdjClose', 'adjclose']
+
+        # common pattern: (ticker, field)
+        if any(str(v).lower() in [fc.lower() for fc in field_candidates] for v in lvl1):
+            # prefer 'Close' then 'Adj Close'
+            for field in ['Close', 'Adj Close']:
+                try:
+                    df = raw.xs(field, axis=1, level=1, drop_level=True)
+                    df.columns = [str(c).upper() for c in df.columns]
+                    return df
+                except Exception:
+                    continue
+
+        # alternative pattern: (field, ticker)
+        if any(str(v).lower() in [fc.lower() for fc in field_candidates] for v in lvl0):
+            for field in ['Close', 'Adj Close']:
+                try:
+                    df = raw.xs(field, axis=1, level=0, drop_level=True)
+                    df.columns = [str(c).upper() for c in df.columns]
+                    return df
+                except Exception:
+                    continue
+
+        # fallback: try to pick numeric column per ticker
+        flattened = {}
+        for t in tickers:
+            matches = [col for col in cols if t.upper() in (str(col[0]).upper(), str(col[1]).upper())]
+            for m in matches:
+                s = raw[m]
+                if pd.api.types.is_numeric_dtype(s):
+                    flattened[t.upper()] = s
+                    break
+        if flattened:
+            return pd.concat(flattened, axis=1).sort_index()
+
+        raise ValueError("Unable to normalize MultiIndex yfinance output")
+
+    # Single-level DataFrame
+    if isinstance(raw, pd.DataFrame):
+        # If single column likely Close/Adj Close for single ticker
+        if raw.shape[1] == 1:
+            colname = raw.columns[0]
+            df = raw.rename(columns={colname: tickers[0].upper()})
+            return df
+
+        # Keep numeric columns and uppercase names
+        numeric_cols = [c for c in raw.columns if pd.api.types.is_numeric_dtype(raw[c])]
+        if numeric_cols:
+            df = raw[numeric_cols].copy()
+            df.columns = [str(c).upper() for c in df.columns]
+            return df
+
+    raise ValueError("Unrecognized yfinance raw format")
+
+def fetch_prices_sequential(tickers, start, end, auto_adjust=False) -> Tuple[Optional[str], pd.DataFrame]:
+    """
+    Robust fallback: fetch each ticker sequentially via Ticker.history.
+    Returns (used_ticker_or_None, dataframe)
+    """
+    frames = []
+    used = None
+    for t in tickers:
+        try:
+            tk = yf.Ticker(t)
+            df = tk.history(start=start, end=end, auto_adjust=auto_adjust)
+            if df is None or df.empty:
+                logger.debug("fetch_prices_sequential: no data for %s", t)
+                continue
+            if 'Close' in df.columns:
+                s = df['Close'].rename(t.upper())
+            elif 'Adj Close' in df.columns:
+                s = df['Adj Close'].rename(t.upper())
+            else:
+                numcols = df.select_dtypes(include=[np.number]).columns
+                if len(numcols) == 0:
+                    logger.debug("fetch_prices_sequential: no numeric columns for %s", t)
+                    continue
+                s = df[numcols[0]].rename(t.upper())
+            frames.append(s)
+            if used is None:
+                used = t
+        except Exception as e:
+            logger.warning("fetch_prices_sequential: failed for %s: %s", t, e)
+    if not frames:
+        return None, pd.DataFrame()
+    result = pd.concat(frames, axis=1).sort_index()
+    return used, result
+
+def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
+                                 start: str = DEFAULT_START_STR,
+                                 end: Optional[str] = None,
+                                 auto_adjust: bool = False,
+                                 threads: bool = True,
+                                 progress: bool = False) -> Tuple[Optional[str], pd.DataFrame]:
+    """
+    Lade Close/Adj Close Preise für tickers via yfinance.
+    Rückgabe: (used_ticker_or_column_name, dataframe)
+    """
+    if isinstance(tickers, str):
+        tickers = [tickers]
+    tickers = _normalize_tickers(tickers)
+    if not tickers:
+        return None, pd.DataFrame()
+
+    logger.debug("fetch_prices_quiet_with_used start tickers=%s start=%s end=%s", tickers, start, end)
+
+    # 1) Versuch: yf.download mit threads=False (sicher auf Windows)
+
+    try:
+        logger.debug("calling yf.download threads=False for tickers=%s", tickers)
+        raw = yf.download(
+            tickers,
+            start=start,
+            end=end,
+            progress=False,
+            group_by="ticker",
+            auto_adjust=auto_adjust,
+            threads=False
+        )
+        logger.debug("yf.download returned type=%s shape=%s", type(raw), getattr(raw, "shape", None))
+
+        if raw is None or (isinstance(raw, pd.DataFrame) and raw.empty):
+            raise RuntimeError("yf.download returned empty")
+
+        df = _normalize_yf_raw(raw, tickers, auto_adjust=auto_adjust)
+        df.columns = [c.upper() for c in df.columns]
+        df.index = pd.to_datetime(df.index, errors="ignore")
+        df = df.sort_index()
+        used = next((t for t in tickers if t.upper() in df.columns), None)
+        return used, df
+
+    except Exception as e:
+        logger.warning("yfinance download failed or returned empty for %s: %s", tickers, e)
+        # fallback: sequentielles Laden pro Ticker (robust, langsamer)
+        used, df = fetch_prices_sequential(tickers, start, end, auto_adjust=auto_adjust)
+        return used, df
+
+def sanity_backtest(price_data: pd.DataFrame, weights: dict, min_rows: int = 60) -> Tuple[bool, str]:
+    """
+    Returns (ok, message). ok==True wenn Sanity checks passed.
+    """
+    if price_data is None or price_data.empty:
+        return False, "Preisdaten fehlen oder sind leer."
+    if not isinstance(weights, dict) or not weights:
+        return False, "Gewichte fehlen oder sind ungültig."
+    # check columns
+    cols = [c.upper() for c in price_data.columns]
+    missing = [t for t in weights.keys() if t.upper() not in cols]
+    if missing:
+        return False, f"Fehlende Preisspalten für: {missing}"
+    # check index length
+    if len(price_data) < min_rows:
+        return False, f"Zu wenige Datenpunkte ({len(price_data)} < {min_rows})."
+    # check weights numeric and sum
+    vals = []
+    for v in weights.values():
+        try:
+            vals.append(float(v))
+        except Exception:
+            return False, "Gewichte müssen numerisch sein."
+    if any(np.isnan(vals)):
+        return False, "Gewichte enthalten NaN."
+    if sum(vals) <= 0:
+        return False, "Summe der Gewichte muss > 0 sein."
+    return True, "Sanity checks passed."
