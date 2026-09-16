@@ -426,11 +426,7 @@ def render_etf_tab(session_state=None):
     etf_universe = ss.get("etf_universe", {}) or {}
     price_data = ss.get("price_data")
     macro_df = ss.get("macro_df")
-    index_choice = ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
-    path_index_choice = UNIVERSE_PATHS.get(index_choice)
-    if path_index_choice is None:
-        logger.error("Kein path_index_choice für index_choice=%s", index_choice)
-
+    
     # 1) Universe prüfen und ggf. Test‑Universe setzen
     if not etf_universe:
         if ALLOW_TEST_UNIVERSE:
@@ -981,7 +977,7 @@ def profile_form_ui(
                 add_etf_candidates(index_choice, tickers, asset_type=asset_type)
 
                 # 1) Universe neu laden (falls add_etf_candidates nicht automatisch updated)
-                path_index_choice = st.session_state.get("path_index_choice") or UNIVERSE_PATHS.get(index_choice)
+                # path_index_choice = st.session_state.get("path_index_choice") or UNIVERSE_PATHS.get(index_choice)
                 if path_index_choice:
                     new_universe, warnings = load_etf_universe(path_index_choice)
                     # optional: normalisiere keys
@@ -1768,20 +1764,17 @@ def profile_form_ui(
         st.warning(f"Summe Equity+Bonds+Cash = {total:.2f}%. Empfohlen: 100%. Nutze Auto-normalize oder passe Werte an.")
 
 
-    # index_choice = st.selectbox("Index / Universe wählen", list(UNIVERSE_PATHS.keys()), index=1, key=f"{prefix}_index_choice")
-    # path_index_choice = UNIVERSE_PATHS[index_choice]
-
     def save_handler(key: str, profile_obj: dict, prefix: str):
-        ss = st.session_state
+        # ss = st.session_state
         try:
             save_profile(key, profile_obj)  # deine bestehende Persistenzfunktion
             st.success(f"Profil '{profile_obj['display_name']}' gespeichert.")
             ss["profile_selected"] = key
 
             # path_index_choice sicher ermitteln
-            path_index_choice = ss.get("path_index_choice") or UNIVERSE_PATHS.get(
-                ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
-            )
+            #path_index_choice = ss.get("path_index_choice") or UNIVERSE_PATHS.get(
+            #    ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
+            #)
 
             # Universe neu laden, falls möglich
             if path_index_choice:
@@ -1842,10 +1835,10 @@ def profile_form_ui(
                 ss["profile_selected"] = key
 
                 # 1) path_index_choice sicher ermitteln
-                path_index_choice = locals().get("path_index_choice") or ss.get("path_index_choice")
-                if not path_index_choice:
-                    index_choice = ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
-                    path_index_choice = UNIVERSE_PATHS.get(index_choice)
+                #path_index_choice = locals().get("path_index_choice") or ss.get("path_index_choice")
+                #if not path_index_choice:
+                #    index_choice = ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
+                #    path_index_choice = UNIVERSE_PATHS.get(index_choice)
 
                 # 2) Neu laden, nur wenn path_index_choice vorhanden
                 if path_index_choice:

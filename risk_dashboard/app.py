@@ -730,12 +730,6 @@ try:
         key=f"{prefix}_index_choice"
     )
 
-    index_choice = st.selectbox(
-        "Index / Universe wählen",
-        list(UNIVERSE_PATHS.keys()),
-        key=f"{prefix}_index_choice"
-    )
-
     path_index_choice = UNIVERSE_PATHS[index_choice]
     etf_universe, universe_warnings = load_etf_universe(path_index_choice)
     # load shared data...
