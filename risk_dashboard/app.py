@@ -28,6 +28,8 @@ import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from risk_dashboard.core.backtest import preflight_check
+
 # Project root and output dirs (unchanged)
 project_root = Path(__file__).resolve().parents[1]
 if str(project_root) not in sys.path:
@@ -1459,6 +1461,61 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
 
     # --- Danach: Backtest aufrufen (wie bisher) ---
 
+    # 2) Aufruf innerhalb einer Funktion / UI‑Handler (z. B. in profile_form_ui)
+    def run_backtest_flow():
+        #ss = st.session_state
+        #prefix = "profile"
+        selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
+
+        valid, removed, common = preflight_check(selected_tickers, price_data=prices_for_bt, min_common_days=250)
+
+        st.info(f"Valid tickers: {valid}")
+        if removed:
+            st.warning(f"Folgende Ticker wurden entfernt, weil keine oder unzureichende Daten vorhanden sind: {', '.join(removed)}")
+
+        if common is None or common.shape[0] < 30:
+            st.error("Nicht genügend gemeinsame Preisdaten für einen sinnvollen Backtest. Bitte wähle andere Ticker oder erweitere das Zeitfenster.")
+            if common is not None:
+                st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
+                st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
+            st.stop()  # oder return, wenn du in einer Funktion bist
+            # kein Backtest starten
+
+        st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
+        st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
+
+        # Gewichte für die validen Ticker zusammenstellen und normalisieren
+        # Angenommen weights_by_ticker ist dict ticker->weight (kann auch aus UI kommen)
+        weights_by_ticker = ss.get("weights_by_ticker", {})  # oder wie du es nennst
+        w_list = [weights_by_ticker.get(t, 0.0) for t in valid]
+        import numpy as np
+        w = np.array(w_list, dtype=float)
+        if w.sum() == 0:
+            st.error("Summe der Gewichte ist 0. Bitte Gewichte anpassen.")
+            st.stop()
+        w = w / w.sum()
+        # Erzeuge mapping für run_backtest
+        weights_for_bt = {t: float(w[i]) for i, t in enumerate(valid)}
+
+        # 3) Backtest mit bereinigten Daten aufrufen
+        try:
+            bt_etf = run_backtest(
+                tickers=valid,
+                prices_df=common,
+                start=common.index.min(),
+                end=common.index.max(),
+                weights=weights_for_bt
+            )
+        except Exception:
+            logging.getLogger("risk_dashboard.core").exception("run_backtest failed")
+            st.error("Backtest fehlgeschlagen. Details im Log.")
+            st.write(traceback.format_exc())
+            bt_etf = pd.DataFrame()
+
+        # weiter mit Ergebnisverarbeitung...
+        return bt_etf
+
+
     if "prices_for_bt" in st.session_state and "weights_by_ticker" in st.session_state:
         from risk_dashboard.core.macro_pipeline import run_backtest
         prices_for_bt = st.session_state.prices_for_bt
@@ -1468,16 +1525,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
             bt_etf = pd.DataFrame()
         else:
             import traceback
-            try:
-                bt_etf = run_backtest(tickers=list(weights_by_ticker.keys()),
-                                                prices_df=prices_for_bt,
-                                                start=start, end=end,
-                                                weights=weights_by_ticker)
-            except Exception:
-                logging.getLogger("risk_dashboard.core").exception("run_backtest failed")
-                st.error("Backtest fehlgeschlagen. Details im Log.")
-                st.write(traceback.format_exc())  # nur temporär zum Debug
-                bt_etf = pd.DataFrame()
+            bt_etf = run_backtest_flow()
 
     else:
         bt_etf = backtest_etf_regime_portfolio(

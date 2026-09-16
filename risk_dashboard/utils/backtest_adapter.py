@@ -1,6 +1,11 @@
 # risk_dashboard/utils/backtest_adapter.py
 from typing import Any, Dict
+
+import numpy as np
+import streamlit as st
 from risk_dashboard.core.macro_pipeline import run_backtest
+from risk_dashboard.core.backtest import preflight_check
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -75,6 +80,42 @@ def adapter_run_backtest(portfolio_or_tickers, *args, **kwargs):
             if abs(total_w - 1.0) > 1e-6:
                 logger.debug("adapter_run_backtest: normalizing weights sum=%s", total_w)
                 weights = {k: float(v) / total_w for k, v in weights.items()}
+
+        ###########################################################
+        # Annahme: ss = st.session_state, prefix gesetzt, selected_etfs, price_data, weights vorhanden
+        ss = st.session_state
+        prefix = "profile"
+        selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
+        # optional: auch Ticker aus "selected_from_portfolio" berücksichtigen
+
+        valid, removed, common = preflight_check(selected_tickers, price_data=prices_df, min_common_days=250)
+
+        # UI Feedback
+        st.info(f"Valid tickers: {valid}")
+        if removed:
+            st.warning(f"Folgende Ticker wurden entfernt, weil keine oder unzureichende Daten vorhanden sind: {', '.join(removed)}")
+
+        if common is None or common.shape[0] < 30:
+            st.error("Nicht genügend gemeinsame Preisdaten für einen sinnvollen Backtest. Bitte wähle andere Ticker oder erweitere das Zeitfenster.")
+            # optional: zeige Details
+            if common is not None:
+                st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
+                st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
+            # Abbruch: kein Backtest starten
+            return
+
+        # Optional: zeige gemeinsame Datenstatistiken
+        st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
+        st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
+
+        # Gewichte prüfen / normalisieren
+        w = np.array([weights.get(t, 0.0) for t in valid], dtype=float)
+        if w.sum() == 0:
+            st.error("Summe der Gewichte ist 0. Bitte Gewichte anpassen.")
+            return
+        w = w / w.sum()
+
+        ###########################################################
 
         # 6) call run_backtest (adapt params as needed)
         try:

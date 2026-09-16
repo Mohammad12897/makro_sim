@@ -1,4 +1,5 @@
 # risk_dashboard/ui/etf_selection_ui.py
+import numpy as np
 import streamlit as st
 import pandas as pd
 from datetime import date
@@ -10,8 +11,8 @@ from risk_dashboard.utils.persistence import save_user_tickers
 from risk_dashboard.core.data_loader import parse_tickers
 from risk_dashboard.ui.helpers import normalize_ticker
 from risk_dashboard.config import DEFAULT_START_STR
-from risk_dashboard.data_utils import cached_download_prices, do_add_tickers
-from risk_dashboard.data_utils import safe_rerun, analyze_callback
+from risk_dashboard.data_utils import cached_download_prices, do_add_tickers,safe_rerun, analyze_callback
+from risk_dashboard.core.backtest import preflight_check
 import logging
 
 ##################
@@ -552,6 +553,43 @@ def render_etf_selection_ui(prefix="etf"):
 
                     # Backtest aufrufen mit den tatsächlich vorhandenen Spalten
                     prices_for_bt = prices.loc[:, mapped_selected]
+
+                    ################################################
+                    # Annahme: ss = st.session_state, prefix gesetzt, selected_etfs, price_data, weights vorhanden
+                    ss = st.session_state
+                    selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
+                    # optional: auch Ticker aus "selected_from_portfolio" berücksichtigen
+
+                    valid, removed, common = preflight_check(selected_tickers, price_data=prices_for_bt, min_common_days=250)
+
+                    # UI Feedback
+                    st.info(f"Valid tickers: {valid}")
+                    if removed:
+                        st.warning(f"Folgende Ticker wurden entfernt, weil keine oder unzureichende Daten vorhanden sind: {', '.join(removed)}")
+
+                    if common is None or common.shape[0] < 30:
+                        st.error("Nicht genügend gemeinsame Preisdaten für einen sinnvollen Backtest. Bitte wähle andere Ticker oder erweitere das Zeitfenster.")
+                        # optional: zeige Details
+                        if common is not None:
+                            st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
+                            st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
+                        # Abbruch: kein Backtest starten
+                        return
+
+                    # Optional: zeige gemeinsame Datenstatistiken
+                    st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
+                    st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
+
+                    # Gewichte prüfen / normalisieren
+                    w = np.array([weights.get(t, 0.0) for t in valid], dtype=float)
+                    if w.sum() == 0:
+                        st.error("Summe der Gewichte ist 0. Bitte Gewichte anpassen.")
+                        return
+                    w = w / w.sum()
+
+                    ################################################
+
+
                     res = run_backtest(
                         prices_df=prices_for_bt,
                         strategy=selected_strategy,

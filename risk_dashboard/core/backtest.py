@@ -24,6 +24,35 @@ except Exception:
     compute_abs_weights = None
     logger.warning("compute_abs_weights konnte nicht importiert werden; Fallback auf None.")
 
+
+# 1) preflight_check definieren (einmalig, z.B. oben im Modul)
+def preflight_check(selected_tickers, price_data, min_common_days=250):
+    import pandas as pd
+    valid, removed, series_list = [], [], []
+    for t in selected_tickers:
+        s = price_data.get(t)
+        if s is None:
+            removed.append(t)
+            continue
+        if isinstance(s, pd.DataFrame):
+            if "Close" in s.columns:
+                s = s["Close"]
+            elif s.shape[1] == 1:
+                s = s.iloc[:, 0]
+            else:
+                removed.append(t)
+                continue
+        if s.dropna().shape[0] < 10:
+            removed.append(t)
+            continue
+        series_list.append(s.rename(t))
+        valid.append(t)
+    if not series_list:
+        return valid, removed, None
+    prices = pd.concat(series_list, axis=1)
+    common = prices.dropna(how="any")
+    return valid, removed, common
+
 def run_all_etf_backtests(
     selected_etfs: list,
     holdings_dir: Path,
