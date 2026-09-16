@@ -81,61 +81,47 @@ def adapter_run_backtest(portfolio_or_tickers, *args, **kwargs):
                 logger.debug("adapter_run_backtest: normalizing weights sum=%s", total_w)
                 weights = {k: float(v) / total_w for k, v in weights.items()}
 
-        ###########################################################
-        # Annahme: ss = st.session_state, prefix gesetzt, selected_etfs, price_data, weights vorhanden
+        # 6) call run_backtest (adapt params as needed)
+        ############################################################
+        from risk_dashboard.core.backtest import run_backtest_flow
+
+        # sicherstellen: ss und prefix sind gesetzt
         ss = st.session_state
         prefix = "profile"
-        selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
-        # optional: auch Ticker aus "selected_from_portfolio" berücksichtigen
-
-        valid, removed, common = preflight_check(selected_tickers, price_data=prices_df, min_common_days=250)
-
-        # UI Feedback
-        st.info(f"Valid tickers: {valid}")
-        if removed:
-            st.warning(f"Folgende Ticker wurden entfernt, weil keine oder unzureichende Daten vorhanden sind: {', '.join(removed)}")
-
-        if common is None or common.shape[0] < 30:
-            st.error("Nicht genügend gemeinsame Preisdaten für einen sinnvollen Backtest. Bitte wähle andere Ticker oder erweitere das Zeitfenster.")
-            # optional: zeige Details
-            if common is not None:
-                st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
-                st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
-            # Abbruch: kein Backtest starten
-            return
-
-        # Optional: zeige gemeinsame Datenstatistiken
-        st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
-        st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
-
-        # Gewichte prüfen / normalisieren
-        w = np.array([weights.get(t, 0.0) for t in valid], dtype=float)
-        if w.sum() == 0:
-            st.error("Summe der Gewichte ist 0. Bitte Gewichte anpassen.")
-            return
-        w = w / w.sum()
-
-        ###########################################################
-
-        # 6) call run_backtest (adapt params as needed)
+        # Default envelope
+        # in adapter_run_backtest
+        bt_response = {"ok": False, "error": "internal_error", "message": "Backtest nicht ausgeführt", "result": {}}
         try:
-            res = run_backtest(
-                tickers=tickers,
-                prices_df=prices_df,
-                start=start,
-                end=end,
-                initial_cash=initial_cash,
-                monthly_dca=kwargs.get("monthly_dca", 0),
-                weights=weights,
+            prices_df = kwargs.get("prices")
+            if prices_df is None:
+                prices_df = ss.get("prices_for_bt")
+
+            weights_map = kwargs.get("weights")
+            if weights_map is None:
+                weights_map = ss.get("weights_by_ticker", {})
+
+            # korrekte emptiness checks
+            import pandas as pd
+            if prices_df is None or (isinstance(prices_df, pd.DataFrame) and prices_df.empty):
+                return {"ok": False, "error": "no_data", "message": "Keine Preisdaten vorhanden", "result": {}}
+            if not weights_map:
+                return {"ok": False, "error": "no_weights", "message": "Keine Gewichte vorhanden", "result": {}}
+
+            bt_response = run_backtest_flow(
+                ss=ss,
+                prefix=prefix,
+                price_data=prices_df,
+                weights_map=weights_map,
+                min_common_days=kwargs.get("min_common_days", 250),
+                initial_cash=kwargs.get("initial_cash", 100000),
                 strategy=kwargs.get("strategy", "equal"),
                 rebalance=kwargs.get("rebalance", "monthly"),
             )
-        except Exception as e:
-            logger.exception("run_backtest failed")
-            return {"ok": False, "message": f"run_backtest error: {e}", "result": {}}
 
-        # 7) normalize return envelope expected by UI
-        if isinstance(res, dict):
-            return {"ok": True, "message": "ok", "result": res}
-        else:
-            return {"ok": True, "message": "ok", "result": {"portfolio_value": res}}
+            return bt_response
+
+        except Exception as e:
+            logger.exception("adapter_run_backtest unexpected error: %s", e)
+            return {"ok": False, "error": "internal_error", "message": f"Adapter Fehler: {e}", "result": {}}
+
+        ###########################################################

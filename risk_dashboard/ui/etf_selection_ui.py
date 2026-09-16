@@ -555,57 +555,44 @@ def render_etf_selection_ui(prefix="etf"):
                     prices_for_bt = prices.loc[:, mapped_selected]
 
                     ################################################
-                    # Annahme: ss = st.session_state, prefix gesetzt, selected_etfs, price_data, weights vorhanden
+                    from risk_dashboard.core.backtest import run_backtest_flow
+
+                    # sicherstellen: ss und prefix sind gesetzt
                     ss = st.session_state
-                    selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
-                    # optional: auch Ticker aus "selected_from_portfolio" berücksichtigen
+                    prefix = "profile"
+                    prices_for_bt = ss.get("prices_for_bt", {})          # dict ticker->Series/DataFrame
+                    weights_by_ticker = ss.get("weights_by_ticker", {})  # dict ticker->weight
 
-                    valid, removed, common = preflight_check(selected_tickers, price_data=prices_for_bt, min_common_days=250)
+                    if prices_for_bt and weights_by_ticker:
+                        bt_response = run_backtest_flow(
+                            ss=ss,
+                            prefix=prefix,
+                            price_data=prices_for_bt,
+                            weights_map=weights_by_ticker,
+                            min_common_days=250,
+                            initial_cash=ss.get("initial_cash", 100000),
+                            strategy=ss.get("selected_strategy", "equal"),
+                            rebalance=ss.get("rebalance", "monthly")
+                        )
 
-                    # UI Feedback
-                    st.info(f"Valid tickers: {valid}")
-                    if removed:
-                        st.warning(f"Folgende Ticker wurden entfernt, weil keine oder unzureichende Daten vorhanden sind: {', '.join(removed)}")
-
-                    if common is None or common.shape[0] < 30:
-                        st.error("Nicht genügend gemeinsame Preisdaten für einen sinnvollen Backtest. Bitte wähle andere Ticker oder erweitere das Zeitfenster.")
-                        # optional: zeige Details
-                        if common is not None:
-                            st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
-                            st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
-                        # Abbruch: kein Backtest starten
-                        return
-
-                    # Optional: zeige gemeinsame Datenstatistiken
-                    st.write("Gemeinsame Datenpunkte für Backtest:", common.shape)
-                    st.write("Gemeinsamer Zeitraum:", common.index.min(), "bis", common.index.max())
-
-                    # Gewichte prüfen / normalisieren
-                    w = np.array([weights.get(t, 0.0) for t in valid], dtype=float)
-                    if w.sum() == 0:
-                        st.error("Summe der Gewichte ist 0. Bitte Gewichte anpassen.")
-                        return
-                    w = w / w.sum()
-
-                    ################################################
-
-
-                    res = run_backtest(
-                        prices_df=prices_for_bt,
-                        strategy=selected_strategy,
-                        initial_cash=initial_cash,
-                        monthly_dca=monthly_dca,
-                        weights=user_weights_mapped if user_weights_mapped else None
-                    )
-
-                    # Ergebnis anzeigen
-                    if res and isinstance(res, dict):
-                        st.line_chart(res["portfolio_value"])
-                        st.write(res["metrics"])
-                        st.dataframe(pd.DataFrame(res.get("trades", [])))
-                        csv = pd.DataFrame(res.get("trades", [])).to_csv(index=False)
-                        st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
+                        # UI: zeige Feedback
+                        # defensive Anzeige
+                        if not bt_response or not bt_response.get("ok"):
+                            st.error(bt_response.get("message", "Backtest fehlgeschlagen"))
+                            payload = bt_response.get("payload") or {}
+                            if payload.get("removed"):
+                                st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                        else:
+                            res = bt_response.get("result", {})
+                            if isinstance(res, dict) and "portfolio_value" in res:
+                                st.line_chart(res["portfolio_value"])
+                                st.write(res.get("metrics", {}))
+                                trades_df = pd.DataFrame(res.get("trades", []))
+                                st.dataframe(trades_df)
+                                if not trades_df.empty:
+                                    st.download_button("Export trades CSV", data=trades_df.to_csv(index=False), file_name="trades.csv")
+                            else:
+                                st.error("Backtest lieferte kein Ergebnis.")
                     else:
-                        st.error("Backtest lieferte kein Ergebnis.")
-
-                    return
+                        st.info("Keine Preisdaten oder Gewichte vorhanden.")
+                    ##############################################

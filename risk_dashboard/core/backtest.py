@@ -10,6 +10,7 @@ from pathlib import Path
 from pyparsing import results
 import streamlit as st
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 from risk_dashboard.core.data import etf
 from risk_dashboard.core.utils import prepare_prices_for_backtest, extract_close_series, compute_market_value_from_holdings
+from risk_dashboard.core.macro_pipeline import run_backtest  # dein Backtest-Entry
 
 try:
     from risk_dashboard.core.weights import compute_abs_weights
@@ -24,34 +26,87 @@ except Exception:
     compute_abs_weights = None
     logger.warning("compute_abs_weights konnte nicht importiert werden; Fallback auf None.")
 
-
-# 1) preflight_check definieren (einmalig, z.B. oben im Modul)
 def preflight_check(selected_tickers, price_data, min_common_days=250):
     import pandas as pd
-    valid, removed, series_list = [], [], []
+    # price_data can be dict ticker->Series or a DataFrame with columns=tickers
+    series_list = []
+    valid, removed = [], []
+
+    # normalize price_data to dict
+    if isinstance(price_data, pd.DataFrame):
+        pdict = {col: price_data[col].dropna() for col in price_data.columns}
+    else:
+        pdict = {k: (v.dropna() if isinstance(v, pd.Series) else v) for k, v in (price_data or {}).items()}
+
     for t in selected_tickers:
-        s = price_data.get(t)
-        if s is None:
-            removed.append(t)
-            continue
-        if isinstance(s, pd.DataFrame):
-            if "Close" in s.columns:
-                s = s["Close"]
-            elif s.shape[1] == 1:
-                s = s.iloc[:, 0]
-            else:
-                removed.append(t)
-                continue
-        if s.dropna().shape[0] < 10:
+        s = pdict.get(t)
+        if s is None or getattr(s, "dropna", lambda: s)().shape[0] < 10:
             removed.append(t)
             continue
         series_list.append(s.rename(t))
         valid.append(t)
+
     if not series_list:
         return valid, removed, None
+
     prices = pd.concat(series_list, axis=1)
     common = prices.dropna(how="any")
     return valid, removed, common
+
+
+def run_backtest_flow(ss, prefix, price_data, weights_map, min_common_days=250, **bt_kwargs):
+    """
+    ss: st.session_state
+    prefix: session prefix (z.B. "profile")
+    price_data: dict ticker -> Series/DataFrame
+    weights_map: dict ticker->weight (unfiltered)
+    bt_kwargs: weitere Parameter für run_backtest (initial_cash, strategy, ...)
+    Returns: dict {"ok": True/False, "message": str, "result": {...}}
+    """
+    selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
+    valid, removed, common = preflight_check(selected_tickers, price_data, min_common_days=min_common_days)
+
+    # UI-Feedback via return payload; UI zeigt es an
+    payload = {"valid": valid, "removed": removed, "common_shape": None, "common_range": None}
+
+    if removed:
+        logger.warning("Removed tickers: %s", removed)
+
+    if common is None or common.shape[0] < 30:
+        if common is not None:
+            payload["common_shape"] = common.shape
+            payload["common_range"] = (common.index.min(), common.index.max())
+        return {"ok": False, "message": "Insufficient common price data", "payload": payload}
+
+    payload["common_shape"] = common.shape
+    payload["common_range"] = (common.index.min(), common.index.max())
+
+    # Gewichte für valid tickers
+    w_list = [weights_map.get(t, 0.0) for t in valid]
+    w = np.array(w_list, dtype=float)
+    if w.sum() == 0:
+        return {"ok": False, "message": "Sum of weights is zero", "payload": payload}
+    w = w / w.sum()
+    weights_for_bt = {t: float(w[i]) for i, t in enumerate(valid)}
+
+    # Backtest aufrufen
+    try:
+        res = run_backtest(
+            tickers=valid,
+            prices_df=common,
+            weights=weights_for_bt,
+            **bt_kwargs
+        )
+    except Exception as e:
+        logger.exception("run_backtest failed: %s", e)
+        return {"ok": False, "message": f"run_backtest error: {e}", "payload": payload}
+
+    # Normalisiere Ergebnisformat für UI
+    if isinstance(res, dict):
+        return {"ok": True, "message": "ok", "payload": payload, "result": res}
+    else:
+        return {"ok": True, "message": "ok", "payload": payload, "result": {"portfolio_value": res}}
+
 
 def run_all_etf_backtests(
     selected_etfs: list,
