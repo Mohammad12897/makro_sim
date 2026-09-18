@@ -1491,8 +1491,31 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                     rebalance=ss.get("rebalance", "monthly")
                 )
 
-                # Envelope debug
-                st.write("BACKTEST RESULT ENVELOPE:", bt_etf)
+
+                resp = bt_etf or {}
+                # temporär
+                st.write("BACKTEST RESULT ENVELOPE:", resp)
+
+                payload = resp.get("payload", {}) or {}
+                res = resp.get("result", {}) or {}
+
+                if not resp.get("ok"):
+                    st.warning(resp.get("message", "Backtest fehlgeschlagen."))
+                    if payload.get("removed"):
+                        st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                else:
+                    pv = res.get("portfolio_value")
+                    metrics = res.get("metrics", {})
+                    if pv is None:
+                        st.warning("Kein Backtest‑Ergebnis (portfolio_value fehlt).")
+                    else:
+                        st.line_chart(pv)
+                        st.write(metrics)
+                        trades_df = pd.DataFrame(res.get("trades", []))
+                        st.dataframe(trades_df)
+                        if not trades_df.empty:
+                            csv = trades_df.to_csv(index=False)
+                            st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
 
                 # Defensive UI‑Verarbeitung des Envelope
                 if not bt_etf or not bt_etf.get("ok"):

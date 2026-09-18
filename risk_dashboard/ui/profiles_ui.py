@@ -1423,23 +1423,21 @@ def profile_form_ui(
                 else:
                     logger.debug("Ticker %s not found in prices.columns", t)
 
-            # after available_mapped is known
+            # --- regimes alignment (unchanged logic, but keep regimes_aligned variable) ---
             regimes = st.session_state.get("regimes")  # original regimes computed on macro_df
             regimes_aligned = None
             if regimes is not None:
                 try:
-                    # if regimes is a DataFrame with tickers as columns
                     if isinstance(regimes, pd.DataFrame):
-                        # keep only columns that exist in available_mapped (case sensitive)
                         keep = [c for c in available_mapped if c in regimes.columns]
                         regimes_aligned = regimes[keep] if keep else None
                     else:
-                        # if regimes is dict/list, implement appropriate alignment logic
                         regimes_aligned = align_regimes_to_tickers(regimes, available_mapped)
                 except Exception:
                     logger.exception("Failed to align regimes")
                     regimes_aligned = None
 
+            # --- availability check ---
             if not available_mapped:
                 st.warning("Keine der ausgewählten Ticker in den Preisdaten vorhanden.")
                 run_disabled = True
@@ -1447,21 +1445,31 @@ def profile_form_ui(
                 # Defaults für Weights / Regimes aus session_state oder fallback
                 user_weights_mapped = st.session_state.get("user_weights_mapped")
                 if user_weights_mapped is None or set(user_weights_mapped.keys()) != set(available_mapped):
-                    # create equal weights for the current mapped assets
                     user_weights_mapped = {c: 1.0 / len(available_mapped) for c in available_mapped}
                     st.session_state["user_weights_mapped"] = user_weights_mapped
 
-                regimes_val = st.session_state.get("regimes_aligned", None)
+                # Verwende die lokal berechnete regimes_aligned, nicht einen anderen key
+                regimes_val = regimes_aligned
 
+                # Temporäre Debugausgaben (entfernen, wenn stabil)
                 st.write("DEBUG available_mapped:", available_mapped)
                 st.write("DEBUG weights:", user_weights_mapped)
                 st.write("DEBUG regimes:", None if regimes_val is None else (regimes_val.head() if hasattr(regimes_val, "head") else regimes_val))
 
                 # Sicherer UI-Aufruf (defensiv)
+                # Achte darauf, dass 'prices' ein DataFrame ist und die Spalten enthält
+                prices_arg = None
+                if prices is not None:
+                    # falls prices ein DataFrame ist, slice defensiv
+                    if hasattr(prices, "columns"):
+                        prices_arg = prices.loc[:, [c for c in available_mapped if c in prices.columns]]
+                    else:
+                        prices_arg = prices
+
                 result = safe_backtest_call(
                     adapter_run_backtest,
                     available_mapped,
-                    prices=prices[available_mapped],
+                    prices=prices_arg,
                     weights=user_weights_mapped,
                     regimes=regimes_val,
                     start=start_arg,
@@ -1470,35 +1478,93 @@ def profile_form_ui(
                     initial_capital=1_000_000,
                     flag_key="backtest_profiles"
                 )
-                # --- Normalize None -> envelope (einheitlich) ---
+
+                # Normalize None -> envelope (einheitlich)
                 if result is None:
                     logger.debug("safe_backtest_call returned None")
-                    result = {"ok": False, "message": "Interner Fehler: kein Ergebnis vom Backtest.", "result": {}}
+                    result = {"ok": False, "message": "Interner Fehler: kein Ergebnis vom Backtest.", "payload": {}, "result": {}}
 
-                # If envelope present, handle ok flag and extract payload once
-                if not result.get("ok"):
-                    st.warning(result.get("message", "Backtest fehlgeschlagen."))
-                    payload = result.get("result", {}) or {}
+                # Envelope korrekt entpacken (defensiv)
+                resp = result or {}
+                st.write("BACKTEST RESULT ENVELOPE:", resp)  # temporär; entferne später
+
+                # Initialisiere payload/res immer, damit sie später sicher verwendbar sind
+                payload = resp.get("payload", {}) or {}
+                res = resp.get("result", {}) or {}
+
+                # Fehlerfall
+                if not resp.get("ok"):
+                    st.warning(resp.get("message", "Backtest fehlgeschlagen."))
+                    if payload.get("removed"):
+                        st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                    if payload.get("common_shape"):
+                        st.info(f"Gemeinsame Handelstage: {payload['common_shape']}")
                 else:
-                    payload = result.get("result", {}) or {}
+                    # Erfolgsfall: sichere Extraktion
+                    pv = res.get("portfolio_value")
+                    metrics = res.get("metrics", {})
 
-                # --- Logging einmalig nach dem Call ---
+                    if pv is None:
+                        st.warning("Kein Backtest‑Ergebnis (portfolio_value fehlt).")
+                    else:
+                        st.line_chart(pv)
+                        st.write(metrics)
+                        trades_df = pd.DataFrame(res.get("trades", []))
+                        st.dataframe(trades_df)
+                        if not trades_df.empty:
+                            csv = trades_df.to_csv(index=False)
+                            st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
+
+                # Logging (nutze die bereits initialisierten payload/res)
                 logger.debug("BACKTEST CALL ARGS: available_mapped=%s weights=%s start=%s end=%s",
                             available_mapped, user_weights_mapped, start_arg, end_arg)
-                logger.debug("BACKTEST RESULT ENVELOPE: %s", repr(result)[:2000])
+                logger.debug("BACKTEST RESULT ENVELOPE: %s", repr(resp)[:2000])
 
-                pv = payload.get("portfolio_value")
-                metrics = payload.get("metrics", {})
+                pv = res.get("portfolio_value")
+                metrics = res.get("metrics", {})
 
-                logger.debug("portfolio_value type=%s shape=%s",
-                            type(pv), getattr(pv, "shape", None))
-                # optional: more introspection guarded by hasattr
+                logger.debug("portfolio_value type=%s shape=%s", type(pv), getattr(pv, "shape", None))
                 try:
                     nunique = pv.nunique() if hasattr(pv, "nunique") else None
                     std = float(pv.std()) if hasattr(pv, "std") else None
                     logger.debug("portfolio_value nunique=%s std=%s", nunique, std)
                 except Exception:
                     logger.exception("Error inspecting portfolio_value")
+                # --- Defensive: konstantes Portfolio erkennen ---
+                def is_constant_portfolio(pv):
+                    if pv is None:
+                        return True
+                    if isinstance(pv, pd.Series):
+                        try:
+                            return pv.nunique() == 1 or float(pv.std()) == 0.0
+                        except Exception:
+                            return True
+                    if isinstance(pv, pd.DataFrame):
+                        try:
+                            return all(float(pv[c].std()) == 0.0 for c in pv.columns)
+                        except Exception:
+                            return True
+                    return True
+
+                # --- Ergebnisbehandlung und Rendering ---
+                if not res:
+                    st.warning("Kein Backtest‑Ergebnis verfügbar.")
+                    run_disabled = True
+                else:
+                    if is_constant_portfolio(pv) and metrics.get("cagr", None) in (0.0, np.float64(0.0)):
+                        st.warning("Backtest lieferte keine aussagekräftigen Ergebnisse. Preisdaten, Gewichte oder Strategie prüfen.")
+                        run_disabled = True
+                    else:
+                        removed = payload.get("removed") or payload.get("removed_tickers") or []
+                        if removed:
+                            st.warning("Folgende Ticker wurden entfernt (keine Preisdaten): " + ", ".join(removed))
+                        # render_backtest erwartet das result-Objekt (oder das gesamte Envelope), passe an
+                        render_backtest(res)
+                        run_disabled = False
+
+            # Run-Button
+            if st.button("Berechnen", key="btn_backtest_requested", disabled=run_disabled):
+                st.session_state["backtest_requested"] = True
 
                 # --- Defensive check: constant portfolio detection ---
                 def is_constant_portfolio(pv):

@@ -53,69 +53,38 @@ def preflight_check(selected_tickers, price_data, min_common_days=250):
     common = prices.dropna(how="any")
     return valid, removed, common
 
-
+# risk_dashboard/core/backtest_flow.py (Auszug)
 def run_backtest_flow(ss, prefix, price_data, weights_map, min_common_days=250, **bt_kwargs):
-    """
-    ss: st.session_state
-    prefix: session prefix (z.B. "profile")
-    price_data: dict ticker -> Series/DataFrame
-    weights_map: dict ticker->weight (unfiltered)
-    bt_kwargs: weitere Parameter für run_backtest (initial_cash, strategy, ...)
-    Returns: dict {"ok": True/False, "message": str, "result": {...}}
-    """
     selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
     valid, removed, common = preflight_check(selected_tickers, price_data, min_common_days=min_common_days)
 
-    st.write("valid:", valid)
-    st.write("removed:", removed)
-    st.write("common.shape:", None if common is None else common.shape)
-    if common is not None:
-        st.write("common index range:", common.index.min(), "—", common.index.max())
-
-
-    # UI-Feedback via return payload; UI zeigt es an
-    payload = {"valid": valid, "removed": removed, "common_shape": None, "common_range": None}
-
-    if removed:
-        logger.warning("Removed tickers: %s", removed)
+    payload = {"valid": valid, "removed": removed, "common_shape": None, "common_range": None, "weights_for_bt": {}}
 
     if common is None or common.shape[0] < 30:
         if common is not None:
             payload["common_shape"] = common.shape
             payload["common_range"] = (common.index.min(), common.index.max())
-        return {"ok": False, "message": "Insufficient common price data", "payload": payload}
+        return {"ok": False, "message": "Insufficient common price data", "payload": payload, "result": {}}
 
     payload["common_shape"] = common.shape
     payload["common_range"] = (common.index.min(), common.index.max())
 
-    # Gewichte für valid tickers
+    # build weights_for_bt (no st.* here)
     w_list = [weights_map.get(t, 0.0) for t in valid]
     w = np.array(w_list, dtype=float)
     if w.sum() == 0:
-        st.error("Summe der Gewichte ist 0. Bitte Gewichte anpassen.")
-        st.stop()
+        return {"ok": False, "message": "Sum of weights is zero", "payload": payload, "result": {}}
     w = w / w.sum()
     weights_for_bt = {t: float(w[i]) for i, t in enumerate(valid)}
-    st.write("DEBUG: weights_for_bt:", weights_for_bt)
+    payload["weights_for_bt"] = weights_for_bt
 
-    # Backtest aufrufen
     try:
-        res = run_backtest(
-            tickers=valid,
-            prices_df=common,
-            weights=weights_for_bt,
-            **bt_kwargs
-        )
+        res = run_backtest(tickers=valid, prices_df=common, weights=weights_for_bt, **bt_kwargs)
     except Exception as e:
         logger.exception("run_backtest failed: %s", e)
-        return {"ok": False, "message": f"run_backtest error: {e}", "payload": payload}
+        return {"ok": False, "message": f"run_backtest error: {e}", "payload": payload, "result": {}}
 
-    # Normalisiere Ergebnisformat für UI
-    if isinstance(res, dict):
-        return {"ok": True, "message": "ok", "payload": payload, "result": res}
-    else:
-        return {"ok": True, "message": "ok", "payload": payload, "result": {"portfolio_value": res}}
-
+    return {"ok": True, "message": "ok", "payload": payload, "result": res if isinstance(res, dict) else {"portfolio_value": res}}
 
 def run_all_etf_backtests(
     selected_etfs: list,

@@ -403,34 +403,58 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                                     flag_key="backtest_call"
                                 )
 
-                                # --- Einheitliche Normalisierung des Ergebnisses ---
+                                # Normalize None -> envelope (einheitlich)
                                 if result is None:
                                     logger.debug("safe_backtest_call returned None")
-                                    result = {"ok": False, "message": "Interner Fehler: kein Ergebnis vom Backtest.", "result": {}}
+                                    result = {"ok": False, "message": "Interner Fehler: kein Ergebnis vom Backtest.", "payload": {}, "result": {}}
 
-                                # Envelope behandeln und Payload extrahieren
-                                payload = result.get("result", {}) or {}
-                                if not result.get("ok"):
-                                    st.warning(result.get("message", "Backtest fehlgeschlagen."))
-                                    run_disabled = True
+                                # Envelope korrekt entpacken (defensiv)
+                                resp = result or {}
+                                st.write("BACKTEST RESULT ENVELOPE:", resp)  # temporär; entferne später
+
+                                # Initialisiere payload/res immer, damit sie später sicher verwendbar sind
+                                payload = resp.get("payload", {}) or {}
+                                res = resp.get("result", {}) or {}
+
+                                # Fehlerfall
+                                if not resp.get("ok"):
+                                    st.warning(resp.get("message", "Backtest fehlgeschlagen."))
+                                    if payload.get("removed"):
+                                        st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                                    if payload.get("common_shape"):
+                                        st.info(f"Gemeinsame Handelstage: {payload['common_shape']}")
                                 else:
-                                    run_disabled = False
+                                    # Erfolgsfall: sichere Extraktion
+                                    pv = res.get("portfolio_value")
+                                    metrics = res.get("metrics", {})
 
-                                # --- Logging (einmalig) ---
-                                logger.debug("BACKTEST CALL ARGS: available=%s weights=%s start=%s end=%s",
+                                    if pv is None:
+                                        st.warning("Kein Backtest‑Ergebnis (portfolio_value fehlt).")
+                                    else:
+                                        st.line_chart(pv)
+                                        st.write(metrics)
+                                        trades_df = pd.DataFrame(res.get("trades", []))
+                                        st.dataframe(trades_df)
+                                        if not trades_df.empty:
+                                            csv = trades_df.to_csv(index=False)
+                                            st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
+
+                                # Logging (nutze die bereits initialisierten payload/res)
+                                logger.debug("BACKTEST CALL ARGS: available_mapped=%s weights=%s start=%s end=%s",
                                             available, user_weights_mapped, start_arg, end_arg)
-                                logger.debug("BACKTEST RESULT ENVELOPE: %s", repr(result)[:2000])
+                                logger.debug("BACKTEST RESULT ENVELOPE: %s", repr(resp)[:2000])
 
-                                pv = payload.get("portfolio_value")
-                                metrics = payload.get("metrics", {})
+                                pv = res.get("portfolio_value")
+                                metrics = res.get("metrics", {})
 
+                                logger.debug("portfolio_value type=%s shape=%s", type(pv), getattr(pv, "shape", None))
                                 try:
                                     nunique = pv.nunique() if hasattr(pv, "nunique") else None
                                     std = float(pv.std()) if hasattr(pv, "std") else None
-                                    logger.debug("portfolio_value type=%s shape=%s nunique=%s std=%s",
-                                                type(pv), getattr(pv, "shape", None), nunique, std)
+                                    logger.debug("portfolio_value nunique=%s std=%s", nunique, std)
                                 except Exception:
                                     logger.exception("Error inspecting portfolio_value")
+
 
                                 # --- Defensive: konstantes Portfolio erkennen ---
                                 def is_constant_portfolio(pv):
@@ -446,8 +470,8 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                                             return all(float(pv[c].std()) == 0.0 for c in pv.columns)
                                         except Exception:
                                             return True
-                                    return True
-
+                                    return True  
+                                                                                              
                                 # --- Ergebnisbehandlung und Rendering ---
                                 if not payload:
                                     st.warning("Kein Backtest‑Ergebnis verfügbar.")
