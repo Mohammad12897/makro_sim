@@ -6,13 +6,11 @@ from datetime import date
 from typing import Dict, List
 import json, os
 from risk_dashboard.core.etf_tools import get_etf_candidates_for_index, compute_etf_score_components, get_preset_weights
-from risk_dashboard.core.macro_pipeline import run_backtest
 from risk_dashboard.utils.persistence import save_user_tickers
 from risk_dashboard.core.data_loader import parse_tickers
 from risk_dashboard.ui.helpers import normalize_ticker
 from risk_dashboard.config import DEFAULT_START_STR
 from risk_dashboard.data_utils import cached_download_prices, do_add_tickers,safe_rerun, analyze_callback
-from risk_dashboard.core.backtest import preflight_check
 import logging
 
 ##################
@@ -563,6 +561,20 @@ def render_etf_selection_ui(prefix="etf"):
                     prices_for_bt = ss.get("prices_for_bt", {})          # dict ticker->Series/DataFrame
                     weights_by_ticker = ss.get("weights_by_ticker", {})  # dict ticker->weight
 
+                    # --- DEBUG: inspect prices_for_bt (temporär) ---
+                    st.write("DEBUG: type(prices_for_bt):", type(prices_for_bt))
+                    if hasattr(prices_for_bt, "shape"):
+                        st.write("DEBUG: shape:", prices_for_bt.shape)
+                    if hasattr(prices_for_bt, "columns"):
+                        st.write("DEBUG: columns:", list(prices_for_bt.columns)[:50])
+                    st.write("DEBUG: sample head:")
+                    try:
+                        st.write(prices_for_bt.head())
+                    except Exception as _:
+                        st.write("DEBUG: prices_for_bt.head() not available")
+                    # --- Ende DEBUG ---
+
+
                     if prices_for_bt and weights_by_ticker:
                         bt_response = run_backtest_flow(
                             ss=ss,
@@ -575,13 +587,16 @@ def render_etf_selection_ui(prefix="etf"):
                             rebalance=ss.get("rebalance", "monthly")
                         )
 
-                        # UI: zeige Feedback
-                        # defensive Anzeige
+                        st.write("BACKTEST RESULT ENVELOPE:", bt_response)
+
+                        # Defensive UI‑Verarbeitung des Envelope
                         if not bt_response or not bt_response.get("ok"):
                             st.error(bt_response.get("message", "Backtest fehlgeschlagen"))
                             payload = bt_response.get("payload") or {}
                             if payload.get("removed"):
                                 st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                            if payload.get("common_shape"):
+                                st.info(f"Gemeinsame Handelstage: {payload['common_shape']}")
                         else:
                             res = bt_response.get("result", {})
                             if isinstance(res, dict) and "portfolio_value" in res:
@@ -590,9 +605,8 @@ def render_etf_selection_ui(prefix="etf"):
                                 trades_df = pd.DataFrame(res.get("trades", []))
                                 st.dataframe(trades_df)
                                 if not trades_df.empty:
-                                    st.download_button("Export trades CSV", data=trades_df.to_csv(index=False), file_name="trades.csv")
+                                    csv = trades_df.to_csv(index=False)
+                                    st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
                             else:
                                 st.error("Backtest lieferte kein Ergebnis.")
-                    else:
-                        st.info("Keine Preisdaten oder Gewichte vorhanden.")
                     ##############################################

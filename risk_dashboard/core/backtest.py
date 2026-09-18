@@ -66,6 +66,13 @@ def run_backtest_flow(ss, prefix, price_data, weights_map, min_common_days=250, 
     selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
     valid, removed, common = preflight_check(selected_tickers, price_data, min_common_days=min_common_days)
 
+    st.write("valid:", valid)
+    st.write("removed:", removed)
+    st.write("common.shape:", None if common is None else common.shape)
+    if common is not None:
+        st.write("common index range:", common.index.min(), "—", common.index.max())
+
+
     # UI-Feedback via return payload; UI zeigt es an
     payload = {"valid": valid, "removed": removed, "common_shape": None, "common_range": None}
 
@@ -85,9 +92,11 @@ def run_backtest_flow(ss, prefix, price_data, weights_map, min_common_days=250, 
     w_list = [weights_map.get(t, 0.0) for t in valid]
     w = np.array(w_list, dtype=float)
     if w.sum() == 0:
-        return {"ok": False, "message": "Sum of weights is zero", "payload": payload}
+        st.error("Summe der Gewichte ist 0. Bitte Gewichte anpassen.")
+        st.stop()
     w = w / w.sum()
     weights_for_bt = {t: float(w[i]) for i, t in enumerate(valid)}
+    st.write("DEBUG: weights_for_bt:", weights_for_bt)
 
     # Backtest aufrufen
     try:

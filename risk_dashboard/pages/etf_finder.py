@@ -288,7 +288,6 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
         st.warning("Keine Top‑Auswahl vorhanden. Bitte wähle zuerst ETFs im Finder.")
     else:
         # Importiere Backtest-Funktion hier (lokal, um zyklische Imports zu vermeiden)
-        from risk_dashboard.core.macro_pipeline import run_backtest
 
         # Prüfe price_df
         if price_df.empty:

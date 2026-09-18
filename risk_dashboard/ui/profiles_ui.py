@@ -33,7 +33,6 @@ from risk_dashboard.core.macro_pipeline import (
     detect_regime,
     select_etfs_for_regime,
     build_regime_portfolio,
-    run_backtest,
     _fetch_and_clean_prices,
     analyze_performance
 )

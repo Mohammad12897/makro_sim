@@ -3,8 +3,6 @@ from typing import Any, Dict
 
 import numpy as np
 import streamlit as st
-from risk_dashboard.core.macro_pipeline import run_backtest
-from risk_dashboard.core.backtest import preflight_check
 
 import logging
 
@@ -118,6 +116,29 @@ def adapter_run_backtest(portfolio_or_tickers, *args, **kwargs):
                 rebalance=kwargs.get("rebalance", "monthly"),
             )
 
+            # Envelope debug
+            st.write("BACKTEST RESULT ENVELOPE:", bt_response)
+
+            # Defensive UI‑Verarbeitung des Envelope
+            if not bt_response or not bt_response.get("ok"):
+                st.error(bt_response.get("message", "Backtest fehlgeschlagen"))
+                payload = bt_response.get("payload") or {}
+                if payload.get("removed"):
+                    st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                if payload.get("common_shape"):
+                    st.info(f"Gemeinsame Handelstage: {payload['common_shape']}")
+            else:
+                res = bt_response.get("result", {})
+                if isinstance(res, dict) and "portfolio_value" in res:
+                    st.line_chart(res["portfolio_value"])
+                    st.write(res.get("metrics", {}))
+                    trades_df = pd.DataFrame(res.get("trades", []))
+                    st.dataframe(trades_df)
+                    if not trades_df.empty:
+                        csv = trades_df.to_csv(index=False)
+                        st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
+                else:
+                    st.error("Backtest lieferte kein Ergebnis.")
             return bt_response
 
         except Exception as e:

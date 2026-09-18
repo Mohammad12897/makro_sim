@@ -1463,7 +1463,6 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
     # 2) Aufruf innerhalb einer Funktion / UI‑Handler (z. B. in profile_form_ui)
 
     if "prices_for_bt" in st.session_state and "weights_by_ticker" in st.session_state:
-        from risk_dashboard.core.macro_pipeline import run_backtest
         prices_for_bt = st.session_state.prices_for_bt
         weights_by_ticker = st.session_state.weights_by_ticker
         if prices_for_bt.empty or not weights_by_ticker:
@@ -1492,19 +1491,29 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                     rebalance=ss.get("rebalance", "monthly")
                 )
 
-                # UI: zeige Feedback
-                st.info(f"Valid tickers: {bt_etf['payload'].get('valid', [])}")
-                if bt_etf['payload'].get('removed'):
-                    st.warning("Entfernte Ticker: " + ", ".join(bt_etf['payload']['removed']))
-                if not bt_etf["ok"]:
-                    st.error(bt_etf["message"])
+                # Envelope debug
+                st.write("BACKTEST RESULT ENVELOPE:", bt_etf)
+
+                # Defensive UI‑Verarbeitung des Envelope
+                if not bt_etf or not bt_etf.get("ok"):
+                    st.error(bt_etf.get("message", "Backtest fehlgeschlagen"))
+                    payload = bt_etf.get("payload") or {}
+                    if payload.get("removed"):
+                        st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                    if payload.get("common_shape"):
+                        st.info(f"Gemeinsame Handelstage: {payload['common_shape']}")
                 else:
-                    res = bt_etf["result"]
-                    # Beispiel: line chart falls vorhanden
+                    res = bt_etf.get("result", {})
                     if isinstance(res, dict) and "portfolio_value" in res:
                         st.line_chart(res["portfolio_value"])
-            else:
-                st.info("Keine Preisdaten oder Gewichte vorhanden.")
+                        st.write(res.get("metrics", {}))
+                        trades_df = pd.DataFrame(res.get("trades", []))
+                        st.dataframe(trades_df)
+                        if not trades_df.empty:
+                            csv = trades_df.to_csv(index=False)
+                            st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
+                    else:
+                        st.error("Backtest lieferte kein Ergebnis.")
 
     else:
         bt_etf = backtest_etf_regime_portfolio(
