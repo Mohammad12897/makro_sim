@@ -1,0 +1,27 @@
+etf_universe:
+  nasdaq100:
+    name: "Invesco EQQQ NASDAQ-100 UCITS ETF"
+    ticker: "EQQQ.L"
+    isin: "IE0032077012"
+    asset_class: "equity"
+    region: "usa"
+    ter_pct: 0.30
+    replication: "physical"
+
+  nasdaq100_ishares:
+    name: "iShares NASDAQ 100 UCITS ETF"
+    ticker: "CNDX.L"
+    isin: "IE00B53SZB19"
+    asset_class: "equity"
+    region: "usa"
+    ter_pct: 0.33
+    replication: "physical"
+
+  sp500:
+    name: "iShares Core S&P 500 UCITS ETF"
+    ticker: "CSPX.L"
+    isin: "IE00B5BMR087"
+    asset_class: "equity"
+    region: "usa"
+    ter_pct: 0.07
+    replication: "physical"

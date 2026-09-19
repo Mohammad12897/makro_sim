@@ -1,0 +1,27 @@
+etf_universe:
+  eurostoxx50:
+    name: "iShares EURO STOXX 50 UCITS ETF"
+    ticker: "EUN2.DE"
+    isin: "IE00B53L3W79"
+    asset_class: "equity"
+    region: "europe"
+    ter_pct: 0.10
+    replication: "physical"
+
+  eurostoxx50_esg:
+    name: "Xtrackers EURO STOXX 50 ESG UCITS ETF"
+    ticker: "XESX.DE"
+    isin: "IE00BG0J4841"
+    asset_class: "equity"
+    region: "europe"
+    ter_pct: 0.12
+    replication: "physical"
+
+  euro_equity_world:
+    name: "Vanguard FTSE Developed Europe UCITS ETF"
+    ticker: "VEUR.L"
+    isin: "IE00B945VV12"
+    asset_class: "equity"
+    region: "europe"
+    ter_pct: 0.10
+    replication: "physical"

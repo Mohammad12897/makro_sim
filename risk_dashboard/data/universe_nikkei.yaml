@@ -1,0 +1,27 @@
+etf_universe:
+  nikkei225:
+    name: "iShares Nikkei 225 UCITS ETF"
+    ticker: "I225.L"
+    isin: "IE00B53L3F39"
+    asset_class: "equity"
+    region: "japan"
+    ter_pct: 0.20
+    replication: "physical"
+
+  japan_largecap:
+    name: "Xtrackers MSCI Japan UCITS ETF"
+    ticker: "XJPN.L"
+    isin: "IE00BJ0KDR00"
+    asset_class: "equity"
+    region: "japan"
+    ter_pct: 0.19
+    replication: "physical"
+
+  japan_smallcap:
+    name: "iShares MSCI Japan Small Cap UCITS ETF"
+    ticker: "ISJP.L"
+    isin: "IE00B3F81G20"
+    asset_class: "equity"
+    region: "japan"
+    ter_pct: 0.40
+    replication: "physical"
