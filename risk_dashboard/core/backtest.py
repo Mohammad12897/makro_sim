@@ -27,30 +27,68 @@ except Exception:
     logger.warning("compute_abs_weights konnte nicht importiert werden; Fallback auf None.")
 
 def preflight_check(selected_tickers, price_data, min_common_days=250):
+    """
+    Normalisiert price_data (DataFrame oder dict ticker->Series) und prüft,
+    welche Ticker ausreichend Daten haben. Liefert:
+      valid  -> Liste der Ticker mit ausreichender Historie
+      removed-> Liste der Ticker, die entfernt wurden (keine/zu wenige Daten)
+      common -> DataFrame mit gemeinsamen Handelstagen (dropna(how='any')) oder None
+    """
     import pandas as pd
-    # price_data can be dict ticker->Series or a DataFrame with columns=tickers
+
     series_list = []
     valid, removed = [], []
 
-    # normalize price_data to dict
+    # normalize price_data to dict ticker->Series (dropna applied)
     if isinstance(price_data, pd.DataFrame):
-        pdict = {col: price_data[col].dropna() for col in price_data.columns}
+        pdict = {}
+        for col in price_data.columns:
+            try:
+                s = price_data[col].dropna()
+                # ensure datetime index
+                if not isinstance(s.index, pd.DatetimeIndex):
+                    s.index = pd.to_datetime(s.index, errors="coerce")
+                    s = s.dropna()
+                pdict[col] = s
+            except Exception:
+                pdict[col] = pd.Series(dtype="float64")
     else:
-        pdict = {k: (v.dropna() if isinstance(v, pd.Series) else v) for k, v in (price_data or {}).items()}
+        pdict = {}
+        for k, v in (price_data or {}).items():
+            if isinstance(v, pd.Series):
+                s = v.dropna()
+                if not isinstance(s.index, pd.DatetimeIndex):
+                    try:
+                        s.index = pd.to_datetime(s.index, errors="coerce")
+                        s = s.dropna()
+                    except Exception:
+                        s = s.dropna()
+                pdict[k] = s
+            else:
+                pdict[k] = pd.Series(dtype="float64")
 
+    # evaluate each selected ticker
     for t in selected_tickers:
         s = pdict.get(t)
-        if s is None or getattr(s, "dropna", lambda: s)().shape[0] < 10:
+        # treat None or empty Series as removed
+        if s is None or (isinstance(s, pd.Series) and s.dropna().shape[0] < min_common_days):
             removed.append(t)
             continue
-        series_list.append(s.rename(t))
-        valid.append(t)
+        # accept series with at least a small minimum (allow smaller than min_common_days for initial filtering)
+        if isinstance(s, pd.Series) and s.shape[0] >= 10:
+            series_list.append(s.rename(t))
+            valid.append(t)
+        else:
+            removed.append(t)
 
     if not series_list:
         return valid, removed, None
 
+    # concat and compute common (rows where all valid tickers have data)
     prices = pd.concat(series_list, axis=1)
     common = prices.dropna(how="any")
+
+    # return valid, removed, common (caller can check common.shape[0] < min_common_days)
     return valid, removed, common
 
 # risk_dashboard/core/backtest_flow.py (Auszug)

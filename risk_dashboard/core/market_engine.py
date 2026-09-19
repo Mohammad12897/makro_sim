@@ -179,8 +179,11 @@ def to_utc_aware(series: pd.Series) -> pd.Series:
         series.index = series.index.tz_convert("UTC")
     return series.dropna()
 
-
 def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=None, period: Optional[str]=None) -> Optional[pd.Series]:
+    """
+    Versucht, Preisdaten für `ticker` von yfinance zu laden und als pd.Series (DatetimeIndex) zurückzugeben.
+    Liefert None bei Fehlern oder wenn keine verwertbaren Preisdaten vorhanden sind.
+    """
     try:
         # zentrale Funktion: wenn period angegeben, kann start/end None sein
         if start is None and end is None and period is not None:
@@ -188,7 +191,8 @@ def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=
         else:
             df = safe_fetch(ticker, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
 
-        if df is None or df.empty:
+        # safe_fetch kann None oder leeres DataFrame zurückgeben
+        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             logger.debug("safe_fetch returned empty for %s", ticker)
             return None
 
@@ -197,48 +201,58 @@ def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=
             try:
                 df = flatten_yf_dataframe(df)
             except Exception:
-                pass
+                logger.debug("flatten_yf_dataframe failed for %s; continuing with original columns", ticker)
 
-        # Index sicherstellen
-        try:
-            df.index = pd.to_datetime(df.index)
-        except Exception:
-            df = ensure_date_column(df, date_col="date")
-            df = df.set_index("date")
+        # Index sicherstellen (DatetimeIndex)
+        if not isinstance(df.index, pd.DatetimeIndex):
+            try:
+                df.index = pd.to_datetime(df.index)
+            except Exception:
+                # fallback: versuche eine 'date' Spalte zu verwenden
+                try:
+                    df = ensure_date_column(df, date_col="date")
+                    df = df.set_index("date")
+                    df.index = pd.to_datetime(df.index)
+                except Exception:
+                    logger.warning("Could not coerce index to datetime for %s", ticker)
+                    return None
 
         # Preisspalte finden (Adj Close bevorzugt)
         price_col = None
-        for candidate in ["ADJ CLOSE", "ADJ_CLOSE", "ADJClose", "Adj Close", "Close", "close"]:
-            matches = [c for c in df.columns if c.upper().replace("_"," ") == candidate.upper().replace("_"," ")]
-            if matches:
-                price_col = matches[0]
+        candidates = ["ADJ CLOSE", "ADJ_CLOSE", "ADJClose", "Adj Close", "Close", "close"]
+        cols_upper = [str(c).upper().replace("_", " ") for c in df.columns]
+        for candidate in candidates:
+            for orig_col, col_upper in zip(df.columns, cols_upper):
+                if col_upper == candidate.upper().replace("_", " "):
+                    price_col = orig_col
+                    break
+            if price_col is not None:
                 break
 
         if price_col is None:
             # fallback: erste numerische Spalte
             numeric = df.select_dtypes(include="number")
             if numeric.shape[1] == 0:
-                logger.warning("No Close/Adj Close column for %s: %s", ticker, df.columns.tolist())
+                logger.warning("No numeric price column (Close/Adj Close) for %s: %s", ticker, df.columns.tolist())
                 return None
             price_col = numeric.columns[0]
 
-        # Normalisieren (Index, Duplikate, Sortierung)
-        df = normalize_price_df(df, price_col=price_col)
+        # Normalisieren (Index, Duplikate, Sortierung) — versuche normalize_price_df, sonst Fallback
+        try:
+            df_norm = normalize_price_df(df[[price_col]].copy(), price_col=price_col)
+        except Exception:
+            df_norm = df[[price_col]].copy()
+            df_norm = df_norm[~df_norm.index.duplicated(keep="first")]
+            df_norm = df_norm.sort_index()
 
-        # Extrahiere die Preis‑Series (erste Spalte nach normalize_price_df)
-        s = df.iloc[:, 0].copy()
+        # Extrahiere die Preis‑Series
+        s = df_norm.iloc[:, 0].copy()
         s.name = ticker
         return s.sort_index()
 
     except Exception:
         logger.exception("Error in _try_yf_download for %s", ticker)
         return None
-
-    except Exception:
-        logger.exception("Error in _try_yf_download for %s", ticker)
-        return None
-
-
 
 def _try_yf_ticker_history(ticker: str, start: Optional[str]=None, end: Optional[str]=None, period: Optional[str]=None) -> Optional[pd.Series]:
     """
