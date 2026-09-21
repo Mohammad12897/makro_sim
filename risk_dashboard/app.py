@@ -1480,6 +1480,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
             weights_by_ticker = ss.get("weights_by_ticker", {})  # dict ticker->weight
 
             if prices_for_bt and weights_by_ticker:
+                run_disabled = False
                 bt_etf = run_backtest_flow(
                     ss=ss,
                     prefix=prefix,
@@ -1491,9 +1492,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                     rebalance=ss.get("rebalance", "monthly")
                 )
 
-
                 resp = bt_etf or {}
-                # temporär
                 st.write("BACKTEST RESULT ENVELOPE:", resp)
 
                 payload = resp.get("payload", {}) or {}
@@ -1501,9 +1500,12 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
 
                 if not resp.get("ok"):
                     st.warning(resp.get("message", "Backtest fehlgeschlagen."))
-                    if payload.get("removed"):
-                        st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                    removed = payload.get("removed") or payload.get("removed_tickers") or []
+                    if removed:
+                        st.warning("Entfernte Ticker: " + ", ".join(removed))
+                    run_disabled = True
                 else:
+                    run_disabled = False
                     pv = res.get("portfolio_value")
                     metrics = res.get("metrics", {})
                     if pv is None:
@@ -1516,6 +1518,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                         if not trades_df.empty:
                             csv = trades_df.to_csv(index=False)
                             st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
+
 
                 # Defensive UI‑Verarbeitung des Envelope
                 if not bt_etf or not bt_etf.get("ok"):

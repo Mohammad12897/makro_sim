@@ -573,8 +573,6 @@ def render_etf_selection_ui(prefix="etf"):
                     except Exception as _:
                         st.write("DEBUG: prices_for_bt.head() not available")
                     # --- Ende DEBUG ---
-
-
                     if prices_for_bt and weights_by_ticker:
                         bt_response = run_backtest_flow(
                             ss=ss,
@@ -587,8 +585,8 @@ def render_etf_selection_ui(prefix="etf"):
                             rebalance=ss.get("rebalance", "monthly")
                         )
 
+                        # defensive Envelope handling
                         resp = bt_response or {}
-                        # temporär
                         st.write("BACKTEST RESULT ENVELOPE:", resp)
 
                         payload = resp.get("payload", {}) or {}
@@ -596,9 +594,12 @@ def render_etf_selection_ui(prefix="etf"):
 
                         if not resp.get("ok"):
                             st.warning(resp.get("message", "Backtest fehlgeschlagen."))
-                            if payload.get("removed"):
-                                st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                            removed = payload.get("removed") or payload.get("removed_tickers") or []
+                            if removed:
+                                st.warning("Entfernte Ticker: " + ", ".join(removed))
+                            run_disabled = True
                         else:
+                            run_disabled = False
                             pv = res.get("portfolio_value")
                             metrics = res.get("metrics", {})
                             if pv is None:
@@ -611,16 +612,19 @@ def render_etf_selection_ui(prefix="etf"):
                                 if not trades_df.empty:
                                     csv = trades_df.to_csv(index=False)
                                     st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
-
+                        
                         # Defensive UI‑Verarbeitung des Envelope
                         if not bt_response or not bt_response.get("ok"):
                             st.error(bt_response.get("message", "Backtest fehlgeschlagen"))
                             payload = bt_response.get("payload") or {}
-                            if payload.get("removed"):
-                                st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                            removed = payload.get("removed") or payload.get("removed_tickers") or []
+                            if removed:
+                                st.warning("Entfernte Ticker: " + ", ".join(removed))
+                            run_disabled = True
                             if payload.get("common_shape"):
                                 st.info(f"Gemeinsame Handelstage: {payload['common_shape']}")
                         else:
+                            run_disabled = False
                             res = bt_response.get("result", {})
                             if isinstance(res, dict) and "portfolio_value" in res:
                                 st.line_chart(res["portfolio_value"])

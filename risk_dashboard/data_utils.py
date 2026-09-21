@@ -285,21 +285,18 @@ def safe_fetch(
     allow_empty: bool = False,
     cache: Optional[Dict[str, pd.DataFrame]] = None,
     cache_key: Optional[str] = None,
-    raise_on_failure: bool = True,
+    raise_on_failure: bool = False,
     **fetch_kwargs: Any,
 ) -> pd.DataFrame:
-    # Defaults im Body setzen (nicht in Signatur)
     start = start or DEFAULT_START_STR
     end = end or datetime.today().strftime("%Y-%m-%d")
 
-    # Guard: leere Tickerliste
     if not tickers:
         logger.debug("safe_fetch: received empty tickers list")
         if allow_empty:
             return pd.DataFrame()
         raise ValueError("safe_fetch: tickers list is empty")
 
-    # Cache lookup
     if cache is not None and cache_key is not None:
         cached = cache.get(cache_key)
         if cached is not None and not cached.empty:
@@ -313,7 +310,7 @@ def safe_fetch(
             logger.debug(
                 "safe_fetch: attempt %d/%d tickers=%s start=%s end=%s interval=%s kwargs=%s",
                 attempt, attempts, tickers, start, end, interval,
-                {k: fetch_kwargs.get(k) for k in ("auto_adjust","threads") if k in fetch_kwargs}
+                {k: fetch_kwargs.get(k) for k in ("auto_adjust", "threads") if k in fetch_kwargs}
             )
             df = fetch_prices_from_yf(
                 tickers,
@@ -336,7 +333,6 @@ def safe_fetch(
             last_exc = exc
             logger.exception("safe_fetch: unexpected error on attempt %d for %s", attempt, tickers)
 
-        # backoff with jitter
         sleep_for = backoff_factor * (2 ** (attempt - 1))
         jitter = random.uniform(0, sleep_for * 0.1)
         total_sleep = sleep_for + jitter

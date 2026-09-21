@@ -1459,51 +1459,67 @@ def profile_form_ui(
                 # Sicherer UI-Aufruf (defensiv)
                 # Achte darauf, dass 'prices' ein DataFrame ist und die Spalten enthält
                 prices_arg = None
-                if prices is not None:
-                    # falls prices ein DataFrame ist, slice defensiv
+
+                # defensive checks before using prices
+                run_disabled = False
+
+                # prices kann None, DataFrame oder anderes sein
+                if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
+                    st.warning("Preisdaten sind nicht geladen. Bitte Preise laden oder Cache prüfen.")
+                    run_disabled = True
+                    prices_arg = pd.DataFrame()
+                else:
+                    # defensive slicing: nur Spalten nehmen, die wirklich in prices vorhanden sind
                     if hasattr(prices, "columns"):
-                        prices_arg = prices.loc[:, [c for c in available_mapped if c in prices.columns]]
+                        cols = [c for c in available_mapped if c in prices.columns]
+                        prices_arg = prices.loc[:, cols] if cols else pd.DataFrame()
                     else:
+                        # prices ist kein DataFrame (z. B. Series) — übernehme direkt
                         prices_arg = prices
 
-                result = safe_backtest_call(
-                    adapter_run_backtest,
-                    available_mapped,
-                    prices=prices_arg,
-                    weights=user_weights_mapped,
-                    regimes=regimes_val,
-                    start=start_arg,
-                    end=end_arg,
-                    rebalance="monthly",
-                    initial_capital=1_000_000,
-                    flag_key="backtest_profiles"
-                )
+                # Wenn prices_arg leer ist, deaktivieren wir den Run und informieren den Nutzer
+                if isinstance(prices_arg, pd.DataFrame) and prices_arg.empty:
+                    st.warning("Keine passenden Preisspalten für die ausgewählten Ticker gefunden.")
+                    run_disabled = True
+
+                # safe_backtest_call nur aufrufen, wenn nicht disabled
+                result = {}
+                if not run_disabled:
+                    result = safe_backtest_call(
+                        adapter_run_backtest,
+                        args=(available_mapped,),          # tuple mit der Liste der Ticker
+                        prices=prices_arg,                 # DataFrame oder leeres DF (defensiv vorbereitet)
+                        weights=user_weights_mapped,       # dict ticker->weight
+                        regimes=regimes_val,               # optional, falls verwendet
+                        start=start_arg,
+                        end=end_arg,
+                        rebalance="monthly",
+                        initial_cash=1_000_000,            # korrektes Keyword für deinen Adapter/Core
+                        flag_key=f"{prefix}_backtest_flag",
+                    )
 
                 # Normalize None -> envelope (einheitlich)
                 if result is None:
                     logger.debug("safe_backtest_call returned None")
                     result = {"ok": False, "message": "Interner Fehler: kein Ergebnis vom Backtest.", "payload": {}, "result": {}}
 
-                # Envelope korrekt entpacken (defensiv)
+                # defensive Envelope handling
                 resp = result or {}
-                st.write("BACKTEST RESULT ENVELOPE:", resp)  # temporär; entferne später
+                st.write("BACKTEST RESULT ENVELOPE:", resp)
 
-                # Initialisiere payload/res immer, damit sie später sicher verwendbar sind
                 payload = resp.get("payload", {}) or {}
                 res = resp.get("result", {}) or {}
 
-                # Fehlerfall
                 if not resp.get("ok"):
                     st.warning(resp.get("message", "Backtest fehlgeschlagen."))
-                    if payload.get("removed"):
-                        st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
-                    if payload.get("common_shape"):
-                        st.info(f"Gemeinsame Handelstage: {payload['common_shape']}")
+                    removed = payload.get("removed") or payload.get("removed_tickers") or []
+                    if removed:
+                        st.warning("Entfernte Ticker: " + ", ".join(removed))
+                    run_disabled = True
                 else:
-                    # Erfolgsfall: sichere Extraktion
+                    run_disabled = False
                     pv = res.get("portfolio_value")
                     metrics = res.get("metrics", {})
-
                     if pv is None:
                         st.warning("Kein Backtest‑Ergebnis (portfolio_value fehlt).")
                     else:

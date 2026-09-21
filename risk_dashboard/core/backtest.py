@@ -27,13 +27,6 @@ except Exception:
     logger.warning("compute_abs_weights konnte nicht importiert werden; Fallback auf None.")
 
 def preflight_check(selected_tickers, price_data, min_common_days=250):
-    """
-    Normalisiert price_data (DataFrame oder dict ticker->Series) und prüft,
-    welche Ticker ausreichend Daten haben. Liefert:
-      valid  -> Liste der Ticker mit ausreichender Historie
-      removed-> Liste der Ticker, die entfernt wurden (keine/zu wenige Daten)
-      common -> DataFrame mit gemeinsamen Handelstagen (dropna(how='any')) oder None
-    """
     import pandas as pd
 
     series_list = []
@@ -45,7 +38,6 @@ def preflight_check(selected_tickers, price_data, min_common_days=250):
         for col in price_data.columns:
             try:
                 s = price_data[col].dropna()
-                # ensure datetime index
                 if not isinstance(s.index, pd.DatetimeIndex):
                     s.index = pd.to_datetime(s.index, errors="coerce")
                     s = s.dropna()
@@ -67,14 +59,11 @@ def preflight_check(selected_tickers, price_data, min_common_days=250):
             else:
                 pdict[k] = pd.Series(dtype="float64")
 
-    # evaluate each selected ticker
     for t in selected_tickers:
         s = pdict.get(t)
-        # treat None or empty Series as removed
         if s is None or (isinstance(s, pd.Series) and s.dropna().shape[0] < min_common_days):
             removed.append(t)
             continue
-        # accept series with at least a small minimum (allow smaller than min_common_days for initial filtering)
         if isinstance(s, pd.Series) and s.shape[0] >= 10:
             series_list.append(s.rename(t))
             valid.append(t)
@@ -84,14 +73,10 @@ def preflight_check(selected_tickers, price_data, min_common_days=250):
     if not series_list:
         return valid, removed, None
 
-    # concat and compute common (rows where all valid tickers have data)
     prices = pd.concat(series_list, axis=1)
     common = prices.dropna(how="any")
-
-    # return valid, removed, common (caller can check common.shape[0] < min_common_days)
     return valid, removed, common
 
-# risk_dashboard/core/backtest_flow.py (Auszug)
 def run_backtest_flow(ss, prefix, price_data, weights_map, min_common_days=250, **bt_kwargs):
     selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
     valid, removed, common = preflight_check(selected_tickers, price_data, min_common_days=min_common_days)
@@ -107,10 +92,10 @@ def run_backtest_flow(ss, prefix, price_data, weights_map, min_common_days=250, 
     payload["common_shape"] = common.shape
     payload["common_range"] = (common.index.min(), common.index.max())
 
-    # build weights_for_bt (no st.* here)
     w_list = [weights_map.get(t, 0.0) for t in valid]
     w = np.array(w_list, dtype=float)
     if w.sum() == 0:
+        payload["weights_for_bt"] = {}
         return {"ok": False, "message": "Sum of weights is zero", "payload": payload, "result": {}}
     w = w / w.sum()
     weights_for_bt = {t: float(w[i]) for i, t in enumerate(valid)}

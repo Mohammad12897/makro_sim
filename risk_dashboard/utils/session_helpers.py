@@ -22,74 +22,37 @@ except Exception:
 
     st = _StreamlitShim()
 
-def _call_fn_with_safe_kwargs(fn, *args, **kwargs):
+def _call_fn_with_safe_kwargs(fn, *pos_args, **kwargs):
     """
-    Map common kwarg variants to canonical names expected by the adapter/backtest,
-    call the target function and normalize the return envelope.
+    Wrapper, der kwargs filtert und sicher an fn übergibt.
+    Erwartet optional ein kwargs['args'] das eine tuple/list mit positional args enthält.
     """
-    logger.debug("Entering _call_fn_with_safe_kwargs: fn=%s args=%s kwargs_keys=%s",
-                 getattr(fn, "__name__", str(fn)), args, list(kwargs.keys()))
+    # Extrahiere explizit 'args' falls als kw übergeben
+    extra_args = ()
+    if "args" in kwargs:
+        maybe_args = kwargs.pop("args")
+        if isinstance(maybe_args, (list, tuple)):
+            extra_args = tuple(maybe_args)
+        elif maybe_args is None:
+            extra_args = ()
+        else:
+            # falls ein einzelner Wert übergeben wurde, packe ihn in ein tuple
+            extra_args = (maybe_args,)
 
-    # Build call_kwargs by mapping known variants to canonical names
+    # Mapping/Filter der erlaubten kwargs wie bisher (deine bestehende Logik)
     call_kwargs = {}
-
-    # prices mapping (UI may pass 'prices' or 'prices_df')
-    if "prices" in kwargs:
-        call_kwargs["prices"] = kwargs.pop("prices")
-    elif "prices_df" in kwargs:
-        call_kwargs["prices"] = kwargs.pop("prices_df")
-
-    # weights mapping (weights or user_weights)
-    if "weights" in kwargs:
-        call_kwargs["weights"] = kwargs.pop("weights")
-    elif "user_weights" in kwargs:
-        call_kwargs["weights"] = kwargs.pop("user_weights")
-
-    # start / end
-    if "start" in kwargs:
-        call_kwargs["start"] = kwargs.pop("start")
-    elif "start_date" in kwargs:
-        call_kwargs["start"] = kwargs.pop("start_date")
-
-    if "end" in kwargs:
-        call_kwargs["end"] = kwargs.pop("end")
-    elif "end_date" in kwargs:
-        call_kwargs["end"] = kwargs.pop("end_date")
-
-    # initial capital -> initial_cash
-    if "initial_capital" in kwargs:
-        call_kwargs["initial_cash"] = kwargs.pop("initial_capital")
-    elif "initial_cash" in kwargs:
-        call_kwargs["initial_cash"] = kwargs.pop("initial_cash")
-
-    # rebalance variants
-    if "rebalance" in kwargs:
-        call_kwargs["rebalance"] = kwargs.pop("rebalance")
-    elif "rebalance_freq" in kwargs:
-        freq = kwargs.pop("rebalance_freq")
-        call_kwargs["rebalance"] = "monthly" if (isinstance(freq, str) and freq.upper() == "M") else freq
-
-    # optional pass-through keys
-    for k in ("regimes", "strategy", "flag_key", "monthly_dca"):
+    allowed_keys = getattr(fn, "_allowed_kwargs", None)  # optional
+    # Beispiel: mappe nur bestimmte keys; hier deine bestehende Logik verwenden
+    for k in ("prices", "weights", "start", "end", "initial_cash", "rebalance", "regimes", "flag_key"):
         if k in kwargs:
-            call_kwargs[k] = kwargs.pop(k)
+            call_kwargs[k] = kwargs[k]
 
-    logger.debug("Mapped call_kwargs keys: %s; remaining ignored kwargs: %s",
-                 list(call_kwargs.keys()), list(kwargs.keys()))
+    # Füge pos_args (vom Aufrufer) voran und dann extra_args (aus kwargs['args'])
+    final_args = tuple(pos_args) + extra_args
 
-    # Call the target function
-    try:
-        result = fn(*args, **call_kwargs)
-    except Exception:
-        logger.exception("Error calling %s", getattr(fn, "__name__", str(fn)))
-        raise
-
-    # Normalize return envelope expected by callers
-    if isinstance(result, dict) and "ok" in result and "result" in result:
-        return result
-    if isinstance(result, dict):
-        return {"ok": True, "message": "ok", "result": result}
-    return {"ok": True, "message": "ok", "result": result}
+    logger.debug("Mapped call_kwargs keys: %s; remaining ignored kwargs: %s", list(call_kwargs.keys()), [k for k in kwargs.keys() if k not in call_kwargs])
+    # Rufe die Funktion mit final_args und call_kwargs auf
+    return fn(*final_args, **call_kwargs)
 
 def maybe_run_backtest(run_fn, *args, **kwargs):
     try:

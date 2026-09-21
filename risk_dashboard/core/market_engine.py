@@ -179,6 +179,7 @@ def to_utc_aware(series: pd.Series) -> pd.Series:
         series.index = series.index.tz_convert("UTC")
     return series.dropna()
 
+
 def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=None, period: Optional[str]=None) -> Optional[pd.Series]:
     """
     Versucht, Preisdaten für `ticker` von yfinance zu laden und als pd.Series (DatetimeIndex) zurückzugeben.
@@ -186,10 +187,15 @@ def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=
     """
     try:
         # zentrale Funktion: wenn period angegeben, kann start/end None sein
-        if start is None and end is None and period is not None:
-            df = safe_fetch(ticker, start=None, end=None, interval="1d", auto_adjust=True, threads=False)
-        else:
-            df = safe_fetch(ticker, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
+        try:
+            if start is None and end is None and period is not None:
+                df = safe_fetch(ticker, start=None, end=None, interval="1d", auto_adjust=True, threads=False)
+            else:
+                df = safe_fetch(ticker, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
+        except Exception as e:
+            # safe_fetch kann RuntimeError werfen; wir behandeln das hier und geben None zurück
+            logger.warning("safe_fetch failed for %s: %s", ticker, e)
+            return None
 
         # safe_fetch kann None oder leeres DataFrame zurückgeben
         if df is None or (isinstance(df, pd.DataFrame) and df.empty):
@@ -251,7 +257,7 @@ def _try_yf_download(ticker: str, start: Optional[str]=None, end: Optional[str]=
         return s.sort_index()
 
     except Exception:
-        logger.exception("Error in _try_yf_download for %s", ticker)
+        logger.exception("Unexpected error in _try_yf_download for %s", ticker)
         return None
 
 def _try_yf_ticker_history(ticker: str, start: Optional[str]=None, end: Optional[str]=None, period: Optional[str]=None) -> Optional[pd.Series]:

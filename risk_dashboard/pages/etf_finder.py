@@ -389,18 +389,25 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                                 logger.debug("adapter_run_backtest signature: %s", inspect.signature(adapter_run_backtest))
                                 #logger.debug("incoming kwargs keys: %s", list(kwargs.keys()))
 
-                                # --- Sicherer Aufruf des Adapters via safe_backtest_call ---
+                                # defensive: nur Spalten nehmen, die wirklich existieren
+                                if prices is not None and hasattr(prices, "columns"):
+                                    cols = [c for c in available if c in prices.columns]
+                                    prices_arg = prices.loc[:, cols] if cols else pd.DataFrame()
+                                else:
+                                    prices_arg = pd.DataFrame()
+
+                                # Sicherer, positionaler Aufruf des Adapters
                                 result = safe_backtest_call(
                                     adapter_run_backtest,
-                                    available,                                # positional: portfolio_or_tickers
-                                    prices=prices[available] if prices is not None else None,
-                                    weights=user_weights_mapped,              # kann None sein
-                                    regimes=regimes_val,                      # optional
+                                    available,                    # positional: portfolio_or_tickers (Liste)
+                                    prices=prices_arg,
+                                    weights=user_weights_mapped,
+                                    regimes=regimes_val,
                                     start=start_arg,
                                     end=end_arg,
-                                    rebalance="monthly",                      # oder rebalance_freq="M" je nach Adapter
-                                    initial_capital=1_000_000,
-                                    flag_key="backtest_call"
+                                    rebalance="monthly",
+                                    initial_cash=1_000_000,      # korrektes Keyword für den Adapter/Core
+                                    flag_key="backtest_call",
                                 )
 
                                 # Normalize None -> envelope (einheitlich)
@@ -419,12 +426,15 @@ if st.button(f"Backtest Top {top_n} (aus ETF Finder)"):
                                 # Fehlerfall
                                 if not resp.get("ok"):
                                     st.warning(resp.get("message", "Backtest fehlgeschlagen."))
-                                    if payload.get("removed"):
-                                        st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
+                                    removed = payload.get("removed") or payload.get("removed_tickers") or []
+                                    if removed:
+                                        st.warning("Entfernte Ticker: " + ", ".join(removed))
+                                    run_disabled = True
                                     if payload.get("common_shape"):
                                         st.info(f"Gemeinsame Handelstage: {payload['common_shape']}")
                                 else:
                                     # Erfolgsfall: sichere Extraktion
+                                    run_disabled = False
                                     pv = res.get("portfolio_value")
                                     metrics = res.get("metrics", {})
 
