@@ -13,20 +13,21 @@ from risk_dashboard.config import DEFAULT_START_STR
 from risk_dashboard.data_utils import cached_download_prices, do_add_tickers,safe_rerun, analyze_callback
 import logging
 
+
 ##################
-from logging.handlers import RotatingFileHandler
+#from logging.handlers import RotatingFileHandler
 import uuid
 
-LOGFILE = os.path.join(os.path.dirname(__file__), "..", "logs", "ui_debug.log")
-os.makedirs(os.path.dirname(LOGFILE), exist_ok=True)
+#LOGFILE = os.path.join(os.path.dirname(__file__), "..", "logs", "ui_debug.log")
+#os.makedirs(os.path.dirname(LOGFILE), exist_ok=True)
 
-logger = logging.getLogger("risk_dashboard.ui.etf_selection_ui")
-logger.setLevel(logging.DEBUG)
-if not logger.handlers:
-    handler = RotatingFileHandler(LOGFILE, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
-    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s [run=%(run_id)s seq=%(seq)d] %(message)s")
-    handler.setFormatter(fmt)
-    logger.addHandler(handler)
+#logger = logging.getLogger("risk_dashboard.ui.etf_selection_ui")
+#logger.setLevel(logging.DEBUG)
+#if not logger.handlers:
+#    handler = RotatingFileHandler(LOGFILE, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
+#    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s [run=%(run_id)s seq=%(seq)d] %(message)s")
+#    handler.setFormatter(fmt)
+#    logger.addHandler(handler)
 
 ###################
     

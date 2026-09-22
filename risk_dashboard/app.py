@@ -27,6 +27,10 @@ import logging
 import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from risk_dashboard.logging_config import configure_logging
+configure_logging(log_level=logging.DEBUG, logfile="risk_dashboard/logs/app_exceptions.log", run_id="-")
+
+
 
 
 # Project root and output dirs (unchanged)
