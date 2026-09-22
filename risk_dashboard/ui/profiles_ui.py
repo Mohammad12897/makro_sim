@@ -786,8 +786,13 @@ def profile_form_ui(
 
     # --- Vorbedingungen: tickers und tickers_list sicher setzen ---
     # Beispiel: aus defaults oder session_state (passe an deine Struktur an)
-    tickers = defaults.get("tickers", []) if 'defaults' in locals() else st.session_state.get("profile_tickers", [])
-    tickers_list = list(tickers)  # Liste für Loader-Aufruf
+    tickers = None
+    if "defaults" in locals() and isinstance(defaults, dict):
+        tickers = defaults.get("tickers", [])
+    if not tickers:
+        tickers = st.session_state.get("profile_tickers", []) or []
+
+    tickers_list = list(tickers)
         
     # 1) Fallback aus session_state
     if price_data is None:
