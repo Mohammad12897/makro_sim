@@ -381,7 +381,7 @@ def fetch_price_history_bulk(
             return {}
         raise
 
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         logger.warning("fetch_price_history_bulk: fetched DataFrame is empty for %s", tickers)
         if allow_empty:
             return {}
@@ -434,7 +434,7 @@ def extract_close_series(df, ticker):
     Robust gegen MultiIndex, verschiedene Spaltennamen und fehlende Daten.
     """
 
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         return pd.Series(dtype=float)
 
     # MultiIndex flatten falls nötig
@@ -652,7 +652,7 @@ def fetch_prices_sequential(tickers, start, end, auto_adjust=False) -> Tuple[Opt
         try:
             tk = yf.Ticker(t)
             df = tk.history(start=start, end=end, auto_adjust=auto_adjust)
-            if df is None or df.empty:
+            if df is None or (isinstance(df, pd.DataFrame) and df.empty):
                 logger.debug("fetch_prices_sequential: no data for %s", t)
                 continue
             if 'Close' in df.columns:

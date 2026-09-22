@@ -15,7 +15,7 @@ def load_asset_series(ticker, start=DEFAULT_START_STR, end=None):
         raise ValueError("Ticker ungültig oder delisted.")
 
     df = safe_fetch(ticker, start=start, end=end, interval="1d", auto_adjust=False)
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         raise ValueError(f"Keine Daten für {ticker}")
 
     # defensiv flattenen

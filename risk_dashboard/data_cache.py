@@ -14,7 +14,7 @@ def load_price_data_cached_with_used(tickers, start=DEFAULT_START_STR):
     used, df = fetch_prices_quiet_with_used(tickers, start=start)
     # ACHTUNG: fetch_prices_quiet_with_used MUSS existieren!
 
-    if df is None:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         df = pd.DataFrame()
 
     # MultiIndex flatten
@@ -36,7 +36,7 @@ def load_price_data_cached(tickers, start=DEFAULT_START_STR):
 
     df = safe_fetch(tickers, start=start)   # <‑‑ NUR EIN RETURN
 
-    if df is None:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         return pd.DataFrame()
 
     # MultiIndex flatten

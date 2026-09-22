@@ -44,7 +44,7 @@ def load_fx_history(pair: str = "EURUSD=X", period: str = "10y") -> pd.DataFrame
         df = pd.DataFrame()
 
     # 2) Fallbacks falls leer
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         logger.info("safe_fetch returned empty for %s, trying fallbacks...", pair)
         # (Behalte hier deine bestehenden pandas_datareader / HTTP CSV Fallbacks unverändert)
         # ... (kopiere den bisherigen Fallback‑Block aus deiner Datei)
@@ -104,7 +104,7 @@ def _prepare_prophet_df(df: pd.DataFrame, value_col: str | None = None) -> pd.Da
     Liefert DataFrame mit Spalten ['ds','y'] für Prophet.
     value_col: optionaler Name der Spalte mit FX-Werten (z.B. 'EURUSD=X' oder 'close').
     """
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         return pd.DataFrame(columns=["ds", "y"])
 
     # Wenn Index Datetime ist, nutze ihn als ds
@@ -208,7 +208,7 @@ def forecast_fx_arima(pair: str = "EURUSD=X",
         return pd.DataFrame(columns=["date", "fx"]), pd.DataFrame(columns=["date", "fx_forecast"])
 
     # Prüfen, ob Daten vorhanden und korrekt formatiert sind
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         logger.warning("Skipping FX forecast: no data for %s", pair)
         return pd.DataFrame(columns=["date", "fx"]), pd.DataFrame(columns=["date", "fx_forecast"])
 

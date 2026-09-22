@@ -782,8 +782,57 @@ def profile_form_ui(
     # Defensive fallbacks: Parameter -> session_state -> loader (only as last resort)
     etf_universe = etf_universe or st.session_state.get("etf_universe") or {}
     universe_warnings = universe_warnings or st.session_state.get("universe_warnings")
+
+
+    # --- Vorbedingungen: tickers und tickers_list sicher setzen ---
+    # Beispiel: aus defaults oder session_state (passe an deine Struktur an)
+    tickers = defaults.get("tickers", []) if 'defaults' in locals() else st.session_state.get("profile_tickers", [])
+    tickers_list = list(tickers)  # Liste für Loader-Aufruf
+        
+    # 1) Fallback aus session_state
     if price_data is None:
         price_data = st.session_state.get("price_data")
+
+    # 2) price_data kann DataFrame oder dict sein → available Ticker bestimmen
+    if price_data is None:
+        available = []
+    elif hasattr(price_data, "columns"):
+        cols = set(price_data.columns)
+        available = [t for t in tickers if t in cols]
+    else:
+        available = [t for t in tickers if t in (price_data or {})]
+
+    if not available:
+        st.error("Keine Portfolio‑Ticker in Preisdaten vorhanden.")
+        st.stop()
+
+    # 3) Loader nur aufrufen, wenn price_data fehlt
+    if price_data is None:
+        if not tickers_list:
+            logger.warning("load_price_data skipped: no tickers to download")
+            price_data = None
+        else:
+            try:
+                price_data = load_price_data(tickers_list)
+                if is_nonempty(price_data):
+                    st.session_state["price_data"] = price_data
+                else:
+                    price_data = None
+            except Exception as e:
+                logger.exception("load_price_data failed: %s", e)
+                price_data = None
+
+    # 4) Regimes an Preise anpassen
+    if regimes_val is not None and hasattr(prices_df, "index"):
+        if not regimes_val.index.equals(prices_df.index):
+            regimes_aligned = regimes_val.reindex(prices_df.index, method="ffill")
+        else:
+            regimes_aligned = regimes_val.copy()
+    else:
+        regimes_aligned = None
+
+
+
 
     # Load stock universe (static file) — use project path, handle missing file
     try:
@@ -1032,6 +1081,49 @@ def profile_form_ui(
     if price_data is None:
         price_data = st.session_state.get("price_data")
 
+    # 2) price_data kann DataFrame oder dict sein → available Ticker bestimmen
+    if price_data is None:
+        available = []
+    elif hasattr(price_data, "columns"):
+        cols = set(price_data.columns)
+        available = [t for t in tickers if t in cols]
+    else:
+        available = [t for t in tickers if t in (price_data or {})]
+
+    if not available:
+        st.error("Keine Portfolio‑Ticker in Preisdaten vorhanden.")
+        st.stop()
+
+    # 3) Loader nur aufrufen, wenn price_data fehlt
+    if price_data is None:
+        if not tickers_list:
+            logger.warning("load_price_data skipped: no tickers to download")
+            price_data = None
+        else:
+            try:
+                price_data = load_price_data(tickers_list)
+                if is_nonempty(price_data):
+                    st.session_state["price_data"] = price_data
+                else:
+                    price_data = None
+            except Exception as e:
+                logger.exception("load_price_data failed: %s", e)
+                price_data = None
+
+    # 4) Regimes an Preise anpassen
+    if regimes_val is not None and hasattr(prices_df, "index"):
+        if not regimes_val.index.equals(prices_df.index):
+            regimes_aligned = regimes_val.reindex(prices_df.index, method="ffill")
+        else:
+            regimes_aligned = regimes_val.copy()
+    else:
+        regimes_aligned = None
+
+
+
+
+
+
     # 2) Defensive Extraktion von Tickers aus etf_universe
     def extract_tickers_from_universe(universe_meta):
         """
@@ -1089,16 +1181,31 @@ def profile_form_ui(
     tickers_list = extract_tickers_from_universe(etf_universe)
     logger.debug("tickers_list extracted from etf_universe: %s", tickers_list)
 
-    # 3) Loader nur aufrufen, wenn wir tatsächlich Ticker haben
+    # 1) Fallback aus session_state
+    if price_data is None:
+        price_data = st.session_state.get("price_data")
+
+    # 2) price_data kann DataFrame oder dict sein → available Ticker bestimmen
+    if price_data is None:
+        available = []
+    elif hasattr(price_data, "columns"):
+        cols = set(price_data.columns)
+        available = [t for t in tickers if t in cols]
+    else:
+        available = [t for t in tickers if t in (price_data or {})]
+
+    if not available:
+        st.error("Keine Portfolio‑Ticker in Preisdaten vorhanden.")
+        st.stop()
+
+    # 3) Loader nur aufrufen, wenn price_data fehlt
     if price_data is None:
         if not tickers_list:
-            logger.warning("load_price_data skipped: no tickers to download (etf_universe empty)")
+            logger.warning("load_price_data skipped: no tickers to download")
             price_data = None
         else:
             try:
-                # Entweder load_price_data akzeptiert etf_universe oder eine ticker-liste.
-                # Falls es Ticker-Liste erwartet, übergib tickers_list; sonst etf_universe.
-                price_data = load_price_data(tickers_list)  # oder load_price_data(etf_universe)
+                price_data = load_price_data(tickers_list)
                 if is_nonempty(price_data):
                     st.session_state["price_data"] = price_data
                 else:
@@ -1106,6 +1213,16 @@ def profile_form_ui(
             except Exception as e:
                 logger.exception("load_price_data failed: %s", e)
                 price_data = None
+
+    # 4) Regimes an Preise anpassen
+    if regimes_val is not None and hasattr(prices_df, "index"):
+        if not regimes_val.index.equals(prices_df.index):
+            regimes_aligned = regimes_val.reindex(prices_df.index, method="ffill")
+        else:
+            regimes_aligned = regimes_val.copy()
+    else:
+        regimes_aligned = None
+
 
     # 4) Wenn noch keine Preisdaten: Upload-UI anbieten (kein sofortiger return)
     if not is_nonempty(price_data):
@@ -1238,10 +1355,14 @@ def profile_form_ui(
         st.stop()
 
     # 6) Regimes an Preise anpassen
-    if regimes_val is not None and hasattr(prices_df, "index") and not regimes_val.index.equals(prices_df.index):
-        regimes_aligned = regimes_val.reindex(prices_df.index, method="ffill")
+    if regimes_val is not None and hasattr(prices_df, "index"):
+        if not regimes_val.index.equals(prices_df.index):
+            regimes_aligned = regimes_val.reindex(prices_df.index, method="ffill")
+        else:
+            regimes_aligned = regimes_val.copy()
     else:
-        regimes_aligned = regimes_val
+        regimes_aligned = None
+        
 
     # 7) Backtest aufrufen
     try:
@@ -1625,7 +1746,7 @@ def profile_form_ui(
     if isinstance(bt, dict) and bt:
         pv = bt.get("portfolio_value")
         metrics = bt.get("metrics", {})
-        if pv is not None and not pv.empty:
+        if pv is not None and isinstance(pv, (pd.Series, pd.DataFrame)) and not pv.empty:
             st.session_state["last_backtest_results_df"] = pv.rename("portfolio_value").reset_index()
             st.session_state["last_backtest_results_csv"] = st.session_state["last_backtest_results_df"].to_csv(index=False)
         if metrics:

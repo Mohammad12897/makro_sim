@@ -271,7 +271,7 @@ def _try_yf_ticker_history(ticker: str, start: Optional[str]=None, end: Optional
             df = tk.history(period=period, auto_adjust=True)
         else:
             df = tk.history(start=start, end=end, auto_adjust=True)
-        if df is None or df.empty:
+        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             return None
 
         # Index sicherstellen

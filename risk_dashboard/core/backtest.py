@@ -202,7 +202,7 @@ def run_all_etf_backtests(
             logger.debug("prices head: %s", prices.head().to_dict())
             logger.debug("prices index dtype: %s", type(prices.index))
 
-            if prices is None or prices.empty:
+            if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
                 logger.warning("Keine Preisdaten für %s – Backtest übersprungen.", etf)
                 results["results"][etf] = {"status": "skipped", "reason": "no_prices"}
                 continue
@@ -337,7 +337,7 @@ def run_portfolio_backtest (
         }
 
     # 2) Preise prüfen
-    if prices_df is None or prices_df.empty:
+    if prices_df is None or (isinstance(prices_df, pd.DataFrame) and prices_df.empty):
         return {"portfolio_value": pd.Series(dtype=float), "metrics": {}, "weights_over_time": pd.DataFrame()}
 
     df = prices_df.copy()

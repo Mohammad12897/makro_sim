@@ -35,7 +35,7 @@ def load_etf_prices_monthly(tickers_tuple, period="10y"):
     tickers = list(tickers_tuple)
     prices = download_etf_history(tickers, period=period, auto_resample=True)
 
-    if prices is None or prices.empty:
+    if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
         st.error("load_etf_prices_monthly— keine Preise geladen.")
         return pd.DataFrame(), tickers
 
@@ -563,7 +563,7 @@ def backtest_regime_hrp(low, medium, high, period="10y", scenario_df=None, scena
 
     prices, missing = load_etf_prices_monthly(tuple(all_tickers), period=period)
 
-    if prices is None or prices.empty:
+    if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
         st.error("HRP-Backtest: Keine ETF-Preise geladen.")
         return pd.DataFrame(), {}, missing
 
@@ -767,7 +767,7 @@ def backtest_etf_regime_portfolio(ticker_map, period="max", scenario_df=None, sc
 
     # prices: monthly DataFrame (ME index) aus download_etf_history
     prices = download_etf_history(all_tickers, period=period, auto_resample=True)
-    if prices is None or prices.empty:
+    if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
         st.error("ETF-Backtest: Keine ETF-Preise geladen.")
         return pd.DataFrame()
 
@@ -924,7 +924,7 @@ def generate_investment_package(risk_row, scenario, regimes, etf_meta: dict, pri
     Liefert dict mit keys: date, regime, package (Liste), risk_score
     """
     # Validierung
-    if prices_df is None or prices_df.empty:
+    if prices_df is None or (isinstance(prices_df, pd.DataFrame) and prices_df.empty):
         return {"date": None, "regime": scenario, "package": [], "risk_score": float("nan")}
 
     package = []

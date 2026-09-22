@@ -93,7 +93,7 @@ def load_and_validate_macro_data() -> Optional[pd.DataFrame]:
         logger.exception("Fehler beim Laden der Makrodaten")
         return None
 
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         logger.error("load_macro_data returned empty DataFrame")
         return None
 

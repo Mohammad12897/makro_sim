@@ -79,7 +79,7 @@ def fetch_price_history(symbol: str, period: str = "5y") -> Optional[pd.Series]:
         # zentrale Fetch-Funktion verwenden
         df = safe_fetch(symbol, start=None, end=None, interval="1d", auto_adjust=True)
 
-        if df is None or df.empty:
+        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             return None
 
         # defensiv flattenen

@@ -245,7 +245,7 @@ def _fetch_and_clean_prices(tickers, start=None, end=None):
             logger.debug("yfinance download failed for %s: %s", t, e)
             df = None
 
-        if df is None or df.empty:
+        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             logger.debug("No data for %s (df is None or empty).", t)
             removed.append(t)
             continue
@@ -327,7 +327,7 @@ def run_backtest(tickers=None, prices_df=None, start=None, end=None,
     removed_tickers = []
 
     # 1) Preise laden, falls nicht übergeben
-    if prices_df is None:
+    if prices_df is None or (isinstance(prices_df, pd.DataFrame) and prices_df.empty):
         if not tickers:
             raise ValueError("Keine Ticker übergeben.")
         prices_df, removed_tickers = _fetch_and_clean_prices(tickers, start=start, end=end)

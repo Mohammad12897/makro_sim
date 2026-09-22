@@ -72,7 +72,7 @@ def _write_audit(entry: dict) -> None:
 # --- Ergänzende Hilfsfunktionen für Datums- und Preisnormalisierung ---
 def get_latest_before(df: pd.DataFrame, date_col, target_date):
     import pandas as pd
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         return None
 
     target_ts = pd.to_datetime(target_date, errors="coerce")
@@ -147,7 +147,7 @@ def normalize_price_df(df: pd.DataFrame, price_col: Optional[str] = None) -> pd.
     - sortiert, entfernt Duplikate
     Rückgabe: DataFrame mit einer Preis-Spalte als erste Spalte.
     """
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         return pd.DataFrame()
 
     df = df.copy()
@@ -192,7 +192,7 @@ def validate_prophet_input(df: pd.DataFrame) -> pd.DataFrame:
     Minimalvalidierung für Prophet: gibt DataFrame mit Spalten 'ds' und 'y' zurück.
     Erwartet: Datumsspalte 'date' oder Index; Zielspalte 'value' oder erste numerische Spalte.
     """
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         raise ValueError("validate_prophet_input: leeres DataFrame")
 
     df = df.copy()

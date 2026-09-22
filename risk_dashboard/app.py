@@ -262,7 +262,7 @@ def analyze_single_etf(ticker: str):
     # 1. Preise laden (mit Spinner)
     with st.spinner("Preise laden und Kennzahlen berechnen..."):
         df = load_price_data_cached(ticker)  # akzeptiert String oder Liste
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         st.error("Keine Preisdaten verfügbar für " + ticker)
         return
 
@@ -810,7 +810,7 @@ etf_universes = {
 
 def _safe_ensure_date_series(df, label="df"):
     # None / empty check
-    if df is None:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         logging.getLogger(__name__).warning("%s is None", label)
         return pd.Series(dtype="datetime64[ns]")
     if hasattr(df, "empty") and df.empty:
@@ -1722,7 +1722,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
         logging.getLogger(__name__).exception("load_etf_universe_prices schlug fehl")
         prices_df, missing_total_prices, mapping = pd.DataFrame(), [], {}
 
-    if prices_df is None or prices_df.shape[1] == 0:
+    if prices_df is None or (isinstance(prices_df, pd.DataFrame) and prices_df.empty) or prices_df.shape[1] == 0:
         st.error("Keine Preisdaten geladen. Prüfe ETF‑Ticker in risk_dashboard/config/etf_universe.yaml")
         st.stop()
 

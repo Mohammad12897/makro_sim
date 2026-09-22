@@ -21,7 +21,7 @@ def download_fx_history(tickers, period="10y") -> pd.DataFrame:
         logger.exception("safe_fetch failed: %s", e)
         return pd.DataFrame()
 
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         return pd.DataFrame()
 
     # Falls MultiIndex, flatten defensiv

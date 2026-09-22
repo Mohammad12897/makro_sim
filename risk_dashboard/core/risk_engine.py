@@ -210,7 +210,7 @@ def detect_risk_regimes():
     df = compute_risk_score_v2(normalize=True, method="minmax")
 
     # Defensive Prüfung
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         raise ValueError("Keine Risiko-Daten vorhanden in detect_risk_regimes().")
 
     # Priorisierte Score-Spalten (Fallbacks)

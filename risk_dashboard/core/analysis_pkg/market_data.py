@@ -9,7 +9,7 @@ def get_history(ticker, years=5):
     start = end - dt.timedelta(days=365 * years)
     df = yf.Ticker(ticker).history(start=start, end=end)
 
-    if df is None or df.empty:
+    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
         return pd.Series(dtype=float)
 
     # Robust: Fallback auf "Close", wenn "Adj Close" fehlt

@@ -28,7 +28,7 @@ def fetch_prices(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
         # zentrale Funktion verwenden; auto_adjust True entspricht vorherigem Verhalten
         df = safe_fetch(ticker, start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), interval="1d", auto_adjust=True, threads=False)
 
-        if df is None or df.empty:
+        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             return None
 
         # Falls MultiIndex defensiv flattenen

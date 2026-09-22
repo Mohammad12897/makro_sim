@@ -14,7 +14,7 @@ def get_ki_score(ticker: str):
     if not ticker:
         return None
     prices = fetch_prices(ticker)
-    if prices is None:
+    if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
         return None
     return compute_ki_score_from_prices(prices)
 

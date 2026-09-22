@@ -127,7 +127,7 @@ def download_batch_with_backoff(tickers: List[str], period: str = "max", retries
             wait_for_rate_slot()
             logger.info("Batch download attempt %d for %d tickers", attempt, len(tickers))
             df = safe_fetch(tickers, start=None, end=None, interval="1d")
-            if df is None:
+            if df is None or (isinstance(df, pd.DataFrame) and df.empty):
                 logger.warning("Batch fetch returned None for %s", tickers)
                 time.sleep(pause * (1 + attempt * 0.5))
                 continue
@@ -169,7 +169,7 @@ def download_batch_with_backoff(tickers: List[str], period: str = "max", retries
         wait_for_rate_slot()
         logger.info("Final fallback: yf.download() for %d tickers", len(tickers))
         df = yf.download(tickers, period=period, group_by='ticker', threads=True, progress=False, auto_adjust=False)
-        if df is None:
+        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             logger.warning("Final fallback returned None for %s", tickers)
             return None
 

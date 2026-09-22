@@ -145,7 +145,7 @@ def render_etf_selection_ui(prefix="etf"):
             seq = next_seq(); log.info("added ticker", extra={"seq": seq, "ticker": raw_val, "mapped": mapped, "missing": missing})
             st.session_state[stable_input_key] = ""
 
-            if prices is None:
+            if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
                 # freundlich informieren, Mapping erfolgt später, falls nötig
                 st.warning("Preisdaten noch nicht geladen. Mapping wird durchgeführt, sobald Preisdaten verfügbar sind.")
 
@@ -469,7 +469,7 @@ def render_etf_selection_ui(prefix="etf"):
                 seq = next_seq(); log.debug("download_prices returned", extra={"seq": seq, "prices_shape": getattr(prices, "shape", None)})
 
                 # Prüfen, ob Preisdaten vorhanden sind
-                if prices is None or (hasattr(prices, "empty") and prices.empty):
+                if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
                     st.error("Keine Preisdaten gefunden für die ausgewählten ETFs.")
 
                     # Retry-Button: ruft einen sicheren Rerun auf

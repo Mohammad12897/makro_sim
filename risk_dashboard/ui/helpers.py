@@ -61,14 +61,30 @@ def render_backtest(bt):
     st.write("CAGR:", f"{metrics.get('cagr'):.2%}" if metrics.get("cagr") else "n/a")
     st.write("Max Drawdown:", f"{metrics.get('max_dd'):.2%}" if metrics.get("max_dd") else "n/a")
 
-    if pv is not None and hasattr(pv, "empty") and not pv.empty:
-        df = pv.reset_index()
-        df.columns = ["date", "value"]
+    if pv is not None and isinstance(pv, (pd.Series, pd.DataFrame)) and not pv.empty:
+        # normalize to DataFrame with date/value
+        if isinstance(pv, pd.Series):
+            df = pv.reset_index()
+            df.columns = ["date", "value"]
+        else:
+            # DataFrame: try to find a single value column or use first numeric column
+            numeric = pv.select_dtypes(include="number")
+            if numeric.shape[1] == 0:
+                st.warning("portfolio_value enthält keine numerischen Werte.")
+            else:
+                df = numeric.iloc[:, [0]].reset_index()
+                df.columns = ["date", "value"]
+
         chart = alt.Chart(df).mark_line().encode(
             x="date:T",
             y="value:Q"
         )
         st.altair_chart(chart, use_container_width=True)
+    else:
+        st.info("Kein Portfolio‑Wert zum Plotten vorhanden.")
+
+
+
 
 def safe_backtest_call(fn, *args, prices_df=None, available=None, **kwargs):
      # Filter
