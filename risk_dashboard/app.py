@@ -25,52 +25,29 @@ import os
 import sys
 import logging
 import threading
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from risk_dashboard.logging_config import configure_logging
-configure_logging(log_level=logging.DEBUG, logfile="risk_dashboard/logs/app_exceptions.log", run_id="-")
 
-
-
-
-# Project root and output dirs (unchanged)
+# Project root and output dirs
 project_root = Path(__file__).resolve().parents[1]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 out_dir = project_root / "data" / "backtests"
 out_dir.mkdir(parents=True, exist_ok=True)
 
-# Logging directory and file
+# Logging: zentrale Konfiguration aktivieren (einmalig)
+from risk_dashboard.logging_config import configure_logging
+
 LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 log_file = os.path.join(LOG_DIR, "app_exceptions.log")
 
-# Root logger basic config (only once)
+# configure_logging muss VOR allen logger-Aufrufen stehen
+configure_logging(log_level=logging.DEBUG, logfile=log_file, run_id="-")
+
+# Optional: root logger Referenz
 root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
-root_logger.propagate = False  # avoid double propagation
 
-fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-
-# Add RotatingFileHandler only if not present
-if not any(isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", "").endswith("app_exceptions.log") for h in root_logger.handlers):
-    fh = RotatingFileHandler(log_file, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(fmt)
-    root_logger.addHandler(fh)
-
-# Add StreamHandler only if not present
-if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    sh.setFormatter(fmt)
-    root_logger.addHandler(sh)
-
-# Reduce noisy third-party loggers
-logging.getLogger("yfinance").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-
-# Uncaught exceptions -> log file
+# Uncaught exceptions -> log via logger (verwende den zentral konfigurierten Logger)
 def _log_unhandled_exception(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
@@ -82,17 +59,11 @@ sys.excepthook = _log_unhandled_exception
 def _thread_excepthook(args):
     logging.getLogger(__name__).exception("Uncaught thread exception", exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
 
-# Python 3.8+: set thread excepthook
 threading.excepthook = _thread_excepthook
 
-# Quick test write (will create file if writable)
-try:
-    logging.getLogger(__name__).info("LOGGING INITIALIZED: writing test entry")
-    with open(log_file, "a", encoding="utf-8") as _f:
-        _f.write("LOG FILE WRITE TEST\n")
-except Exception:
-    # If this fails, we'll detect it below with file existence checks
-    pass
+# Testlog (kein direkter File‑Write nötig)
+logging.getLogger(__name__).info("LOGGING INITIALIZED")
+
 
 # --- Now import streamlit and the rest of your app modules ---
 import locale
