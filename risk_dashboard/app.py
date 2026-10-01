@@ -380,7 +380,8 @@ from risk_dashboard.ui_helpers import (
     handle_portfolio_upload_with_price_lookup,
     load_markdown_safe,
     show_intro,
-    status_legend
+    status_legend, 
+    consolidate_portfolio_df
 )
 
 # Page config ganz oben
@@ -436,6 +437,7 @@ elif choice == "Backtest Rezept":
         st.warning("Backtest‑Dokument nicht gefunden. Die Analyse ist trotzdem verfügbar.")
     # ... ETF Vergleich Block ...
 
+# Upload Tab
 elif choice == "Upload":
     st.header("Portfolio Upload")
     st.markdown("**Portfolio-CSV (Ticker, Menge, Preis, market_value optional)**")
@@ -449,32 +451,36 @@ elif choice == "Upload":
     if df is None:
         df = pd.DataFrame(columns=["ticker", "quantity", "market_value", "weight"])
 
-    new_tickers = [t for t in user_tickers if t not in df["ticker"].astype(str).tolist()]
+    if df is not None and not df.empty:
+        df = consolidate_portfolio_df(df)
+        st.session_state["portfolio_df"] = df    
+
+    # Nur neue, noch nicht vorhandene Ticker ermitteln (normalisiert)
+    existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()]
+    new_tickers = [t for t in user_tickers if t.upper() not in existing]
 
     if new_tickers:
-        # hole preise und update portfolio_df via ui_helpers wrapper (fügt market_value/weight)
         from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio
         add_new_tickers_to_portfolio(new_tickers)
 
-        # setze navigate_to für sicheren Seitenwechsel (wird vor Selectbox angewendet)
+        # setze navigate_to für sicheren Seitenwechsel
         st.session_state["navigate_to"] = "Holdings Analyse"
-
-        # versuche rerun nur wenn verfügbar, sonst informiere Nutzer
         rerun_fn = getattr(st, "experimental_rerun", None)
         if callable(rerun_fn):
             rerun_fn()
         else:
             st.info("Ticker hinzugefügt. Klicke unten, um zur Analyse zu wechseln.")
-            if st.button("Zur Analyse wechseln"):
-                st.session_state["app_sidebar_page_choice"] = "Holdings Analyse"
-                rerun_fn = getattr(st, "experimental_rerun", None)
-                if callable(rerun_fn):
-                    rerun_fn()
+
+    if st.button("Zur Analyse wechseln"):
+        st.session_state["app_sidebar_page_choice"] = "Holdings Analyse"
+        rerun_fn = getattr(st, "experimental_rerun", None)
+        if callable(rerun_fn):
+            rerun_fn()
 
     st.sidebar.write("portfolio_df head:", st.session_state.get("portfolio_df"))
     st.sidebar.write("prices_for_bt cols:", list(st.session_state.get("prices_for_bt").columns) if isinstance(st.session_state.get("prices_for_bt"), pd.DataFrame) else st.session_state.get("prices_for_bt"))
 
-
+# Holdings Analyse
 elif choice == "Holdings Analyse":
     st.header("Holdings Analyse")
     status_legend()
@@ -482,30 +488,35 @@ elif choice == "Holdings Analyse":
     # 1) Session-Daten / Fallback-Synchronisation
     user_tickers = st.session_state.get("user_tickers", [])
     df = st.session_state.get("portfolio_df")
-
-    # Falls df noch nicht existiert, lege leeres DataFrame an
     if df is None:
         df = pd.DataFrame(columns=["ticker", "quantity", "market_value", "weight"])
 
-    # Versuche, neue Ticker automatisch mit Preisen hinzuzufügen (Wrapper in ui_helpers)
-    existing = df["ticker"].astype(str).tolist() if not df.empty else []
-    new_tickers = [t for t in user_tickers if t not in existing]
+    # Normalisiere vorhandene ticker-Liste
+    existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()] if not df.empty else []
+
+    # Neue Ticker automatisch mit Preisen hinzufügen
+    new_tickers = [t for t in user_tickers if t.upper() not in existing]
     if new_tickers:
         from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio
         add_new_tickers_to_portfolio(new_tickers)
-        # lade aktualisiertes df aus session
-        df = st.session_state.get("portfolio_df", df)
 
-    prices = st.session_state.get("prices_for_bt")  # optional
+    # lade aktualisiertes df aus session
+    df = st.session_state.get("portfolio_df", df)
+    prices = st.session_state.get("prices_for_bt")
 
-    # 2) Wenn nach allem noch kein Portfolio vorhanden ist, abbrechen
+    # 2) Falls nach allem noch kein Portfolio vorhanden ist, abbrechen
     if df is None or df.empty:
         st.info("Kein Portfolio geladen. Bitte im Upload Tab hochladen oder Ticker hinzufügen.")
         st.stop()
 
-    # 3) Anzeige / Basisvisuals
-    st.subheader("Holdings Breakdown")
-    st.dataframe(df)
+    # 3) Konsolidierung: gleiche Ticker zusammenfassen (falls Rohstrings vorhanden)
+    df = consolidate_portfolio_df(df)
+    st.session_state["portfolio_df"] = df
+
+    # 4) Anzeige: Tabelle + Charts (bestehende Anzeige-Logik verwenden)
+    st.subheader("Holdings Tabelle")
+    st.dataframe(df)  # oder st.table(df.head(50))
+    # ... vorhandene Visualisierungen hier aufrufen ...
     try:
         st.bar_chart(df.set_index("ticker")["weight"])
     except Exception:
@@ -747,14 +758,29 @@ def render_sidebar(available_etfs):
 
     # ----- Bulk / Freitext Eingabe (unterstützt TICKER, TICKER:QTY, mehrere Einträge) -----
     st.sidebar.subheader("Schnell hinzufügen")
-    
-    ticker_raw = st.sidebar.text_area("Ticker hinzufügen (z. B. NVDA oder DAX:1, BTC 2)", height=100)
-    qty_default = st.sidebar.number_input("Menge (Default für Einträge ohne Menge)", min_value=0, value=1, step=1)
+    # Sidebar: Bulk / Freitext Eingabe (einzige Hinzufügemethode)
+    ticker_raw = st.sidebar.text_area(
+        "Ticker hinzufügen (z. B. NVDA oder DAX:1, BTC 2)",
+        placeholder="z. B. NVDA oder DAX:1, BTC 2",
+        key=f"{prefix}_sidebar_ticker_raw",
+        height=100,
+    )
+    qty_default = st.sidebar.number_input(
+        "Menge (Default für Einträge ohne Menge)",
+        min_value=0,
+        value=1,
+        step=1,
+        key=f"{prefix}_sidebar_qty_default",
+    )
+    if st.sidebar.button("Hinzufügen", key=f"{prefix}_btn_add_tickers"):
+        from risk_dashboard.input_parsing import parse_ticker_input
+        from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio_with_quantities
 
-    if st.sidebar.button("Hinzufügen", key="btn_add_tickers"):
         parsed, invalid = parse_ticker_input(ticker_raw, default_qty=int(qty_default))
         if invalid:
-            st.sidebar.error(f"Ungültige Eingaben: {', '.join(invalid)}. Erwartetes Format: TICKER[:| |=]MENGE")
+            st.sidebar.error(
+                f"Ungültige Eingaben: {', '.join(invalid)}. Erwartetes Format: TICKER[:| |=]MENGE"
+            )
         elif not parsed:
             st.sidebar.warning("Keine gültigen Ticker erkannt.")
         else:

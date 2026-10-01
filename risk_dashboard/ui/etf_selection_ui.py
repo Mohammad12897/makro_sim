@@ -182,6 +182,7 @@ def render_etf_selection_ui(prefix="etf"):
     st.header("ETF Auswahl und Explainable Scoring")
 
     # ---------------- Sidebar (stabile Reihenfolge und Keys) ----------------
+    # --- Beginn: ersetze den bisherigen with st.sidebar: Block durch diesen ---
     with st.sidebar:
         st.subheader("Portfolio Eingabe")
 
@@ -189,54 +190,77 @@ def render_etf_selection_ui(prefix="etf"):
         asset_type = st.radio(
             "Asset Type",
             ["ETF", "Stock", "Mixed"],
-            index=["ETF", "Stock", "Mixed"].index(st.session_state[asset_key]),
+            index=["ETF", "Stock", "Mixed"].index(st.session_state.get(asset_key, "ETF")),
             key=asset_key
         )
-        seq = next_seq(); log.info("asset_type selected", extra={"seq": seq, "asset_type": st.session_state[asset_key]})
+        seq = next_seq()
+        log.info("asset_type selected", extra={"seq": seq, "asset_type": st.session_state.get(asset_key)})
 
+        # Einzel‑Ticker für schnelle Analyse (stabile TextInput, nur für Analyse)
         etf_val = st.text_input(
-            "Ticker hinzufügen",
-            key=stable_input_key,
+            "Einzelticker (Analyse)",
+            key=f"{prefix}_stable_input",
             placeholder="z.B. AAPL oder VWRL",
-            value=st.session_state.get(stable_input_key, "")
         )
-            
-        st.button("Analysieren", on_click=analyze_callback, key="analyze_button")
+        st.button("Analysieren", on_click=analyze_callback, key=f"{prefix}_analyze_button")
 
-        # stable add button (immer mit stabilem Key)
-        st.button(
-            "Hinzufügen",
-            on_click=add_ticker_callback,
-            args=(prefix, asset_key, stable_input_key),
-            key=f"{prefix}_add_button"
+        st.markdown("---")
+
+        # Bulk / Freitext Eingabe (Textarea) für Hinzufügen von TICKER oder TICKER:QTY
+        st.subheader("Schnell hinzufügen (einzeln oder mehrere)")
+        ticker_raw = st.text_area(
+            "Ticker hinzufügen (z. B. NVDA oder DAX:1, BTC 2)",
+            placeholder="z. B. NVDA oder DAX:1, BTC 2",
+            key=f"{prefix}_sidebar_ticker_raw",
+            height=100,
+        )
+        qty_default = st.number_input(
+            "Menge (Default für Einträge ohne Menge)",
+            min_value=0,
+            value=1,
+            step=1,
+            key=f"{prefix}_sidebar_qty_default",
         )
 
-        # Render per-asset lists in fixed order (nur aktive Asset-Liste anzeigen)
-        try:
-            for at in ("ETF", "Stock", "Mixed"):
-                seq = next_seq(); log.debug("per-asset loop start", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "at": at})
-                lst_key = f"{prefix}_user_tickers_{at}"
-                items = st.session_state.get(lst_key, [])
-                if items:
-                    st.write(f"**{at}**: {', '.join(items)}")
-                seq = next_seq(); log.debug("lst_key/items snapshot", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "lst_key": lst_key, "items_len": len(items) if items is not None else None})
+        # Bulk‑Hinzufügen Button ruft Parser + Einfügefunktion auf
+        if st.button("Hinzufügen", key=f"{prefix}_add_button"):
+            from risk_dashboard.input_parsing import parse_ticker_input
+            from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio_with_quantities
 
-                if at == st.session_state.get(asset_key) and items:
-                    st.write("Eigene Ticker (aktuell):")
-                    for t in list(items):
-                        cols = st.columns([8, 1])
-                        cols[0].write(t)
-                        if cols[1].button("x", key=f"{prefix}_rm_{at}_{t}"):
-                            seq = next_seq(); log.info("remove ticker pressed", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq, "ticker": t, "lst_key": lst_key})
-                            st.session_state[lst_key].remove(t)
-                            if t in st.session_state.get("user_tickers", []):
-                                st.session_state["user_tickers"].remove(t)
-                            save_user_tickers(st.session_state["user_tickers"])
-                            # st.experimental_rerun()
-                            safe_rerun()
-        except Exception:
-            seq = next_seq(); log.exception("exception in per-asset loop", extra={"run_id": st.session_state["_ui_run_id"], "seq": seq})
+            parsed, invalid = parse_ticker_input(ticker_raw, default_qty=int(qty_default))
+            if invalid:
+                st.error(f"Ungültige Eingaben: {', '.join(invalid)}. Erwartetes Format: TICKER[:| |=]MENGE")
+            elif not parsed:
+                st.warning("Keine gültigen Ticker erkannt.")
+            else:
+                pairs = [(t, q) for t, q in parsed.items()]
+                add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=int(qty_default))
+                st.session_state["navigate_to"] = "Holdings Analyse"
+                rerun_fn = getattr(st, "experimental_rerun", None)
+                if callable(rerun_fn):
+                    rerun_fn()
+                else:
+                    st.info("Ticker hinzugefügt. Wechsle zur Holdings Analyse.")
 
+        st.markdown("---")
+
+        # Standard‑ETFs / Index Auswahl etc. (unverändert)
+        index_choice = st.selectbox(
+            "Index / Universe wählen",
+            ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"],
+            index=1,
+            key=f"{prefix}_etf_index_choice"
+        )
+        # Kandidaten einmalig laden
+        df_candidates = get_etf_candidates_for_index(index_choice)
+        if df_candidates.empty:
+            st.warning("Keine vordefinierten Kandidaten für diesen Index.")
+            new_etfs = st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)")
+            if st.button("Kandidaten speichern"):
+                from risk_dashboard.etf_candidates import add_etf_candidates
+                add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
+                safe_rerun()
+    # --- Ende Sidebar Block ---
     # Debug nach Sidebar (temporär)
     st.write("DEBUG after sidebar; asset_type:", st.session_state.get(asset_key))
     st.write("DEBUG stable_input_value:", st.session_state.get(stable_input_key))

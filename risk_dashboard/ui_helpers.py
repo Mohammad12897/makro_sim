@@ -139,73 +139,31 @@ def handle_portfolio_upload_with_price_lookup(prefix="profile"):
         return None
 
 def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
+    """
+    Fügt Ticker mit default_qty ins portfolio_df ein.
+    new_tickers: List[str] (z. B. ["AAPL", "CSPX.L"])
+    """
     if not new_tickers:
         return
 
-    # 1) normalize
     new_tickers_norm = [normalize_ticker(t) for t in new_tickers]
 
-    # 2) load or init df
     df = st.session_state.get("portfolio_df")
     if df is None:
-        df = pd.DataFrame(columns=["ticker", "quantity", "market_value", "weight"])
+        df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
 
-    # 3) try to use existing time series cache (DataFrame) from session
-    prices_cache = st.session_state.get("prices_for_bt")
-    prices_df = prices_cache if isinstance(prices_cache, pd.DataFrame) else None
+    # existing tickers (upper) verhindern doppelte Einträge
+    existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()]
 
-    # 4) determine which tickers need a quick last-price fetch
-    need_fetch = []
-    last_prices: dict = {}
-
+    to_add = []
     for t in new_tickers_norm:
-        if t in df["ticker"].astype(str).tolist():
+        if t.upper() in existing:
             continue
-        # try session time series first
-        if prices_df is not None:
-            series = find_price_for_ticker(prices_df, t)
-            if series is not None and not series.empty:
-                try:
-                    last_prices[t] = float(series.ffill().iloc[-1])
-                    continue
-                except Exception:
-                    pass
-        need_fetch.append(t)
+        to_add.append((t, default_qty))
 
-    # 5) fallback: fetch last prices as dict for missing tickers
-    if need_fetch:
-        fetched = fetch_last_prices(need_fetch, lookback_days=365)  # fetch_last_prices must compute start internally
-        last_prices.update(fetched)
-
-    # 6) add rows
-    for t in new_tickers_norm:
-        if t in df["ticker"].astype(str).tolist():
-            continue
-        qty = st.session_state.get("last_added_quantity", default_qty)
-        try:
-            qty = int(qty)
-        except Exception:
-            qty = default_qty
-        price = last_prices.get(t)
-        mv = qty * price if price is not None else 0.0
-        df = pd.concat([df, pd.DataFrame([{"ticker": t, "quantity": qty, "market_value": mv, "weight": 0}])], ignore_index=True)
-
-    # 7) recompute weights and update session
-    total_mv = df["market_value"].sum()
-    df["weight"] = (df["market_value"] / total_mv) if total_mv > 0 else 0
-    st.session_state["portfolio_df"] = df
-    st.session_state["portfolio_total_value"] = float(total_mv)
-
-    # 8) update price cache: if we fetched full time series earlier, merge; else keep dict cache
-    if isinstance(prices_df, pd.DataFrame) and not prices_df.empty:
-        st.session_state["prices_for_bt"] = prices_df
-    else:
-        existing_cache = st.session_state.get("prices_for_bt", {})
-        if isinstance(existing_cache, dict):
-            existing_cache.update(last_prices)
-            st.session_state["prices_for_bt"] = existing_cache
-        else:
-            st.session_state["prices_for_bt"] = last_prices
+    if to_add:
+        # Reuse the with-quantities function to avoid code duplication
+        add_new_tickers_to_portfolio_with_quantities(to_add, default_qty=default_qty)
 
 def add_new_tickers_to_portfolio_with_quantities(pairs: List[Tuple[str,int]], default_qty: int = 1):
     """
@@ -287,3 +245,19 @@ def add_new_tickers_to_portfolio_with_quantities(pairs: List[Tuple[str,int]], de
             st.session_state["prices_for_bt"] = existing_cache
         else:
             st.session_state["prices_for_bt"] = last_prices
+
+def consolidate_portfolio_df(df):
+    df = df.copy()
+    df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
+    df["ticker"] = df["ticker"].str.split().str[0]  # 'DAX 3' -> 'DAX'
+    df["quantity"] = pd.to_numeric(df.get("quantity", 0), errors="coerce").fillna(0).astype(int)
+    df["market_value"] = pd.to_numeric(df.get("market_value", 0.0), errors="coerce").fillna(0.0)
+    df_grouped = df.groupby("ticker", as_index=False).agg({
+        "quantity": "sum",
+        "market_value": "sum",
+        "price": "last"
+    })
+    total_mv = df_grouped["market_value"].sum()
+    df_grouped["weight"] = (df_grouped["market_value"] / total_mv * 100.0) if total_mv > 0 else 0.0
+    return df_grouped[["ticker", "quantity", "price", "market_value", "weight"]]
+
