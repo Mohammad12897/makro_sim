@@ -843,7 +843,51 @@ def backtest_etf_regime_portfolio(ticker_map, period="max", scenario_df=None, sc
         "regime": regime_series
     })
     return df
-    
+
+
+# in risk_dashboard/core/investment_engine.py oder oben in app.py
+def run_backtest_if_ready(prefix="profile", scenario_df=None, scenario_regimes=None):
+    ss = st.session_state
+
+    # fallback auf session_state falls None
+    if scenario_df is None:
+        scenario_df = ss.get("scenario_df")
+    if scenario_regimes is None:
+        scenario_regimes = ss.get("scenario_regimes")
+
+    # guard: don't start if already running
+    if ss.get("run_backtest_in_progress"):
+        return False
+    if "prices_for_bt" in ss and "weights_by_ticker" in ss:
+        prices_for_bt = ss["prices_for_bt"]
+        weights_by_ticker = ss["weights_by_ticker"]
+        if prices_for_bt is None or getattr(prices_for_bt, "empty", True):
+            logger.warning("run_backtest_if_ready: prices_for_bt leer")
+            return False
+        if not weights_by_ticker:
+            logger.warning("run_backtest_if_ready: weights_by_ticker leer")
+            return False
+
+        try:
+            ss["run_backtest_in_progress"] = True
+            logger.info("Starting backtest...")
+            bt_result = backtest_etf_regime_portfolio(
+                ticker_map=weights_by_ticker,
+                period="10y",
+                scenario_df=scenario_df,
+                scenario_regimes=scenario_regimes,
+                price_data=prices_for_bt
+            )
+            ss["last_backtest_result"] = bt_result
+            logger.info("Backtest erfolgreich")
+            return True
+        except Exception:
+            logger.exception("Backtest fehlgeschlagen")
+            st.error("Backtest fehlgeschlagen. Details im Log.")
+            return False
+        finally:
+            ss["run_backtest_in_progress"] = False
+    return False
         
 def performance_stats(equity_df, risk_free_rate=0.0):
     """

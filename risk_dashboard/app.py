@@ -75,6 +75,7 @@ from typing import Optional, Any, Dict
 import numpy as np
 import plotly.graph_objects as go
 from risk_dashboard.data_utils import do_add_tickers, safe_rerun, fetch_prices_quiet_with_used, sanitize_session_state
+from risk_dashboard.ui.profiles_ui import show_holdings_uploader
 print(">>> APP STARTED: TOP OF app.py", flush=True)
 
 
@@ -370,68 +371,62 @@ def analyze_single_etf_using_df(ticker: str, price_df: pd.DataFrame):
     st.plotly_chart(fig_dd, use_container_width=True)
 
 
+# --- Imports oben in app.py ---
+
 # --- Docs / dynamische Seitenliste ---
-docs_dir = project_root / "risk_dashboard" / "docs"
-docs = sorted(docs_dir.glob("*.md"))
-pages = {p.stem: str(p) for p in docs}  # key = filename without suffix, value = full path
+# docs automatisch
+# --- Imports oben in app.py ---
+from risk_dashboard.ui_helpers import (
+    handle_portfolio_upload_with_price_lookup,
+    load_markdown_safe,
+    show_intro,
+    status_legend
+)
 
-# --- Helpers ---
-@st.cache_data
-def load_markdown_safe(path_str: str) -> str:
-    if not path_str:
-        return ""
-    p = Path(path_str)
-    if not p.exists():
-        return ""
-    return p.read_text(encoding="utf-8")
-
-def status_legend():
-    c1, c2, c3 = st.columns([1,6,6])
-    with c1:
-        st.markdown("<span style='color:green; font-size:18px;'>●</span>", unsafe_allow_html=True)
-    with c2:
-        st.markdown("**iShares (UK/US)** – echte Holdings verfügbar")
-    with c3:
-        st.markdown("")
-    st.markdown("---")
-    c1, c2 = st.columns([1,10])
-    with c1:
-        st.markdown("<span style='color:orange; font-size:18px;'>●</span>", unsafe_allow_html=True)
-    with c2:
-        st.markdown("**Vanguard / Amundi / Xtrackers** – Demo‑Holdings")
-    c1, c2 = st.columns([1,10])
-    with c1:
-        st.markdown("<span style='color:red; font-size:18px;'>●</span>", unsafe_allow_html=True)
-    with c2:
-        st.markdown("**Cash / Nicht‑ETF** – keine Holdings")
-
-def show_intro(md_path: str):
-    md = load_markdown_safe(md_path)
-    if md:
-        with st.expander("Einführung", expanded=True):
-            st.markdown(md, unsafe_allow_html=False)
-    else:
-        st.info("Einführungsdokument nicht gefunden.")
-
-# --- Layout ---
+# Page config ganz oben
 st.set_page_config(page_title="Risk Dashboard", layout="wide")
 st.sidebar.title("Navigation")
 
-# Sidebar Auswahl aus dynamischer pages‑Liste
-#choice = st.sidebar.selectbox("Seite wählen", list(pages.keys()))
+# Docs automatisch
+docs_dir = project_root / "risk_dashboard" / "docs"
+docs = sorted(docs_dir.glob("*.md"))
+pages_from_docs = {p.stem: str(p) for p in docs}
+custom_pages = {"Dashboard": None, "Upload": None, "Holdings Analyse": None}
+pages = dict(pages_from_docs)
+for k in custom_pages:
+    if k not in pages:
+        pages[k] = None
+
+# --- Debug: sofort prüfen, welche Keys wir haben ---
+#st.sidebar.write("pages:", list(pages.keys()))
+#st.sidebar.write("session keys:", list(st.session_state.keys()))        
+
+# navigation override BEFORE widget instantiation
+if "navigate_to" in st.session_state:
+    # setze den widget-default-Wert nur wenn Selectbox noch nicht existiert
+    # wir setzen hier den session_state key, das ist sicher vor der Selectbox
+    st.session_state["app_sidebar_page_choice"] = st.session_state.pop("navigate_to")
+
+# Sidebar Selectbox (Key stabil)
 choice = st.sidebar.selectbox("Seite wählen", list(pages.keys()), key="app_sidebar_page_choice")
 
-# Topbar / Header
+# kontextuelle Einführung nur wenn md vorhanden
+md_path = pages.get(choice)
+if isinstance(md_path, str) and md_path.endswith(".md"):
+    show_intro(md_path)
+
 st.title("Risk Dashboard")
-show_intro(pages[choice])  # kontextuelle Einführung oben auf jeder Seite
 
-print(">>> BEFORE BACKTESTS", flush=True)
+# per-render registry (muss VOR uploader/widget-Aufrufen stehen)
+ss = st.session_state
+ss["_rendered_widget_keys"] = []
 
-# Seiteninhalt
+# --- Seiteninhalt ---
 if choice == "Dashboard":
     st.header("Übersicht")
     status_legend()
     st.write("Hier kommen Charts, KPIs, etc.")
+
 elif choice == "Backtest Rezept":
     st.header("Backtest Rezept")
     md_full = load_markdown_safe(pages.get("backtest-recipe", "risk_dashboard/docs/backtest-recipe.md"))
@@ -439,62 +434,140 @@ elif choice == "Backtest Rezept":
         st.markdown(md_full, unsafe_allow_html=False)
     else:
         st.warning("Backtest‑Dokument nicht gefunden. Die Analyse ist trotzdem verfügbar.")
-
-    st.subheader("ETF Vergleich")
-    etf_list = st.multiselect(
-        "ETFs auswählen",
-        ["VWRL.L", "VOO", "CSPX.L", "EQQQ.L", "VWCE.DE", "SPY"],
-        default=["VWRL.L", "VOO"]
-    )
-
-
-    if not etf_list:
-        st.info("Bitte mindestens einen ETF auswählen.")
-    else:
-        st.write("Ausgewählte ETFs:", etf_list)
-        with st.spinner("Preise für alle ETFs laden..."):
-            price_df = load_price_data_cached(etf_list)  # akzeptiert Liste
-
-        if price_df is None or price_df.empty:
-            st.error("Keine Preisdaten für die ausgewählten ETFs.")
-        else:
-            # optional persistieren
-            st.session_state["price_data"] = price_df
-
-            # Einzelanalysen basierend auf dem bereits geladenen DataFrame
-            for t in etf_list:
-                st.write(f"Analysiere {t}")
-                analyze_single_etf_using_df(t, price_df)  # implementiere diese Funktion analog
+    # ... ETF Vergleich Block ...
 
 elif choice == "Upload":
     st.header("Portfolio Upload")
     st.markdown("**Portfolio-CSV (Ticker, Menge, Preis, market_value optional)**")
-   
-    # in profiles_ui.py (Upload-Handler)
-    uploaded = st.file_uploader("Hochladen (CSV, max 200MB)", type=["csv"], accept_multiple_files=False)
-    if uploaded:
-        size_bytes = uploaded.getbuffer().nbytes
-        # nur Preview lesen (erste 4 KB)
-        uploaded.seek(0)
-        preview = uploaded.read(4096).decode(errors="ignore")
-        if len(preview) > 2000:
-            preview = preview[:2000] + "...[truncated]"
-        st.session_state["uploaded_preview"] = preview
-        st.success(f"Datei empfangen: {uploaded.name} ({size_bytes} bytes)")
 
-        # CSV sicher parsen (seek zurück)
-        try:
-            uploaded.seek(0)
-            df = pd.read_csv(uploaded)
-            # validierung hier: Spalten, types, max rows
-        except Exception as e:
-            st.error(f"CSV konnte nicht gelesen werden: {e}")
-        # Validierung / Parsing hier
+    # Upload-Handler (schreibt file + session_state["portfolio_df"])
+    handle_portfolio_upload_with_price_lookup(prefix="profile")
+
+    # Sidebar/Handler Ticker-Synchronisation (sofort nach Hinzufügen)
+    user_tickers = st.session_state.get("user_tickers", [])  # Liste aus Sidebar
+    df = st.session_state.get("portfolio_df")
+    if df is None:
+        df = pd.DataFrame(columns=["ticker", "quantity", "market_value", "weight"])
+
+    new_tickers = [t for t in user_tickers if t not in df["ticker"].astype(str).tolist()]
+
+    if new_tickers:
+        # hole preise und update portfolio_df via ui_helpers wrapper (fügt market_value/weight)
+        from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio
+        add_new_tickers_to_portfolio(new_tickers)
+
+        # setze navigate_to für sicheren Seitenwechsel (wird vor Selectbox angewendet)
+        st.session_state["navigate_to"] = "Holdings Analyse"
+
+        # versuche rerun nur wenn verfügbar, sonst informiere Nutzer
+        rerun_fn = getattr(st, "experimental_rerun", None)
+        if callable(rerun_fn):
+            rerun_fn()
+        else:
+            st.info("Ticker hinzugefügt. Klicke unten, um zur Analyse zu wechseln.")
+            if st.button("Zur Analyse wechseln"):
+                st.session_state["app_sidebar_page_choice"] = "Holdings Analyse"
+                rerun_fn = getattr(st, "experimental_rerun", None)
+                if callable(rerun_fn):
+                    rerun_fn()
+
+    st.sidebar.write("portfolio_df head:", st.session_state.get("portfolio_df"))
+    st.sidebar.write("prices_for_bt cols:", list(st.session_state.get("prices_for_bt").columns) if isinstance(st.session_state.get("prices_for_bt"), pd.DataFrame) else st.session_state.get("prices_for_bt"))
+
+
 elif choice == "Holdings Analyse":
     st.header("Holdings Analyse")
     status_legend()
-    st.write("Analyse‑UI hier.")
 
+    # 1) Session-Daten / Fallback-Synchronisation
+    user_tickers = st.session_state.get("user_tickers", [])
+    df = st.session_state.get("portfolio_df")
+
+    # Falls df noch nicht existiert, lege leeres DataFrame an
+    if df is None:
+        df = pd.DataFrame(columns=["ticker", "quantity", "market_value", "weight"])
+
+    # Versuche, neue Ticker automatisch mit Preisen hinzuzufügen (Wrapper in ui_helpers)
+    existing = df["ticker"].astype(str).tolist() if not df.empty else []
+    new_tickers = [t for t in user_tickers if t not in existing]
+    if new_tickers:
+        from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio
+        add_new_tickers_to_portfolio(new_tickers)
+        # lade aktualisiertes df aus session
+        df = st.session_state.get("portfolio_df", df)
+
+    prices = st.session_state.get("prices_for_bt")  # optional
+
+    # 2) Wenn nach allem noch kein Portfolio vorhanden ist, abbrechen
+    if df is None or df.empty:
+        st.info("Kein Portfolio geladen. Bitte im Upload Tab hochladen oder Ticker hinzufügen.")
+        st.stop()
+
+    # 3) Anzeige / Basisvisuals
+    st.subheader("Holdings Breakdown")
+    st.dataframe(df)
+    try:
+        st.bar_chart(df.set_index("ticker")["weight"])
+    except Exception:
+        st.write("Gewichtsdiagramm konnte nicht gezeichnet werden (prüfe 'weight' Spalte).")
+
+    # 4) Performance (nur wenn Preisdaten vorhanden)
+    if prices is not None and hasattr(prices, "columns") and len(prices.columns) > 0:
+        st.subheader("Performance")
+        tickers = df["ticker"].astype(str).tolist()
+        available = [t for t in tickers if t in prices.columns]
+        missing = [t for t in tickers if t not in prices.columns]
+        if missing:
+            st.warning(f"Für diese Ticker fehlen Preise: {', '.join(missing)} (werden ignoriert)")
+
+        if available:
+            weights = df.set_index("ticker")["weight"].reindex(available).fillna(0)
+            returns = prices[available].pct_change().dropna(how="all")
+            port_ret = (returns * weights).sum(axis=1)
+            cum = (1 + port_ret).cumprod()
+            st.line_chart(cum.rename("Portfolio Equity"))
+
+            # Kennzahlen
+            ann_factor = 252
+            total_return = cum.iloc[-1] - 1
+            days = (cum.index[-1] - cum.index[0]).days if hasattr(cum.index, "dtype") else len(cum)
+            cagr = (cum.iloc[-1]) ** (365.0 / max(days, 1)) - 1
+            vol = port_ret.std() * (ann_factor ** 0.5)
+            sharpe = (port_ret.mean() * ann_factor) / (vol if vol > 0 else 1)
+            running_max = cum.cummax()
+            max_dd = ((cum / running_max) - 1).min()
+
+            cols = st.columns(4)
+            cols[0].metric("Total Return", f"{total_return:.2%}")
+            cols[1].metric("CAGR", f"{cagr:.2%}")
+            cols[2].metric("Volatilität (ann.)", f"{vol:.2%}")
+            cols[3].metric("Sharpe (ann.)", f"{sharpe:.2f}")
+            st.write(f"Max Drawdown: {max_dd:.2%}")
+
+            st.subheader("Top Holdings")
+            st.table(df.sort_values("weight", ascending=False).head(10).reset_index(drop=True))
+        else:
+            st.info("Keine passenden Preisreihen für die geladenen Ticker gefunden.")
+    else:
+        st.info("Keine Preisdaten vorhanden. Lade Preise oder aktiviere Preislookup im Upload.")
+
+    # 5) Weitere Kennzahlen
+    st.subheader("Weitere Kennzahlen")
+    st.write("Gesamtwert:", f"{st.session_state.get('portfolio_total_value', 0):,.2f}")
+    st.write("Anzahl Positionen:", len(df))
+
+    from risk_dashboard.data_utils import fetch_prices_from_yf, normalize_ticker
+    st.sidebar.write(fetch_prices_from_yf([normalize_ticker("NVDA")]).tail(3))
+
+else:
+    # Falls choice ein Markdown‑Dokument ist (aus docs), zeige es
+    md_path = pages.get(choice)
+    if isinstance(md_path, str) and md_path.endswith(".md"):
+        md_full = load_markdown_safe(md_path)
+        if md_full:
+            st.markdown(md_full, unsafe_allow_html=False)
+        else:
+            st.info("Dokument nicht gefunden.")
 
 # Weitere Core-Module (Risk, Scenario, FX, Market, Investment)
 from risk_dashboard.core.risk_engine import (
@@ -549,7 +622,7 @@ from risk_dashboard.core.regime_model import (
 )
 from risk_dashboard.core.etl import load_etf_universe_prices
 from risk_dashboard.core.asset_packages import parse_etf_input
-from risk_dashboard.ui.profiles_ui import profile_form_ui, render_etf_tab
+from risk_dashboard.ui.profiles_ui import is_nonempty, profile_form_ui, render_etf_tab
 from risk_dashboard.core.weights import compute_abs_weights
 from risk_dashboard.data.etf_universes import ETF_UNIVERSES
 from risk_dashboard.core.regime_hmm import fit_hmm_regimes, map_hmm_states_to_labels
@@ -658,25 +731,71 @@ AVAILABLE_ETF = [
     "AGGG.L","IEGA.L","SGLN.L","PCOM.L"
 ]
 
+# Kopierfertig: aktualisierte Sidebar-Funktion
 def render_sidebar(available_etfs):
+    # Lokale Importe (anpassen, falls Pfade anders sind)
+    from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio_with_quantities
+    from risk_dashboard.input_parsing import parse_ticker_input
+
+    # Optional: falls analyze_ticker in einem Modul liegt
+    try:
+        from risk_dashboard.core.analysis import analyze_ticker
+    except Exception:
+        analyze_ticker = None
+
     st.sidebar.title("Portfolio Eingabe")
-    st.sidebar.text_input("Ticker hinzufügen", key="new_ticker", placeholder="z. B. AAPL oder CSPX.L")
-    if st.sidebar.button("Analysieren", key="analyze_main"):
-        ticker = st.session_state.get("new_ticker", "").strip().upper()
-        if ticker:
-            try:
-                analyze_ticker(ticker, available_etfs)
-            except Exception as e:
-                st.sidebar.error(f"Analyse fehlgeschlagen: {e}")
+
+    # ----- Bulk / Freitext Eingabe (unterstützt TICKER, TICKER:QTY, mehrere Einträge) -----
+    st.sidebar.subheader("Schnell hinzufügen")
+    
+    ticker_raw = st.sidebar.text_area("Ticker hinzufügen (z. B. NVDA oder DAX:1, BTC 2)", height=100)
+    qty_default = st.sidebar.number_input("Menge (Default für Einträge ohne Menge)", min_value=0, value=1, step=1)
+
+    if st.sidebar.button("Hinzufügen", key="btn_add_tickers"):
+        parsed, invalid = parse_ticker_input(ticker_raw, default_qty=int(qty_default))
+        if invalid:
+            st.sidebar.error(f"Ungültige Eingaben: {', '.join(invalid)}. Erwartetes Format: TICKER[:| |=]MENGE")
+        elif not parsed:
+            st.sidebar.warning("Keine gültigen Ticker erkannt.")
+        else:
+            pairs = [(t, q) for t, q in parsed.items()]
+            add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=int(qty_default))
+            st.session_state["navigate_to"] = "Holdings Analyse"
+            rerun = getattr(st, "experimental_rerun", None)
+            if callable(rerun):
+                rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Standard‑ETFs")
 
+    # ----- Einzel-Ticker Analyse (separates Feld) -----
+    st.sidebar.subheader("Einzelticker analysieren")
+    single_ticker = st.sidebar.text_input(
+        "Ticker für Analyse (einzeln)", key="new_ticker", placeholder="z. B. AAPL oder CSPX.L"
+    )
+    if st.sidebar.button("Analysieren", key="analyze_main"):
+        ticker = (single_ticker or "").strip().upper()
+        if not ticker:
+            st.sidebar.warning("Bitte ein Ticker-Kürzel eingeben.")
+        else:
+            if analyze_ticker is None:
+                st.sidebar.error("Analyse-Funktion nicht verfügbar (Modul fehlt).")
+            else:
+                try:
+                    analyze_ticker(ticker, available_etfs)
+                except Exception as e:
+                    st.sidebar.error(f"Analyse fehlgeschlagen: {e}")
+
+    st.sidebar.markdown("---")
+
+    # ----- Standard-ETFs (Auswahl) -----
+    st.sidebar.subheader("Standard‑ETFs")
     st.sidebar.multiselect("LOW RISK", options=available_etfs, key="low_risk_selected")
     st.sidebar.multiselect("MEDIUM RISK", options=available_etfs, key="med_risk_selected")
     st.sidebar.multiselect("HIGH RISK", options=available_etfs, key="high_risk_selected")
 
     st.sidebar.markdown("---")
+
+    # ----- Optimierungsverfahren Auswahl -----
     st.sidebar.selectbox(
         "Optimierungsverfahren wählen",
         ["HRP", "Mean-Variance", "Min-Var"],
@@ -691,8 +810,7 @@ try:
 
     # zentral: Index auswählen und Universe einmalig laden
 
-    # app.py (einmalig, zentral)
-    ss = st.session_state
+    
     prefix = "profile"
     # DEV Debug: session keys anzeigen
     if ss.get("DEBUG"):
@@ -1238,6 +1356,11 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
     if "date" in scenario_regimes.columns:
         scenario_regimes["date"] = pd.to_datetime(scenario_regimes["date"], errors="coerce")
 
+    # nachdem scenario_df und scenario_regimes berechnet wurden
+    st.session_state["scenario_df"] = scenario_df
+    st.session_state["scenario_regimes"] = scenario_regimes
+
+    
     st.write("DEBUG cols:", risk_score_df.columns.tolist())
     st.write("DEBUG head:", risk_score_df.head())
     st.write("DEBUG scenario_df head:", scenario_df.head())
@@ -1346,7 +1469,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
         st.session_state[stable_input_key] = ""
 
     # (sidebar code creates the widget)
-    st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
+    # st.text_input("Ticker hinzufügen", key=stable_input_key, placeholder="z.B. AAPL oder VWRL")
 
     # --- Mapping UI block (after mapped_cols, missing computed) ---
     if "manual_map" not in st.session_state:
@@ -1359,79 +1482,136 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
     if prices is None or getattr(prices, "empty", True):
         st.error("Keine Preisdaten verfügbar. Prüfe Ticker und Datenquelle.")
     else:
-        # optional upload fallback
-        uploaded = st.file_uploader("Upload holdings CSV (optional)", type=["csv"])
+        # --- Holdings Upload + Manual Mapping + Persistierung für Backtest ---
+        if "mapping_missing" not in st.session_state:
+            st.session_state["mapping_missing"] = []
+        if "weights_by_pricecol" not in st.session_state:
+            st.session_state["weights_by_pricecol"] = {}
+
+        # Prüfe session state
+        # st.sidebar.write("session keys:", list(st.session_state.keys()))
+        st.sidebar.write("user_tickers:", st.session_state.get("user_tickers"))
+        st.sidebar.write("portfolio_df (head):", st.session_state.get("portfolio_df").head() if st.session_state.get("portfolio_df") is not None else "None")
+
+        # Prüfe price cache / prices_for_bt
+        st.sidebar.write("prices_for_bt keys:", list(st.session_state.get("prices_for_bt", {}).keys()) if isinstance(st.session_state.get("prices_for_bt"), dict) else "not-dict")
+        st.sidebar.write("prices_for_bt sample:", st.session_state.get("prices_for_bt"))
+
+        st.markdown("### Optional: Holdings hochladen (CSV mit Spalte 'ticker')")
+
+        uploaded = show_holdings_uploader(prefix="profile")
+        st.write("DEBUG: uploaded object:", bool(uploaded))
+
         if uploaded is not None:
             try:
+                # Lese die Datei einmal und persistiere DataFrame
+                uploaded.seek(0)
                 uploaded_df = pd.read_csv(uploaded)
+                st.write("DEBUG: uploaded_df head:", uploaded_df.head())
+
+                # Falls portfolio_df noch nicht gesetzt ist, setze es
+                if "portfolio_df" not in st.session_state:
+                    st.session_state["portfolio_df"] = uploaded_df
+
                 if "ticker" in uploaded_df.columns:
                     holdings_list = list(dict.fromkeys(uploaded_df["ticker"].astype(str).tolist()))
-                    mapped_cols, missing = do_add_tickers(holdings_list, prefix, asset_key, prices=prices)
-                    if missing:
-                        st.warning(f"Einige Ticker konnten nicht gemappt werden: {missing}")
-                    # UI sofort aktualisieren
+                    mapped_cols, missing_local = do_add_tickers(holdings_list, prefix, asset_key, prices=prices)
+                    st.session_state["mapping_missing"] = missing_local or []
+                    st.session_state["last_uploaded_holdings"] = holdings_list
+                    logger.debug("do_add_tickers -> mapped_cols=%s missing=%s", mapped_cols, missing_local)
                     safe_rerun()
                 else:
                     st.error("Hochgeladene CSV enthält keine Spalte 'ticker'.")
             except Exception as e:
+                logger.exception("Fehler beim Einlesen der hochgeladenen Datei: %s", e)
                 st.error(f"Fehler beim Einlesen der Datei: {e}")
 
-        # --- Manual mapping UI (missing contains tickers that couldn't be auto-mapped) ---
+        # Manual mapping UI (only if there are missing tickers)
+        missing = st.session_state.get("mapping_missing", []) or []
         if missing:
             st.warning(f"Automatisches Mapping fehlgeschlagen für: {missing}")
             cols = ["<skip>"] + list(prices.columns)
-            # Erzeuge persistente Selectboxes (Werte landen in st.session_state["map_<ticker>"])
-            for h in missing:
-                default = st.session_state.get("manual_map", {}).get(h, "<skip>")
-                st.selectbox(f"Map {h} →", options=cols, index=cols.index(default) if default in cols else 0, key=f"map_{h}")
 
-            # Apply manual mapping
-            if st.button("Apply manual mapping", key="apply_manual_mapping"):
-                if st.session_state.get("_processing_apply_mapping"):
-                    st.info("Mapping wird bereits verarbeitet...")
-                else:
-                    st.session_state["_processing_apply_mapping"] = True
-                    try:
-                        manual_map = st.session_state.get("manual_map", {})
-                        for h in missing:
-                            choice = st.session_state.get(f"map_{h}", "<skip>")
-                            if choice and choice != "<skip>":
-                                manual_map[h] = choice
-                        st.session_state["manual_map"] = manual_map
+            # Use a form so all selectboxes are submitted together
+            with st.form("manual_map_form"):
+                for h in missing:
+                    default = st.session_state.get("manual_map", {}).get(h, "<skip>")
+                    st.selectbox(f"Map {h} →", options=cols, index=cols.index(default) if default in cols else 0, key=f"map_{h}")
+                submitted = st.form_submit_button("Apply manual mapping")
 
-                        # Update holding_to_price
-                        for h, c in manual_map.items():
-                            holding_to_price[h] = c
+            if submitted:
+                st.session_state["_processing_apply_mapping"] = True
+                try:
+                    manual_map = st.session_state.get("manual_map", {}) or {}
+                    for h in missing:
+                        choice = st.session_state.get(f"map_{h}", "<skip>")
+                        if choice and choice != "<skip>":
+                            manual_map[h] = choice
+                    st.session_state["manual_map"] = manual_map
 
-                        # Rebuild weights_by_pricecol
-                        weights_by_pricecol = {}
+                    # Build holding_to_price from manual_map (and optionally existing mappings)
+                    holding_to_price = {}
+                    holding_to_price.update(manual_map)
+
+                    # Rebuild weights_by_pricecol from holdings DataFrame 'hold'
+                    weights_by_pricecol = {}
+                    # ensure 'hold' exists and has expected columns
+                    if "hold" not in locals() and "hold" not in globals():
+                        logger.warning("Variable 'hold' nicht gefunden; stelle sicher, dass holdings DataFrame verfügbar ist.")
+                    else:
                         for _, row in hold.iterrows():
-                            hh = str(row["ticker"])
+                            hh = str(row.get("ticker", "")).strip()
                             w = float(row.get("weight_in_etf", 0.0) or 0.0)
                             price_col = holding_to_price.get(hh)
                             if price_col:
                                 weights_by_pricecol[price_col] = weights_by_pricecol.get(price_col, 0.0) + w
 
-                        if not weights_by_pricecol:
-                            st.error("Nach Anwendung des manuellen Mappings wurden keine Price‑Spalten gefunden.")
-                        else:
-                            unique_cols = list(weights_by_pricecol.keys())
-                            missing_cols = [c for c in unique_cols if c not in prices.columns]
-                            if missing_cols:
-                                st.error(f"Die folgenden Price‑Spalten fehlen in den Preisdaten: {missing_cols}")
-                            else:
-                                prices_for_bt = prices.loc[:, unique_cols]
-                                weights_by_ticker = {col: float(w) for col, w in weights_by_pricecol.items()}
-                                total = sum(weights_by_ticker.values())
-                                if total > 0:
-                                    weights_by_ticker = {t: w / total for t, w in weights_by_ticker.items()}
+                    if not weights_by_pricecol:
+                        st.error("Nach Anwendung des manuellen Mappings wurden keine Price‑Spalten gefunden.")
+                    else:
+                        # persist aggregated mapping for later use
+                        st.session_state["weights_by_pricecol"] = weights_by_pricecol
+                        # clear missing (mapping done)
+                        st.session_state["mapping_missing"] = []
+                        st.success("Manuelles Mapping angewendet.")
+                        # rerun so the next block picks up weights_by_pricecol
+                        safe_rerun()
+                finally:
+                    st.session_state["_processing_apply_mapping"] = False
 
-                                st.session_state["prices_for_bt"] = prices_for_bt
-                                st.session_state["weights_by_ticker"] = weights_by_ticker
-                                st.success("Manuelles Mapping angewendet.")
-                                safe_rerun()
-                    finally:
-                        st.session_state["_processing_apply_mapping"] = False
+        # If weights_by_pricecol was persisted (either by do_add_tickers or manual mapping), build prices_for_bt and weights_by_ticker
+        weights_by_pricecol = st.session_state.get("weights_by_pricecol", {}) or {}
+        if weights_by_pricecol:
+            unique_cols = list(weights_by_pricecol.keys())
+            # normalize prices columns
+            prices.columns = [str(c).strip() for c in prices.columns]
+            missing_cols = [c for c in unique_cols if c not in prices.columns]
+            if missing_cols:
+                st.error(f"Die folgenden Price‑Spalten fehlen in den Preisdaten: {missing_cols}")
+            else:
+                prices_for_bt = prices.loc[:, unique_cols]
+
+                # Build weights_by_ticker and normalize
+                weights_by_ticker = {col: float(w) for col, w in weights_by_pricecol.items()}
+                total = sum(weights_by_ticker.values()) or 0.0
+                if total > 0:
+                    weights_by_ticker = {col: (w / total) for col, w in weights_by_ticker.items()}
+                else:
+                    cols_list = list(weights_by_ticker.keys())
+                    if cols_list:
+                        eq_w = 1.0 / len(cols_list)
+                        weights_by_ticker = {c: eq_w for c in cols_list}
+                    else:
+                        weights_by_ticker = {}
+
+                # persist for backtest
+                st.session_state["prices_for_bt"] = prices_for_bt
+                st.session_state["weights_by_ticker"] = weights_by_ticker
+                logger.debug("Manual mapping applied: prices_for_bt cols=%s weights_by_ticker=%s",
+                            list(prices_for_bt.columns), weights_by_ticker)
+
+                # trigger rerun so the top-of-function backtest check can pick up the keys
+                safe_rerun()
 
     # --- Danach: Backtest aufrufen (wie bisher) ---
 
@@ -1493,7 +1673,6 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                         if not trades_df.empty:
                             csv = trades_df.to_csv(index=False)
                             st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
-
 
                 # Defensive UI‑Verarbeitung des Envelope
                 if not bt_etf or not bt_etf.get("ok"):

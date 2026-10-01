@@ -6,11 +6,13 @@ import pandas as pd
 import streamlit as st
 import yfinance as yf
 from requests.exceptions import RequestException
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import inspect
 from types import SimpleNamespace
 from collections import deque
+import re
+
 
 from risk_dashboard.core.holdings import map_holdings_to_pricecols
 
@@ -223,15 +225,29 @@ def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def _normalize_tickers(tickers: Sequence[str]) -> List[str]:
-    return [t.strip().upper() for t in tickers if t and str(t).strip()]
+    out = []
+    for t in tickers:
+        if not t:
+            continue
+        s = str(t).strip().upper()
+        s = s.replace(" ", "").replace("/", "")
+        out.append(s)
+    return out
 
-def fetch_prices_from_yf(tickers, start=DEFAULT_START_STR, end=None,
+def normalize_ticker(t: str) -> str:
+    t = str(t).strip().upper()
+    # einfache Heuristiken; erweitere nach Bedarf
+    if t.endswith(".OQ"):
+        return t.replace(".OQ", ".US")
+    return t
+
+def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = None,
                          interval: str = "1d", auto_adjust: bool = False,
                          threads: bool = False, **kwargs) -> pd.DataFrame:
     """
-    Lädt Preise mit yfinance.download.
-    - interval: '1d', '1wk', '1mo', ...
-    - zusätzliche kwargs werden an yf.download weitergereicht
+    Lädt Zeitreihen mit yfinance.download.
+    - Wenn lookback_days gesetzt und start None: berechne start = end - lookback_days.
+    - Niemals lookback_days an yf.download weiterreichen.
     """
     if isinstance(tickers, str):
         tickers = [tickers]
@@ -239,7 +255,20 @@ def fetch_prices_from_yf(tickers, start=DEFAULT_START_STR, end=None,
     if not tickers:
         return pd.DataFrame()
 
-    logger.debug("fetch_prices_from_yf start tickers=%s start=%s end=%s interval=%s", tickers, start, end, interval)
+    # berechne start/end wenn lookback_days gegeben
+    if lookback_days is not None and start is None:
+        end_date = end or datetime.utcnow().date().isoformat()
+        # end kann ein date/string sein; sicherheitshalber als date behandeln
+        if isinstance(end_date, str):
+            end_date_dt = datetime.fromisoformat(end_date)
+        else:
+            end_date_dt = end_date
+        start_dt = (end_date_dt - timedelta(days=lookback_days)).date()
+        start = start_dt.isoformat()
+        end = end_date_dt.date().isoformat()
+
+    logger.debug("fetch_prices_from_yf start tickers=%s start=%s end=%s interval=%s",
+                 tickers, start, end, interval)
 
     try:
         raw = yf.download(
@@ -263,7 +292,10 @@ def fetch_prices_from_yf(tickers, start=DEFAULT_START_STR, end=None,
 
     df = flatten_yf_dataframe(raw)
 
-    # Index bereinigen
+    # Spalten normalisieren für Matching
+    df.columns = [str(c).upper() for c in df.columns]
+    df.columns = [c.replace(".OQ", ".US") for c in df.columns]
+
     try:
         df.index = pd.to_datetime(df.index)
     except Exception:
@@ -273,6 +305,60 @@ def fetch_prices_from_yf(tickers, start=DEFAULT_START_STR, end=None,
     logger.debug("fetch_prices_from_yf returning dataframe with columns %s and index length %d",
                  list(df.columns), len(df.index))
     return df
+
+def fetch_last_prices(tickers, lookback_days: int = 365) -> dict:
+    """
+    Liefert dict {ticker: last_price}. Nutzt fetch_prices_from_yf intern.
+    """
+    if isinstance(tickers, str):
+        tickers = [tickers]
+    tickers = _normalize_tickers(tickers)
+    if not tickers:
+        return {}
+
+    # delegiere an fetch_prices_from_yf; diese Funktion rechnet start/end wenn lookback_days gesetzt
+    price_df = fetch_prices_from_yf(tickers, lookback_days=lookback_days, interval="1d")
+    if price_df is None or price_df.empty:
+        return {}
+
+    last_row = price_df.ffill().iloc[-1]
+    last_prices = {str(col): float(last_row[col]) for col in price_df.columns if pd.notna(last_row[col])}
+    return last_prices
+
+def find_price_for_ticker(prices_df: pd.DataFrame, ticker: str) -> Optional[pd.Series]:
+    """
+    Versucht, eine Price-Zeitreihe für 'ticker' in prices_df zu finden.
+    Probiert Varianten (Ticker, Ticker.US, Ticker.DE, Ticker with .OQ->.US).
+    Gibt die Series zurück oder None.
+    """
+    if prices_df is None or prices_df.empty:
+        return None
+
+    t = normalize_ticker(ticker)
+
+    # direkte Übereinstimmung
+    if t in prices_df.columns:
+        return prices_df[t]
+
+    # Varianten
+    variants = [
+        t,
+        t + ".US",
+        t + ".DE",
+        t.replace(".OQ", ".US"),
+    ]
+    for v in variants:
+        if v in prices_df.columns:
+            return prices_df[v]
+
+    # evtl. Spalten sind in MultiIndex (z.B. flatten_yf_dataframe anders strukturiert) —
+    # versuche einfache contains-Match (vorsichtig)
+    cols = list(prices_df.columns)
+    for c in cols:
+        if c.upper().startswith(t):
+            return prices_df[c]
+
+    return None
 
 def safe_fetch(
     tickers: List[str],
@@ -470,71 +556,6 @@ def extract_close_series(df, ticker):
         return df[numeric_cols[0]].dropna()
 
     return pd.Series(dtype=float)
-
-def fetch_prices_quiet_with_used_old(tickers: Sequence[str] | str,
-                                 start: str = DEFAULT_START_STR,
-                                 end: Optional[str] = None,
-                                 auto_adjust: bool = False,
-                                 threads: bool = True,
-                                 progress: bool = False) -> Tuple[Optional[str], pd.DataFrame]:
-    """
-    Lade Close/Adj Close Preise für tickers via yfinance.
-    Rückgabe: (used_ticker_or_column_name, dataframe)
-    - used: erster Ticker (aus input order), der tatsächlich Daten liefert; oder None.
-    - dataframe: DatetimeIndex, Spalten = TICKER (uppercased)
-    """
-    if isinstance(tickers, str):
-        tickers = [tickers]
-    tickers = _normalize_tickers(tickers)
-    if not tickers:
-        return None, pd.DataFrame()
-
-    logger.debug("fetch_prices_quiet_with_used start tickers=%s start=%s end=%s", tickers, start, end)
-
-    try:
-        raw = yf.download(
-            tickers,
-            start=start,
-            end=end,
-            progress=progress,
-            group_by="ticker",
-            auto_adjust=auto_adjust,
-            threads=threads
-        )
-    except Exception as e:
-        logger.warning("yfinance download failed for %s: %s", tickers, e)
-        return None, pd.DataFrame()
-
-    if raw is None or raw.empty:
-        logger.warning("fetch_prices_quiet_with_used returned empty for %s", tickers)
-        return None, pd.DataFrame()
-
-    # Robustes Flattening
-    df = flatten_yf_dataframe(raw)
-
-    # Spalten auf Großbuchstaben (einheitlich)
-    df.columns = [str(c).upper() for c in df.columns]
-
-    # Bestimme 'used' als erster Ticker, der tatsächlich Spalte liefert
-    used = None
-    for t in tickers:
-        if str(t).upper() in df.columns:
-            used = str(t).upper()
-            break
-    if used is None:
-        numeric_cols = df.select_dtypes(include="number").columns.tolist()
-        used = numeric_cols[0] if numeric_cols else None
-
-    # Index in Datetime konvertieren
-    try:
-        df.index = pd.to_datetime(df.index)
-    except Exception:
-        pass
-
-    df = df.sort_index()
-    logger.debug("fetch_prices_quiet_with_used returning used=%s df.shape=%s", used, df.shape)
-    return used, df
-
 
 from multiprocessing import Process, Queue
 import traceback

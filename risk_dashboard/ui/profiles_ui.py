@@ -43,6 +43,7 @@ from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.data_loader import parse_tickers, load_price_data
 from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR, ALLOW_TEST_UNIVERSE,UNIVERSE_PATHS
 from risk_dashboard.data_utils import safe_rerun
+from risk_dashboard.core.investment_engine import run_backtest_if_ready
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +176,74 @@ def load_etf_yaml():
     except Exception:
         st.warning("Fehler beim Laden von ETF YAML; benutze leeres Mapping.")
     return {}
+
+
+def show_prices_uploader(prefix="profile", label=None):
+    """
+    Zeigt genau einen file_uploader für Preisdaten an (eindeutiger key).
+    Bei erfolgreichem Einlesen persistiert es DataFrame in st.session_state['prices_for_bt'].
+    Gibt das DataFrame zurück oder None.
+    """
+    uploader_key = f"prices_uploader_{prefix}"
+    label = label or "CSV mit Preisdaten hochladen (Date, Close oder mehrere Spalten mit Tickers)"
+    # Wenn das Widget bereits registriert ist, erzeugen wir es trotzdem nicht mehrfach,
+    # aber Streamlit benötigt die Aufrufstelle — deshalb rufen wir die uploader-Funktion
+    # immer an dieser zentralen Stelle auf.
+    uploaded = st.file_uploader(label, type=["csv"], key=uploader_key, accept_multiple_files=False)
+
+    if uploaded is None:
+        return None
+
+    try:
+        df = pd.read_csv(uploaded, parse_dates=["Date"], dayfirst=False)
+        if "Date" in df.columns:
+            df = df.set_index("Date").sort_index()
+        else:
+            # Versuch: Index als Datum interpretieren
+            try:
+                df.index = pd.to_datetime(df.index)
+                df = df.sort_index()
+            except Exception:
+                st.error("Die hochgeladene Datei enthält keine erkennbare 'Date' Spalte.")
+                return None
+
+        if df.shape[1] == 1 and "Close" not in df.columns:
+            df.columns = ["Close"]
+
+        df.columns = [str(c).strip() for c in df.columns]
+
+        if df.shape[0] < 2 or df.shape[1] < 1:
+            st.error("Hochgeladene Preisdaten enthalten zu wenige Zeilen/Spalten.")
+            return None
+
+        # persist
+        st.session_state["prices_for_bt"] = df
+        st.session_state["price_data_uploaded_from_csv"] = True
+        st.success(f"Preisdaten erfolgreich hochgeladen ({getattr(uploaded, 'name', 'uploaded file')}).")
+        return df
+
+    except Exception as e:
+        logger.exception("Fehler beim Einlesen der Preisdaten: %s", e)
+        st.error(f"Fehler beim Einlesen der Preisdaten: {e}")
+        return None
+
+def show_holdings_uploader(prefix="profile", label=None):
+    uploader_key = f"holdings_uploader_{prefix}"
+    # wenn bereits in diesem Render gerendert, skip
+    if uploader_key in st.session_state.get("_rendered_widget_keys", []):
+        # widget wurde bereits erzeugt; gib vorhandene session_state info zurück
+        return st.session_state.get("last_holdings_upload")  # kann None sein
+
+    # markiere als gerendert für diesen Render
+    st.session_state.setdefault("_rendered_widget_keys", []).append(uploader_key)
+
+    label = label or "Hochladen (CSV, max 200MB)"
+    uploaded = st.file_uploader(label, type=["csv"], key=uploader_key, accept_multiple_files=False)
+
+    # optional: persistiere kurz für andere UI-Blöcke
+    if uploaded is not None:
+        st.session_state["last_holdings_upload"] = uploaded
+    return uploaded
 
 def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
     # 1. Versuche session_state
@@ -708,6 +777,112 @@ def detect_historical_regimes(
 
     return pd.Series(regimes, index=macro_df.index, name="regime")
 
+
+from pandas.api.types import is_object_dtype
+
+def unique_preserve_order(seq):
+    seen = set()
+    out = []
+    for s in seq:
+        if s and s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out
+
+def normalize_value(v):
+    if v is None:
+        return []
+    if isinstance(v, str):
+        return [s.strip() for s in v.split(",") if s.strip()]
+    if isinstance(v, (list, tuple, set)):
+        out = []
+        for x in v:
+            if isinstance(x, str) and "," in x:
+                out.extend([s.strip() for s in x.split(",") if s.strip()])
+            elif isinstance(x, (list, tuple, set)):
+                out.extend(normalize_value(x))
+            else:
+                out.append(x)
+        return [str(x).strip() for x in out if x]
+    try:
+        return list(v)
+    except Exception:
+        return []
+
+
+
+def resolve_session_tickers(st_session, prefix="etf", asset_key_name=None):
+    candidates = [
+        "profile_tickers", "user_tickers", "tickers", "selected_etfs",
+        "etf_user_tickers_ETF", "etf_user_tickers_Mixed"
+    ]
+    if asset_key_name:
+        asset_val = st_session.get(asset_key_name)
+        if asset_val:
+            candidates.insert(0, f"{prefix}_user_tickers_{asset_val}")
+            candidates.insert(0, f"etf_user_tickers_{asset_val}")
+
+    for k in candidates:
+        v = st_session.get(k)
+        if v:
+            return normalize_value(v)
+
+    # cheap fallback: first matching prefix key
+    prefix_key = f"{prefix}_user_tickers_"
+    for key in st_session.keys():
+        if key.startswith(prefix_key):
+            return normalize_value(st_session.get(key))
+
+    return []
+
+def extract_tickers_from_universe(universe_meta):
+    if universe_meta is None:
+        return []
+    if isinstance(universe_meta, dict):
+        tickers = []
+        for v in universe_meta.values():
+            if isinstance(v, dict):
+                t = v.get("ticker") or v.get("tickers") or v.get("symbol")
+                if t:
+                    tickers.extend(normalize_value(t))
+            elif isinstance(v, str):
+                tickers.extend(normalize_value(v))
+        return unique_preserve_order(tickers)
+
+    if isinstance(universe_meta, pd.DataFrame):
+        for col in ("ticker", "tickers", "symbol", "symbols"):
+            if col in universe_meta.columns:
+                s = universe_meta[col].dropna()
+                return unique_preserve_order(s.astype(str).tolist()) if not s.empty else []
+        try:
+            idx = universe_meta.index.dropna().astype(str)
+            if not idx.empty:
+                return unique_preserve_order(idx.tolist())
+        except Exception:
+            pass
+        for col in universe_meta.columns:
+            if is_object_dtype(universe_meta[col]):
+                vals = universe_meta[col].dropna().astype(str).tolist()
+                if vals:
+                    return unique_preserve_order(vals)
+        return []
+
+    if isinstance(universe_meta, (list, tuple, set)):
+        tickers = []
+        for item in universe_meta:
+            if isinstance(item, str):
+                tickers.extend(normalize_value(item))
+            elif isinstance(item, dict):
+                t = item.get("ticker") or item.get("symbol")
+                if t:
+                    tickers.extend(normalize_value(t))
+        return unique_preserve_order(tickers)
+
+    logger.warning("extract_tickers_from_universe: unsupported type %s", type(universe_meta))
+    return []
+
+
+
 def profile_form_ui(
     etf_universe: Optional[Dict] = None,
     universe_warnings: Optional[Any] = None,
@@ -731,6 +906,16 @@ def profile_form_ui(
     if "analysis_close_series" not in st.session_state:
         st.session_state["analysis_close_series"] = None
 
+
+    # ganz oben in profile_form_ui, nachdem ss = st.session_state gesetzt wurde
+    # defensive: only call when not already running
+    if not ss.get("run_backtest_in_progress"):
+        try:
+            started = run_backtest_if_ready(prefix="profile")
+            if started:
+                ss["run_backtest_in_progress"] = True
+        except Exception:
+            logger.exception("run_backtest_if_ready failed")
 
     st.header("Portfolio Profile")
 
@@ -784,21 +969,52 @@ def profile_form_ui(
     universe_warnings = universe_warnings or st.session_state.get("universe_warnings")
 
 
-    # --- Vorbedingungen: tickers und tickers_list sicher setzen ---
-    # Beispiel: aus defaults oder session_state (passe an deine Struktur an)
-    tickers = None
-    if "defaults" in locals() and isinstance(defaults, dict):
-        tickers = defaults.get("tickers", [])
-    if not tickers:
-        tickers = st.session_state.get("profile_tickers", []) or []
+    # defensive resolution of tickers
+    # Defensive resolution of tickers list key and tickers
+    # --- Defensive resolution of tickers and list_key ---
+    
+    import logging
+    logger = logging.getLogger(__name__)
 
-    tickers_list = list(tickers)
+    # Debug: was ist in session_state, welche Keys sind relevant
+    logger.debug("SESSION KEYS: %r", list(st.session_state.keys()))
+    logger.debug("profile_tickers: %r", st.session_state.get("profile_tickers"))
+    logger.debug("user_tickers: %r", st.session_state.get("user_tickers"))
+    logger.debug("etf_user_tickers_ETF: %r", st.session_state.get("etf_user_tickers_ETF"))
+    # computed asset_key value (guarded)
+    asset_val = st.session_state.get("asset_key")  # passe den Namen an, falls anders
+    logger.debug("asset_key value: %r", asset_val)
+    computed = f"etf_user_tickers_{asset_val}" if asset_val else None
+    logger.debug("computed key: %r -> %r", computed, st.session_state.get(computed) if computed else None)
+
+    # use module-level helpers
+
+# flatten + split comma items + uppercase + dedupe
+    tickers_list = resolve_session_tickers(st.session_state, prefix="etf", asset_key_name="etf_asset_type") or []
+    if not tickers_list:
+        tickers_list = extract_tickers_from_universe(etf_universe)
+
+
+    flat = []
+    for it in tickers_list:
+        if isinstance(it, str) and "," in it:
+            flat.extend([s.strip() for s in it.split(",") if s.strip()])
+        else:
+            flat.append(it)
+    tickers = []
+    seen = set()
+    for t in [str(x).strip().upper() for x in flat if x]:
+        if t not in seen:
+            seen.add(t)
+            tickers.append(t)
+    logger.debug("Final normalized tickers: %s", tickers)
+    
         
     # 1) Fallback aus session_state
     if price_data is None:
         price_data = st.session_state.get("price_data")
 
-    # 2) price_data kann DataFrame oder dict sein → available Ticker bestimmen
+    # 2) available bestimmen
     if price_data is None:
         available = []
     elif hasattr(price_data, "columns"):
@@ -808,14 +1024,27 @@ def profile_form_ui(
         available = [t for t in tickers if t in (price_data or {})]
 
     if not available:
-        st.error("Keine Portfolio‑Ticker in Preisdaten vorhanden.")
-        st.stop()
+        st.warning("Keine Portfolio‑Ticker in Preisdaten vorhanden. Bitte Preisdaten hochladen oder Auswahl anpassen.")
+        # don't stop here — show upload widget and let user fix it
+        # (the upload UI block later will handle uploaded file and safe_rerun)
+        available = []
+
+    # show upload fallback if no price data
+    # Beispiel: an der Stelle, wo price_data fehlt
+    if not is_nonempty(price_data):
+        st.warning("Preisdaten konnten nicht geladen werden. Bitte Preisdaten hochladen oder Auswahl anpassen.")
+        df = show_prices_uploader(prefix="profile")
+        if df is not None:
+            # optional: lokale Variable aktualisieren
+            price_data = df
+            # safe_rerun() nur falls nötig, weil session_state gesetzt wurde
+            safe_rerun()
+
 
     # 3) Loader nur aufrufen, wenn price_data fehlt
     if price_data is None:
         if not tickers_list:
             logger.warning("load_price_data skipped: no tickers to download")
-            price_data = None
         else:
             try:
                 price_data = load_price_data(tickers_list)
@@ -823,19 +1052,19 @@ def profile_form_ui(
                     st.session_state["price_data"] = price_data
                 else:
                     price_data = None
-            except Exception as e:
-                logger.exception("load_price_data failed: %s", e)
+            except Exception:
+                logger.exception("load_price_data failed")
                 price_data = None
 
-    # 4) Regimes an Preise anpassen
-    if regimes_val is not None and hasattr(prices_df, "index"):
-        if not regimes_val.index.equals(prices_df.index):
-            regimes_aligned = regimes_val.reindex(prices_df.index, method="ffill")
+    # 4) Regimes an Preise anpassen (verwende regimes aus session_state oder Parameter)
+    regimes_val = regimes_val if 'regimes_val' in locals() else st.session_state.get("regimes")
+    if regimes_val is not None and hasattr(price_data, "index"):
+        if not regimes_val.index.equals(price_data.index):
+            regimes_aligned = regimes_val.reindex(price_data.index, method="ffill")
         else:
             regimes_aligned = regimes_val.copy()
     else:
         regimes_aligned = None
-
 
 
 
@@ -1082,11 +1311,11 @@ def profile_form_ui(
             
     # price_data: fallback to session_state, loader only as last resort
 
-    # 1) Fallback aus session_state, aber ohne "or" mit DataFrame
+    # 1) Fallback aus session_state
     if price_data is None:
         price_data = st.session_state.get("price_data")
 
-    # 2) price_data kann DataFrame oder dict sein → available Ticker bestimmen
+    # 2) available bestimmen
     if price_data is None:
         available = []
     elif hasattr(price_data, "columns"):
@@ -1096,14 +1325,27 @@ def profile_form_ui(
         available = [t for t in tickers if t in (price_data or {})]
 
     if not available:
-        st.error("Keine Portfolio‑Ticker in Preisdaten vorhanden.")
-        st.stop()
+        st.warning("Keine Portfolio‑Ticker in Preisdaten vorhanden. Bitte Preisdaten hochladen oder Auswahl anpassen.")
+        # don't stop here — show upload widget and let user fix it
+        # (the upload UI block later will handle uploaded file and safe_rerun)
+        available = []
+
+    # show upload fallback if no price data
+    # Beispiel: an der Stelle, wo price_data fehlt
+    if not is_nonempty(price_data):
+        st.warning("Preisdaten konnten nicht geladen werden. Bitte Preisdaten hochladen oder Auswahl anpassen.")
+        df = show_prices_uploader(prefix="profile")
+        if df is not None:
+            # optional: lokale Variable aktualisieren
+            price_data = df
+            # safe_rerun() nur falls nötig, weil session_state gesetzt wurde
+            safe_rerun()
+
 
     # 3) Loader nur aufrufen, wenn price_data fehlt
     if price_data is None:
         if not tickers_list:
             logger.warning("load_price_data skipped: no tickers to download")
-            price_data = None
         else:
             try:
                 price_data = load_price_data(tickers_list)
@@ -1111,86 +1353,33 @@ def profile_form_ui(
                     st.session_state["price_data"] = price_data
                 else:
                     price_data = None
-            except Exception as e:
-                logger.exception("load_price_data failed: %s", e)
+            except Exception:
+                logger.exception("load_price_data failed")
                 price_data = None
 
-    # 4) Regimes an Preise anpassen
-    if regimes_val is not None and hasattr(prices_df, "index"):
-        if not regimes_val.index.equals(prices_df.index):
-            regimes_aligned = regimes_val.reindex(prices_df.index, method="ffill")
+    # 4) Regimes an Preise anpassen (verwende regimes aus session_state oder Parameter)
+    regimes_val = regimes_val if 'regimes_val' in locals() else st.session_state.get("regimes")
+    if regimes_val is not None and hasattr(price_data, "index"):
+        if not regimes_val.index.equals(price_data.index):
+            regimes_aligned = regimes_val.reindex(price_data.index, method="ffill")
         else:
             regimes_aligned = regimes_val.copy()
     else:
         regimes_aligned = None
 
 
-
-
-
-
     # 2) Defensive Extraktion von Tickers aus etf_universe
-    def extract_tickers_from_universe(universe_meta):
-        """
-        Robust: accepts None, dict, DataFrame, list/tuple/set and returns list[str].
-        """
-        if universe_meta is None:
-            return []
-
-        if isinstance(universe_meta, dict):
-            tickers = []
-            for v in universe_meta.values():
-                if isinstance(v, dict):
-                    t = v.get("ticker") or v.get("tickers") or v.get("symbol")
-                    if t:
-                        tickers.append(str(t))
-                elif isinstance(v, str):
-                    tickers.append(v)
-            return list(dict.fromkeys([t for t in tickers if t]))
-
-        if isinstance(universe_meta, pd.DataFrame):
-            # prefer explicit columns
-            for col in ("ticker", "tickers", "symbol", "symbols"):
-                if col in universe_meta.columns:
-                    return universe_meta[col].dropna().astype(str).tolist()
-            # fallback: index if looks like tickers
-            try:
-                idx = universe_meta.index.astype(str)
-                if all(len(x) > 0 for x in idx):
-                    return idx.tolist()
-            except Exception:
-                pass
-            # last resort: first object column
-            for col in universe_meta.columns:
-                if universe_meta[col].dtype == object:
-                    vals = universe_meta[col].dropna().astype(str).tolist()
-                    if vals:
-                        return vals
-            return []
-
-        if isinstance(universe_meta, (list, tuple, set)):
-            tickers = []
-            for item in universe_meta:
-                if isinstance(item, str):
-                    tickers.append(item)
-                elif isinstance(item, dict):
-                    t = item.get("ticker") or item.get("symbol")
-                    if t:
-                        tickers.append(str(t))
-            return list(dict.fromkeys([t for t in tickers if t]))
-
-        logger.warning("extract_tickers_from_universe: unsupported type %s", type(universe_meta))
-        return []
-
+    
     # --- Verwendung in deiner UI ---
-    tickers_list = extract_tickers_from_universe(etf_universe)
-    logger.debug("tickers_list extracted from etf_universe: %s", tickers_list)
+    #tickers_list = extract_tickers_from_universe(etf_universe)
+    #tickers = list(tickers_list) if tickers_list else []
+    #logger.debug("tickers_list extracted from etf_universe: %s", tickers_list)
 
     # 1) Fallback aus session_state
     if price_data is None:
         price_data = st.session_state.get("price_data")
 
-    # 2) price_data kann DataFrame oder dict sein → available Ticker bestimmen
+    # 2) available bestimmen
     if price_data is None:
         available = []
     elif hasattr(price_data, "columns"):
@@ -1200,14 +1389,28 @@ def profile_form_ui(
         available = [t for t in tickers if t in (price_data or {})]
 
     if not available:
-        st.error("Keine Portfolio‑Ticker in Preisdaten vorhanden.")
-        st.stop()
+        st.warning("Keine Portfolio‑Ticker in Preisdaten vorhanden. Bitte Preisdaten hochladen oder Auswahl anpassen.")
+        # don't stop here — show upload widget and let user fix it
+        # (the upload UI block later will handle uploaded file and safe_rerun)
+        available = []
+
+    # show upload fallback if no price data
+    # Beispiel: an der Stelle, wo price_data fehlt
+    if not is_nonempty(price_data):
+        st.warning("Preisdaten konnten nicht geladen werden. Bitte Preisdaten hochladen oder Auswahl anpassen.")
+        df = show_prices_uploader(prefix="profile")
+        if df is not None:
+            # optional: lokale Variable aktualisieren
+            price_data = df
+            # safe_rerun() nur falls nötig, weil session_state gesetzt wurde
+            safe_rerun()
+
+
 
     # 3) Loader nur aufrufen, wenn price_data fehlt
     if price_data is None:
         if not tickers_list:
             logger.warning("load_price_data skipped: no tickers to download")
-            price_data = None
         else:
             try:
                 price_data = load_price_data(tickers_list)
@@ -1215,45 +1418,33 @@ def profile_form_ui(
                     st.session_state["price_data"] = price_data
                 else:
                     price_data = None
-            except Exception as e:
-                logger.exception("load_price_data failed: %s", e)
+            except Exception:
+                logger.exception("load_price_data failed")
                 price_data = None
 
-    # 4) Regimes an Preise anpassen
-    if regimes_val is not None and hasattr(prices_df, "index"):
-        if not regimes_val.index.equals(prices_df.index):
-            regimes_aligned = regimes_val.reindex(prices_df.index, method="ffill")
+    # 4) Regimes an Preise anpassen (verwende regimes aus session_state oder Parameter)
+    regimes_val = regimes_val if 'regimes_val' in locals() else st.session_state.get("regimes")
+    if regimes_val is not None and hasattr(price_data, "index"):
+        if not regimes_val.index.equals(price_data.index):
+            regimes_aligned = regimes_val.reindex(price_data.index, method="ffill")
         else:
             regimes_aligned = regimes_val.copy()
     else:
         regimes_aligned = None
 
 
+
     # 4) Wenn noch keine Preisdaten: Upload-UI anbieten (kein sofortiger return)
+    # Beispiel: an der Stelle, wo price_data fehlt
     if not is_nonempty(price_data):
-        logger.warning("profile_form_ui: price_data fehlt oder ist leer; zeige Upload-UI")
-        st.warning("Preisdaten konnten nicht geladen werden. Bitte überprüfe die Verbindung oder wähle andere ETFs.")
-        uploaded_prices = st.file_uploader(
-            "CSV mit Preisdaten hochladen (Date mit Datum und Close)",
-            type=["csv"],
-            key="prices_uploader_profile"
-        )
-        if uploaded_prices is not None:
-            try:
-                df = pd.read_csv(uploaded_prices, parse_dates=["Date"]).set_index("Date").sort_index()
-                if "Close" not in df.columns and df.shape[1] == 1:
-                    df.columns = ["Close"]
-                if is_nonempty(df):
-                    st.session_state["price_data"] = df
-                    price_data = df
-                    st.success("Preisdaten erfolgreich hochgeladen.")
-                    # st.experimental_rerun()
-                    safe_rerun()
-                else:
-                    st.error("Hochgeladene Datei enthält keine gültigen Preisdaten.")
-            except Exception as e:
-                logger.exception("Fehler beim Einlesen der Preisdaten: %s", e)
-                st.error("Fehler beim Einlesen der Preisdaten.")
+        st.warning("Preisdaten konnten nicht geladen werden. Bitte Preisdaten hochladen oder Auswahl anpassen.")
+        df = show_prices_uploader(prefix="profile")
+        if df is not None:
+            # optional: lokale Variable aktualisieren
+            price_data = df
+            # safe_rerun() nur falls nötig, weil session_state gesetzt wurde
+            safe_rerun()
+
 
     # Build portfolio only when price_data is available
     portfolio = st.session_state.get("selected_portfolio")

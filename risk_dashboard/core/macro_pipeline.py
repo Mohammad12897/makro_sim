@@ -90,7 +90,7 @@ def optimize_portfolio(prices: pd.DataFrame, method="HRP"):
     """
 
     # Falls keine Daten → Equal Weight
-    if prices is None or prices.empty:
+    if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
         return {}
 
     # Returns berechnen
