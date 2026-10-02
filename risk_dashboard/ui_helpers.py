@@ -246,18 +246,65 @@ def add_new_tickers_to_portfolio_with_quantities(pairs: List[Tuple[str,int]], de
         else:
             st.session_state["prices_for_bt"] = last_prices
 
-def consolidate_portfolio_df(df):
+def consolidate_portfolio_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Bereinigt und konsolidiert portfolio_df:
+    - Normalisiert ticker (Uppercase, trim)
+    - Entfernt angehängte Mengenreste (z. B. 'DAX 3' -> 'DAX')
+    - Gruppiert nach ticker, summiert quantity und market_value
+    - Rechnet weight neu
+    """
+    if df is None or df.empty:
+        # Gib ein leeres DataFrame mit Standardspalten zurück
+        return pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
+
     df = df.copy()
+
+    # 1) Normalisiere ticker
     df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
     df["ticker"] = df["ticker"].str.split().str[0]  # 'DAX 3' -> 'DAX'
-    df["quantity"] = pd.to_numeric(df.get("quantity", 0), errors="coerce").fillna(0).astype(int)
-    df["market_value"] = pd.to_numeric(df.get("market_value", 0.0), errors="coerce").fillna(0.0)
-    df_grouped = df.groupby("ticker", as_index=False).agg({
-        "quantity": "sum",
-        "market_value": "sum",
-        "price": "last"
-    })
-    total_mv = df_grouped["market_value"].sum()
-    df_grouped["weight"] = (df_grouped["market_value"] / total_mv * 100.0) if total_mv > 0 else 0.0
-    return df_grouped[["ticker", "quantity", "price", "market_value", "weight"]]
 
+    # 2) Stelle sicher, dass die erwarteten Spalten existieren
+    expected_cols = {
+        "quantity": 0,
+        "market_value": 0.0,
+        "price": None
+    }
+    for col, default in expected_cols.items():
+        if col not in df.columns:
+            df[col] = default
+
+    # 3) Typkonvertierung mit Fallbacks
+    df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
+    df["market_value"] = pd.to_numeric(df["market_value"], errors="coerce").fillna(0.0)
+
+    # 4) Gruppieren: nur existierende Spalten in agg verwenden
+    agg_map = {}
+    if "quantity" in df.columns:
+        agg_map["quantity"] = "sum"
+    if "market_value" in df.columns:
+        agg_map["market_value"] = "sum"
+    # price: last if present
+    if "price" in df.columns:
+        agg_map["price"] = "last"
+
+    # Falls agg_map leer wäre (sehr unwahrscheinlich), lege Standardaggregation an
+    if not agg_map:
+        agg_map = {"quantity": "sum", "market_value": "sum", "price": "last"}
+
+    df_grouped = df.groupby("ticker", as_index=False).agg(agg_map)
+
+    # 5) Recompute weights
+    total_mv = df_grouped.get("market_value", pd.Series([0.0])).sum()
+    if total_mv > 0:
+        df_grouped["weight"] = (df_grouped["market_value"] / total_mv) * 100.0
+    else:
+        df_grouped["weight"] = 0.0
+
+    # 6) Sicherstellen, dass alle Spalten in der erwarteten Reihenfolge vorhanden sind
+    cols = ["ticker", "quantity", "price", "market_value", "weight"]
+    for c in cols:
+        if c not in df_grouped.columns:
+            df_grouped[c] = None if c == "price" else 0.0
+
+    return df_grouped[cols]

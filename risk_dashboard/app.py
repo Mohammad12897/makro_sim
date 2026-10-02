@@ -447,17 +447,25 @@ elif choice == "Upload":
 
     # Sidebar/Handler Ticker-Synchronisation (sofort nach Hinzufügen)
     user_tickers = st.session_state.get("user_tickers", [])  # Liste aus Sidebar
+
+    # Lade oder initialisiere portfolio_df
     df = st.session_state.get("portfolio_df")
     if df is None:
-        df = pd.DataFrame(columns=["ticker", "quantity", "market_value", "weight"])
+        df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
 
-    if df is not None and not df.empty:
-        df = consolidate_portfolio_df(df)
-        st.session_state["portfolio_df"] = df    
+    # Konsolidieren, falls nötig (bereinigt Rohstrings wie "DAX 3")
+    try:
+        from risk_dashboard.ui_helpers import consolidate_portfolio_df
+        if df is not None and not df.empty:
+            df = consolidate_portfolio_df(df)
+            st.session_state["portfolio_df"] = df
+    except Exception as e:
+        # Loggen, aber nicht abbrechen
+        logger.exception("Fehler bei consolidate_portfolio_df im Upload-Block: %s", e)
 
-    # Nur neue, noch nicht vorhandene Ticker ermitteln (normalisiert)
-    existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()]
-    new_tickers = [t for t in user_tickers if t.upper() not in existing]
+    # Nur neue, noch nicht vorhandene Ticker ermitteln (normalisiert, Uppercase)
+    existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()] if not df.empty else []
+    new_tickers = [t for t in user_tickers if t and t.upper() not in existing]
 
     if new_tickers:
         from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio
@@ -489,18 +497,18 @@ elif choice == "Holdings Analyse":
     user_tickers = st.session_state.get("user_tickers", [])
     df = st.session_state.get("portfolio_df")
     if df is None:
-        df = pd.DataFrame(columns=["ticker", "quantity", "market_value", "weight"])
+        df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
 
     # Normalisiere vorhandene ticker-Liste
     existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()] if not df.empty else []
 
-    # Neue Ticker automatisch mit Preisen hinzufügen
-    new_tickers = [t for t in user_tickers if t.upper() not in existing]
+    # Neue Ticker automatisch mit Preisen hinzufügen (nur wenn noch nicht vorhanden)
+    new_tickers = [t for t in user_tickers if t and t.upper() not in existing]
     if new_tickers:
         from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio
         add_new_tickers_to_portfolio(new_tickers)
 
-    # lade aktualisiertes df aus session
+    # lade aktualisiertes df aus session (falls add_new... es aktualisiert hat)
     df = st.session_state.get("portfolio_df", df)
     prices = st.session_state.get("prices_for_bt")
 
@@ -510,62 +518,88 @@ elif choice == "Holdings Analyse":
         st.stop()
 
     # 3) Konsolidierung: gleiche Ticker zusammenfassen (falls Rohstrings vorhanden)
-    df = consolidate_portfolio_df(df)
-    st.session_state["portfolio_df"] = df
-
-    # 4) Anzeige: Tabelle + Charts (bestehende Anzeige-Logik verwenden)
-    st.subheader("Holdings Tabelle")
-    st.dataframe(df)  # oder st.table(df.head(50))
-    # ... vorhandene Visualisierungen hier aufrufen ...
     try:
-        st.bar_chart(df.set_index("ticker")["weight"])
+        from risk_dashboard.ui_helpers import consolidate_portfolio_df
+        df = consolidate_portfolio_df(df)
+        st.session_state["portfolio_df"] = df
+    except Exception as e:
+        logger.exception("Fehler bei consolidate_portfolio_df in Holdings Analyse: %s", e)
+    
+    # 4) Anzeige: Tabelle + Charts
+    st.subheader("Holdings Tabelle")
+    st.dataframe(df)
+
+    # Gewichtsdiagramm (robust)
+    try:
+        if "weight" in df.columns and not df["weight"].isnull().all():
+            st.bar_chart(df.set_index("ticker")["weight"])
+        else:
+            st.write("Gewichtsdiagramm: keine gültigen 'weight' Werte vorhanden.")
     except Exception:
         st.write("Gewichtsdiagramm konnte nicht gezeichnet werden (prüfe 'weight' Spalte).")
 
-    # 4) Performance (nur wenn Preisdaten vorhanden)
+    # 5) Performance (nur wenn Preisdaten vorhanden)
     if prices is not None and hasattr(prices, "columns") and len(prices.columns) > 0:
         st.subheader("Performance")
+
+        # Tickerliste aus df (normalisiert) und Abgleich mit prices.columns
         tickers = df["ticker"].astype(str).tolist()
+        # Falls nötig, normalisiere Groß-/Kleinschreibung: prices.columns sind oft exakt so wie in data
         available = [t for t in tickers if t in prices.columns]
         missing = [t for t in tickers if t not in prices.columns]
         if missing:
             st.warning(f"Für diese Ticker fehlen Preise: {', '.join(missing)} (werden ignoriert)")
 
         if available:
-            weights = df.set_index("ticker")["weight"].reindex(available).fillna(0)
+            # Gewichte als Bruchteile verwenden
+            weights_pct = df.set_index("ticker")["weight"].reindex(available).fillna(0)
+            weights = weights_pct / 100.0
+
+            # Tagesrenditen
             returns = prices[available].pct_change().dropna(how="all")
-            port_ret = (returns * weights).sum(axis=1)
-            cum = (1 + port_ret).cumprod()
-            st.line_chart(cum.rename("Portfolio Equity"))
+            if returns.empty:
+                st.info("Preisreihen vorhanden, aber keine Renditedaten (zu kurze Zeitreihe).")
+            else:
+                # Portfolio‑Rendite: returns * weights (weights als Spaltenvektor)
+                port_ret = (returns * weights.values).sum(axis=1)
 
-            # Kennzahlen
-            ann_factor = 252
-            total_return = cum.iloc[-1] - 1
-            days = (cum.index[-1] - cum.index[0]).days if hasattr(cum.index, "dtype") else len(cum)
-            cagr = (cum.iloc[-1]) ** (365.0 / max(days, 1)) - 1
-            vol = port_ret.std() * (ann_factor ** 0.5)
-            sharpe = (port_ret.mean() * ann_factor) / (vol if vol > 0 else 1)
-            running_max = cum.cummax()
-            max_dd = ((cum / running_max) - 1).min()
+                # Kumulierte Equity (Start bei 1)
+                cum = (1 + port_ret).cumprod()
+                st.line_chart(cum.rename("Portfolio Equity"))
 
-            cols = st.columns(4)
-            cols[0].metric("Total Return", f"{total_return:.2%}")
-            cols[1].metric("CAGR", f"{cagr:.2%}")
-            cols[2].metric("Volatilität (ann.)", f"{vol:.2%}")
-            cols[3].metric("Sharpe (ann.)", f"{sharpe:.2f}")
-            st.write(f"Max Drawdown: {max_dd:.2%}")
+                # Kennzahlen
+                ann_factor = 252
+                total_return = cum.iloc[-1] - 1
+                # Tage als Differenz der Datumsindizes (falls DatetimeIndex)
+                try:
+                    days = (cum.index[-1] - cum.index[0]).days
+                except Exception:
+                    days = len(cum)
+                cagr = (cum.iloc[-1]) ** (365.0 / max(days, 1)) - 1
+                vol = port_ret.std() * (ann_factor ** 0.5)
+                sharpe = (port_ret.mean() * ann_factor) / (vol if vol > 0 else 1)
+                running_max = cum.cummax()
+                max_dd = ((cum / running_max) - 1).min()
 
-            st.subheader("Top Holdings")
-            st.table(df.sort_values("weight", ascending=False).head(10).reset_index(drop=True))
+                cols = st.columns(4)
+                cols[0].metric("Total Return", f"{total_return:.2%}")
+                cols[1].metric("CAGR", f"{cagr:.2%}")
+                cols[2].metric("Volatilität (ann.)", f"{vol:.2%}")
+                cols[3].metric("Sharpe (ann.)", f"{sharpe:.2f}")
+                st.write(f"Max Drawdown: {max_dd:.2%}")
+
+                st.subheader("Top Holdings")
+                st.table(df.sort_values("weight", ascending=False).head(10).reset_index(drop=True))
         else:
             st.info("Keine passenden Preisreihen für die geladenen Ticker gefunden.")
     else:
         st.info("Keine Preisdaten vorhanden. Lade Preise oder aktiviere Preislookup im Upload.")
 
-    # 5) Weitere Kennzahlen
+    # 6) Weitere Kennzahlen
     st.subheader("Weitere Kennzahlen")
     st.write("Gesamtwert:", f"{st.session_state.get('portfolio_total_value', 0):,.2f}")
-    st.write("Anzahl Positionen:", len(df))
+    st.write("Anzahl Positionen:", df.shape[0])
+
 
     from risk_dashboard.data_utils import fetch_prices_from_yf, normalize_ticker
     st.sidebar.write(fetch_prices_from_yf([normalize_ticker("NVDA")]).tail(3))
