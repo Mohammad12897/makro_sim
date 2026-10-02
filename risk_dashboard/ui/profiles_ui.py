@@ -1222,6 +1222,7 @@ def profile_form_ui(
         logger.debug("profile_form_ui session_state keys: %s", list(ss.keys()))
 
     # Wenn du einen DuplicateKey vermutest, logge direkt vor der selectbox
+    logger.debug("Rendering index selectbox with prefix=%s", prefix)
     logger.debug("About to render index selectbox with key=%s", f"{prefix}_local_index_choice")
     if index_choice is None:
         index_choice = st.selectbox(
@@ -1259,7 +1260,6 @@ def profile_form_ui(
                 add_etf_candidates(index_choice, tickers, asset_type=asset_type)
 
                 # 1) Universe neu laden (falls add_etf_candidates nicht automatisch updated)
-                # path_index_choice = st.session_state.get("path_index_choice") or UNIVERSE_PATHS.get(index_choice)
                 if path_index_choice:
                     new_universe, warnings = load_etf_universe(path_index_choice)
                     # optional: normalisiere keys
@@ -2169,10 +2169,6 @@ def profile_form_ui(
             st.success(f"Profil '{profile_obj['display_name']}' gespeichert.")
             ss["profile_selected"] = key
 
-            # path_index_choice sicher ermitteln
-            #path_index_choice = ss.get("path_index_choice") or UNIVERSE_PATHS.get(
-            #    ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
-            #)
 
             # Universe neu laden, falls möglich
             if path_index_choice:
@@ -2233,10 +2229,6 @@ def profile_form_ui(
                 ss["profile_selected"] = key
 
                 # 1) path_index_choice sicher ermitteln
-                #path_index_choice = locals().get("path_index_choice") or ss.get("path_index_choice")
-                #if not path_index_choice:
-                #    index_choice = ss.get(f"{prefix}_index_choice") or ss.get("index_choice")
-                #    path_index_choice = UNIVERSE_PATHS.get(index_choice)
 
                 # 2) Neu laden, nur wenn path_index_choice vorhanden
                 if path_index_choice:

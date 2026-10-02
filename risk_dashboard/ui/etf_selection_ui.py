@@ -76,6 +76,9 @@ def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
 
 import time
 def render_etf_selection_ui(prefix="etf"):
+    # Wenn dies der ETF‑Kontext ist, setze prefix explizit auf "etf"
+    prefix = prefix or "etf"
+    
     asset_key = f"{prefix}_asset_type"
     stable_input_key = f"{prefix}_ticker_input"
 
@@ -244,13 +247,17 @@ def render_etf_selection_ui(prefix="etf"):
 
         st.markdown("---")
 
-        # Standard‑ETFs / Index Auswahl etc. (unverändert)
+        logger.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
+        st.write("DEBUG prefix:", prefix)  # nur temporär in der UI
+
+        # EINDEUTIGE Selectbox für ETF‑Kontext
         index_choice = st.selectbox(
             "Index / Universe wählen",
             ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"],
             index=1,
-            key=f"{prefix}_etf_index_choice"
+            key=f"{prefix}_etf_index_choice",  # explizit etf_ prefix
         )
+
         # Kandidaten einmalig laden
         df_candidates = get_etf_candidates_for_index(index_choice)
         if df_candidates.empty:
@@ -274,19 +281,22 @@ def render_etf_selection_ui(prefix="etf"):
         f"Replication {weights['replication']:.0%}, Liquidity {weights['liquidity']:.0%}"
     )
 
-    index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key=f"{prefix}_index_choice")
-    # Kandidaten einmalig laden
-    df_candidates = get_etf_candidates_for_index(index_choice)
+    #logger.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
+    #st.write("DEBUG prefix:", prefix)  # nur temporär in der UI
 
-    if df_candidates.empty:
-        st.warning("Keine vordefinierten Kandidaten für diesen Index.")
-        new_etfs = st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)")
-        if st.button("Kandidaten speichern"):
-            from risk_dashboard.etf_candidates import add_etf_candidates
-            add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
-            # st.experimental_rerun()
-            safe_rerun()
-        return
+    #index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key=f"{prefix}_index_choice")
+    # Kandidaten einmalig laden
+    #df_candidates = get_etf_candidates_for_index(index_choice)
+
+    #if df_candidates.empty:
+    #    st.warning("Keine vordefinierten Kandidaten für diesen Index.")
+    #    new_etfs = st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)")
+    #    if st.button("Kandidaten speichern"):
+    #        from risk_dashboard.etf_candidates import add_etf_candidates
+    #        add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
+    #        # st.experimental_rerun()
+    #        safe_rerun()
+    #    return
 
     # user tickers ergänzen
     for t in st.session_state.get("user_tickers", []):

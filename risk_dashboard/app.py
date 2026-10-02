@@ -792,6 +792,8 @@ def render_sidebar(available_etfs):
 
     # ----- Bulk / Freitext Eingabe (unterstützt TICKER, TICKER:QTY, mehrere Einträge) -----
     st.sidebar.subheader("Schnell hinzufügen")
+    logger.debug("st.sidebar.text_area with prefix=%s", prefix)
+
     # Sidebar: Bulk / Freitext Eingabe (einzige Hinzufügemethode)
     ticker_raw = st.sidebar.text_area(
         "Ticker hinzufügen (z. B. NVDA oder DAX:1, BTC 2)",
@@ -869,20 +871,24 @@ st.title("Macroeconomic Risk Dashboard")
 try:
 
     # zentral: Index auswählen und Universe einmalig laden
-
     
-    prefix = "profile"
+    prefix = "app"
     # DEV Debug: session keys anzeigen
     if ss.get("DEBUG"):
         st.write("session_state keys:", list(ss.keys()))
         logger.debug("session_state keys: %s", list(ss.keys()))
 
+    logger.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
+    st.write("DEBUG prefix:", prefix)  # nur temporär in der UI
+
     index_choice = st.selectbox(
         "Index / Universe wählen",
         list(UNIVERSE_PATHS.keys()),
         index=1,
-        key=f"{prefix}_index_choice"
+        key=f"{prefix}_index_choice",  # explizit globaler key app
     )
+
+    prefix = "profile"
 
     path_index_choice = UNIVERSE_PATHS[index_choice]
     etf_universe, universe_warnings = load_etf_universe(path_index_choice)
