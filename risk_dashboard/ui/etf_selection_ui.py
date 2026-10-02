@@ -75,36 +75,30 @@ def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
     return mapped  
 
 import time
-def render_etf_selection_ui(prefix="etf"):
-    # Wenn dies der ETF‑Kontext ist, setze prefix explizit auf "etf"
+def render_etf_selection_ui(prefix: str = "etf"):
     prefix = prefix or "etf"
-    
+
     asset_key = f"{prefix}_asset_type"
     stable_input_key = f"{prefix}_ticker_input"
 
-    #############################################
     # Defaults sicher setzen (nur vor Widget-Erzeugung)
     st.session_state.setdefault("_ui_run_id", str(uuid.uuid4()))
     st.session_state.setdefault("_ui_seq", 0)
     st.session_state.setdefault("user_tickers", [])
     st.session_state.setdefault(asset_key, "ETF")
-    # setdefault stellt sicher, dass der Key existiert, ohne ihn nach Widget-Instanziierung zu ändern
     st.session_state.setdefault(stable_input_key, "")
 
-    
     # einmalige Initialisierung (nur Setup, keine Widgets)
     init_key = f"{prefix}_ui_initialized"
     if not st.session_state.get(init_key, False):
-        # migrations, defaults, leichte Prefetches
         st.session_state[init_key] = True
         logging.getLogger(__name__).info("etf_selection_ui initial setup done")
-
 
     def next_seq():
         st.session_state["_ui_seq"] += 1
         return st.session_state["_ui_seq"]
 
-    # LoggerAdapter für run_id/seq
+    # LoggerAdapter für run_id/seq (wie vorher)
     class _Adapter(logging.LoggerAdapter):
         def process(self, msg, kwargs):
             extra = self.extra.copy()
@@ -114,78 +108,14 @@ def render_etf_selection_ui(prefix="etf"):
 
     log = _Adapter(logger, {"run_id": st.session_state["_ui_run_id"], "seq": 0})
 
-    def snapshot(keys):
-        # keys kann Strings oder callables enthalten
-        resolved = []
-        for k in keys:
-            resolved.append(k() if callable(k) else k)
-        return {k: st.session_state.get(k) for k in resolved}
-
-    ##########################################
-    WATCH_KEYS = [
-        lambda: asset_key,
-        lambda: stable_input_key,
-        "user_tickers",
-        lambda: f"{prefix}_user_tickers_ETF",
-        lambda: f"{prefix}_user_tickers_Stock",
-        lambda: f"{prefix}_user_tickers_Mixed",
-    ]
-
-    seq = next_seq(); log.debug("stable keys set", extra={"seq": seq, "keys": list(st.session_state.keys())})
-
-    def add_ticker_callback(prefix, asset_key, stable_input_key):
-        seq = next_seq(); log.info("add_button pressed", extra={"seq": seq})
-        before = snapshot(WATCH_KEYS)
-
-        raw_val = (st.session_state.get(stable_input_key, "") or "").strip()
-        seq = next_seq(); log.debug("stable_input read", extra={"seq": seq, "raw_val": raw_val})
-
-        # prices dynamisch holen (Option B)
-        prices = st.session_state.get("prices_for_bt")  # Key an dein Projekt anpassen
-
-        if raw_val:
-            # do_add_tickers macht Mapping + session_state updates; prices kann None sein
-            mapped, missing = do_add_tickers([raw_val], prefix, asset_key, prices=prices)
-            seq = next_seq(); log.info("added ticker", extra={"seq": seq, "ticker": raw_val, "mapped": mapped, "missing": missing})
-            st.session_state[stable_input_key] = ""
-
-            if prices is None or (isinstance(prices, pd.DataFrame) and prices.empty):
-                # freundlich informieren, Mapping erfolgt später, falls nötig
-                st.warning("Preisdaten noch nicht geladen. Mapping wird durchgeführt, sobald Preisdaten verfügbar sind.")
-
-        # parse / normalize / apply weitere Änderungen falls nötig
-        try:
-            parsed = parse_tickers(raw_val)
-            seq = next_seq(); log.debug("parsed tickers", extra={"seq": seq, "parsed": parsed})
-        except Exception:
-            seq = next_seq(); log.exception("parse_tickers failed", extra={"seq": seq})
-            st.error("Fehler beim Parsen der Ticker")
-            parsed = []
-
-        per_asset_key = f"{prefix}_user_tickers_{st.session_state.get(asset_key,'ETF')}"
-        st.session_state.setdefault(per_asset_key, [])
-        st.session_state.setdefault("user_tickers", [])
-        for t in parsed:
-            t_norm = normalize_ticker(t)
-            if t_norm and t_norm not in st.session_state[per_asset_key]:
-                st.session_state[per_asset_key].append(t_norm)
-            if t_norm and t_norm not in st.session_state["user_tickers"]:
-                st.session_state["user_tickers"].append(t_norm)
-
-        save_user_tickers(st.session_state["user_tickers"])
-        after = snapshot(WATCH_KEYS)
-        seq = next_seq(); log.info("session_state diff after add", extra={"seq": seq, "before": before, "after": after})
-        safe_rerun()
-
     # per-asset storage keys (einmalig) — sorgt für stabile session_state-Form
     for at in ("ETF", "Stock", "Mixed"):
         st.session_state.setdefault(f"{prefix}_user_tickers_{at}", [])
 
-        # Header (Hauptbereich)
+    # Header (Hauptbereich)
     st.header("ETF Auswahl und Explainable Scoring")
 
     # ---------------- Sidebar (stabile Reihenfolge und Keys) ----------------
-    # --- Beginn: ersetze den bisherigen with st.sidebar: Block durch diesen ---
     with st.sidebar:
         st.subheader("Portfolio Eingabe")
 
@@ -247,33 +177,44 @@ def render_etf_selection_ui(prefix="etf"):
 
         st.markdown("---")
 
-        logger.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
-        st.write("DEBUG prefix:", prefix)  # nur temporär in der UI
-
-        # EINDEUTIGE Selectbox für ETF‑Kontext
+        # EINDEUTIGE Selectbox für ETF‑Kontext (nur hier in Sidebar)
+        log.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
         index_choice = st.selectbox(
             "Index / Universe wählen",
             ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"],
             index=1,
-            key=f"{prefix}_etf_index_choice",  # explizit etf_ prefix
+            key=f"{prefix}_etf_index_choice",
         )
 
-        # Kandidaten einmalig laden
-        df_candidates = get_etf_candidates_for_index(index_choice)
+        # Kandidaten einmalig laden (robust)
+        try:
+            df_candidates = get_etf_candidates_for_index(index_choice)
+            if df_candidates is None:
+                df_candidates = pd.DataFrame(columns=["ticker", "name", "expense_ratio", "aum"])
+        except Exception:
+            log.exception("get_etf_candidates_for_index failed", extra={"seq": next_seq()})
+            df_candidates = pd.DataFrame(columns=["ticker", "name", "expense_ratio", "aum"])
+
         if df_candidates.empty:
             st.warning("Keine vordefinierten Kandidaten für diesen Index.")
-            new_etfs = st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)")
-            if st.button("Kandidaten speichern"):
+            new_etfs = st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)", key=f"{prefix}_new_etfs")
+            if st.button("Kandidaten speichern", key=f"{prefix}_save_candidates"):
                 from risk_dashboard.etf_candidates import add_etf_candidates
                 add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
                 safe_rerun()
+
     # --- Ende Sidebar Block ---
-    # Debug nach Sidebar (temporär)
-    st.write("DEBUG after sidebar; asset_type:", st.session_state.get(asset_key))
-    st.write("DEBUG stable_input_value:", st.session_state.get(stable_input_key))
+
+    # Debug nach Sidebar (nur logger)
+    log.debug("After sidebar; asset_type=%s stable_input=%s", extra={"asset_type": st.session_state.get(asset_key), "stable_input": st.session_state.get(stable_input_key)})
 
     # ---------------- Hauptbereich (restlicher Code) ----------------
-    preset = st.selectbox("Gewichtungs‑Preset", ["Balanced", "Conservative", "Aggressive"], index=0, key=f"{prefix}_preset_select")
+    preset = st.selectbox(
+        "Gewichtungs‑Preset",
+        ["Balanced", "Conservative", "Aggressive"],
+        index=0,
+        key=f"{prefix}_preset_select"
+    )
     weights = get_preset_weights(preset)
     st.markdown(
         f"**Aktuelles Preset:** {preset} — Gewichte: TER {weights['ter']:.0%}, "
@@ -281,24 +222,7 @@ def render_etf_selection_ui(prefix="etf"):
         f"Replication {weights['replication']:.0%}, Liquidity {weights['liquidity']:.0%}"
     )
 
-    #logger.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
-    #st.write("DEBUG prefix:", prefix)  # nur temporär in der UI
-
-    #index_choice = st.selectbox("Index / Universe wählen", ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"], index=1, key=f"{prefix}_index_choice")
-    # Kandidaten einmalig laden
-    #df_candidates = get_etf_candidates_for_index(index_choice)
-
-    #if df_candidates.empty:
-    #    st.warning("Keine vordefinierten Kandidaten für diesen Index.")
-    #    new_etfs = st.text_input("Kommaseparierte ETFs hinzufügen (z.B. EUNL.DE, CSPX.L)")
-    #    if st.button("Kandidaten speichern"):
-    #        from risk_dashboard.etf_candidates import add_etf_candidates
-    #        add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
-    #        # st.experimental_rerun()
-    #        safe_rerun()
-    #    return
-
-    # user tickers ergänzen
+    # user tickers ergänzen (falls noch nicht in df_candidates)
     for t in st.session_state.get("user_tickers", []):
         if t not in df_candidates["ticker"].values:
             df_candidates = pd.concat([df_candidates, pd.DataFrame([{"ticker": t}])], ignore_index=True)
@@ -312,7 +236,7 @@ def render_etf_selection_ui(prefix="etf"):
         with st.expander(f"{ticker}", expanded=False):
             cols = st.columns([6, 2])
             cols[0].write(f"Ticker: **{ticker}**")
-            if cols[1].button("Holdings laden", key=f"load_holdings_{ticker}"):
+            if cols[1].button("Holdings laden", key=f"{prefix}_load_holdings_{ticker}"):
                 df_hold = get_holdings_for_etf(ticker, api_key=st.secrets.get("HOLDINGS_API_KEY"))
                 if df_hold.empty:
                     st.warning("Keine Holdings gefunden.")
@@ -324,20 +248,15 @@ def render_etf_selection_ui(prefix="etf"):
         if t not in df_candidates["ticker"].values:
             df_candidates = pd.concat([df_candidates, pd.DataFrame([{"ticker": t}])], ignore_index=True)
 
-    # ... restlicher Code wie Score-Berechnung, DataFrame-Ausgabe etc.
-
-    # Compute explainable scores using current preset weights
-    # We adapt compute_etf_score_components to use preset weights by temporarily overriding PRESETS if needed.
-    # For simplicity, compute components and then compute total using current weights here.
+    # Score‑Berechnung (wie vorher)
     comps = []
     for _, row in df_candidates.iterrows():
         comp = compute_etf_score_components(row.to_dict())
-        # recompute total with current weights
-        total = (weights["ter"] * comp["ter_score"] +
-                 weights["aum"] * comp["aum_score"] +
-                 weights["tracking"] * comp["tracking_score"] +
-                 weights["replication"] * comp["replication_score"] +
-                 weights["liquidity"] * comp["liquidity_score"])
+        total = (weights["ter"] * comp.get("ter_score", 0) +
+                 weights["aum"] * comp.get("aum_score", 0) +
+                 weights["tracking"] * comp.get("tracking_score", 0) +
+                 weights["replication"] * comp.get("replication_score", 0) +
+                 weights["liquidity"] * comp.get("liquidity_score", 0))
         comp["total_score"] = round(total * 100, 2)
         comp["ticker"] = row.get("ticker")
         comp["name"] = row.get("name")
@@ -349,6 +268,7 @@ def render_etf_selection_ui(prefix="etf"):
     st.subheader("Rangliste der Kandidaten")
     st.dataframe(df_scores[["ticker","name","total_score","ter_score","aum_score","tracking_score","replication_score","liquidity_score"]], width='stretch')
 
+    # ... restlicher Code unverändert ...
 
     # Export-Button
     if st.button("Ergebnisse exportieren"):

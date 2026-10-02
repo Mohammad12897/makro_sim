@@ -885,10 +885,8 @@ try:
         "Index / Universe wählen",
         list(UNIVERSE_PATHS.keys()),
         index=1,
-        key=f"{prefix}_index_choice",  # explizit globaler key app
+        key=f"{prefix}_index_choice", 
     )
-
-    prefix = "profile"
 
     path_index_choice = UNIVERSE_PATHS[index_choice]
     etf_universe, universe_warnings = load_etf_universe(path_index_choice)
