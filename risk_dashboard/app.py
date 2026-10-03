@@ -881,11 +881,11 @@ try:
     prefix = "app"
     # DEV Debug: session keys anzeigen
     if ss.get("DEBUG"):
-        st.write("session_state keys:", list(ss.keys()))
-        logger.debug("session_state keys: %s", list(ss.keys()))
+        st.text(f"DEBUG prefix: {prefix}")  # nur sehr kurz, kein dump großer Objekte
 
     logger.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
-  
+    logger.debug("DEBUG prefix: %s", prefix)
+
     index_choice = st.selectbox(
         "Index / Universe wählen",
         list(UNIVERSE_PATHS.keys()),
