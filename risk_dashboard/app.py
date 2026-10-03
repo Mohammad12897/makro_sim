@@ -810,24 +810,29 @@ def render_sidebar(available_etfs):
         key=f"{prefix}_sidebar_qty_default",
     )
     if st.sidebar.button("Hinzufügen", key=f"{prefix}_btn_add_tickers"):
+        from risk_dashboard.ui_helpers import add_tickers_and_fetch
         from risk_dashboard.input_parsing import parse_ticker_input
-        from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio_with_quantities
-
+        # parse_ticker_input liefert dict ticker->qty oder list; passe an
         parsed, invalid = parse_ticker_input(ticker_raw, default_qty=int(qty_default))
         if invalid:
-            st.sidebar.error(
-                f"Ungültige Eingaben: {', '.join(invalid)}. Erwartetes Format: TICKER[:| |=]MENGE"
-            )
+            st.error(f"Ungültige Eingaben: {', '.join(invalid)}")
         elif not parsed:
-            st.sidebar.warning("Keine gültigen Ticker erkannt.")
+            st.warning("Keine gültigen Ticker erkannt.")
         else:
-            pairs = [(t, q) for t, q in parsed.items()]
-            add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=int(qty_default))
+            tickers = list(parsed.keys())  # oder parsed wenn list
+            success, failed, combined = add_tickers_and_fetch(tickers, prefix=prefix, start=DEFAULT_START_STR, end=str(pd.Timestamp.today()))
+            if success:
+                st.success(f"Erfolgreich geladen: {', '.join(success)}")
+            if failed:
+                st.warning(f"Keine Preisdaten für: {', '.join(failed)} (übersprungen)")
+            # optional: navigiere zur Analyse
             st.session_state["navigate_to"] = "Holdings Analyse"
-            rerun = getattr(st, "experimental_rerun", None)
-            if callable(rerun):
-                rerun()
-
+            rerun_fn = getattr(st, "experimental_rerun", None)
+            if callable(rerun_fn):
+                rerun_fn()
+            else:
+                st.info("Ticker hinzugefügt. Wechsle zur Holdings Analyse.")
+        
     st.sidebar.markdown("---")
 
     # ----- Einzel-Ticker Analyse (separates Feld) -----
@@ -880,8 +885,7 @@ try:
         logger.debug("session_state keys: %s", list(ss.keys()))
 
     logger.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
-    st.write("DEBUG prefix:", prefix)  # nur temporär in der UI
-
+  
     index_choice = st.selectbox(
         "Index / Universe wählen",
         list(UNIVERSE_PATHS.keys()),
