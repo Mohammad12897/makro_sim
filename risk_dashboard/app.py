@@ -74,7 +74,7 @@ from typing import Optional, Any, Dict
 
 import numpy as np
 import plotly.graph_objects as go
-from risk_dashboard.data_utils import do_add_tickers, safe_rerun, fetch_prices_quiet_with_used, sanitize_session_state
+from risk_dashboard.data_utils import do_add_tickers, is_prices_empty, normalize_prices, safe_rerun, fetch_prices_quiet_with_used, sanitize_session_state
 from risk_dashboard.ui.profiles_ui import show_holdings_uploader
 print(">>> APP STARTED: TOP OF app.py", flush=True)
 
@@ -479,11 +479,12 @@ elif choice == "Upload":
         else:
             st.info("Ticker hinzugefügt. Klicke unten, um zur Analyse zu wechseln.")
 
-    if st.button("Zur Analyse wechseln"):
+    if st.button("Zur Analyse wechseln", key="app_go_to_analysis"):
         st.session_state["app_sidebar_page_choice"] = "Holdings Analyse"
         rerun_fn = getattr(st, "experimental_rerun", None)
         if callable(rerun_fn):
             rerun_fn()
+
 
     st.sidebar.write("portfolio_df head:", st.session_state.get("portfolio_df"))
     st.sidebar.write("prices_for_bt cols:", list(st.session_state.get("prices_for_bt").columns) if isinstance(st.session_state.get("prices_for_bt"), pd.DataFrame) else st.session_state.get("prices_for_bt"))
@@ -919,10 +920,11 @@ except Exception:
 # --- ETF Auswahl UI oben auf der Seite ---
 
 # einmalige Initialisierung (falls nötig)
-if not st.session_state.get("etf_selection_ui_initialized", False):
+init_key = f"{prefix}_ui_initialized"
+if not st.session_state.get(init_key, False):
     # nur Setup, keine Widgets
-    st.session_state["etf_selection_ui_initialized"] = True
-    logging.getLogger(__name__).debug("etf_selection_ui initial setup done")
+    st.session_state[init_key] = True
+    logging.getLogger(__name__).debug("_ui_initialized initial setup done")
 
 # immer rendern
 try:
@@ -1681,65 +1683,115 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
 
     # 2) Aufruf innerhalb einer Funktion / UI‑Handler (z. B. in profile_form_ui)
 
+    # --- Hauptblock: Backtest nur ausführen, wenn Preise und Gewichte vorhanden sind ---
+    # oben im Modul (falls noch nicht importiert)
+
+    # --- Backtest Ausführung nur wenn Preise und Gewichte vorhanden sind ---
     if "prices_for_bt" in st.session_state and "weights_by_ticker" in st.session_state:
-        prices_for_bt = st.session_state.prices_for_bt
-        weights_by_ticker = st.session_state.weights_by_ticker
-        if prices_for_bt.empty or not weights_by_ticker:
-            st.error("Backtest nicht möglich: keine Daten.")
-            bt_etf = pd.DataFrame()
+        # Lese aus session_state (sichere .get Verwendung)
+        prices_for_bt = st.session_state.get("prices_for_bt")
+        weights_by_ticker = st.session_state.get("weights_by_ticker", {})
+
+        # Defensive Prüfung
+        if is_prices_empty(prices_for_bt) or not weights_by_ticker:
+            st.error("Keine Preisdaten oder Gewichte vorhanden. Bitte lade Preisdaten oder wähle ETFs.")
+            st.stop()
+
+        # Normalisiere prices_for_bt zu DataFrame und schreibe zurück in session_state
+        prices_for_bt = normalize_prices(prices_for_bt)
+        st.session_state["prices_for_bt"] = prices_for_bt
+
+        # Debug‑Log (nur logger)
+        logger.debug(
+            "Preparing backtest: prices_for_bt type=%s shape=%s weights_count=%d",
+            type(prices_for_bt),
+            getattr(prices_for_bt, "shape", None),
+            len(weights_by_ticker),
+        )
+
+        # Import und Backtest-Aufruf
+        from risk_dashboard.core.backtest import run_backtest_flow
+
+        ss = st.session_state
+        prefix = "profile"
+
+        try:
+            bt_etf = run_backtest_flow(
+                ss=ss,
+                prefix=prefix,
+                price_data=prices_for_bt,
+                weights_map=weights_by_ticker,
+                min_common_days=250,
+                initial_cash=ss.get("initial_cash", 100000),
+                strategy=ss.get("selected_strategy", "equal"),
+                rebalance=ss.get("rebalance", "monthly"),
+            )
+        except Exception as e:
+            logger.exception("Backtest-Aufruf fehlgeschlagen", exc_info=True)
+            st.error(f"Backtest fehlgeschlagen: {e}")
+            st.stop()
+
+        # Defensive Prüfung der Rückgabe von run_backtest_flow
+        # bt_etf kann dict (Envelope) oder DataFrame/objekt sein — vereinheitlichen
+        if isinstance(bt_etf, dict):
+            maybe_df = bt_etf.get("result", {}) .get("portfolio_value") or bt_etf.get("payload", {}).get("portfolio_value")
+            if maybe_df is not None:
+                bt_etf = normalize_prices(maybe_df)
+            else:
+                # Versuch, dict in DataFrame zu konvertieren; falls nicht möglich, leeres DF
+                try:
+                    bt_etf = pd.DataFrame(bt_etf)
+                except Exception:
+                    bt_etf = pd.DataFrame()
+
+        if not isinstance(bt_etf, pd.DataFrame):
+            st.error("Interner Fehler: Backtest lieferte kein DataFrame. Siehe Logs.")
+            logger.debug("backtest returned unexpected type: %s; content: %s", type(bt_etf), str(bt_etf)[:1000])
+            st.stop()
+
+        # jetzt ist bt_etf ein DataFrame, Zugriff auf .columns ist sicher
+        if "date" not in bt_etf.columns:
+            logger.warning("Backtest result missing 'date' column")
+
+        # Envelope-Handling: falls run_backtest_flow ein Envelope dict zurückgibt, extrahiere resp/result
+        # Wenn bt_etf ursprünglich ein Envelope war, resp ist das Envelope; sonst bauen wir ein neutrales Envelope
+        resp = bt_etf if isinstance(bt_etf, dict) else {}
+        # Falls run_backtest_flow bereits ein Envelope zurückgegeben hat, benutze es; sonst versuche aus res/payload zu lesen
+        if not resp:
+            # Falls run_backtest_flow lieferte, dass res/payload in 'bt_etf' nicht vorhanden sind,
+            # versuche die standardisierte Rückgabe aus der Funktion (falls vorhanden)
+            # (Dieser Block bleibt bewusst defensiv; konkrete Extraktion hängt von run_backtest_flow API ab.)
+            resp = bt_etf if isinstance(bt_etf, dict) else {}
+
+        st.write("BACKTEST RESULT ENVELOPE:", resp)
+
+        payload = resp.get("payload", {}) or {}
+        res = resp.get("result", {}) or {}
+
+        if not resp.get("ok"):
+            st.warning(resp.get("message", "Backtest fehlgeschlagen."))
+            removed = payload.get("removed") or payload.get("removed_tickers") or []
+            if removed:
+                st.warning("Entfernte Ticker: " + ", ".join(removed))
+            run_disabled = True
         else:
-            import traceback
+            run_disabled = False
+            pv = res.get("portfolio_value")
+            metrics = res.get("metrics", {})
+            if pv is None:
+                st.warning("Kein Backtest‑Ergebnis (portfolio_value fehlt).")
+            else:
+                st.line_chart(pv)
+                st.write(metrics)
+                trades_df = pd.DataFrame(res.get("trades", []))
+                st.dataframe(trades_df)
+                if not trades_df.empty:
+                    csv = trades_df.to_csv(index=False)
+                    st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
 
-            from risk_dashboard.core.backtest import run_backtest_flow
-
-            # sicherstellen: ss und prefix sind gesetzt
-            ss = st.session_state
-            prefix = "profile"
-            prices_for_bt = ss.get("prices_for_bt", {})          # dict ticker->Series/DataFrame
-            weights_by_ticker = ss.get("weights_by_ticker", {})  # dict ticker->weight
-
-            if prices_for_bt and weights_by_ticker:
-                run_disabled = False
-                bt_etf = run_backtest_flow(
-                    ss=ss,
-                    prefix=prefix,
-                    price_data=prices_for_bt,
-                    weights_map=weights_by_ticker,
-                    min_common_days=250,
-                    initial_cash=ss.get("initial_cash", 100000),
-                    strategy=ss.get("selected_strategy", "equal"),
-                    rebalance=ss.get("rebalance", "monthly")
-                )
-
-                resp = bt_etf or {}
-                st.write("BACKTEST RESULT ENVELOPE:", resp)
-
-                payload = resp.get("payload", {}) or {}
-                res = resp.get("result", {}) or {}
-
-                if not resp.get("ok"):
-                    st.warning(resp.get("message", "Backtest fehlgeschlagen."))
-                    removed = payload.get("removed") or payload.get("removed_tickers") or []
-                    if removed:
-                        st.warning("Entfernte Ticker: " + ", ".join(removed))
-                    run_disabled = True
-                else:
-                    run_disabled = False
-                    pv = res.get("portfolio_value")
-                    metrics = res.get("metrics", {})
-                    if pv is None:
-                        st.warning("Kein Backtest‑Ergebnis (portfolio_value fehlt).")
-                    else:
-                        st.line_chart(pv)
-                        st.write(metrics)
-                        trades_df = pd.DataFrame(res.get("trades", []))
-                        st.dataframe(trades_df)
-                        if not trades_df.empty:
-                            csv = trades_df.to_csv(index=False)
-                            st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
-
-                # Defensive UI‑Verarbeitung des Envelope
-                if not bt_etf or not bt_etf.get("ok"):
+            # Defensive Envelope‑Verarbeitung (falls run_backtest_flow Envelope zurückgibt)
+            if isinstance(bt_etf, dict):
+                if not bt_etf.get("ok"):
                     st.error(bt_etf.get("message", "Backtest fehlgeschlagen"))
                     payload = bt_etf.get("payload") or {}
                     if payload.get("removed"):

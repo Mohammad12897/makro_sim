@@ -773,3 +773,78 @@ def sanity_backtest(price_data: pd.DataFrame, weights: dict, min_rows: int = 60)
     if sum(vals) <= 0:
         return False, "Summe der Gewichte muss > 0 sein."
     return True, "Sanity checks passed."
+
+def is_prices_empty(prices: Any) -> bool:
+    if prices is None:
+        return True
+    if hasattr(prices, "empty"):
+        try:
+            return bool(prices.empty)
+        except Exception:
+            return False
+    if isinstance(prices, dict):
+        return len(prices) == 0
+    try:
+        return len(prices) == 0
+    except Exception:
+        return False
+
+def normalize_prices(prices: Any) -> pd.DataFrame:
+    if prices is None:
+        return pd.DataFrame()
+    if isinstance(prices, pd.DataFrame):
+        return prices
+    if isinstance(prices, pd.Series):
+        return prices.to_frame()
+    if isinstance(prices, dict):
+        try:
+            # dict of ticker -> Series/DataFrame
+            return pd.concat({k: v for k, v in prices.items()}, axis=1)
+        except Exception:
+            try:
+                return pd.DataFrame(prices)
+            except Exception:
+                return pd.DataFrame()
+    try:
+        return pd.DataFrame(prices)
+    except Exception:
+        return pd.DataFrame()
+
+def fetch_prices_for_ticker(ticker: str, start: str = None, end: str = None, interval: str = "1d", **kwargs) -> Optional[pd.DataFrame]:
+    """
+    Versucht, Preisdaten für einen einzelnen Ticker zu laden.
+    Rückgabe: DataFrame (oder Series) bei Erfolg, None bei Fehler / no data.
+    kwargs werden an die zugrundeliegende fetch-Funktion weitergereicht.
+    """
+    try:
+        # safe_fetch ist eure bestehende Funktion, die retries macht
+        df = safe_fetch([ticker], start=start, end=end, interval=interval, **kwargs)
+        # safe_fetch kann DataFrame mit Spalte ticker oder dict zurückgeben
+        if df is None:
+            logger.debug("fetch_prices_for_ticker: no data for %s (None)", ticker)
+            return None
+
+        # normalize to DataFrame
+        if isinstance(df, dict):
+            # dict mapping ticker->Series/DF
+            val = df.get(ticker)
+            if val is None:
+                logger.debug("fetch_prices_for_ticker: dict returned but no key %s", ticker)
+                return None
+            df_norm = normalize_prices(val)
+        else:
+            # df is DataFrame or Series
+            df_norm = normalize_prices(df)
+
+        # if still empty -> treat as no data
+        if df_norm is None or df_norm.empty:
+            logger.debug("fetch_prices_for_ticker: empty after normalize for %s", ticker)
+            return None
+
+        # keep only first numeric column if multiple (project-specific)
+        # optional: prefer 'Close'/'Adj Close' if present
+        return df_norm
+
+    except Exception as e:
+        logger.exception("fetch_prices_for_ticker failed for %s: %s", ticker, e)
+        return None

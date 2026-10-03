@@ -156,24 +156,34 @@ def render_etf_selection_ui(prefix: str = "etf"):
         )
 
         # Bulk‑Hinzufügen Button ruft Parser + Einfügefunktion auf
-        if st.button("Hinzufügen", key=f"{prefix}_add_button"):
-            from risk_dashboard.input_parsing import parse_ticker_input
-            from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio_with_quantities
 
-            parsed, invalid = parse_ticker_input(ticker_raw, default_qty=int(qty_default))
-            if invalid:
-                st.error(f"Ungültige Eingaben: {', '.join(invalid)}. Erwartetes Format: TICKER[:| |=]MENGE")
-            elif not parsed:
-                st.warning("Keine gültigen Ticker erkannt.")
-            else:
-                pairs = [(t, q) for t, q in parsed.items()]
-                add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=int(qty_default))
-                st.session_state["navigate_to"] = "Holdings Analyse"
-                rerun_fn = getattr(st, "experimental_rerun", None)
-                if callable(rerun_fn):
-                    rerun_fn()
-                else:
-                    st.info("Ticker hinzugefügt. Wechsle zur Holdings Analyse.")
+        # in der UI-Datei, dort wo ticker_raw und qty_default definiert sind
+        #if st.button("Hinzufügen", key=f"{prefix}_add_button"):
+        #    from risk_dashboard.ui_helpers import add_tickers_and_fetch
+        #    from risk_dashboard.input_parsing import parse_ticker_input
+            # parse_ticker_input liefert dict ticker->qty oder list; passe an
+        #    parsed, invalid = parse_ticker_input(ticker_raw, default_qty=int(qty_default))
+        #    if invalid:
+        #        st.error(f"Ungültige Eingaben: {', '.join(invalid)}")
+        #    elif not parsed:
+        #        st.warning("Keine gültigen Ticker erkannt.")
+        #    else:
+        #        tickers = list(parsed.keys())  # oder parsed wenn list
+        #        success, failed, combined = add_tickers_and_fetch(tickers, prefix=prefix, start=DEFAULT_START_STR, end=str(pd.Timestamp.today()))
+        #        if success:
+        #            st.success(f"Erfolgreich geladen: {', '.join(success)}")
+        #        if failed:
+        #            st.warning(f"Keine Preisdaten für: {', '.join(failed)} (übersprungen)")
+                # optional: navigiere zur Analyse
+        #        st.session_state["navigate_to"] = "Holdings Analyse"
+        #        rerun_fn = getattr(st, "experimental_rerun", None)
+        #        if callable(rerun_fn):
+        #            rerun_fn()
+        #        else:
+        #            st.info("Ticker hinzugefügt. Wechsle zur Holdings Analyse.")
+
+        # Bulk input moved to app.py sidebar to avoid duplicate widgets and key collisions.
+        st.info("Ticker schnell hinzufügen: benutze das Sidebar Formular (Schnell hinzufügen).")
 
         st.markdown("---")
 
@@ -229,6 +239,10 @@ def render_etf_selection_ui(prefix: str = "etf"):
 
     # Holdings import
     from risk_dashboard.core.holdings import get_holdings_for_etf
+    import re
+
+    def _safe_key(s: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_]", "_", str(s))
 
     # Kandidaten / Ticker rendern (Expander pro Ticker)
     for idx, row in df_candidates.iterrows():
@@ -236,9 +250,10 @@ def render_etf_selection_ui(prefix: str = "etf"):
         with st.expander(f"{ticker}", expanded=False):
             cols = st.columns([6, 2])
             cols[0].write(f"Ticker: **{ticker}**")
-            if cols[1].button("Holdings laden", key=f"{prefix}_load_holdings_{ticker}"):
+            btn_key = f"{prefix}_load_holdings_{_safe_key(ticker)}"
+            if cols[1].button("Holdings laden", key=btn_key):
                 df_hold = get_holdings_for_etf(ticker, api_key=st.secrets.get("HOLDINGS_API_KEY"))
-                if df_hold.empty:
+                if df_hold is None or df_hold.empty:
                     st.warning("Keine Holdings gefunden.")
                 else:
                     st.dataframe(df_hold)
@@ -248,15 +263,26 @@ def render_etf_selection_ui(prefix: str = "etf"):
         if t not in df_candidates["ticker"].values:
             df_candidates = pd.concat([df_candidates, pd.DataFrame([{"ticker": t}])], ignore_index=True)
 
-    # Score‑Berechnung (wie vorher)
+    # Score‑Berechnung (robust)
     comps = []
     for _, row in df_candidates.iterrows():
-        comp = compute_etf_score_components(row.to_dict())
-        total = (weights["ter"] * comp.get("ter_score", 0) +
-                 weights["aum"] * comp.get("aum_score", 0) +
-                 weights["tracking"] * comp.get("tracking_score", 0) +
-                 weights["replication"] * comp.get("replication_score", 0) +
-                 weights["liquidity"] * comp.get("liquidity_score", 0))
+        try:
+            comp = compute_etf_score_components(row.to_dict())
+        except Exception as e:
+            log.exception("compute_etf_score_components failed for row", extra={"seq": next_seq(), "ticker": row.get("ticker"), "error": str(e)})
+            comp = {
+                "ter_score": 0.0,
+                "aum_score": 0.0,
+                "tracking_score": 0.0,
+                "replication_score": 0.0,
+                "liquidity_score": 0.0,
+            }
+
+        total = (weights.get("ter", 0) * comp.get("ter_score", 0) +
+                weights.get("aum", 0) * comp.get("aum_score", 0) +
+                weights.get("tracking", 0) * comp.get("tracking_score", 0) +
+                weights.get("replication", 0) * comp.get("replication_score", 0) +
+                weights.get("liquidity", 0) * comp.get("liquidity_score", 0))
         comp["total_score"] = round(total * 100, 2)
         comp["ticker"] = row.get("ticker")
         comp["name"] = row.get("name")
@@ -264,11 +290,21 @@ def render_etf_selection_ui(prefix: str = "etf"):
         comp["aum"] = row.get("aum")
         comps.append(comp)
 
-    df_scores = pd.DataFrame(comps).sort_values("total_score", ascending=False).reset_index(drop=True)
+    if not comps:
+        st.warning("Keine Kandidaten‑Scores verfügbar. Prüfe die Kandidatenliste oder die Score‑Funktionen.")
+        return
+
+    df_scores = pd.DataFrame(comps)
+    if "total_score" not in df_scores.columns:
+        df_scores["total_score"] = 0.0
+
+    df_scores = df_scores.sort_values("total_score", ascending=False).reset_index(drop=True)
     st.subheader("Rangliste der Kandidaten")
     st.dataframe(df_scores[["ticker","name","total_score","ter_score","aum_score","tracking_score","replication_score","liquidity_score"]], width='stretch')
 
-    # ... restlicher Code unverändert ...
+    # Hinweis: accidental browser dumps removed from source.
+    # If you need an example marker, keep an anonymized template in risk_dashboard/docs/edge_tabs_example.txt
+
 
     # Export-Button
     if st.button("Ergebnisse exportieren"):

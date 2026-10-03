@@ -809,8 +809,6 @@ def normalize_value(v):
     except Exception:
         return []
 
-
-
 def resolve_session_tickers(st_session, prefix="etf", asset_key_name=None):
     candidates = [
         "profile_tickers", "user_tickers", "tickers", "selected_etfs",
