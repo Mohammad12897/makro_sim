@@ -140,20 +140,20 @@ def render_etf_selection_ui(prefix: str = "etf"):
         st.markdown("---")
 
         # Bulk / Freitext Eingabe (Textarea) für Hinzufügen von TICKER oder TICKER:QTY
-        st.subheader("Schnell hinzufügen (einzeln oder mehrere)")
-        ticker_raw = st.text_area(
-            "Ticker hinzufügen (z. B. NVDA oder DAX:1, BTC 2)",
-            placeholder="z. B. NVDA oder DAX:1, BTC 2",
-            key=f"{prefix}_sidebar_ticker_raw",
-            height=100,
-        )
-        qty_default = st.number_input(
-            "Menge (Default für Einträge ohne Menge)",
-            min_value=0,
-            value=1,
-            step=1,
-            key=f"{prefix}_sidebar_qty_default",
-        )
+        #st.subheader("Schnell hinzufügen (einzeln oder mehrere)")
+       # ticker_raw = st.text_area(
+        #    "Ticker hinzufügen (z. B. NVDA oder DAX:1, BTC 2)",
+        #    placeholder="z. B. NVDA oder DAX:1, BTC 2",
+        #    key=f"{prefix}_sidebar_ticker_raw",
+        #    height=100,
+        #)
+        #qty_default = st.number_input(
+        #    "Menge (Default für Einträge ohne Menge)",
+        #    min_value=0,
+        #    value=1,
+        #    step=1,
+        #    key=f"{prefix}_sidebar_qty_default",
+        #)
 
         # Bulk‑Hinzufügen Button ruft Parser + Einfügefunktion auf
 
@@ -366,11 +366,17 @@ def render_etf_selection_ui(prefix: str = "etf"):
     if "manual_weights" not in st.session_state:
         st.session_state["manual_weights"] = {}
 
+    # Helper: sichere Key‑Erzeugung für Widgets
+    import re
+    def _safe_widget_key(prefix: str, name: str) -> str:
+        return f"{prefix}_{re.sub(r'[^A-Za-z0-9_]', '_', str(name))}"
+
     # Slider für manuelle Anpassung (wird beim Render aus session_state initialisiert)
     for t in selected:
-        default = st.session_state["manual_weights"].get(t, 0.0)
-        val = st.slider(f"{t} Gewicht (%)", 0.0, 100.0, value=float(default), key=f"slider_{t}")
-        st.session_state["manual_weights"][t] = val
+        default = float(st.session_state["manual_weights"].get(t, 0.0))
+        slider_key = _safe_widget_key(prefix, f"slider_{t}")
+        val = st.slider(f"{t} Gewicht (%)", 0.0, 100.0, value=default, key=slider_key)
+        st.session_state["manual_weights"][t] = float(val)
 
     # user_weights aus session_state erzeugen (als Dezimalanteile)
     user_weights = {t: st.session_state["manual_weights"].get(t, 0.0) / 100.0 for t in selected}
@@ -380,8 +386,8 @@ def render_etf_selection_ui(prefix: str = "etf"):
     
     # Backtest section
     st.subheader("Backtest der Auswahl")
-    start = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR))
-    end = st.date_input("Enddatum", value=pd.Timestamp.today())
+    start = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR), key=f"{prefix}_start_date")
+    end = st.date_input("Enddatum", value=pd.to_datetime(pd.Timestamp.today().date()), key=f"{prefix}_end_date")
     rebalance = st.selectbox("Rebalancing", ["monthly", "quarterly", "yearly", "none"], index=0, key="etf_rebalance_select")
 
 
@@ -394,8 +400,8 @@ def render_etf_selection_ui(prefix: str = "etf"):
 
     # --- Widgets (oben im UI) ---
     selected = st.multiselect("Wähle ETFs", options=available_etfs, default=["NVDA"])
-    start = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR))
-    end = st.date_input("Enddatum", value=pd.Timestamp.today())
+    start = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR), key=f"{prefix}_start_etf_date")
+    end = st.date_input("Enddatum", value=pd.to_datetime(pd.Timestamp.today().date()), key=f"{prefix}_end_etf_date")
 
     # statt: if prices_loaded: show controls else: hide controls
     # mache:
@@ -516,7 +522,7 @@ def render_etf_selection_ui(prefix: str = "etf"):
                         return
 
                     # Sicherstellen, dass user_weights existiert (Default: equal)
-                    if not isinstance(user_weights, dict):
+                    if not isinstance(user_weights, dict) or not selected:
                         user_weights = {s: 1.0 / len(selected) for s in selected}
 
                     # Remappe user_weights auf price-column keys
@@ -528,6 +534,16 @@ def render_etf_selection_ui(prefix: str = "etf"):
                         else:
                             logger.debug("WARN: Kein Mapping für %s; wird ignoriert.", s)
 
+                    # Normalisieren (sicher gegen Summe 0)
+                    total = sum(user_weights_mapped.values())
+                    if total <= 1e-12:
+                        # fallback: equal weights on mapped_selected
+                        user_weights_mapped = {pc: 1.0 / len(mapped_selected) for pc in mapped_selected}
+                    else:
+                        user_weights_mapped = {k: v / total for k, v in user_weights_mapped.items()}
+
+                    logger.debug("DEBUG: user_weights_mapped keys: %s", list(user_weights_mapped.keys()))
+                       
                     # Normalisieren
                     total = sum(user_weights_mapped.values()) or 1.0
                     user_weights_mapped = {k: v / total for k, v in user_weights_mapped.items()}
@@ -578,7 +594,24 @@ def render_etf_selection_ui(prefix: str = "etf"):
 
                         # defensive Envelope handling
                         resp = bt_response or {}
-                        st.write("BACKTEST RESULT ENVELOPE:", resp)
+
+
+                        # Normalize backtest output into a standard envelope
+                        if isinstance(bt_response, dict) and any(k in bt_response for k in ("ok", "payload", "result")):
+                            resp = bt_response
+                        else:
+                            # build a minimal envelope
+                            resp = {
+                                "ok": True,
+                                "message": None,
+                                "result": bt_response,
+                                "payload": {}
+                            }
+
+                        logger.debug("BACKTEST RESULT ENVELOPE keys=%s", list(resp.keys()))
+                        # UI: only show small, safe parts
+                        st.json({k: resp.get(k) for k in ("ok", "message")})
+
 
                         payload = resp.get("payload", {}) or {}
                         res = resp.get("result", {}) or {}
