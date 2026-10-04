@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 from typing import Dict, List
-import json, os
+import json, os, re
 from risk_dashboard.core.etf_tools import get_etf_candidates_for_index, compute_etf_score_components, get_preset_weights
 from risk_dashboard.utils.persistence import save_user_tickers
 from risk_dashboard.core.data_loader import parse_tickers
@@ -139,49 +139,6 @@ def render_etf_selection_ui(prefix: str = "etf"):
 
         st.markdown("---")
 
-        # Bulk / Freitext Eingabe (Textarea) für Hinzufügen von TICKER oder TICKER:QTY
-        #st.subheader("Schnell hinzufügen (einzeln oder mehrere)")
-       # ticker_raw = st.text_area(
-        #    "Ticker hinzufügen (z. B. NVDA oder DAX:1, BTC 2)",
-        #    placeholder="z. B. NVDA oder DAX:1, BTC 2",
-        #    key=f"{prefix}_sidebar_ticker_raw",
-        #    height=100,
-        #)
-        #qty_default = st.number_input(
-        #    "Menge (Default für Einträge ohne Menge)",
-        #    min_value=0,
-        #    value=1,
-        #    step=1,
-        #    key=f"{prefix}_sidebar_qty_default",
-        #)
-
-        # Bulk‑Hinzufügen Button ruft Parser + Einfügefunktion auf
-
-        # in der UI-Datei, dort wo ticker_raw und qty_default definiert sind
-        #if st.button("Hinzufügen", key=f"{prefix}_add_button"):
-        #    from risk_dashboard.ui_helpers import add_tickers_and_fetch
-        #    from risk_dashboard.input_parsing import parse_ticker_input
-            # parse_ticker_input liefert dict ticker->qty oder list; passe an
-        #    parsed, invalid = parse_ticker_input(ticker_raw, default_qty=int(qty_default))
-        #    if invalid:
-        #        st.error(f"Ungültige Eingaben: {', '.join(invalid)}")
-        #    elif not parsed:
-        #        st.warning("Keine gültigen Ticker erkannt.")
-        #    else:
-        #        tickers = list(parsed.keys())  # oder parsed wenn list
-        #        success, failed, combined = add_tickers_and_fetch(tickers, prefix=prefix, start=DEFAULT_START_STR, end=str(pd.Timestamp.today()))
-        #        if success:
-        #            st.success(f"Erfolgreich geladen: {', '.join(success)}")
-        #        if failed:
-        #            st.warning(f"Keine Preisdaten für: {', '.join(failed)} (übersprungen)")
-                # optional: navigiere zur Analyse
-        #        st.session_state["navigate_to"] = "Holdings Analyse"
-        #        rerun_fn = getattr(st, "experimental_rerun", None)
-        #        if callable(rerun_fn):
-        #            rerun_fn()
-        #        else:
-        #            st.info("Ticker hinzugefügt. Wechsle zur Holdings Analyse.")
-
         # Bulk input moved to app.py sidebar to avoid duplicate widgets and key collisions.
         st.info("Ticker schnell hinzufügen: benutze das Sidebar Formular (Schnell hinzufügen).")
 
@@ -239,7 +196,6 @@ def render_etf_selection_ui(prefix: str = "etf"):
 
     # Holdings import
     from risk_dashboard.core.holdings import get_holdings_for_etf
-    import re
 
     def _safe_key(s: str) -> str:
         return re.sub(r"[^A-Za-z0-9_]", "_", str(s))
@@ -348,28 +304,35 @@ def render_etf_selection_ui(prefix: str = "etf"):
                 st.write("**Komponenten‑Gewichte:**")
                 st.json(weights)
 
-    # Weights override UI (optional)
-    if st.checkbox("Gewichte manuell anpassen"):
-        w_ter = st.slider("TER Gewicht (%)", 0, 100, int(weights["ter"]*100))
-        w_aum = st.slider("AUM Gewicht (%)", 0, 100, int(weights["aum"]*100))
-        w_tracking = st.slider("Tracking Gewicht (%)", 0, 100, int(weights["tracking"]*100))
-        w_rep = st.slider("Replication Gewicht (%)", 0, 100, int(weights["replication"]*100))
-        w_liq = st.slider("Liquidity Gewicht (%)", 0, 100, int(weights["liquidity"]*100))
+    
+    def _safe_widget_key(prefix: str, name: str) -> str:
+        return f"{prefix}_{re.sub(r'[^A-Za-z0-9_]', '_', str(name))}"
+
+    # --- Weights override UI (optional) ---
+    if st.checkbox("Gewichte manuell anpassen", key=f"{prefix}_weights_override_chk"):
+        # ensure weights values exist and are floats
+        w_ter = st.slider("TER Gewicht (%)", 0, 100, int(weights.get("ter", 0.0) * 100), key=f"{prefix}_w_ter")
+        w_aum = st.slider("AUM Gewicht (%)", 0, 100, int(weights.get("aum", 0.0) * 100), key=f"{prefix}_w_aum")
+        w_tracking = st.slider("Tracking Gewicht (%)", 0, 100, int(weights.get("tracking", 0.0) * 100), key=f"{prefix}_w_tracking")
+        w_rep = st.slider("Replication Gewicht (%)", 0, 100, int(weights.get("replication", 0.0) * 100), key=f"{prefix}_w_rep")
+        w_liq = st.slider("Liquidity Gewicht (%)", 0, 100, int(weights.get("liquidity", 0.0) * 100), key=f"{prefix}_w_liq")
+
         total = w_ter + w_aum + w_tracking + w_rep + w_liq
         if total > 0:
-            weights = {"ter": w_ter/total, "aum": w_aum/total, "tracking": w_tracking/total, "replication": w_rep/total, "liquidity": w_liq/total}
+            weights = {
+                "ter": w_ter / total,
+                "aum": w_aum / total,
+                "tracking": w_tracking / total,
+                "replication": w_rep / total,
+                "liquidity": w_liq / total,
+            }
             st.success("Gewichte aktualisiert.")
         else:
             st.error("Summe der Gewichte muss > 0 sein.")
 
-    # Session state für manuelle Gewichte initialisieren (UI-Aufbau)
+    # --- Session state für manuelle Gewichte initialisieren (UI-Aufbau) ---
     if "manual_weights" not in st.session_state:
         st.session_state["manual_weights"] = {}
-
-    # Helper: sichere Key‑Erzeugung für Widgets
-    import re
-    def _safe_widget_key(prefix: str, name: str) -> str:
-        return f"{prefix}_{re.sub(r'[^A-Za-z0-9_]', '_', str(name))}"
 
     # Slider für manuelle Anpassung (wird beim Render aus session_state initialisiert)
     for t in selected:
@@ -378,18 +341,54 @@ def render_etf_selection_ui(prefix: str = "etf"):
         val = st.slider(f"{t} Gewicht (%)", 0.0, 100.0, value=default, key=slider_key)
         st.session_state["manual_weights"][t] = float(val)
 
-    # user_weights aus session_state erzeugen (als Dezimalanteile)
-    user_weights = {t: st.session_state["manual_weights"].get(t, 0.0) / 100.0 for t in selected}
-    # Fallback: falls Summe 0 -> gleichverteilen
-    if sum(user_weights.values()) == 0 and selected:
+    # --- user_weights aus session_state erzeugen (als Dezimalanteile) ---
+    manual = st.session_state.get("manual_weights", {})
+    user_weights = {t: float(manual.get(t, 0.0)) / 100.0 for t in selected}
+
+    # Fallback: falls Summe (nahe) 0 -> gleichverteilen; sonst normalisieren
+    total = sum(user_weights.values())
+    if selected and total <= 1e-12:
         user_weights = {t: 1.0 / len(selected) for t in selected}
-    
-    # Backtest section
+    else:
+        user_weights = {t: (w / total) if total > 0 else 1.0 / len(selected) for t, w in user_weights.items()}
+
+    # --- Backtest section ---
     st.subheader("Backtest der Auswahl")
     start = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR), key=f"{prefix}_start_date")
     end = st.date_input("Enddatum", value=pd.to_datetime(pd.Timestamp.today().date()), key=f"{prefix}_end_date")
-    rebalance = st.selectbox("Rebalancing", ["monthly", "quarterly", "yearly", "none"], index=0, key="etf_rebalance_select")
+    rebalance = st.selectbox("Rebalancing", ["monthly", "quarterly", "yearly", "none"], index=0, key=f"{prefix}_rebalance_select")
 
+    # Backtest Button (verwende die bereits berechneten user_weights)
+    if st.button("Backtest starten", key=f"{prefix}_run_backtest"):
+        logger.debug("DEBUG: selected=%s user_weights=%s", selected, user_weights)
+        if not selected:
+            st.warning("Keine Auswahl getroffen.")
+        else:
+            # Mapping und Normalisierung vor dem Backtest (Beispiel)
+            mapped_selected = [sel_to_price[s] for s in selected if sel_to_price.get(s)]
+            if not mapped_selected:
+                st.error("Keine der ausgewählten Ticker konnten auf Preisspalten gemappt werden.")
+            else:
+                # Remappe user_weights auf price-column keys
+                user_weights_mapped = {}
+                for s, w in user_weights.items():
+                    pc = sel_to_price.get(s)
+                    if pc:
+                        user_weights_mapped[pc] = user_weights_mapped.get(pc, 0.0) + float(w)
+                    else:
+                        logger.debug("WARN: Kein Mapping für %s; wird ignoriert.", s)
+
+                # Normalisieren (sicher gegen Summe 0)
+                total_mapped = sum(user_weights_mapped.values())
+                if total_mapped <= 1e-12:
+                    user_weights_mapped = {pc: 1.0 / len(mapped_selected) for pc in mapped_selected}
+                else:
+                    user_weights_mapped = {k: v / total_mapped for k, v in user_weights_mapped.items()}
+
+                logger.debug("DEBUG: user_weights_mapped keys=%s", list(user_weights_mapped.keys()))
+                # hier run_backtest_flow aufrufen mit user_weights_mapped
+
+    
 
     # falls prices schon geladen werden kann, sonst lade Metadaten zuerst
     try:
