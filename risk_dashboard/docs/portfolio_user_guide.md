@@ -152,7 +152,6 @@ Total Return, CAGR, Volatilität, Sharpe Ratio, Max Drawdown — werden angezeig
 ## Umsetzungsschritte (Priorisierte To‑Do‑Liste)
 
 1. **Accidental paste entfernen**  
- - Suche projektweit nach Debug/Browser‑Dump‑Blöcken (z. B. `edge_all_open_tabs`) und entferne sie vollständig.  
  - Committe die Änderung und starte das Dashboard neu.
 
 2. **UI: Menge‑Feld sichtbar platzieren**  
