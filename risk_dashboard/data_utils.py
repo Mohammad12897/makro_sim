@@ -1,17 +1,18 @@
 # risk_dashboard/data_utils.py
 import time, random, logging
+from datetime import datetime, date, timedelta
+from tracemalloc import start
 from typing import List, Optional, Any, Dict, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import streamlit as st
 import yfinance as yf
 from requests.exceptions import RequestException
-from datetime import datetime, timedelta
 from pathlib import Path
 import inspect
 from types import SimpleNamespace
 from collections import deque
-import re
+import re, json
 
 
 from risk_dashboard.core.holdings import map_holdings_to_pricecols
@@ -27,6 +28,91 @@ from risk_dashboard.config import DEFAULT_START_STR
 def cached_download_prices(tickers, start, end, **kwargs):
     from risk_dashboard.core.etf_tools import download_prices
     return download_prices(tickers, start=start, end=end, **kwargs)
+
+
+def _safe_serialize_value(v: Any):
+    """Return a JSON-serializable representation for mixed payload values."""
+    # Pandas objects
+    if isinstance(v, pd.DataFrame):
+        return {"__type": "dataframe", "columns": list(v.columns), "rows": v.to_dict(orient="records")}
+    if isinstance(v, pd.Series):
+        return {"__type": "series", "values": v.tolist(), "index": v.index.tolist()}
+    # numpy types
+    if isinstance(v, (np.integer, np.floating, np.bool_)):
+        return v.item()
+    # lists/tuples: ensure elements are serializable (flatten nested DataFrames)
+    if isinstance(v, (list, tuple)):
+        out = []
+        for e in v:
+            try:
+                json.dumps(e)
+                out.append(e)
+            except Exception:
+                out.append(repr(e))
+        return out
+    # dicts: sanitize recursively
+    if isinstance(v, dict):
+        return {k: _safe_serialize_value(val) for k, val in v.items()}
+    # fallback: try json, else repr
+    try:
+        json.dumps(v)
+        return v
+    except Exception:
+        return repr(v)
+
+def normalize_envelope(resp: Any) -> dict:
+    """Return a safe envelope dict with serializable payload/result."""
+    if resp is None:
+        return {"ok": False, "message": "no response", "result": {}, "payload": {}}
+    if isinstance(resp, dict):
+        envelope = {"ok": bool(resp.get("ok", True)), "message": resp.get("message"), "result": {}, "payload": {}}
+        # normalize result
+        raw_res = resp.get("result")
+        if raw_res is None:
+            envelope["result"] = {}
+        elif isinstance(raw_res, (pd.DataFrame, pd.Series)):
+            envelope["result"] = _safe_serialize_value(raw_res)
+        elif isinstance(raw_res, dict):
+            envelope["result"] = {k: _safe_serialize_value(v) for k, v in raw_res.items()}
+        else:
+            envelope["result"] = _safe_serialize_value(raw_res)
+        # normalize payload
+        raw_payload = resp.get("payload") or {}
+        if isinstance(raw_payload, dict):
+            envelope["payload"] = {k: _safe_serialize_value(v) for k, v in raw_payload.items()}
+        else:
+            envelope["payload"] = _safe_serialize_value(raw_payload)
+        return envelope
+    # if resp is a DataFrame or Series, wrap it
+    if isinstance(resp, (pd.DataFrame, pd.Series)):
+        return {"ok": True, "message": None, "result": _safe_serialize_value(resp), "payload": {}}
+    # fallback
+    return {"ok": True, "message": None, "result": repr(resp), "payload": {}}
+
+
+def _sanitize_date_param(d):
+    """
+    Liefert None oder 'YYYY-MM-DD' (string). Akzeptiert None, pd.Timestamp, datetime, oder String.
+    """
+    if d is None:
+        return None
+    # pd.Timestamp oder datetime types
+    #if isinstance(d, (pd.Timestamp, datetime.datetime, datetime.date)):
+    if isinstance(d, (pd.Timestamp, datetime, date)):
+        return pd.Timestamp(d).date().isoformat()
+    if isinstance(d, str):
+        # bereits YYYY-MM-DD?
+        if len(d) == 10 and d[4] == "-" and d[7] == "-":
+            return d
+        try:
+            ts = pd.to_datetime(d, errors="coerce")
+            if pd.isna(ts):
+                return None
+            return ts.date().isoformat()
+        except Exception:
+            return None
+    return None
+
 
 def safe_rerun():
     """
@@ -257,37 +343,59 @@ def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = Non
 
     # berechne start/end wenn lookback_days gegeben
     if lookback_days is not None and start is None:
+        # robustes Handling: akzeptiert date, datetime oder string (mit/ohne Zeit)
         end_date = end or datetime.utcnow().date().isoformat()
-        # end kann ein date/string sein; sicherheitshalber als date behandeln
-        if isinstance(end_date, str):
-            end_date_dt = datetime.fromisoformat(end_date)
-        else:
-            end_date_dt = end_date
-        start_dt = (end_date_dt - timedelta(days=lookback_days)).date()
+        # parse sicher mit pandas (tolerant gegenüber Zeitanteilen)
+        end_ts = pd.to_datetime(end_date, errors="coerce")
+        if pd.isna(end_ts):
+            # Fallback: benutze heute als Enddatum
+            end_ts = pd.Timestamp.utcnow()
+        start_dt = (end_ts - pd.Timedelta(days=lookback_days)).date()
         start = start_dt.isoformat()
-        end = end_date_dt.date().isoformat()
+        end = end_ts.date().isoformat()
 
-    logger.debug("fetch_prices_from_yf start tickers=%s start=%s end=%s interval=%s",
-                 tickers, start, end, interval)
+    # sanitize incoming start/end
+    start_s = _sanitize_date_param(start)
+    end_s = _sanitize_date_param(end)
+
+    logger.debug("yf.download tickers=%s start=%s end=%s interval=%s", tickers, start_s, end_s, interval)
 
     try:
-        raw = yf.download(
-            tickers,
-            start=start,
-            end=end,
-            interval=interval,
-            progress=False,
-            group_by="ticker",
-            auto_adjust=auto_adjust,
-            threads=threads,
-            **kwargs
-        )
-    except Exception as e:
-        logger.warning("fetch_prices_from_yf failed for %s: %s", tickers, e)
-        return pd.DataFrame()
+        if start_s is None and end_s is None:
+            logger.debug("Using period fallback for yf.download (5y)")
+            raw = yf.download(
+                tickers,
+                period="5y",
+                interval=interval,
+                progress=False,
+                group_by="ticker",
+                auto_adjust=auto_adjust,
+                threads=threads,
+                **kwargs
+            )
+        else:
+            raw = yf.download(
+                tickers,
+                start=start_s,
+                end=end_s,
+                interval=interval,
+                progress=False,
+                group_by="ticker",
+                auto_adjust=auto_adjust,
+                threads=threads,
+                **kwargs
+            )
+    except ValueError as e:
+        logger.error("yfinance ValueError for %s start=%s end=%s: %s", tickers, start_s, end_s, e)
+        raw = None
+    except Exception:
+        logger.exception("Unexpected error calling yf.download for %s", tickers)
+        raw = None
 
-    if raw is None or raw.empty:
-        logger.warning("fetch_prices_from_yf returned empty DataFrame for %s", tickers)
+    # danach wie gehabt prüfen, ob df None oder leer ist
+    if raw is None or (hasattr(raw, "empty") and raw.empty):
+        logger.warning("fetch_prices_from_yf returned empty DataFrame for %s (start=%s end=%s)", tickers, start_s, end_s)
+        # handle empty according to eure Logik (retry, return empty, etc.)
         return pd.DataFrame()
 
     df = flatten_yf_dataframe(raw)
@@ -561,12 +669,28 @@ from multiprocessing import Process, Queue
 import traceback
 
 def _worker_download(q, tickers, start, end, auto_adjust, threads):
+    # sanitize incoming start/end
+    start_s = _sanitize_date_param(start)
+    end_s = _sanitize_date_param(end)
+
+    # Debug log vor dem Download
+    logger.debug("yf.download tickers=%s start=%s end=%s", tickers, start_s, end_s)
+
     try:
-        raw = yf.download(tickers, start=start, end=end, progress=False,
-                          group_by="ticker", auto_adjust=auto_adjust, threads=threads)
+        if start_s is None and end_s is None:
+            # Fallback: period statt start/end (z. B. 5y)
+            raw = yf.download(tickers, period="5y", progress=False,
+                                group_by="ticker", auto_adjust=auto_adjust, threads=threads)
+        else:
+            raw = yf.download(tickers, start=start_s, end=end_s, progress=False,
+                                group_by="ticker", auto_adjust=auto_adjust, threads=threads)
+        
         q.put(("ok", raw))
+    except ValueError as e:
+        q.put(("err", traceback.format_exc()))
     except Exception as e:
         q.put(("err", traceback.format_exc()))
+
 
 def safe_yf_download(tickers, start, end, auto_adjust=False, threads=False, timeout=60):
     q = Queue()
@@ -712,24 +836,40 @@ def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
     if not tickers:
         return None, pd.DataFrame()
 
-    logger.debug("fetch_prices_quiet_with_used start tickers=%s start=%s end=%s", tickers, start, end)
+    # sanitize incoming start/end
+    start_s = _sanitize_date_param(start)
+    end_s = _sanitize_date_param(end)
 
-    # 1) Versuch: yf.download mit threads=False (sicher auf Windows)
+    # Debug log vor dem Download
+    logger.debug("fetch_prices_quiet_with_used tickers=%s start=%s end=%s ", tickers, start_s, end_s)
 
     try:
-        logger.debug("calling yf.download threads=False for tickers=%s", tickers)
-        raw = yf.download(
-            tickers,
-            start=start,
-            end=end,
-            progress=False,
-            group_by="ticker",
-            auto_adjust=auto_adjust,
-            threads=False
-        )
-        logger.debug("yf.download returned type=%s shape=%s", type(raw), getattr(raw, "shape", None))
+        if start_s is None and end_s is None:
+            # Fallback: period statt start/end (z. B. 5y)
+            raw = yf.download(
+                        tickers,
+                        period="5y",
+                        progress=False,
+                        group_by="ticker",
+                        auto_adjust=auto_adjust,
+                        threads=False
+                    )
+        else:
+            raw = yf.download(
+                        tickers,
+                        start=start_s,
+                        end=end_s,
+                        progress=False,
+                        group_by="ticker",
+                        auto_adjust=auto_adjust,
+                        threads=False
+                    )
+    
 
-        if raw is None or (isinstance(raw, pd.DataFrame) and raw.empty):
+        # danach wie gehabt prüfen, ob df None oder leer ist
+        if raw is None or (hasattr(raw, "empty") and raw.empty):
+            logger.warning("fetch_prices_from_yf returned empty DataFrame for %s (start=%s end=%s)", tickers, start_s, end_s)
+            # handle empty according to eure Logik (retry, return empty, etc.)
             raise RuntimeError("yf.download returned empty")
 
         df = _normalize_yf_raw(raw, tickers, auto_adjust=auto_adjust)
@@ -812,39 +952,36 @@ def normalize_prices(prices: Any) -> pd.DataFrame:
 
 def fetch_prices_for_ticker(ticker: str, start: str = None, end: str = None, interval: str = "1d", **kwargs) -> Optional[pd.DataFrame]:
     """
-    Versucht, Preisdaten für einen einzelnen Ticker zu laden.
-    Rückgabe: DataFrame (oder Series) bei Erfolg, None bei Fehler / no data.
-    kwargs werden an die zugrundeliegende fetch-Funktion weitergereicht.
+    Wrapper: versucht, Preisdaten für einen einzelnen Ticker zu laden.
+    Gibt DataFrame/Series zurück oder None bei Fehler / no data.
     """
+    start_s = _sanitize_date_param(start)
+    end_s = _sanitize_date_param(end)
+
     try:
-        # safe_fetch ist eure bestehende Funktion, die retries macht
-        df = safe_fetch([ticker], start=start, end=end, interval=interval, **kwargs)
-        # safe_fetch kann DataFrame mit Spalte ticker oder dict zurückgeben
+        # safe_fetch ist eure bestehende Funktion; passe den Namen an, falls anders
+        df = safe_fetch([ticker], start=start_s, end=end_s, interval=interval, **kwargs)
+
         if df is None:
             logger.debug("fetch_prices_for_ticker: no data for %s (None)", ticker)
             return None
 
-        # normalize to DataFrame
+        # Falls safe_fetch ein dict zurückgibt, hole den Eintrag für ticker
         if isinstance(df, dict):
-            # dict mapping ticker->Series/DF
             val = df.get(ticker)
             if val is None:
                 logger.debug("fetch_prices_for_ticker: dict returned but no key %s", ticker)
                 return None
             df_norm = normalize_prices(val)
         else:
-            # df is DataFrame or Series
             df_norm = normalize_prices(df)
 
-        # if still empty -> treat as no data
         if df_norm is None or df_norm.empty:
             logger.debug("fetch_prices_for_ticker: empty after normalize for %s", ticker)
             return None
 
-        # keep only first numeric column if multiple (project-specific)
-        # optional: prefer 'Close'/'Adj Close' if present
         return df_norm
 
-    except Exception as e:
-        logger.exception("fetch_prices_for_ticker failed for %s: %s", ticker, e)
+    except Exception:
+        logger.exception("fetch_prices_for_ticker failed for %s", ticker)
         return None
