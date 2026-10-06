@@ -1850,10 +1850,13 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
     df_bt = None
 
     if isinstance(bt_etf, dict):
-        # Entferne versehentliche Browser‑Dumps falls vorhanden
-        bt_etf.pop("edge_all_open_tabs", None)
+        from risk_dashboard.utils.sanitize import sanitize_bt_etf
+        bt_safe = sanitize_bt_etf(bt_etf)
+        candidate = bt_safe.get("result") or bt_safe.get("payload") or bt_safe
+        logger.debug("bt_etf sanitized keys=%s", list(bt_safe.keys()))
+        # weiterverarbeitung mit candidate ...
 
-        candidate = bt_etf.get("result") or bt_etf.get("payload") or bt_etf
+        #candidate = bt_etf.get("result") or bt_etf.get("payload") or bt_etf
         try:
             if isinstance(candidate, pd.DataFrame):
                 df_bt = candidate.copy()
