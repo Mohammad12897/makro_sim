@@ -7,6 +7,7 @@ import logging
 
 
 from risk_dashboard.data_utils import fetch_prices_from_yf, find_price_for_ticker, normalize_ticker, fetch_last_prices, safe_rerun
+from risk_dashboard.data_utils import fetch_prices_for_ticker, normalize_prices
 logger = logging.getLogger(__name__)
 
 
@@ -314,12 +315,7 @@ def consolidate_portfolio_df(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_grouped[cols]
 
-
 def add_tickers_and_fetch(tickers: list[str], prefix: str = "etf", start: str = None, end: str = None):
-    """
-    Fügt Ticker zur Session hinzu, lädt Preise pro Ticker, kombiniert erfolgreiche Preise,
-    aktualisiert session_state und gibt (success_list, failed_list, combined_df) zurück.
-    """
     success = []
     failed = []
     prices_accum = {}
@@ -334,19 +330,15 @@ def add_tickers_and_fetch(tickers: list[str], prefix: str = "etf", start: str = 
             logger.debug("add_tickers_and_fetch: no data for %s", t)
             continue
 
-        # normalize and pick a sensible column if needed
         df_norm = normalize_prices(df)
         if df_norm.empty:
             failed.append(t)
             continue
 
-        # choose a single series if multiple columns (project-specific)
-        # prefer 'Close' or first column
+        # pick sensible column (prefer Close)
         if df_norm.shape[1] > 1:
             if "Close" in df_norm.columns:
                 col = "Close"
-            elif "close" in [c.lower() for c in df_norm.columns]:
-                col = [c for c in df_norm.columns if c.lower() == "close"][0]
             else:
                 col = df_norm.columns[0]
             prices_accum[t] = df_norm[col]
@@ -355,34 +347,28 @@ def add_tickers_and_fetch(tickers: list[str], prefix: str = "etf", start: str = 
 
         success.append(t)
 
-    # combine successful prices
     combined = pd.DataFrame()
     if prices_accum:
         try:
             combined = pd.concat(prices_accum, axis=1)
-            # ensure columns are ticker names (not MultiIndex)
             combined.columns = [str(c) for c in combined.columns]
         except Exception:
             combined = pd.DataFrame(prices_accum)
 
-    # update session_state only with successful results
     if not combined.empty:
         st.session_state.setdefault("user_tickers", [])
         for t in success:
             if t not in st.session_state["user_tickers"]:
                 st.session_state["user_tickers"].append(t)
-        # merge with existing prices_for_bt if present
         existing = st.session_state.get("prices_for_bt")
         if existing is None or (hasattr(existing, "empty") and existing.empty):
             st.session_state["prices_for_bt"] = combined
         else:
             try:
                 merged = pd.concat([existing, combined], axis=1)
-                # drop duplicate columns if any
                 merged = merged.loc[:, ~merged.columns.duplicated()]
                 st.session_state["prices_for_bt"] = merged
             except Exception:
                 st.session_state["prices_for_bt"] = combined
 
-    # return for UI feedback
     return success, failed, combined

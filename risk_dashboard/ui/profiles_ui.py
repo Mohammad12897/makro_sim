@@ -21,7 +21,7 @@ import logging, inspect, pathlib
 
 from risk_dashboard.core.data import portfolio
 from risk_dashboard.etf_candidates import add_etf_candidates
-from risk_dashboard.data_utils import fetch_price_history_bulk, price_history_to_prices_df
+from risk_dashboard.data_utils import fetch_price_history_bulk, price_history_to_prices_df, _safe_serialize_value, normalize_envelope
 from risk_dashboard.core.screening import screen_and_rank
 from risk_dashboard.core.config import load_profiles, save_profile, load_etf_universe
 from risk_dashboard.core.utils import resolve_components, analyze_portfolio_components, classify_etf
@@ -1813,46 +1813,91 @@ def profile_form_ui(
                         flag_key=f"{prefix}_backtest_flag",
                     )
 
-                # Normalize None -> envelope (einheitlich)
-                if result is None:
-                    logger.debug("safe_backtest_call returned None")
-                    result = {"ok": False, "message": "Interner Fehler: kein Ergebnis vom Backtest.", "payload": {}, "result": {}}
+                # defensive normalization: immer ein Envelope dict zurückgeben
+                resp = normalize_envelope(result)
 
-                # defensive Envelope handling
-                resp = result or {}
-                st.write("BACKTEST RESULT ENVELOPE:", resp)
+                # Debug: nur sichere, kleine Ausgabe
+                logger.debug("BACKTEST RESULT ENVELOPE keys=%s", list(resp.keys()))
+                st.json({k: resp.get(k) for k in ("ok", "message")})
 
+                # sichere Extraktion (keine Truth-Evaluation von DataFrames)
                 payload = resp.get("payload", {}) or {}
                 res = resp.get("result", {}) or {}
 
-                if not resp.get("ok"):
-                    st.warning(resp.get("message", "Backtest fehlgeschlagen."))
-                    removed = payload.get("removed") or payload.get("removed_tickers") or []
-                    if removed:
-                        st.warning("Entfernte Ticker: " + ", ".join(removed))
-                    run_disabled = True
-                else:
-                    run_disabled = False
-                    pv = res.get("portfolio_value")
-                    metrics = res.get("metrics", {})
-                    if pv is None:
-                        st.warning("Kein Backtest‑Ergebnis (portfolio_value fehlt).")
-                    else:
-                        st.line_chart(pv)
-                        st.write(metrics)
-                        trades_df = pd.DataFrame(res.get("trades", []))
+                # Wenn result als serialisiertes DataFrame geliefert wurde, rekonstruiere und zeige
+                if isinstance(res, dict) and res.get("__type") == "dataframe":
+                    df_rows = res.get("rows", [])
+                    try:
+                        df = pd.DataFrame(df_rows)
+                        st.dataframe(df)
+                    except Exception:
+                        st.write("Backtest result (table) — konnte nicht als DataFrame dargestellt werden.")
+
+                # Wenn result ein dict mit portfolio_value enthält, plotte es (sicher)
+                elif isinstance(res, dict) and "portfolio_value" in res:
+                    pv = res["portfolio_value"]
+                    try:
+                        st.line_chart(pd.DataFrame(pv))
+                    except Exception:
+                        st.write("Portfolio value vorhanden, aber konnte nicht geplottet werden.")
+
+                # Trades anzeigen, falls vorhanden (aus payload oder result)
+                trades = payload.get("trades") or (res.get("trades") if isinstance(res, dict) else None)
+                if trades:
+                    try:
+                        trades_df = pd.DataFrame(trades)
                         st.dataframe(trades_df)
                         if not trades_df.empty:
                             csv = trades_df.to_csv(index=False)
                             st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
+                    except Exception:
+                        st.write("Trades vorhanden, aber konnten nicht als Tabelle dargestellt werden.")
+
+                # Defensive handling für verschiedene result-Formate
+                if result is None:
+                    logger.debug("safe_backtest_call returned None")
+                    resp = {"ok": False, "message": "Interner Fehler: kein Ergebnis vom Backtest.", "payload": {}, "result": {}}
+                else:
+                    # Falls normalize_envelope noch kein dict geliefert hat (sehr unwahrscheinlich), baue ein Minimal‑Envelope
+                    if not isinstance(resp, dict):
+                        resp = {"ok": True, "message": None, "result": result, "payload": {}}
+
+                # Weitere, explizite Prüfung auf dict‑Envelope (vermeide if resp: ...)
+                if isinstance(resp, dict):
+                    if not resp.get("ok"):
+                        st.error(resp.get("message", "Backtest fehlgeschlagen"))
+                        removed = (resp.get("payload") or {}).get("removed") or (resp.get("payload") or {}).get("removed_tickers") or []
+                        if removed:
+                            st.warning("Entfernte Ticker: " + ", ".join(removed))
+                        if (resp.get("payload") or {}).get("common_shape"):
+                            st.info(f"Gemeinsame Handelstage: {resp['payload']['common_shape']}")
+                    else:
+                        # ok == True: falls result noch nicht angezeigt wurde, versuche sichere Darstellung
+                        safe_res = resp.get("result", {}) or {}
+                        if isinstance(safe_res, dict) and "portfolio_value" in safe_res:
+                            try:
+                                st.line_chart(pd.DataFrame(safe_res["portfolio_value"]))
+                                st.write(safe_res.get("metrics", {}))
+                            except Exception:
+                                st.write("Portfolio value vorhanden, aber konnte nicht geplottet werden.")
+                        elif hasattr(safe_res, "shape") and hasattr(safe_res, "columns"):
+                            # falls run_backtest_flow direkt ein DataFrame zurückgegeben hat
+                            try:
+                                st.line_chart(safe_res)
+                            except Exception:
+                                st.write("Backtest lieferte ein DataFrame, konnte aber nicht geplottet werden.")
+                        # trades wurden oben bereits behandelt
 
                 # Logging (nutze die bereits initialisierten payload/res)
-                logger.debug("BACKTEST CALL ARGS: available_mapped=%s weights=%s start=%s end=%s",
-                            available_mapped, user_weights_mapped, start_arg, end_arg)
+                logger.debug(
+                    "BACKTEST CALL ARGS: available_mapped=%s weights=%s start=%s end=%s",
+                    available_mapped, user_weights_mapped, start_arg, end_arg
+                )
                 logger.debug("BACKTEST RESULT ENVELOPE: %s", repr(resp)[:2000])
 
-                pv = res.get("portfolio_value")
-                metrics = res.get("metrics", {})
+                # sichere Inspektion von portfolio_value (res ist oben gesetzt)
+                pv = res.get("portfolio_value") if isinstance(res, dict) else None
+                metrics = res.get("metrics", {}) if isinstance(res, dict) else {}
 
                 logger.debug("portfolio_value type=%s shape=%s", type(pv), getattr(pv, "shape", None))
                 try:
@@ -1861,6 +1906,7 @@ def profile_form_ui(
                     logger.debug("portfolio_value nunique=%s std=%s", nunique, std)
                 except Exception:
                     logger.exception("Error inspecting portfolio_value")
+
                 # --- Defensive: konstantes Portfolio erkennen ---
                 def is_constant_portfolio(pv):
                     if pv is None:

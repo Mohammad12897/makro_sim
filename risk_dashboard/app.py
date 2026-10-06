@@ -1,4 +1,4 @@
-﻿# risk_dashboard/app.py
+# risk_dashboard/app.py
 # $env:PYTHONPATH="C:\Projects\makro_sim"
 # im aktivierten venv
 # python -m pip install --upgrade pip
@@ -1735,86 +1735,106 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
             st.error(f"Backtest fehlgeschlagen: {e}")
             st.stop()
 
-        # Defensive Prüfung der Rückgabe von run_backtest_flow
-        # bt_etf kann dict (Envelope) oder DataFrame/objekt sein — vereinheitlichen
-        if isinstance(bt_etf, dict):
-            maybe_df = bt_etf.get("result", {}) .get("portfolio_value") or bt_etf.get("payload", {}).get("portfolio_value")
-            if maybe_df is not None:
-                bt_etf = normalize_prices(maybe_df)
-            else:
-                # Versuch, dict in DataFrame zu konvertieren; falls nicht möglich, leeres DF
-                try:
-                    bt_etf = pd.DataFrame(bt_etf)
-                except Exception:
-                    bt_etf = pd.DataFrame()
-
-        if not isinstance(bt_etf, pd.DataFrame):
-            st.error("Interner Fehler: Backtest lieferte kein DataFrame. Siehe Logs.")
-            logger.debug("backtest returned unexpected type: %s; content: %s", type(bt_etf), str(bt_etf)[:1000])
-            st.stop()
-
-        # jetzt ist bt_etf ein DataFrame, Zugriff auf .columns ist sicher
-        if "date" not in bt_etf.columns:
-            logger.warning("Backtest result missing 'date' column")
-
-        # Envelope-Handling: falls run_backtest_flow ein Envelope dict zurückgibt, extrahiere resp/result
-        # Wenn bt_etf ursprünglich ein Envelope war, resp ist das Envelope; sonst bauen wir ein neutrales Envelope
-        resp = bt_etf if isinstance(bt_etf, dict) else {}
-        # Falls run_backtest_flow bereits ein Envelope zurückgegeben hat, benutze es; sonst versuche aus res/payload zu lesen
-        if not resp:
-            # Falls run_backtest_flow lieferte, dass res/payload in 'bt_etf' nicht vorhanden sind,
-            # versuche die standardisierte Rückgabe aus der Funktion (falls vorhanden)
-            # (Dieser Block bleibt bewusst defensiv; konkrete Extraktion hängt von run_backtest_flow API ab.)
-            resp = bt_etf if isinstance(bt_etf, dict) else {}
-
-        st.write("BACKTEST RESULT ENVELOPE:", resp)
-
-        payload = resp.get("payload", {}) or {}
-        res = resp.get("result", {}) or {}
-
-        if not resp.get("ok"):
-            st.warning(resp.get("message", "Backtest fehlgeschlagen."))
-            removed = payload.get("removed") or payload.get("removed_tickers") or []
-            if removed:
-                st.warning("Entfernte Ticker: " + ", ".join(removed))
-            run_disabled = True
+        # --- Defensive Vereinheitlichung der Rückgabe ---
+        # bt_etf kann ein Envelope-dict, ein DataFrame oder ein anderes Objekt sein.
+        # Ziel: resp ist immer ein dict mit keys: ok, message, result, payload
+        if isinstance(bt_etf, dict) and any(k in bt_etf for k in ("ok", "result", "payload")):
+            resp = bt_etf
         else:
-            run_disabled = False
-            pv = res.get("portfolio_value")
-            metrics = res.get("metrics", {})
-            if pv is None:
-                st.warning("Kein Backtest‑Ergebnis (portfolio_value fehlt).")
+            # Wenn dict ohne Envelope-Struktur geliefert wurde, versuche result/payload zu extrahieren
+            if isinstance(bt_etf, dict):
+                resp = {
+                    "ok": True,
+                    "message": None,
+                    "result": bt_etf.get("result", bt_etf),
+                    "payload": bt_etf.get("payload", {}),
+                }
             else:
-                st.line_chart(pv)
-                st.write(metrics)
-                trades_df = pd.DataFrame(res.get("trades", []))
+                # bt_etf ist kein dict (z.B. DataFrame). Packe es als result in ein Envelope
+                resp = {"ok": True, "message": None, "result": bt_etf, "payload": {}}
+
+        logger.debug("BACKTEST RESULT ENVELOPE keys=%s", list(resp.keys()))
+        st.json({k: resp.get(k) for k in ("ok", "message")})
+
+        # --- Sichere Extraktion ohne Truth-Evaluation von DataFrames ---
+        payload = resp.get("payload", {}) or {}
+        res = resp.get("result", {}) if resp.get("result", None) is not None else {}
+
+        # Wenn result serialisierte DataFrame-Repräsentation enthält, rekonstruiere sie
+        if isinstance(res, dict) and res.get("__type") == "dataframe":
+            df_rows = res.get("rows", [])
+            try:
+                df = pd.DataFrame(df_rows)
+                st.dataframe(df)
+            except Exception:
+                st.write("Backtest result (table) — konnte nicht als DataFrame dargestellt werden.")
+
+        # Wenn result ein dict mit portfolio_value enthält, plotte es sicher
+        elif isinstance(res, dict) and "portfolio_value" in res:
+            pv = res["portfolio_value"]
+            try:
+                st.line_chart(pd.DataFrame(pv))
+            except Exception:
+                st.write("Portfolio value vorhanden, aber konnte nicht geplottet werden.")
+
+        # Wenn result bereits ein DataFrame ist, zeige/plotte es defensiv
+        elif hasattr(res, "shape") and hasattr(res, "columns"):
+            try:
+                # optional: prüfe auf 'date' Spalte, aber nicht mit `if res:` vermeiden
+                if "date" not in res.columns:
+                    logger.warning("Backtest result missing 'date' column")
+                st.line_chart(res)
+                st.dataframe(res.head(200))
+            except Exception:
+                st.write("Backtest lieferte ein DataFrame, konnte aber nicht vollständig dargestellt werden.")
+
+        # Trades anzeigen (payload oder result)
+        trades = None
+        if isinstance(payload, dict):
+            trades = payload.get("trades")
+        if trades is None and isinstance(res, dict):
+            trades = res.get("trades")
+
+        if trades:
+            try:
+                trades_df = pd.DataFrame(trades)
                 st.dataframe(trades_df)
                 if not trades_df.empty:
                     csv = trades_df.to_csv(index=False)
                     st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
+            except Exception:
+                st.write("Trades vorhanden, aber konnten nicht als Tabelle dargestellt werden.")
 
-            # Defensive Envelope‑Verarbeitung (falls run_backtest_flow Envelope zurückgibt)
-            if isinstance(bt_etf, dict):
-                if not bt_etf.get("ok"):
-                    st.error(bt_etf.get("message", "Backtest fehlgeschlagen"))
-                    payload = bt_etf.get("payload") or {}
-                    if payload.get("removed"):
-                        st.warning("Entfernte Ticker: " + ", ".join(payload["removed"]))
-                    if payload.get("common_shape"):
-                        st.info(f"Gemeinsame Handelstage: {payload['common_shape']}")
-                else:
-                    res = bt_etf.get("result", {})
-                    if isinstance(res, dict) and "portfolio_value" in res:
-                        st.line_chart(res["portfolio_value"])
-                        st.write(res.get("metrics", {}))
-                        trades_df = pd.DataFrame(res.get("trades", []))
-                        st.dataframe(trades_df)
-                        if not trades_df.empty:
-                            csv = trades_df.to_csv(index=False)
-                            st.download_button("Export trades CSV", data=csv, file_name="trades.csv")
-                    else:
-                        st.error("Backtest lieferte kein Ergebnis.")
+        # Fehler-/Statusbehandlung des Envelope
+        if not isinstance(resp, dict):
+            resp = {"ok": False, "message": "Unerwartetes Backtest-Format", "result": {}, "payload": {}}
 
+        if not resp.get("ok"):
+            st.error(resp.get("message", "Backtest fehlgeschlagen"))
+            removed = (resp.get("payload") or {}).get("removed") or (resp.get("payload") or {}).get("removed_tickers") or []
+            if removed:
+                st.warning("Entfernte Ticker: " + ", ".join(removed))
+            if (resp.get("payload") or {}).get("common_shape"):
+                st.info(f"Gemeinsame Handelstage: {resp['payload']['common_shape']}")
+
+        # Logging: sichere, begrenzte Ausgabe
+        logger.debug("BACKTEST CALL ARGS: weights_by_ticker=%s", weights_by_ticker)
+        logger.debug("BACKTEST RESULT ENVELOPE (truncated): %s", repr(resp)[:2000])
+
+        # Sichere Inspektion von portfolio_value (nur wenn dict)
+        pv = None
+        metrics = {}
+        if isinstance(res, dict):
+            pv = res.get("portfolio_value")
+            metrics = res.get("metrics", {})
+
+        logger.debug("portfolio_value type=%s shape=%s", type(pv), getattr(pv, "shape", None))
+        try:
+            nunique = pv.nunique() if hasattr(pv, "nunique") else None
+            std = float(pv.std()) if hasattr(pv, "std") else None
+            logger.debug("portfolio_value nunique=%s std=%s", nunique, std)
+        except Exception:
+            logger.exception("Error inspecting portfolio_value")
     else:
         bt_etf = backtest_etf_regime_portfolio(
             ticker_map,
@@ -1826,56 +1846,126 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
     st.write("DEBUG etf_prices:", etf_prices)
     st.write("DEBUG bt_etf (vor Anpassung):", bt_etf)
 
-    # Robustes Handling von 'date' und 'equity' Spalten
-    if bt_etf is not None and not (hasattr(bt_etf, "empty") and bt_etf.empty):
-        # Falls 'date' fehlt, versuche Alternativen
-        if "date" not in bt_etf.columns:
-            alt_date_cols = [c for c in bt_etf.columns if "date" in c.lower() or "time" in c.lower()]
+    # --- 1) Vereinheitliche bt_etf in ein DataFrame df_bt (defensiv) ---
+    df_bt = None
+
+    if isinstance(bt_etf, dict):
+        # Entferne versehentliche Browser‑Dumps falls vorhanden
+        bt_etf.pop("edge_all_open_tabs", None)
+
+        candidate = bt_etf.get("result") or bt_etf.get("payload") or bt_etf
+        try:
+            if isinstance(candidate, pd.DataFrame):
+                df_bt = candidate.copy()
+            elif isinstance(candidate, list):
+                df_bt = pd.DataFrame(candidate)
+            elif isinstance(candidate, dict):
+                # 1) serialisierte DataFrame-Repräsentation?
+                if candidate.get("__type") == "dataframe" and isinstance(candidate.get("rows"), list):
+                    df_bt = pd.DataFrame(candidate["rows"])
+                else:
+                    # 2) Wenn alle Werte Sequenzen gleicher Länge sind -> dict-of-columns
+                    vals = list(candidate.values())
+                    if vals and all(isinstance(v, (list, tuple, np.ndarray, pd.Series)) for v in vals):
+                        lengths = [len(v) for v in vals]
+                        if len(set(lengths)) == 1:
+                            try:
+                                df_bt = pd.DataFrame(candidate)
+                            except Exception:
+                                logger.exception("dict->DataFrame failed despite uniform lengths")
+                                df_bt = pd.DataFrame()
+                        else:
+                            # unterschiedliche Längen -> nicht tabellarisch
+                            logger.debug("Candidate dict has sequence values but differing lengths: %s", lengths)
+                            df_bt = pd.DataFrame()
+                    else:
+                        # 3) Falls ein bekanntes Feld mit tabellarischen Daten existiert, extrahiere es
+                        if "portfolio_value" in candidate:
+                            pv = candidate["portfolio_value"]
+                            if isinstance(pv, pd.DataFrame):
+                                df_bt = pv.copy()
+                            elif isinstance(pv, list):
+                                # Liste von (date, value) oder Liste von Werten
+                                try:
+                                    df_bt = pd.DataFrame(pv)
+                                except Exception:
+                                    df_bt = pd.DataFrame({"portfolio_value": pv})
+                            else:
+                                df_bt = pd.DataFrame()
+                        elif "trades" in candidate and isinstance(candidate["trades"], list):
+                            try:
+                                df_bt = pd.DataFrame(candidate["trades"])
+                            except Exception:
+                                df_bt = pd.DataFrame()
+                        else:
+                            # 4) Keine tabellarische Struktur erkennbar
+                            logger.debug("Candidate dict is not tabular and contains keys: %s", list(candidate.keys()))
+                            df_bt = pd.DataFrame()
+            else:
+                df_bt = pd.DataFrame()
+        except Exception:
+            logger.exception("Could not convert backtest candidate to DataFrame")
+    elif hasattr(bt_etf, "shape") and hasattr(bt_etf, "columns"):
+        df_bt = bt_etf.copy()
+
+    if df_bt is None:
+        logger.debug("bt_etf not tabular; using empty DataFrame for safe handling.")
+        df_bt = pd.DataFrame()
+
+    # --- 2) Sichere 'date' Erkennung, Konvertierung und Plotten (nur auf df_bt) ---
+    if df_bt.empty:
+        st.warning("Backtest lieferte keine tabellarischen Ergebnisse (leeres DataFrame). Kein Plot.")
+    else:
+        # finde/benenne alternative Datumsspalte
+        if "date" not in df_bt.columns:
+            alt_date_cols = [c for c in df_bt.columns if "date" in c.lower() or "time" in c.lower()]
             if alt_date_cols:
-                bt_etf = bt_etf.rename(columns={alt_date_cols[0]: "date"})
+                df_bt = df_bt.rename(columns={alt_date_cols[0]: "date"})
                 st.write(f"DEBUG: Umbenannt {alt_date_cols[0]} -> 'date'")
             else:
-                tmp = bt_etf.reset_index()
+                tmp = df_bt.reset_index()
                 datetime_cols = [c for c in tmp.columns if pd.api.types.is_datetime64_any_dtype(tmp[c])]
                 if datetime_cols:
-                    bt_etf = tmp.rename(columns={datetime_cols[0]: "date"})
+                    df_bt = tmp.rename(columns={datetime_cols[0]: "date"})
                     st.write(f"DEBUG: reset_index ergab datetime Spalte {datetime_cols[0]} -> 'date'")
                 else:
-                    st.error("bt_etf enthält keine Spalte 'date' und kein Datetime-Index. Plot wird nicht erstellt.")
-                    st.write("DEBUG bt_etf info:", tmp.info())
-                    bt_etf = pd.DataFrame()
+                    st.error("Keine 'date'-Spalte oder Datetime-Index gefunden. Kein Plot.")
+                    st.write("DEBUG df_bt info:", tmp.info())
+                    df_bt = pd.DataFrame()
 
-        if not bt_etf.empty:
-            if "equity" not in bt_etf.columns:
-                alt_equity = [c for c in bt_etf.columns if any(k in c.lower() for k in ("equity", "portfolio", "value", "nav"))]
-                if alt_equity:
-                    bt_etf = bt_etf.rename(columns={alt_equity[0]: "equity"})
-                    st.write(f"DEBUG: Umbenannt {alt_equity[0]} -> 'equity'")
+        # konvertiere Datum sicher, drop NaT, sortiere
+        if not df_bt.empty and "date" in df_bt.columns:
+            df_bt = df_bt.copy()  # vermeidet SettingWithCopyWarning
+            df_bt["date"] = pd.to_datetime(df_bt["date"], errors="coerce")
+            df_bt = df_bt.dropna(subset=["date"])
+            if df_bt.empty:
+                st.warning("Nach Datumskonvertierung keine gültigen Zeilen mehr.")
+            else:
+                df_bt = df_bt.sort_values("date").reset_index(drop=True)
+                st.write("DEBUG df_bt (final):", df_bt.head())
+
+                # Wähle y-Spalte: equity bevorzugt, sonst portfolio_value
+                y_col = "equity" if "equity" in df_bt.columns else ("portfolio_value" if "portfolio_value" in df_bt.columns else None)
+                if y_col is None:
+                    st.error("Weder 'equity' noch 'portfolio_value' in den Daten. Kein Plot.")
                 else:
-                    st.error("bt_etf enthält keine Spalte 'equity'. Plot wird nicht erstellt.")
-                    st.write("DEBUG bt_etf columns:", bt_etf.columns.tolist())
-                    bt_etf = pd.DataFrame()
+                    try:
+                        fig_bt2 = px.line(
+                            df_bt,
+                            x="date",
+                            y=y_col,
+                            color="regime" if "regime" in df_bt.columns else None,
+                            title="Regime-basierte Equity-Kurve (ETF-Backtest)"
+                        )
+                        fig_bt2.update_layout(height=500, yaxis_title="Equity (indexiert)")
+                        st.plotly_chart(fig_bt2, use_container_width=True)
+                    except Exception:
+                        logger.exception("Fehler beim Erstellen des Plotly-Figures")
+                        st.error("Fehler beim Erstellen des Plots.")
 
-    if bt_etf is None or (hasattr(bt_etf, "empty") and bt_etf.empty):
-        st.warning("Nach Prüfungen ist bt_etf leer. Kein Plot.")
-    else:
-        bt_etf["date"] = pd.to_datetime(bt_etf["date"], errors="coerce")
-        bt_etf = bt_etf.dropna(subset=["date"])
-        bt_etf = bt_etf.sort_values("date").reset_index(drop=True)
-        st.write("DEBUG bt_etf (final):", bt_etf.head())
-
-        fig_bt2 = px.line(
-            bt_etf,
-            x="date",
-            y="equity",
-            color="regime" if "regime" in bt_etf.columns else None,
-            title="Regime-basierte Equity-Kurve (ETF-Backtest)"
-        )
-        fig_bt2.update_layout(height=500, yaxis_title="Equity (indexiert)")
-        st.plotly_chart(fig_bt2, width="stretch")
-
-    if bt_etf is not None and not (hasattr(bt_etf, "empty") and bt_etf.empty):
-        stats_etf = performance_stats(bt_etf)
+    # --- 3) Performance-Kennzahlen nur aus df_bt berechnen ---
+    if not df_bt.empty:
+        stats_etf = performance_stats(df_bt)
         st.subheader("Performance-Kennzahlen (ETF-Backtest)")
         st.write(stats_etf)
     else:
