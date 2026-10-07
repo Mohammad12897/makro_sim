@@ -447,12 +447,24 @@ elif choice == "Upload":
     handle_portfolio_upload_with_price_lookup(prefix="profile")
 
     # Sidebar/Handler Ticker-Synchronisation (sofort nach Hinzufügen)
-    user_tickers = st.session_state.get("user_tickers", [])  # Liste aus Sidebar
+    # 1) Session-Daten / Fallback-Synchronisation
+    user_tickers = st.session_state.get("user_tickers", [])
 
-    # Lade oder initialisiere portfolio_df
+    # prefer explicit portfolio_df, but fallback to portfolio (compatibility)
     df = st.session_state.get("portfolio_df")
     if df is None:
-        df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
+        # try legacy key
+        legacy = st.session_state.get("portfolio")
+        if legacy is not None:
+            # normalize legacy to portfolio_df shape
+            df = legacy.copy()
+            # ensure required columns exist
+            for col in ("price", "market_value", "weight"):
+                if col not in df.columns:
+                    df[col] = None
+            df = df[["ticker", "quantity", "price", "market_value", "weight"]]
+        else:
+            df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
 
     # Konsolidieren, falls nötig (bereinigt Rohstrings wie "DAX 3")
     try:
