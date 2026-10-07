@@ -497,9 +497,22 @@ elif choice == "Holdings Analyse":
 
     # 1) Session-Daten / Fallback-Synchronisation
     user_tickers = st.session_state.get("user_tickers", [])
+
+    # prefer explicit portfolio_df, but fallback to portfolio (compatibility)
     df = st.session_state.get("portfolio_df")
     if df is None:
-        df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
+        # try legacy key
+        legacy = st.session_state.get("portfolio")
+        if legacy is not None:
+            # normalize legacy to portfolio_df shape
+            df = legacy.copy()
+            # ensure required columns exist
+            for col in ("price", "market_value", "weight"):
+                if col not in df.columns:
+                    df[col] = None
+            df = df[["ticker", "quantity", "price", "market_value", "weight"]]
+        else:
+            df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
 
     # Normalisiere vorhandene ticker-Liste
     existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()] if not df.empty else []
@@ -528,8 +541,21 @@ elif choice == "Holdings Analyse":
         logger.exception("Fehler bei consolidate_portfolio_df in Holdings Analyse: %s", e)
     
     # 4) Anzeige: Tabelle + Charts
+    # ensure df has expected columns and types
+    df = df.copy()
+    df["ticker"] = df["ticker"].astype(str).str.upper().str.strip()
+    df["quantity"] = pd.to_numeric(df.get("quantity", 0), errors="coerce").fillna(0).astype(int)
+
+    # ensure price and market_value columns exist
+    if "price" not in df.columns:
+        df["price"] = None
+    if "market_value" not in df.columns:
+        # if price is missing, market_value will be 0/NaN; keep numeric type
+        df["market_value"] = df["quantity"] * df["price"].fillna(0)
+
     st.subheader("Holdings Tabelle")
-    st.dataframe(df)
+    st.dataframe(df.reset_index(drop=True))
+
 
     # Gewichtsdiagramm (robust)
     try:
