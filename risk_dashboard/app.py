@@ -814,81 +814,62 @@ def render_sidebar(available_etfs):
     )
 
     from risk_dashboard.utils.parsers import parse_quick_add
-    def add_tickers_from_quick_add(text: str, default_qty: int = 1):
-        if not text or not text.strip():
-            st.warning("Bitte gib mindestens einen Ticker ein.")
-            return
+    # oben: importiere die funktion einmal statisch (empfohlen)
+    from risk_dashboard.ui_helpers import add_tickers_and_fetch  # oder korrekter Pfad
 
-        parsed = parse_quick_add(text, default_qty=default_qty)
-        if not parsed:
-            st.error("Keine gültigen Einträge erkannt.")
-            return
-
-        # Initialisiere session state für Portfolio falls nötig
-        if "portfolio" not in st.session_state:
-            st.session_state["portfolio"] = pd.DataFrame(columns=["ticker", "quantity"])
-
-        df = st.session_state["portfolio"].copy()
-        added = []
-        skipped = []
-
-        for item in parsed:
-            t = normalize_ticker(item["ticker"])
-            q = int(item.get("quantity", default_qty))
-            if q <= 0:
-                skipped.append((t, "ungültige Menge"))
-                continue
-
-            if t in df["ticker"].values:
-                df.loc[df["ticker"] == t, "quantity"] += q
-                added.append((t, q, "erhöht"))
-            else:
-                df = pd.concat([df, pd.DataFrame([{"ticker": t, "quantity": q}])], ignore_index=True)
-                added.append((t, q, "neu"))
-
-        st.session_state["portfolio"] = df
-
-        if added:
-            st.success(f"Hinzugefügt / aktualisiert: {', '.join([f'{t} ({q})' for t,q,_ in added])}")
-            logger.debug("Added tickers: %s", [t for t,q,_ in added])
-        if skipped:
-            st.warning(f"Übersprungen: {', '.join([f'{t} ({reason})' for t,reason in skipped])}")
-            logger.debug("Skipped tickers: %s", skipped)
-
-    # Button auslösen
+    # oben idealerweise: from risk_dashboard.data_utils import add_tickers_and_fetch
     if st.sidebar.button("Hinzufügen", key=f"{prefix}_btn_add_tickers"):
-        # parse_quick_add liefert Liste von {"ticker":..., "quantity":...}
         parsed = parse_quick_add(ticker_raw, default_qty=int(qty_default))
         if not parsed:
             st.warning("Keine gültigen Ticker erkannt.")
         else:
-            # Extrahiere Tickerliste und optional Mengen (hier: nur Ticker an add_tickers_and_fetch)
-            tickers = [item["ticker"] for item in parsed]
-            # Optional: wenn add_tickers_and_fetch Mengen akzeptiert, übergebe sie; sonst nur tickers
-            try:
-                from risk_dashboard.ui_helpers import add_tickers_and_fetch
-            except Exception:
-                logger.exception("Konnte add_tickers_and_fetch nicht importieren")
-                st.error("Interner Fehler beim Hinzufügen der Ticker.")
-                tickers = []
+            # Normalisiere Ticker und baue tickers_with_qty
+            tickers_with_qty = []
+            for item in parsed:
+                t = normalize_ticker(item["ticker"])
+                q = int(item.get("quantity", int(qty_default)))
+                if q <= 0:
+                    continue
+                tickers_with_qty.append((t, q))
 
-            if tickers:
+            # Update portfolio in session_state (persistiert Mengen)
+            portfolio = st.session_state.get("portfolio")
+            if portfolio is None:
+                portfolio = pd.DataFrame(columns=["ticker", "quantity"])
+            for t, q in tickers_with_qty:
+                if t in portfolio["ticker"].values:
+                    portfolio.loc[portfolio["ticker"] == t, "quantity"] = (
+                        portfolio.loc[portfolio["ticker"] == t, "quantity"].astype(int) + q
+                    )
+                else:
+                    portfolio = pd.concat([portfolio, pd.DataFrame([{"ticker": t, "quantity": q}])], ignore_index=True)
+            st.session_state["portfolio"] = portfolio
+
+            # Lade Preise nur für unique tickers
+            tickers = list({t for t, _ in tickers_with_qty})
+            try:
                 success, failed, combined = add_tickers_and_fetch(
                     tickers,
                     prefix=prefix,
                     start=DEFAULT_START_STR,
                     end=str(pd.Timestamp.today()),
                 )
-                if success:
-                    st.success(f"Erfolgreich geladen: {', '.join(success)}")
-                if failed:
-                    st.warning(f"Keine Preisdaten für: {', '.join(failed)} (übersprungen)")
-                # optional: navigiere zur Analyse
-                st.session_state["navigate_to"] = "Holdings Analyse"
-                rerun_fn = getattr(st, "experimental_rerun", None)
-                if rerun_fn:
-                    rerun_fn()
-        
+            except Exception:
+                logger.exception("Konnte add_tickers_and_fetch nicht importieren/ausführen")
+                st.error("Interner Fehler beim Laden der Preisdaten")
+                success, failed, combined = [], [], pd.DataFrame()
+
+            if success:
+                st.success(f"Erfolgreich geladen: {', '.join(success)}")
+            if failed:
+                st.warning(f"Keine Preisdaten für: {', '.join(failed)} (übersprungen)")
+
+            # Navigiere zur Analyse und rerun
+            st.session_state["navigate_to"] = "Holdings Analyse"
+            rerun_fn = getattr(st, "experimental_rerun", None)
+            if rerun_fn:
+                rerun_fn()
+
     st.sidebar.markdown("---")
 
     # ----- Einzel-Ticker Analyse (separates Feld) -----
