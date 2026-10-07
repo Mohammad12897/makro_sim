@@ -315,60 +315,123 @@ def consolidate_portfolio_df(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_grouped[cols]
 
-def add_tickers_and_fetch(tickers: list[str], prefix: str = "etf", start: str = None, end: str = None):
+def add_tickers_and_fetch(tickers_with_qty, prefix="etf", start=None, end=None):
+    """
+    Load price series for tickers and persist quantities into session_state portfolio.
+
+    - Accepts either:
+        * list[str] (tickers)
+        * list[tuple[str,int]] or list[list] (ticker, qty)
+    - Loads prices (uses fetch_prices_for_ticker and normalize_prices)
+    - Updates st.session_state["user_tickers"], st.session_state["prices_for_bt"]
+    - If qty information provided, updates st.session_state["portfolio"]
+    - Returns (success, failed, combined_df)
+    """
+    # Normalize input: detect (ticker, qty) pairs or plain ticker list
+    qty_map = {}
+    if tickers_with_qty and isinstance(tickers_with_qty[0], (list, tuple)):
+        tickers = [str(t).strip().upper() for t, _ in tickers_with_qty]
+        qty_map = {str(t).strip().upper(): int(q) for t, q in tickers_with_qty}
+    else:
+        tickers = [str(t).strip().upper() for t in tickers_with_qty] if tickers_with_qty else []
+
     success = []
     failed = []
     prices_accum = {}
 
     for t in tickers:
-        t = t.strip()
         if not t:
             continue
-        df = fetch_prices_for_ticker(t, start=start, end=end, auto_adjust=True, threads=False)
+        try:
+            df = fetch_prices_for_ticker(t, start=start, end=end, auto_adjust=True, threads=False)
+        except Exception:
+            logger.exception("add_tickers_and_fetch: fetch_prices_for_ticker raised for %s", t)
+            failed.append(t)
+            continue
+
         if df is None or (hasattr(df, "empty") and df.empty):
             failed.append(t)
             logger.debug("add_tickers_and_fetch: no data for %s", t)
             continue
 
-        df_norm = normalize_prices(df)
-        if df_norm.empty:
+        try:
+            df_norm = normalize_prices(df)
+        except Exception:
+            logger.exception("add_tickers_and_fetch: normalize_prices failed for %s", t)
             failed.append(t)
             continue
 
+        if df_norm is None or (hasattr(df_norm, "empty") and df_norm.empty):
+            failed.append(t)
+            logger.debug("add_tickers_and_fetch: normalized empty for %s", t)
+            continue
+
         # pick sensible column (prefer Close)
-        if df_norm.shape[1] > 1:
-            if "Close" in df_norm.columns:
-                col = "Close"
+        try:
+            if df_norm.shape[1] > 1:
+                col = "Close" if "Close" in df_norm.columns else df_norm.columns[0]
+                prices_accum[t] = df_norm[col]
             else:
-                col = df_norm.columns[0]
-            prices_accum[t] = df_norm[col]
-        else:
-            prices_accum[t] = df_norm.iloc[:, 0]
+                prices_accum[t] = df_norm.iloc[:, 0]
+            success.append(t)
+        except Exception:
+            logger.exception("add_tickers_and_fetch: error selecting price series for %s", t)
+            failed.append(t)
+            continue
 
-        success.append(t)
-
+    # Build combined DataFrame from accumulated series
     combined = pd.DataFrame()
     if prices_accum:
         try:
             combined = pd.concat(prices_accum, axis=1)
+            # ensure simple string column names
             combined.columns = [str(c) for c in combined.columns]
         except Exception:
-            combined = pd.DataFrame(prices_accum)
-
-    if not combined.empty:
-        st.session_state.setdefault("user_tickers", [])
-        for t in success:
-            if t not in st.session_state["user_tickers"]:
-                st.session_state["user_tickers"].append(t)
-        existing = st.session_state.get("prices_for_bt")
-        if existing is None or (hasattr(existing, "empty") and existing.empty):
-            st.session_state["prices_for_bt"] = combined
-        else:
+            # fallback: try constructing DataFrame directly
             try:
-                merged = pd.concat([existing, combined], axis=1)
-                merged = merged.loc[:, ~merged.columns.duplicated()]
-                st.session_state["prices_for_bt"] = merged
+                combined = pd.DataFrame(prices_accum)
             except Exception:
-                st.session_state["prices_for_bt"] = combined
+                logger.exception("add_tickers_and_fetch: failed to build combined DataFrame")
+                combined = pd.DataFrame()
+
+    # Persist user_tickers and prices_for_bt in session_state
+    st.session_state.setdefault("user_tickers", [])
+    for t in success:
+        if t not in st.session_state["user_tickers"]:
+            st.session_state["user_tickers"].append(t)
+
+    existing = st.session_state.get("prices_for_bt")
+    if existing is None or (hasattr(existing, "empty") and existing.empty):
+        st.session_state["prices_for_bt"] = combined
+    else:
+        try:
+            merged = pd.concat([existing, combined], axis=1)
+            merged = merged.loc[:, ~merged.columns.duplicated()]
+            st.session_state["prices_for_bt"] = merged
+        except Exception:
+            logger.exception("add_tickers_and_fetch: merging prices_for_bt failed, replacing with combined")
+            st.session_state["prices_for_bt"] = combined
+
+    # After successful loads, update portfolio quantities from qty_map
+    if qty_map:
+        portfolio = st.session_state.get("portfolio")
+        if portfolio is None:
+            portfolio = pd.DataFrame(columns=["ticker", "quantity"])
+        # ensure ticker column exists
+        if "ticker" not in portfolio.columns:
+            portfolio["ticker"] = []
+        if "quantity" not in portfolio.columns:
+            portfolio["quantity"] = 0
+
+        for t in success:
+            q = int(qty_map.get(t, 1))
+            if t in portfolio["ticker"].values:
+                portfolio.loc[portfolio["ticker"] == t, "quantity"] = (
+                    portfolio.loc[portfolio["ticker"] == t, "quantity"].astype(int) + q
+                )
+            else:
+                portfolio = pd.concat([portfolio, pd.DataFrame([{"ticker": t, "quantity": q}])], ignore_index=True)
+
+        st.session_state["portfolio"] = portfolio
 
     return success, failed, combined
