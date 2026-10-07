@@ -20,6 +20,13 @@ from risk_dashboard.core.holdings import map_holdings_to_pricecols
 logger = logging.getLogger(__name__)
 
 
+MIN_DUMP_TOKEN_OCCURRENCES = 1
+MAX_STR_LEN = 2000
+TRUNCATE_STR_LEN = 500
+TRUNCATE_LIST_LEN = 200
+
+
+
 DEFAULT_MARKERS_FILE = Path(__file__).parents[1] / "docs" / "default_edge_markers.txt"
 DOCS_EXAMPLE = Path(__file__).parents[1] / "docs" / "edge_tabs_example.txt"
 from risk_dashboard.config import DEFAULT_START_STR
@@ -191,40 +198,78 @@ def do_add_tickers(holdings_list, prefix, asset_key, prices=None):
     return mapped_cols, missing
 
 def _load_edge_markers():
-    # Versuche zuerst die projektinterne docs-Datei
+    # wie bei dir: lade aus docs, fallback auf DEFAULT_MARKERS_FILE
     try:
         text = DOCS_EXAMPLE.read_text(encoding="utf-8")
-        markers = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
-        return markers
     except Exception:
-        # Fallback: separate, kontrollierte Datei mit harmlosen Markern
         try:
             text = DEFAULT_MARKERS_FILE.read_text(encoding="utf-8")
-            return [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
         except Exception:
-            # Letzter Rückfall: keine Marker
             return []
+    markers = []
+    for ln in text.splitlines():
+        ln = ln.strip()
+        if not ln or ln.startswith("#"):
+            continue
+        # nur alphanumerische tokens, keine JSON-Blöcke
+        token = re.sub(r'[^A-Za-z0-9_]', '', ln)
+        if token:
+            markers.append(token.lower())
+    return markers
 
+def sanitize_bt_etf(bt_etf):
+    if not isinstance(bt_etf, dict):
+        return bt_etf
+    bt = dict(bt_etf)
+    try:
+        markers = _load_edge_markers()  # _load_edge_markers sollte in demselben Modul oder importiert sein
+        markers = [re.sub(r'[^a-z0-9_]', '', m.lower()) for m in markers if m]
+    except Exception:
+        markers = []
+
+    for k in list(bt.keys()):
+        v = bt.get(k)
+        if isinstance(v, str):
+            s = v.lower()
+            if markers and any(m in s for m in markers) and len(s) > MAX_STR_LEN:
+                bt.pop(k, None)
+                logging.warning("sanitize_bt_etf removed suspicious string key %s (len=%d)", k, len(s))
+                continue
+        if isinstance(v, (list, tuple)) and len(v) > TRUNCATE_LIST_LEN:
+            bt[k] = list(v)[:TRUNCATE_LIST_LEN]
+            logging.debug("sanitize_bt_etf truncated list key %s to %d items", k, TRUNCATE_LIST_LEN)
+
+    ALLOWED_BT_KEYS = {"result", "payload", "prices", "portfolio_value", "trades", "ok", "message"}
+    bt_clean = {k: v for k, v in bt.items() if k in ALLOWED_BT_KEYS}
+
+    for k, v in list(bt_clean.items()):
+        if isinstance(v, str) and len(v) > TRUNCATE_STR_LEN:
+            bt_clean[k] = v[:TRUNCATE_STR_LEN] + "...[truncated]"
+        if isinstance(v, (list, tuple, np.ndarray, pd.Series)) and len(v) > TRUNCATE_LIST_LEN:
+            bt_clean[k] = list(v)[:TRUNCATE_LIST_LEN]
+
+    return bt_clean
 
 def sanitize_session_state():
-    """
-    Entfernt nur eindeutig verdächtige session_state-Keys, die
-    große Strings mit den in docs definierten Markern enthalten.
-    Wird einmalig beim App-Start aufgerufen.
-    """
     markers = _load_edge_markers()
+    if not markers:
+        return []
     removed = []
     for k in list(st.session_state.keys()):
         v = st.session_state.get(k)
         if not isinstance(v, str):
             continue
-        # konservative Heuristik: Marker + sehr große Länge
-        if any(marker in v for marker in markers) and len(v) > 2000:
+        s = v.lower()
+        # heuristik: marker vorkommen UND sehr große Länge
+        marker_hits = sum(1 for m in markers if m in s)
+        if marker_hits >= MIN_DUMP_TOKEN_OCCURRENCES and len(s) > MAX_STR_LEN:
+            # optional: erst in Backup verschieben, dann entfernen
             st.session_state.pop(k, None)
             removed.append(k)
-            logging.warning("sanitize_session_state removed suspicious key %s (len=%d)", k, len(v))
+            logging.warning("sanitize_session_state removed suspicious key %s len=%d hits=%d", k, len(s), marker_hits)
     if removed:
         logging.info("sanitize_session_state removed keys: %s", removed)
+    return removed
 
 def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     """

@@ -27,6 +27,7 @@ import logging
 import threading
 from pathlib import Path
 
+
 # Project root and output dirs
 project_root = Path(__file__).resolve().parents[1]
 if str(project_root) not in sys.path:
@@ -792,16 +793,18 @@ def render_sidebar(available_etfs):
     st.sidebar.title("Portfolio Eingabe")
 
     # ----- Bulk / Freitext Eingabe (unterstützt TICKER, TICKER:QTY, mehrere Einträge) -----
+    # Sidebar: Schnell hinzufügen
     st.sidebar.subheader("Schnell hinzufügen")
+    prefix = "main"  # passe an, falls du mehrere Bereiche hast
     logger.debug("st.sidebar.text_area with prefix=%s", prefix)
 
-    # Sidebar: Bulk / Freitext Eingabe (einzige Hinzufügemethode)
     ticker_raw = st.sidebar.text_area(
         "Ticker hinzufügen (z. B. NVDA oder DAX:1, BTC 2)",
         placeholder="z. B. NVDA oder DAX:1, BTC 2",
         key=f"{prefix}_sidebar_ticker_raw",
         height=100,
     )
+
     qty_default = st.sidebar.number_input(
         "Menge (Default für Einträge ohne Menge)",
         min_value=0,
@@ -809,29 +812,82 @@ def render_sidebar(available_etfs):
         step=1,
         key=f"{prefix}_sidebar_qty_default",
     )
+
+    from risk_dashboard.utils.parsers import parse_quick_add
+    def add_tickers_from_quick_add(text: str, default_qty: int = 1):
+        if not text or not text.strip():
+            st.warning("Bitte gib mindestens einen Ticker ein.")
+            return
+
+        parsed = parse_quick_add(text, default_qty=default_qty)
+        if not parsed:
+            st.error("Keine gültigen Einträge erkannt.")
+            return
+
+        # Initialisiere session state für Portfolio falls nötig
+        if "portfolio" not in st.session_state:
+            st.session_state["portfolio"] = pd.DataFrame(columns=["ticker", "quantity"])
+
+        df = st.session_state["portfolio"].copy()
+        added = []
+        skipped = []
+
+        for item in parsed:
+            t = normalize_ticker(item["ticker"])
+            q = int(item.get("quantity", default_qty))
+            if q <= 0:
+                skipped.append((t, "ungültige Menge"))
+                continue
+
+            if t in df["ticker"].values:
+                df.loc[df["ticker"] == t, "quantity"] += q
+                added.append((t, q, "erhöht"))
+            else:
+                df = pd.concat([df, pd.DataFrame([{"ticker": t, "quantity": q}])], ignore_index=True)
+                added.append((t, q, "neu"))
+
+        st.session_state["portfolio"] = df
+
+        if added:
+            st.success(f"Hinzugefügt / aktualisiert: {', '.join([f'{t} ({q})' for t,q,_ in added])}")
+            logger.debug("Added tickers: %s", [t for t,q,_ in added])
+        if skipped:
+            st.warning(f"Übersprungen: {', '.join([f'{t} ({reason})' for t,reason in skipped])}")
+            logger.debug("Skipped tickers: %s", skipped)
+
+    # Button auslösen
     if st.sidebar.button("Hinzufügen", key=f"{prefix}_btn_add_tickers"):
-        from risk_dashboard.ui_helpers import add_tickers_and_fetch
-        from risk_dashboard.input_parsing import parse_ticker_input
-        # parse_ticker_input liefert dict ticker->qty oder list; passe an
-        parsed, invalid = parse_ticker_input(ticker_raw, default_qty=int(qty_default))
-        if invalid:
-            st.error(f"Ungültige Eingaben: {', '.join(invalid)}")
-        elif not parsed:
+        # parse_quick_add liefert Liste von {"ticker":..., "quantity":...}
+        parsed = parse_quick_add(ticker_raw, default_qty=int(qty_default))
+        if not parsed:
             st.warning("Keine gültigen Ticker erkannt.")
         else:
-            tickers = list(parsed.keys())  # oder parsed wenn list
-            success, failed, combined = add_tickers_and_fetch(tickers, prefix=prefix, start=DEFAULT_START_STR, end=str(pd.Timestamp.today()))
-            if success:
-                st.success(f"Erfolgreich geladen: {', '.join(success)}")
-            if failed:
-                st.warning(f"Keine Preisdaten für: {', '.join(failed)} (übersprungen)")
-            # optional: navigiere zur Analyse
-            st.session_state["navigate_to"] = "Holdings Analyse"
-            rerun_fn = getattr(st, "experimental_rerun", None)
-            if callable(rerun_fn):
-                rerun_fn()
-            else:
-                st.info("Ticker hinzugefügt. Wechsle zur Holdings Analyse.")
+            # Extrahiere Tickerliste und optional Mengen (hier: nur Ticker an add_tickers_and_fetch)
+            tickers = [item["ticker"] for item in parsed]
+            # Optional: wenn add_tickers_and_fetch Mengen akzeptiert, übergebe sie; sonst nur tickers
+            try:
+                from risk_dashboard.ui_helpers import add_tickers_and_fetch
+            except Exception:
+                logger.exception("Konnte add_tickers_and_fetch nicht importieren")
+                st.error("Interner Fehler beim Hinzufügen der Ticker.")
+                tickers = []
+
+            if tickers:
+                success, failed, combined = add_tickers_and_fetch(
+                    tickers,
+                    prefix=prefix,
+                    start=DEFAULT_START_STR,
+                    end=str(pd.Timestamp.today()),
+                )
+                if success:
+                    st.success(f"Erfolgreich geladen: {', '.join(success)}")
+                if failed:
+                    st.warning(f"Keine Preisdaten für: {', '.join(failed)} (übersprungen)")
+                # optional: navigiere zur Analyse
+                st.session_state["navigate_to"] = "Holdings Analyse"
+                rerun_fn = getattr(st, "experimental_rerun", None)
+                if rerun_fn:
+                    rerun_fn()
         
     st.sidebar.markdown("---")
 
@@ -1821,6 +1877,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
         logger.debug("BACKTEST CALL ARGS: weights_by_ticker=%s", weights_by_ticker)
         logger.debug("BACKTEST RESULT ENVELOPE (truncated): %s", repr(resp)[:2000])
 
+
         # Sichere Inspektion von portfolio_value (nur wenn dict)
         pv = None
         metrics = {}
@@ -1849,14 +1906,21 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
     # --- 1) Vereinheitliche bt_etf in ein DataFrame df_bt (defensiv) ---
     df_bt = None
 
+
     if isinstance(bt_etf, dict):
-        from risk_dashboard.utils.sanitize import sanitize_bt_etf
+        from risk_dashboard.data_utils import sanitize_bt_etf
         bt_safe = sanitize_bt_etf(bt_etf)
         candidate = bt_safe.get("result") or bt_safe.get("payload") or bt_safe
-        logger.debug("bt_etf sanitized keys=%s", list(bt_safe.keys()))
+        logging.debug("bt_etf sanitized keys=%s", list(bt_safe.keys()))
         # weiterverarbeitung mit candidate ...
+        logging.debug(
+            "BACKTEST RESULT ENVELOPE (truncated): ok=%s message=%s payload_keys=%s result_type=%s",
+            bt_safe.get("ok"),
+            (bt_safe.get("message")[:200] + "...") if isinstance(bt_safe.get("message"), str) and len(bt_safe.get("message"))>200 else bt_safe.get("message"),
+            list(bt_safe.get("payload", {}).keys()) if isinstance(bt_safe.get("payload"), dict) else None,
+            type(bt_safe.get("result")).__name__
+        )
 
-        #candidate = bt_etf.get("result") or bt_etf.get("payload") or bt_etf
         try:
             if isinstance(candidate, pd.DataFrame):
                 df_bt = candidate.copy()
