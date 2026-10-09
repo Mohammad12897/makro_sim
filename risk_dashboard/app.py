@@ -22,6 +22,7 @@
 # risk_dashboard/app.py
 # --- Logging must be configured before importing streamlit or other app modules ---
 import os
+import re
 import sys
 import logging
 import threading
@@ -90,6 +91,14 @@ def add_ticker_callback(prefix, asset_key, stable_input_key):
         if raw_val:
             mapped, missing = do_add_tickers([raw_val], prefix, asset_key, prices=prices)
             st.session_state[stable_input_key] = ""
+
+            # Debug: was wurde gemappt / fehlt
+            logger.debug("add_ticker_callback mapped=%s missing=%s raw=%s", mapped, missing, raw_val)
+            st.sidebar.write("DEBUG add_ticker_callback mapped", mapped)
+            st.sidebar.write("DEBUG add_ticker_callback missing", missing)
+            # optional: show current prices_for_bt cols
+            prices = st.session_state.get("prices_for_bt")
+            st.sidebar.write("DEBUG prices_for_bt cols", None if prices is None else list(prices.columns))
             # Feedback
             if missing:
                 st.warning(f"Automatisches Mapping fehlgeschlagen für: {missing}")
@@ -399,29 +408,29 @@ for k in custom_pages:
     if k not in pages:
         pages[k] = None
 
-# --- Debug: sofort prüfen, welche Keys wir haben ---
-#st.sidebar.write("pages:", list(pages.keys()))
-#st.sidebar.write("session keys:", list(st.session_state.keys()))        
 
-# navigation override BEFORE widget instantiation
-if "navigate_to" in st.session_state:
-    # setze den widget-default-Wert nur wenn Selectbox noch nicht existiert
-    # wir setzen hier den session_state key, das ist sicher vor der Selectbox
-    st.session_state["app_sidebar_page_choice"] = st.session_state.pop("navigate_to")
+# Docs automatisch (bereits oben erzeugt: pages dict)
+page_options = list(pages.keys())  # z.B. ["Dashboard","Upload","Holdings Analyse","Einstellungen"]
 
-# Sidebar Selectbox (Key stabil)
-choice = st.sidebar.selectbox("Seite wählen", list(pages.keys()), key="app_sidebar_page_choice")
+# Wenn ein navigate_to gesetzt wurde, poppe und setze default für das Widget
+default_choice = st.session_state.pop("navigate_to", None)
+if default_choice:
+    st.session_state.setdefault("app_sidebar_page_choice", default_choice)
+
+# Erzeuge die Sidebar-Selectbox genau einmal (stabiler Key)
+choice = st.sidebar.selectbox("Seite wählen", options=page_options, key="app_sidebar_page_choice")
 
 # kontextuelle Einführung nur wenn md vorhanden
 md_path = pages.get(choice)
 if isinstance(md_path, str) and md_path.endswith(".md"):
     show_intro(md_path)
 
-st.title("Risk Dashboard")
+st.title("Macroeconomic Risk Dashboard")
 
 # per-render registry (muss VOR uploader/widget-Aufrufen stehen)
 ss = st.session_state
 ss["_rendered_widget_keys"] = []
+
 
 # --- Seiteninhalt ---
 if choice == "Dashboard":
@@ -482,22 +491,18 @@ elif choice == "Upload":
 
     if new_tickers:
         from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio
+
+        # Portfolio aktualisieren (kein Fetch hier)
         add_new_tickers_to_portfolio(new_tickers)
 
-        # setze navigate_to für sicheren Seitenwechsel
+        # sichere Navigation: setze Flag und rerun einmal
         st.session_state["navigate_to"] = "Holdings Analyse"
-        rerun_fn = getattr(st, "experimental_rerun", None)
-        if callable(rerun_fn):
-            rerun_fn()
-        else:
-            st.info("Ticker hinzugefügt. Klicke unten, um zur Analyse zu wechseln.")
+        st.experimental_rerun()
 
+    # Button: manuelle Navigation zur Analyse
     if st.button("Zur Analyse wechseln", key="app_go_to_analysis"):
-        st.session_state["app_sidebar_page_choice"] = "Holdings Analyse"
-        rerun_fn = getattr(st, "experimental_rerun", None)
-        if callable(rerun_fn):
-            rerun_fn()
-
+        st.session_state["navigate_to"] = "Holdings Analyse"
+        st.experimental_rerun()
 
     st.sidebar.write("portfolio_df head:", st.session_state.get("portfolio_df"))
     st.sidebar.write("prices_for_bt cols:", list(st.session_state.get("prices_for_bt").columns) if isinstance(st.session_state.get("prices_for_bt"), pd.DataFrame) else st.session_state.get("prices_for_bt"))
@@ -537,42 +542,110 @@ elif choice == "Holdings Analyse":
 
     # lade aktualisiertes df aus session (falls add_new... es aktualisiert hat)
     df = st.session_state.get("portfolio_df", df)
+
+    # --- Sicherer prices-Guard
     prices = st.session_state.get("prices_for_bt")
+    if prices is None:
+        prices = pd.DataFrame()
+    logger.debug("Holdings Analyse: portfolio_df present=%s", "portfolio_df" in st.session_state)
+    st.sidebar.write("DEBUG portfolio_df", st.session_state.get("portfolio_df"))
+    st.sidebar.write("DEBUG prices_for_bt cols", None if prices is None else list(prices.columns))
 
-    # 2) Falls nach allem noch kein Portfolio vorhanden ist, abbrechen
-    if df is None or df.empty:
-        st.info("Kein Portfolio geladen. Bitte im Upload Tab hochladen oder Ticker hinzufügen.")
-        st.stop()
-
-    # 3) Konsolidierung: gleiche Ticker zusammenfassen (falls Rohstrings vorhanden)
-    try:
-        from risk_dashboard.ui_helpers import consolidate_portfolio_df
-        df = consolidate_portfolio_df(df)
-        st.session_state["portfolio_df"] = df
-    except Exception as e:
-        logger.exception("Fehler bei consolidate_portfolio_df in Holdings Analyse: %s", e)
-    
-    # 4) Anzeige: Tabelle + Charts
-    # ensure df has expected columns and types
+    # Konsolidieren und Normalisieren
+    from risk_dashboard.ui_helpers import consolidate_portfolio_df
+    df = consolidate_portfolio_df(df)
     df = df.copy()
     df["ticker"] = df["ticker"].astype(str).str.upper().str.strip()
     df["quantity"] = pd.to_numeric(df.get("quantity", 0), errors="coerce").fillna(0).astype(int)
+    df["price"] = pd.to_numeric(df.get("price"), errors="coerce")  # CSV-Preise numerisch
 
-    # ensure price and market_value columns exist
-    if "price" not in df.columns:
-        df["price"] = None
-    if "market_value" not in df.columns:
-        # if price is missing, market_value will be 0/NaN; keep numeric type
-        df["market_value"] = df["quantity"] * df["price"].fillna(0)
+    # Wenn keine Preisdaten vorhanden sind: Warnung, aber nicht die ganze App crashen
+    if prices is None or getattr(prices, "empty", True):
+        st.warning("Preisdaten sind nicht geladen. Bitte Preise laden oder Cache prüfen.")
+        st.subheader("Holdings Tabelle")
+        st.dataframe(df.reset_index(drop=True))
+        st.stop()
 
+    # Mapping holdings -> price columns (case-insensitive)
+    cols_upper_map = {c.upper(): c for c in prices.columns}
+    mapped_cols = []
+    missing = []
+    for t in df["ticker"].astype(str).str.upper().str.strip():
+        if t in cols_upper_map:
+            mapped_cols.append(cols_upper_map[t])
+        else:
+            t_simple = re.sub(r'(\.L$|-USD$|/USD$)', '', t)
+            candidate = None
+            for cu, orig in cols_upper_map.items():
+                if cu == t_simple or cu.startswith(t_simple) or t_simple.startswith(cu):
+                    candidate = orig
+                    break
+            if candidate:
+                mapped_cols.append(candidate)
+            else:
+                mapped_cols.append(None)
+                missing.append(t)
+
+    if missing:
+        st.warning(f"Für diese Ticker fehlen Preise oder Mapping: {', '.join(missing)}")
+        logger.debug("Holdings Analyse missing mapping: %s", missing)
+
+    available_mapped = [c for c in mapped_cols if c is not None]
+    if not available_mapped:
+        st.info("Keine passenden Preisspalten für Performance‑Berechnung gefunden.")
+        st.subheader("Holdings Tabelle")
+        st.dataframe(df.reset_index(drop=True))
+        st.stop()
+
+    # letzte Preise extrahieren
+    last_prices = {}
+    for col in available_mapped:
+        s = prices[col].dropna()
+        if not s.empty:
+            last_prices[col.upper()] = s.iloc[-1]
+
+    # Build map_df and merge (left join preserves CSV price)
+    map_df = pd.DataFrame({
+        "ticker_norm": df["ticker"].astype(str).str.upper().str.strip(),
+        "mapped_col": mapped_cols
+    })
+    display = df.copy()
+    display["ticker_norm"] = display["ticker"].astype(str).str.upper().str.strip()
+    display = display.merge(map_df, on="ticker_norm", how="left")
+
+    # Normalize last_prices keys and choose price: prefer CSV price, fallback to last_prices
+    last_prices_upper = {k.upper(): v for k, v in last_prices.items()}
+
+    def choose_price(row):
+        p = row.get("price")
+        if pd.notna(p) and p != 0:
+            return p
+        mc = row.get("mapped_col")
+        if mc:
+            return last_prices_upper.get(mc.upper())
+        return None
+
+    display["price"] = display.apply(choose_price, axis=1)
+
+    # compute market_value and weight
+    display["market_value"] = display["quantity"] * display["price"].fillna(0)
+    total_mv = display["market_value"].sum()
+    display["weight"] = (display["market_value"] / total_mv * 100).fillna(0) if total_mv > 0 else 0
+
+    # Anzeige (einmalig)
     st.subheader("Holdings Tabelle")
-    st.dataframe(df.reset_index(drop=True))
+    st.dataframe(display[["ticker","quantity","price","market_value","weight"]].reset_index(drop=True))
 
+    # Performance: nutze available_mapped (Original-Spaltennamen)
+    available_for_perf = [c for c in available_mapped if c in prices.columns]
+    if not available_for_perf:
+        st.info("Keine passenden Preisspalten für Performance‑Berechnung gefunden.")
+        st.stop()
 
-    # Gewichtsdiagramm (robust)
+    # Gewichtsdiagramm (robust) — aus display
     try:
-        if "weight" in df.columns and not df["weight"].isnull().all():
-            st.bar_chart(df.set_index("ticker")["weight"])
+        if "weight" in display.columns and not display["weight"].isnull().all() and (display["weight"] > 0).any():
+            st.bar_chart(display.set_index("ticker")["weight"])
         else:
             st.write("Gewichtsdiagramm: keine gültigen 'weight' Werte vorhanden.")
     except Exception:
@@ -881,7 +954,9 @@ def render_sidebar(available_etfs):
                     )
                 else:
                     portfolio = pd.concat([portfolio, pd.DataFrame([{"ticker": t, "quantity": q}])], ignore_index=True)
-            st.session_state["portfolio"] = portfolio
+            from risk_dashboard.ui_helpers import persist_portfolio_df
+            #st.session_state["portfolio"] = portfolio
+            persist_portfolio_df(portfolio)
 
             # Lade Preise nur für unique tickers
             tickers = list({t for t, _ in tickers_with_qty})
@@ -897,13 +972,35 @@ def render_sidebar(available_etfs):
                 st.error("Interner Fehler beim Laden der Preisdaten")
                 success, failed, combined = [], [], pd.DataFrame()
 
+            # stelle sicher, dass helper die session_state setzt; falls nicht, setze es hier:
+            if combined is not None and not combined.empty:
+                st.session_state["prices_for_bt"] = combined
+            else:
+                # setze leeres DataFrame statt None, damit spätere .columns nicht crashen
+                st.session_state["prices_for_bt"] = pd.DataFrame()
+            # Feedback
+            if failed:
+                st.warning(f"Keine Preisdaten für: {', '.join(failed)} (möglicherweise delisted)")
+
             if success:
                 st.success(f"Erfolgreich geladen: {', '.join(success)}")
-            if failed:
-                st.warning(f"Keine Preisdaten für: {', '.join(failed)} (übersprungen)")
+
+            # Debug-Ausgaben
+            logging.debug("add_tickers success=%s failed=%s", success, failed)
+            st.sidebar.write("DEBUG success", success)
+            st.sidebar.write("DEBUG failed", failed)
+
+            prices = st.session_state.get("prices_for_bt")
+            st.sidebar.write("DEBUG prices_for_bt cols", None if prices is None else list(prices.columns))
+            if prices is not None:
+                st.sidebar.write("DEBUG prices head", prices.head())
+                st.sidebar.write("DEBUG prices index range", prices.index.min(), prices.index.max())
+
+            st.sidebar.write("DEBUG portfolio_df", st.session_state.get("portfolio_df"))
 
             # Navigiere zur Analyse und rerun
             st.session_state["navigate_to"] = "Holdings Analyse"
+            st.experimental_rerun()
             rerun_fn = getattr(st, "experimental_rerun", None)
             if rerun_fn:
                 rerun_fn()
@@ -952,20 +1049,16 @@ st.title("Macroeconomic Risk Dashboard")
 try:
 
     # zentral: Index auswählen und Universe einmalig laden
-    
     prefix = "app"
-    # DEV Debug: session keys anzeigen
     if ss.get("DEBUG"):
-        st.text(f"DEBUG prefix: {prefix}")  # nur sehr kurz, kein dump großer Objekte
+        st.text(f"DEBUG prefix: {prefix}")
 
     logger.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
-    logger.debug("DEBUG prefix: %s", prefix)
-
-    index_choice = st.selectbox(
+    index_choice = st.sidebar.selectbox(
         "Index / Universe wählen",
         list(UNIVERSE_PATHS.keys()),
         index=1,
-        key=f"{prefix}_index_choice", 
+        key=f"{prefix}_index_choice",
     )
 
     path_index_choice = UNIVERSE_PATHS[index_choice]
@@ -1125,10 +1218,10 @@ with tab_macro:
         "Select macro series:",
         list(series.keys()),
         format_func=lambda x: series[x],
-        help=get_definition("Makroserien"), 
+        help=get_definition("Makroserien"),
         key="profiles_select_macro_series"
     )
- 
+
     macro_df = load_macro_series(selected)
     macro_df = macro_df.reset_index()
 
@@ -1158,7 +1251,7 @@ with tab_macro:
         height=500,
         yaxis_title=MACRO_LABELS.get(selected, "Wert")
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------------------
 # FX FORECAST TAB
@@ -1177,9 +1270,9 @@ with tab_fx:
         help="ARIMA = klassisches Zeitreihenmodell, Prophet = robustes Forecasting-Modell.",
         key="profiles_fx_model_choice"
     )
- 
-    hist_arima = fc_arima = hist_prophet = fc_prophet = pd.DataFrame()
 
+    hist_arima = fc_arima = hist_prophet = fc_prophet = pd.DataFrame()
+    # weitere FX-Logik folgt hier...
     if model_choice in ["ARIMA", "Both"]:
         hist_arima, fc_arima = forecast_fx_arima(pair="EURUSD=X", period="10y", steps=60)
         if fc_arima is None or fc_arima.empty:
@@ -1673,15 +1766,21 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
 
         # Manual mapping UI (only if there are missing tickers)
         missing = st.session_state.get("mapping_missing", []) or []
+
         if missing:
-            st.warning(f"Automatisches Mapping fehlgeschlagen für: {missing}")
+            st.warning(f"Automatisches Mapping fehlgeschlagen für: {', '.join(missing)}")
             cols = ["<skip>"] + list(prices.columns)
 
             # Use a form so all selectboxes are submitted together
             with st.form("manual_map_form"):
                 for h in missing:
                     default = st.session_state.get("manual_map", {}).get(h, "<skip>")
-                    st.selectbox(f"Map {h} →", options=cols, index=cols.index(default) if default in cols else 0, key=f"map_{h}")
+                    st.selectbox(
+                        f"Map {h} →",
+                        options=cols,
+                        index=cols.index(default) if default in cols else 0,
+                        key=f"map_{h}"
+                    )
                 submitted = st.form_submit_button("Apply manual mapping")
 
             if submitted:
@@ -1689,38 +1788,15 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                 try:
                     manual_map = st.session_state.get("manual_map", {}) or {}
                     for h in missing:
-                        choice = st.session_state.get(f"map_{h}", "<skip>")
-                        if choice and choice != "<skip>":
-                            manual_map[h] = choice
+                        # read selection from the form keys
+                        sel_key = f"map_{h}"
+                        mapped_val = st.session_state.get(sel_key, "<skip>")
+                        if mapped_val and mapped_val != "<skip>":
+                            manual_map[h] = mapped_val
+                    # persist manual_map back to session_state
                     st.session_state["manual_map"] = manual_map
-
-                    # Build holding_to_price from manual_map (and optionally existing mappings)
-                    holding_to_price = {}
-                    holding_to_price.update(manual_map)
-
-                    # Rebuild weights_by_pricecol from holdings DataFrame 'hold'
-                    weights_by_pricecol = {}
-                    # ensure 'hold' exists and has expected columns
-                    if "hold" not in locals() and "hold" not in globals():
-                        logger.warning("Variable 'hold' nicht gefunden; stelle sicher, dass holdings DataFrame verfügbar ist.")
-                    else:
-                        for _, row in hold.iterrows():
-                            hh = str(row.get("ticker", "")).strip()
-                            w = float(row.get("weight_in_etf", 0.0) or 0.0)
-                            price_col = holding_to_price.get(hh)
-                            if price_col:
-                                weights_by_pricecol[price_col] = weights_by_pricecol.get(price_col, 0.0) + w
-
-                    if not weights_by_pricecol:
-                        st.error("Nach Anwendung des manuellen Mappings wurden keine Price‑Spalten gefunden.")
-                    else:
-                        # persist aggregated mapping for later use
-                        st.session_state["weights_by_pricecol"] = weights_by_pricecol
-                        # clear missing (mapping done)
-                        st.session_state["mapping_missing"] = []
-                        st.success("Manuelles Mapping angewendet.")
-                        # rerun so the next block picks up weights_by_pricecol
-                        safe_rerun()
+                    # set a flag so the rest of the flow picks up the manual mapping
+                    st.success("Manuelles Mapping angewendet.")
                 finally:
                     st.session_state["_processing_apply_mapping"] = False
 

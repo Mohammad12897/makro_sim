@@ -435,3 +435,14 @@ def add_tickers_and_fetch(tickers_with_qty, prefix="etf", start=None, end=None):
         st.session_state["portfolio"] = portfolio
 
     return success, failed, combined
+
+def persist_portfolio_df(df: pd.DataFrame):
+    # normalize columns
+    df = df.copy()
+    df["ticker"] = df["ticker"].astype(str).str.upper().str.strip()
+    df["quantity"] = pd.to_numeric(df.get("quantity", 0), errors="coerce").fillna(0).astype(int)
+    for col in ("price","market_value","weight"):
+        if col not in df.columns:
+            df[col] = None
+    st.session_state["portfolio_df"] = df[["ticker","quantity","price","market_value","weight"]]
+
