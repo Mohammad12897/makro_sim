@@ -104,7 +104,7 @@ def add_ticker_callback(prefix, asset_key, stable_input_key):
                 st.warning(f"Automatisches Mapping fehlgeschlagen für: {missing}")
     finally:
         st.session_state["_processing_add"] = False
-        safe_rerun()
+        safe_rerun(stop=False)
 
 
 # UTF-8 erzwingen (sicher)
@@ -384,15 +384,14 @@ def analyze_single_etf_using_df(ticker: str, price_df: pd.DataFrame):
 # --- Imports oben in app.py ---
 
 # --- Docs / dynamische Seitenliste ---
-# docs automatisch
-# --- Imports oben in app.py ---
 from risk_dashboard.ui_helpers import (
     handle_portfolio_upload_with_price_lookup,
     load_markdown_safe,
     show_intro,
-    status_legend, 
-    consolidate_portfolio_df
+    status_legend,
+    consolidate_portfolio_df,
 )
+from risk_dashboard.data_utils import fetch_prices_from_yf, normalize_ticker
 
 # Page config ganz oben
 st.set_page_config(page_title="Risk Dashboard", layout="wide")
@@ -408,8 +407,7 @@ for k in custom_pages:
     if k not in pages:
         pages[k] = None
 
-# Docs automatisch (bereits oben erzeugt: pages dict)
-page_options = list(pages.keys())  # z.B. ["Dashboard","Upload","Holdings Analyse","Einstellungen"]
+page_options = list(pages.keys())
 
 # If a previous safe_rerun set this flag, process navigation defaults now
 if st.session_state.pop("_needs_rerun", False):
@@ -495,16 +493,31 @@ elif choice == "Upload":
         # Portfolio aktualisieren (kein Fetch hier)
         add_new_tickers_to_portfolio(new_tickers)
 
+        # nach Einlesen und Aggregation
+        df = df.groupby("ticker", as_index=False).agg({"quantity":"sum","market_value":"sum"})
+        total_mv = df["market_value"].sum()
+        if total_mv == 0 or pd.isna(total_mv):
+            st.error("Gesamtmarktwert ist 0 oder ungültig.")
+            return None
+
+        # persist
+        st.session_state["portfolio_df"] = df
+        st.session_state["weights_by_ticker"] = dict(zip(df["ticker"], df["weight"]))
+        st.session_state["portfolio_total_value"] = float(total_mv)
+
+        # prices_for_bt defensiv setzen
+        st.session_state["prices_for_bt"] = combined if (combined is not None and not combined.empty) else pd.DataFrame()
+
+
         # sichere Navigation: setze Flag und rerun einmal
         st.session_state["navigate_to"] = "Holdings Analyse"
-        safe_rerun()
-
+        safe_rerun(stop=False)
 
 
     # Button: manuelle Navigation zur Analyse
     if st.button("Zur Analyse wechseln", key="app_go_to_analysis"):
         st.session_state["navigate_to"] = "Holdings Analyse"
-        safe_rerun()
+        safe_rerun(stop=False)
 
     # Debug-Ausgaben (nur kurz, keine großen Dumps)
     st.sidebar.write("portfolio_df head:", st.session_state.get("portfolio_df"))
@@ -718,8 +731,6 @@ elif choice == "Holdings Analyse":
     st.write("Gesamtwert:", f"{st.session_state.get('portfolio_total_value', 0):,.2f}")
     st.write("Anzahl Positionen:", df.shape[0])
 
-
-    from risk_dashboard.data_utils import fetch_prices_from_yf, normalize_ticker
     st.sidebar.write(fetch_prices_from_yf([normalize_ticker("NVDA")]).tail(3))
 
 else:
@@ -962,8 +973,6 @@ def render_sidebar(available_etfs):
             from risk_dashboard.ui_helpers import persist_portfolio_df
             # persistiere Portfolio
             persist_portfolio_df(portfolio)
-
-            # Lade Preise nur für unique tickers
             tickers = list({t for t, _ in tickers_with_qty})
             try:
                 success, failed, combined = add_tickers_and_fetch(
@@ -977,22 +986,14 @@ def render_sidebar(available_etfs):
                 st.error("Interner Fehler beim Laden der Preisdaten")
                 success, failed, combined = [], [], pd.DataFrame()
 
-            # setze prices_for_bt in session_state (sicher)
-            if combined is not None and not combined.empty:
-                st.session_state["prices_for_bt"] = combined
-            else:
-                st.session_state["prices_for_bt"] = pd.DataFrame()
+            st.session_state["prices_for_bt"] = combined if (combined is not None and not combined.empty) else pd.DataFrame()
 
-            # Feedback
             if failed:
                 st.warning(f"Keine Preisdaten für: {', '.join(failed)} (möglicherweise delisted)")
             if success:
                 st.success(f"Erfolgreich geladen: {', '.join(success)}")
 
-            # Debug-Ausgaben
             logger.debug("add_tickers success=%s failed=%s", success, failed)
-            st.sidebar.write("DEBUG success", success)
-            st.sidebar.write("DEBUG failed", failed)
 
             prices = st.session_state.get("prices_for_bt")
             st.sidebar.write("DEBUG prices_for_bt cols", None if prices is None else list(prices.columns))
@@ -1002,9 +1003,8 @@ def render_sidebar(available_etfs):
 
             st.sidebar.write("DEBUG portfolio_df", st.session_state.get("portfolio_df"))
 
-            # Navigiere zur Analyse und sichere Neuladung
             st.session_state["navigate_to"] = "Holdings Analyse"
-            safe_rerun()
+            safe_rerun(stop=False)
             
     st.sidebar.markdown("---")
 
@@ -1758,7 +1758,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                     st.session_state["mapping_missing"] = missing_local or []
                     st.session_state["last_uploaded_holdings"] = holdings_list
                     logger.debug("do_add_tickers -> mapped_cols=%s missing=%s", mapped_cols, missing_local)
-                    safe_rerun()
+                    safe_rerun(stop=False)
                 else:
                     st.error("Hochgeladene CSV enthält keine Spalte 'ticker'.")
             except Exception as e:
@@ -1833,7 +1833,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                             list(prices_for_bt.columns), weights_by_ticker)
 
                 # trigger rerun so the top-of-function backtest check can pick up the keys
-                safe_rerun()
+                safe_rerun(stop=False)
 
     # --- Danach: Backtest aufrufen (wie bisher) ---
 
