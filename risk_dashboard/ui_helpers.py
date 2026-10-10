@@ -117,25 +117,9 @@ def handle_portfolio_upload_with_price_lookup(prefix="profile"):
         # setze navigate_to statt direkten Widget-Wert
         st.session_state["navigate_to"] = "Holdings Analyse"
 
-        # versuche rerun nur wenn verfügbar, sonst zeige Hinweis/Button
-        rerun_fn = getattr(st, "experimental_rerun", None)
-        if callable(rerun_fn):
-            rerun_fn()
-        else:
-            st.info("Wechsel zur Analyse verfügbar. Klicke unten, um zur Analyse zu wechseln.")
-
-            #if st.button("Zur Analyse wechseln", key="uihelpers_go_to_analysis"):
-            #    st.session_state["app_sidebar_page_choice"] = "Holdings Analyse"
-            #    safe_rerun()  # oder experimental_rerun, je nach Implementierung
-
-            #if st.button("Zur Analyse wechseln"):
-                # setze app_sidebar_page_choice direkt und force rerun if possible
-            #    st.session_state["app_sidebar_page_choice"] = "Holdings Analyse"
-            #    rerun_fn = getattr(st, "experimental_rerun", None)
-            #    if callable(rerun_fn):
-            #        rerun_fn()
-            #    else:
-            #        st.experimental_set_query_params(_nav="holdings")  # optionaler, harm. Fallback
+        # sichere Neuladung / Navigation
+        from risk_dashboard.data_utils import safe_rerun
+        safe_rerun()
 
         return df
 
@@ -143,6 +127,7 @@ def handle_portfolio_upload_with_price_lookup(prefix="profile"):
         logger.exception("Fehler beim Upload/Verarbeiten: %s", e)
         st.error(f"Fehler beim Einlesen: {e}")
         return None
+
 
 def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
     """

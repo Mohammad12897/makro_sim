@@ -15,21 +15,36 @@ from risk_dashboard.data_utils import _sanitize_date_param, cached_download_pric
 import uuid
 import logging
 
-    
+# Logger (oben in der Datei)
 logger = logging.getLogger(__name__)
 
 # Auswahl der Strategie
 selected_strategy = st.selectbox(
     "Strategie",
     options=["buy_and_hold", "equal_weight", "momentum", "monthly_rebalance"],
-    index=0
+    index=0,
+    key="selected_strategy"
 )
 
 # Startkapital
-initial_cash = st.number_input("Startkapital", min_value=0.0, value=10000.0, step=100.0, format="%.2f")
+initial_cash = st.number_input(
+    "Startkapital",
+    min_value=0.0,
+    value=10000.0,
+    step=100.0,
+    format="%.2f",
+    key="initial_cash"
+)
 
 # Optional: monatliches DCA (0 = aus)
-monthly_dca = st.number_input("Monatliches DCA (0 = aus)", min_value=0.0, value=0.0, step=10.0, format="%.2f")
+monthly_dca = st.number_input(
+    "Monatliches DCA (0 = aus)",
+    min_value=0.0,
+    value=0.0,
+    step=10.0,
+    format="%.2f",
+    key="monthly_dca"
+)
 
 def map_selected_to_pricecols(selected_list, price_cols, manual_map=None):
     manual_map = manual_map or {}
@@ -128,10 +143,9 @@ def render_etf_selection_ui(prefix: str = "etf"):
         st.markdown("---")
         st.info("Ticker schnell hinzufügen: benutze das Sidebar Formular (Schnell hinzufügen).")
         st.markdown("---")
-
-        # EINDEUTIGE Selectbox für ETF‑Kontext (nur hier in Sidebar)
-        log.debug("About to render index selectbox in %s with prefix=%s", __name__, prefix)
-        index_choice = st.selectbox(
+    
+        logger.debug("About to render ETF index selectbox with prefix=%s", prefix)
+        index_choice = st.sidebar.selectbox(
             "Index / Universe wählen",
             ["EURO STOXX 50", "NASDAQ 100", "Nikkei 225"],
             index=1,
@@ -144,7 +158,7 @@ def render_etf_selection_ui(prefix: str = "etf"):
             if df_candidates is None:
                 df_candidates = pd.DataFrame(columns=["ticker", "name", "expense_ratio", "aum"])
         except Exception:
-            log.exception("get_etf_candidates_for_index failed", extra={"seq": next_seq()})
+            logger.exception("get_etf_candidates_for_index failed", extra={"index_choice": index_choice})
             df_candidates = pd.DataFrame(columns=["ticker", "name", "expense_ratio", "aum"])
 
         if df_candidates.empty:
@@ -153,6 +167,8 @@ def render_etf_selection_ui(prefix: str = "etf"):
             if st.button("Kandidaten speichern", key=f"{prefix}_save_candidates"):
                 from risk_dashboard.etf_candidates import add_etf_candidates
                 add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
+                # sichere Neuladung / Navigation
+                st.session_state["navigate_to"] = "Holdings Analyse"
                 safe_rerun()
 
     # --- Ende Sidebar Block ---
@@ -335,12 +351,30 @@ def render_etf_selection_ui(prefix: str = "etf"):
         user_weights = {t: 1.0 / len(selected) for t in selected}
     else:
         user_weights = {t: (w / total) if total > 0 else 1.0 / len(selected) for t, w in user_weights.items()}
-
+    
     # --- Backtest section ---
     st.subheader("Backtest der Auswahl")
-    start = st.date_input("Startdatum", value=pd.to_datetime(DEFAULT_START_STR), key=f"{prefix}_start_date", disabled=controls_disabled)
-    end = st.date_input("Enddatum", value=pd.to_datetime(pd.Timestamp.today().date()), key=f"{prefix}_end_date", disabled=controls_disabled)
-    rebalance = st.selectbox("Rebalancing", ["monthly", "quarterly", "yearly", "none"], index=0, key=f"{prefix}_rebalance_select", disabled=controls_disabled)
+
+    start = st.date_input(
+        "Startdatum",
+        value=pd.to_datetime(DEFAULT_START_STR),
+        key=f"{prefix}_start_date",
+        disabled=controls_disabled
+    )
+    end = st.date_input(
+        "Enddatum",
+        value=pd.to_datetime(pd.Timestamp.today().date()),
+        key=f"{prefix}_end_date",
+        disabled=controls_disabled
+    )
+
+    rebalance = st.selectbox(
+        "Rebalancing",
+        ["monthly", "quarterly", "yearly", "none"],
+        index=0,
+        key=f"{prefix}_rebalance_select",
+        disabled=controls_disabled
+    )
 
     if not prices_loaded:
         st.warning("Preisdaten konnten nicht geladen werden. Controls sind deaktiviert.")
@@ -348,59 +382,73 @@ def render_etf_selection_ui(prefix: str = "etf"):
     # Backtest Button (einmalig)
     if st.button("Backtest starten", key=f"{prefix}_run_backtest", disabled=controls_disabled):
         logger.debug("Backtest clicked: selected=%s user_weights=%s", selected, user_weights)
+
+        # 1) Grundvalidierung
         if not selected:
             st.warning("Keine ETFs ausgewählt.")
         else:
-            # Remappe user_weights auf price-column keys
+            # 2) Remappe user_weights auf price-column keys (sel_to_price muss vorhanden sein)
             mapped_selected = [sel_to_price[s] for s in selected if sel_to_price.get(s)]
             if not mapped_selected:
                 st.error("Keine der ausgewählten Ticker konnten auf Preisspalten gemappt werden.")
-                return
+            else:
+                user_weights_mapped = {}
+                for s, w in (user_weights or {}).items():
+                    pc = sel_to_price.get(s)
+                    if pc:
+                        user_weights_mapped[pc] = user_weights_mapped.get(pc, 0.0) + float(w)
+                    else:
+                        logger.debug("WARN: Kein Mapping für %s; wird ignoriert.", s)
 
-            user_weights_mapped = {}
-            for s, w in user_weights.items():
-                pc = sel_to_price.get(s)
-                if pc:
-                    user_weights_mapped[pc] = user_weights_mapped.get(pc, 0.0) + float(w)
+                total_mapped = sum(user_weights_mapped.values())
+                if total_mapped <= 1e-12:
+                    # fallback: gleichverteilte Gewichte über die gemappten, verfügbaren Ticker
+                    user_weights_mapped = {pc: 1.0 / len(mapped_selected) for pc in mapped_selected}
                 else:
-                    logger.debug("WARN: Kein Mapping für %s; wird ignoriert.", s)
+                    # normalize
+                    user_weights_mapped = {k: v / total_mapped for k, v in user_weights_mapped.items()}
 
-            total_mapped = sum(user_weights_mapped.values())
-            if total_mapped <= 1e-12:
-                user_weights_mapped = {pc: 1.0 / len(mapped_selected) for pc in mapped_selected}
-            else:
-                user_weights_mapped = {k: v / total_mapped for k, v in user_weights_mapped.items()}
+                logger.debug("user_weights_mapped=%s", user_weights_mapped)
 
-            logger.debug("user_weights_mapped=%s", user_weights_mapped)
+                # 3) sanitize start/end before download (implementiere _sanitize_date_param in util)
+                start_s = _sanitize_date_param(start)
+                end_s = _sanitize_date_param(end)
 
-            # sanitize start/end before download
-            start_s = _sanitize_date_param(start)
-            end_s = _sanitize_date_param(end)
+                # 4) call backtest runner (use central run_backtest_flow)
+                from risk_dashboard.core.backtest import run_backtest_flow
 
-            # call backtest runner
-            from risk_dashboard.core.backtest import run_backtest_flow
-            with st.spinner("Backtest läuft..."):
-                result = run_backtest_flow(
-                    selected=mapped_selected,
-                    prices_source=prices_df,
-                    weights=user_weights_mapped,
-                    start=start_s,
-                    end=end_s,
-                    strategy=st.session_state.get(f"{prefix}_strategy", "equal"),
-                    initial_cash=st.session_state.get(f"{prefix}_cash", 10000.0),
-                    monthly_dca=st.session_state.get(f"{prefix}_dca", 0.0),
-                    rebalance=st.session_state.get(f"{prefix}_rebalance_select", "monthly"),
-                )
+                with st.spinner("Backtest läuft..."):
+                    try:
+                        result = run_backtest_flow(
+                            selected=mapped_selected,
+                            prices_source=prices_df,            # sicherstellen, dass prices_df vorhanden ist
+                            weights=user_weights_mapped,
+                            start=start_s,
+                            end=end_s,
+                            strategy=st.session_state.get(f"{prefix}_strategy", "equal"),
+                            initial_cash=st.session_state.get(f"{prefix}_cash", 10000.0),
+                            monthly_dca=st.session_state.get(f"{prefix}_dca", 0.0),
+                            rebalance=st.session_state.get(f"{prefix}_rebalance_select", "monthly"),
+                        )
+                    except Exception:
+                        logger.exception("Backtest runner failed", extra={"prefix": prefix})
+                        st.error("Backtest fehlgeschlagen. Details im Log.")
+                        result = None
 
-            # Envelope handling: only small, safe UI output
-            if isinstance(result, dict) and any(k in result for k in ("ok", "payload", "result")):
-                resp = result
-            else:
-                resp = {"ok": True, "message": None, "result": result, "payload": {}}
+                # 5) Envelope handling: sichere UI-Ausgabe
+                if result is None:
+                    pass
+                else:
+                    if isinstance(result, dict) and any(k in result for k in ("ok", "payload", "result")):
+                        resp = result
+                    else:
+                        resp = {"ok": True, "message": None, "result": result, "payload": {}}
 
-            st.json({k: resp.get(k) for k in ("ok", "message")})
-            trades = resp.get("payload", {}).get("trades") or resp.get("result", {}).get("trades")
-            if trades:
-                st.dataframe(pd.DataFrame(trades).head(200))
+                    st.json({k: resp.get(k) for k in ("ok", "message")})
 
-    # End of render_etf_selection_ui
+                    trades = resp.get("payload", {}).get("trades") or resp.get("result", {}).get("trades")
+                    if trades:
+                        st.subheader("Trades (erste 200 Zeilen)")
+                        st.dataframe(pd.DataFrame(trades).head(200))
+                    else:
+                        st.info("Keine Trades im Backtest‑Ergebnis vorhanden.")

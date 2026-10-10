@@ -918,30 +918,54 @@ def profile_form_ui(
     st.header("Portfolio Profile")
 
     cfg = load_profiles()
+    # Lade Profiles aus Konfiguration (sicher)
+    cfg = cfg if isinstance(cfg, dict) else {}
     profiles = cfg.get("profiles", {}) if isinstance(cfg, dict) else {}
 
     col1, col2 = st.columns([2, 1])
     with col1:
         profile_keys = ["<Neu>"] + list(profiles.keys())
-        selected = st.selectbox("Vorhandene Profile", options=profile_keys, index=profile_keys.index(st.session_state.get("profile_selected", "<Neu>")), key="profiles_existing_profile_select")
+        # safe default index lookup
+        default_profile = st.session_state.get("profile_selected", "<Neu>")
+        default_index = profile_keys.index(default_profile) if default_profile in profile_keys else 0
 
-        st.session_state.profile_selected = selected
+        selected = st.selectbox(
+            "Vorhandene Profile",
+            options=profile_keys,
+            index=default_index,
+            key="profiles_existing_profile_select"
+        )
+
+        # Speichere Auswahl in session_state (explizit)
+        st.session_state["profile_selected"] = selected
+
     with col2:
         if st.button("Neu laden (Presets)"):
             cfg = load_profiles()
-            profiles = cfg.get("profiles", {})
+            profiles = cfg.get("profiles", {}) if isinstance(cfg, dict) else {}
+            safe_rerun()
 
+    # Aktuelles Profil / Defaults bestimmen
     if selected != "<Neu>":
-        current = profiles.get(selected, {})
+        current = profiles.get(selected, {}) or {}
         defaults: Dict[str, Any] = current.copy()
     else:
         defaults = {}
 
+    # Risikokategorie Auswahl (mit sicheren Defaults)
     category_options = ["Low", "Medium", "High"]
     default_category = defaults.get("category", "Medium")
     category_index = category_options.index(default_category) if default_category in category_options else 1
-    category = st.selectbox("Risikokategorie", options=category_options, index=category_index, help=TOOLTIPS["category"], key="profiles_risk_category_select")
 
+    category = st.selectbox(
+        "Risikokategorie",
+        options=category_options,
+        index=category_index,
+        help=TOOLTIPS.get("category"),
+        key="profiles_risk_category_select"
+    )
+
+    # Kategorie-Defaults anwenden (nur wenn gewünscht)
     if not defaults:
         defaults.update(CATEGORY_DEFAULTS.get(category, {}))
     else:
@@ -949,7 +973,45 @@ def profile_form_ui(
             defaults.update(CATEGORY_DEFAULTS.get(category, {}))
 
     st.markdown("**Profilname**")
-    profile_name = st.text_input("Profilname", value=defaults.get("display_name", "" if selected == "<Neu>" else selected), help=TOOLTIPS["profile_name"],key="profile_name_input")
+    profile_name = st.text_input(
+        "Profilname",
+        value=defaults.get("display_name", "" if selected == "<Neu>" else selected),
+        help=TOOLTIPS.get("profile_name"),
+        key="profile_name_input"
+    )
+
+    # Debug globaler Session-Status (nur dev)
+    if ss.get("DEBUG"):
+        st.write("profile_form_ui session_state keys:", list(ss.keys()))
+        logger.debug("profile_form_ui session_state keys: %s", list(ss.keys()))
+
+    # Sicheres Rendering einer lokalen Index-Selectbox (nur falls index_choice noch nicht gesetzt)
+    logger.debug("Rendering index selectbox with prefix=%s", prefix)
+    logger.debug("About to render index selectbox with key=%s", f"{prefix}_local_index_choice")
+
+    if index_choice is None:
+        index_choice = st.selectbox(
+            "Index / Universe wählen",
+            list(UNIVERSE_PATHS.keys()),
+            index=1,
+            key=f"{prefix}_local_index_choice"
+        )
+
+    # ab hier: index_choice ist gesetzt und darf verwendet werden
+    path_index_choice = UNIVERSE_PATHS.get(index_choice)
+
+    # Defensive Fallbacks: etf_universe und universe_warnings aus session_state oder leere Defaults
+    etf_universe = etf_universe or st.session_state.get("etf_universe") or {}
+    universe_warnings = universe_warnings or st.session_state.get("universe_warnings") or {}
+
+    # Safe logging: etf_universe may be None or dict
+    try:
+        etf_type = type(etf_universe)
+        etf_len = len(etf_universe) if etf_universe is not None else None
+        etf_sample = list(etf_universe)[:10] if isinstance(etf_universe, dict) and etf_universe else None
+        logger.debug("etf_universe type=%s len=%s sample=%s", etf_type, etf_len, etf_sample)
+    except Exception:
+        logger.exception("Error while logging etf_universe")
 
     st.markdown("**Asset Allocation (in %)**")
     eq = st.number_input("Equity (%)", min_value=0.0, max_value=100.0, value=float(defaults.get("equity_pct", 0)), help=TOOLTIPS["equity_pct"])

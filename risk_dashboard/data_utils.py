@@ -120,26 +120,13 @@ def _sanitize_date_param(d):
             return None
     return None
 
-
 def safe_rerun():
-    """
-    Robust rerun helper for multiple Streamlit versions.
-    - Prefer st.experimental_rerun() when available.
-    - Otherwise set a session flag that the main router can observe.
-    """
-    # 1) Preferred API
     rerun_fn = getattr(st, "experimental_rerun", None)
     if callable(rerun_fn):
-        try:
-            rerun_fn()
-            return True
-        except Exception:
-            # fall back to session-flag approach
-            pass
-
-    # 2) Fallback: set a session flag that the app's main loop checks
-    st.session_state["_rerun_requested"] = True
-    return False
+        rerun_fn()
+    else:
+        st.session_state["_needs_rerun"] = True
+        st.stop()
 
 def run_analysis():
     logging.info("Analyse gestartet")
