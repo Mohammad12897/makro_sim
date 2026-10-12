@@ -7,7 +7,8 @@ import logging
 
 
 from core.yf_helper import _safe_read_csv_text
-from risk_dashboard.data_utils import find_price_for_ticker, normalize_ticker, fetch_last_prices, safe_rerun
+from risk_dashboard.data_utils import find_price_for_ticker, fetch_last_prices, safe_rerun
+from risk_dashboard.ticker_utils import normalize_ticker
 from risk_dashboard.time_utils import _harmonize_index_tz, _make_index_naive
 from risk_dashboard.price_utils import _pick_price_column, _extract_price_series_from_yf
 from risk_dashboard.data_utils import fetch_prices_for_ticker, normalize_prices
@@ -150,17 +151,14 @@ def handle_portfolio_upload_with_price_lookup(prefix="profile"):
 
 
 def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
-    """
-    Fügt Ticker mit default_qty in st.session_state['portfolio_df'] ein.
-    new_tickers: List[str] (z. B. ['AAPL', 'CSPX.L'])
-    """
     if not new_tickers:
         return
-
-    # normalize input tickers
-    new_tickers_norm = [normalize_ticker(str(t)) for t in new_tickers if t and str(t).strip()]
+    # normalize and uppercase
+    new_tickers_norm = [normalize_ticker(str(t)).upper() for t in new_tickers if t and str(t).strip()]
     if not new_tickers_norm:
         return
+    pairs = [(t, default_qty) for t in new_tickers_norm]
+    add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=default_qty)
 
     # ensure portfolio_df exists and has correct columns/types
     portfolio = st.session_state.get("portfolio_df")
@@ -206,48 +204,120 @@ def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
     st.success(f"{len(to_add)} neue Ticker hinzugefügt.")
     return
 
+
 def add_new_tickers_to_portfolio_with_quantities(pairs: List[Tuple[str,int]], default_qty: int = 1):
-    """
-    pairs: list of (ticker, qty)
-    """
     if not pairs:
         return
 
-    # normalize pairs
-    pairs_norm = [(normalize_ticker(str(t)).upper(), int(q) if q is not None else int(default_qty)) for t,q in pairs]
+    # Normalize input pairs (ticker -> normalized uppercase)
+    norm_pairs = []
+    for t, q in pairs:
+        tn = normalize_ticker(str(t)).upper()
+        try:
+            qn = int(q) if q is not None else int(default_qty)
+        except Exception:
+            qn = int(default_qty)
+        norm_pairs.append((tn, qn))
 
-    portfolio = st.session_state.get("portfolio_df")
-    if portfolio is None or portfolio.empty:
-        portfolio = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
+    # Load or init portfolio_df with correct columns and dtypes
+    df = st.session_state.get("portfolio_df")
+    if df is None or df.empty:
+        df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
+    df = df.copy()
 
-    portfolio = portfolio.copy()
-    if "ticker" not in portfolio.columns:
-        portfolio["ticker"] = ""
-    portfolio["ticker"] = portfolio["ticker"].astype(str).str.strip().str.upper()
-    if "quantity" not in portfolio.columns:
-        portfolio["quantity"] = 0
-    portfolio["quantity"] = pd.to_numeric(portfolio["quantity"], errors="coerce").fillna(0).astype(int)
+    # normalize existing tickers and ensure dtypes
+    if "ticker" not in df.columns:
+        df["ticker"] = ""
+    df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
+    if "quantity" not in df.columns:
+        df["quantity"] = 0
+    df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
 
-    # append each pair
-    new_rows = []
-    for t, q in pairs_norm:
-        if t in portfolio["ticker"].values:
-            portfolio.loc[portfolio["ticker"] == t, "quantity"] += int(q)
+    # prepare price cache (DataFrame preferred)
+    prices_cache = st.session_state.get("prices_for_bt")
+    prices_df = prices_cache if isinstance(prices_cache, pd.DataFrame) and not prices_cache.empty else None
+
+    # collect last_prices for missing tickers
+    last_prices = {}
+    need_fetch = []
+
+    existing_set = set(df["ticker"].tolist())
+
+    for t, q in norm_pairs:
+        if t in existing_set:
+            # add quantity to existing row
+            df.loc[df["ticker"] == t, "quantity"] = df.loc[df["ticker"] == t, "quantity"].astype(int) + int(q)
+            continue
+        # try to find price in prices_df
+        price_found = None
+        if prices_df is not None:
+            # direct column match (case-insensitive)
+            for col in prices_df.columns:
+                if normalize_ticker(str(col)).upper() == t:
+                    try:
+                        series = prices_df[col]
+                        price_found = float(series.ffill().iloc[-1])
+                        break
+                    except Exception:
+                        price_found = None
+        if price_found is not None:
+            last_prices[t] = price_found
         else:
-            new_rows.append({"ticker": t, "quantity": int(q), "price": pd.NA, "market_value": pd.NA, "weight": pd.NA})
+            need_fetch.append(t)
+
+    # fetch missing last prices (fallback)
+    if need_fetch:
+        fetched = fetch_last_prices(need_fetch, lookback_days=365)  # returns dict ticker->price
+        for k, v in fetched.items():
+            last_prices[normalize_ticker(k).upper()] = v
+
+    # append new rows
+    new_rows = []
+    for t, q in norm_pairs:
+        if t in existing_set:
+            continue  # already added above
+        price = last_prices.get(t)
+        mv = float(q) * float(price) if price is not None else pd.NA
+        new_rows.append({"ticker": t, "quantity": int(q), "price": price if price is not None else pd.NA,
+                         "market_value": mv, "weight": pd.NA})
 
     if new_rows:
-        portfolio = pd.concat([portfolio, pd.DataFrame(new_rows)], ignore_index=True)
+        df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
 
-    portfolio = portfolio.groupby(portfolio["ticker"].astype(str).str.strip().str.upper(), as_index=False).agg({
+    # consolidate and compute weights
+    df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
+    df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
+    df["market_value"] = pd.to_numeric(df.get("market_value", 0), errors="coerce").fillna(0.0)
+
+    df = df.groupby("ticker", as_index=False).agg({
         "quantity": "sum",
         "price": lambda s: pd.to_numeric(s.dropna().astype(str).str.replace(",", "."), errors="coerce").iloc[0] if s.dropna().any() else pd.NA,
         "market_value": "sum",
         "weight": "first"
     })
 
-    st.session_state["portfolio_df"] = portfolio
-    st.success(f"{len(pairs_norm)} Ticker verarbeitet.")
+    total_mv = float(df["market_value"].sum()) if not df.empty else 0.0
+    if total_mv > 0:
+        df["weight"] = (df["market_value"] / total_mv) * 100.0
+    else:
+        df["weight"] = 0.0
+
+    # persist
+    st.session_state["portfolio_df"] = df
+    st.session_state["portfolio_total_value"] = total_mv
+
+    # update price cache: prefer DataFrame; if not, merge last_prices into dict
+    if isinstance(prices_df, pd.DataFrame) and not prices_df.empty:
+        st.session_state["prices_for_bt"] = prices_df
+    else:
+        existing_cache = st.session_state.get("prices_for_bt", {})
+        if isinstance(existing_cache, dict):
+            existing_cache.update(last_prices)
+            st.session_state["prices_for_bt"] = existing_cache
+        else:
+            st.session_state["prices_for_bt"] = last_prices
+
+    st.success(f"{len(new_rows)} neue Ticker hinzugefügt, Gesamtwert {total_mv:,.2f}")
     return
 
 def consolidate_portfolio_df(df: pd.DataFrame) -> pd.DataFrame:

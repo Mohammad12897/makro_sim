@@ -9,8 +9,6 @@ logger = logging.getLogger(__name__)
 from risk_dashboard.utils.session_helpers import maybe_run_backtest
 
 
-def normalize_ticker(t: str) -> str:
-    return t.strip().upper()
 
 def detect_type(ticker: str, etf_df=None, stock_df=None) -> str:
     # Prefer explicit lookup in universes if provided
