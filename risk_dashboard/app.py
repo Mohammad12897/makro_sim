@@ -78,8 +78,8 @@ import numpy as np
 import plotly.graph_objects as go
 from risk_dashboard.data_utils import do_add_tickers, is_prices_empty, normalize_prices, safe_rerun, fetch_prices_quiet_with_used, sanitize_session_state
 from risk_dashboard.ui.profiles_ui import show_holdings_uploader
+from risk_dashboard.handlers import handle_holdings_analyse
 print(">>> APP STARTED: TOP OF app.py", flush=True)
-
 
 def add_ticker_callback(prefix, asset_key, stable_input_key):
     if st.session_state.get("_processing_add", False):
@@ -409,11 +409,29 @@ for k in custom_pages:
 
 page_options = list(pages.keys())
 
-# If a previous safe_rerun set this flag, process navigation defaults now
+# ganz oben in app.py, vor Widgets
 if st.session_state.pop("_needs_rerun", False):
     default_choice = st.session_state.pop("navigate_to", None)
     if default_choice:
         st.session_state.setdefault("app_sidebar_page_choice", default_choice)
+
+# oben in app.py, nach _needs_rerun handling
+st.sidebar.write("DEBUG portfolio_df dtypes", None if st.session_state.get("portfolio_df") is None else st.session_state["portfolio_df"].dtypes.to_dict())
+st.sidebar.write("DEBUG portfolio_df head", None if st.session_state.get("portfolio_df") is None else st.session_state["portfolio_df"].head(10))
+
+combined = st.session_state.get("prices_for_bt", pd.DataFrame())
+st.sidebar.write("DEBUG combined columns", list(combined.columns))
+
+if not combined.empty:
+    st.sidebar.write("DEBUG index range", combined.index.min(), combined.index.max())
+    st.sidebar.write("DEBUG null counts", combined.isna().sum().to_dict())
+    st.sidebar.write("DEBUG first_valid_index", {c: combined[c].first_valid_index() for c in combined.columns})
+    # nur ausgewählte head‑Ausgabe, nicht ganze DF
+    cols = [c for c in ['BTC','NVDA'] if c in combined.columns]
+    if cols:
+        st.sidebar.write("DEBUG head BTC,NVDA", combined[cols].head(10))
+
+st.sidebar.write("DEBUG _needs_rerun", st.session_state.get("_needs_rerun"))
 
 # Sidebar-Selectbox (einmalig)
 choice = st.sidebar.selectbox("Seite wählen", options=page_options, key="app_sidebar_page_choice")
@@ -493,31 +511,17 @@ elif choice == "Upload":
         # Portfolio aktualisieren (kein Fetch hier)
         add_new_tickers_to_portfolio(new_tickers)
 
-        # nach Einlesen und Aggregation
-        df = df.groupby("ticker", as_index=False).agg({"quantity":"sum","market_value":"sum"})
-        total_mv = df["market_value"].sum()
-        if total_mv == 0 or pd.isna(total_mv):
-            st.error("Gesamtmarktwert ist 0 oder ungültig.")
-            return None
-
-        # persist
-        st.session_state["portfolio_df"] = df
-        st.session_state["weights_by_ticker"] = dict(zip(df["ticker"], df["weight"]))
-        st.session_state["portfolio_total_value"] = float(total_mv)
-
-        # prices_for_bt defensiv setzen
-        st.session_state["prices_for_bt"] = combined if (combined is not None and not combined.empty) else pd.DataFrame()
-
-
-        # sichere Navigation: setze Flag und rerun einmal
-        st.session_state["navigate_to"] = "Holdings Analyse"
-        safe_rerun(stop=False)
-
+        ok = handle_holdings_analyse()
+        if ok:
+            st.session_state["navigate_to"] = "Holdings Analyse"
+            safe_rerun(stop=False)
 
     # Button: manuelle Navigation zur Analyse
     if st.button("Zur Analyse wechseln", key="app_go_to_analysis"):
-        st.session_state["navigate_to"] = "Holdings Analyse"
-        safe_rerun(stop=False)
+        ok = handle_holdings_analyse()
+        if ok:
+            st.session_state["navigate_to"] = "Holdings Analyse"
+            safe_rerun(stop=False)
 
     # Debug-Ausgaben (nur kurz, keine großen Dumps)
     st.sidebar.write("portfolio_df head:", st.session_state.get("portfolio_df"))
@@ -1003,8 +1007,10 @@ def render_sidebar(available_etfs):
 
             st.sidebar.write("DEBUG portfolio_df", st.session_state.get("portfolio_df"))
 
-            st.session_state["navigate_to"] = "Holdings Analyse"
-            safe_rerun(stop=False)
+            ok = handle_holdings_analyse()
+            if ok:
+                st.session_state["navigate_to"] = "Holdings Analyse"
+                safe_rerun(stop=False)
             
     st.sidebar.markdown("---")
 
@@ -1746,18 +1752,20 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                 # Lese die Datei einmal und persistiere DataFrame
                 uploaded.seek(0)
                 uploaded_df = pd.read_csv(uploaded)
-                st.write("DEBUG: uploaded_df head:", uploaded_df.head())
-
-                # Falls portfolio_df noch nicht gesetzt ist, setze es
-                if "portfolio_df" not in st.session_state:
-                    st.session_state["portfolio_df"] = uploaded_df
-
+                # normalize column names
+                uploaded_df.columns = uploaded_df.columns.str.strip().str.lower()
+                # coerce numeric
+                uploaded_df['price'] = pd.to_numeric(uploaded_df.get('price', pd.Series()), errors='coerce')
+                uploaded_df['quantity'] = pd.to_numeric(uploaded_df.get('quantity', pd.Series()), errors='coerce').fillna(0)
+                uploaded_df['market_value'] = uploaded_df['quantity'] * uploaded_df['price']
+                # persist final df
+                st.session_state['portfolio_df'] = uploaded_df
+                # then proceed to mapping / do_add_tickers
                 if "ticker" in uploaded_df.columns:
                     holdings_list = list(dict.fromkeys(uploaded_df["ticker"].astype(str).tolist()))
                     mapped_cols, missing_local = do_add_tickers(holdings_list, prefix, asset_key, prices=prices)
                     st.session_state["mapping_missing"] = missing_local or []
                     st.session_state["last_uploaded_holdings"] = holdings_list
-                    logger.debug("do_add_tickers -> mapped_cols=%s missing=%s", mapped_cols, missing_local)
                     safe_rerun(stop=False)
                 else:
                     st.error("Hochgeladene CSV enthält keine Spalte 'ticker'.")

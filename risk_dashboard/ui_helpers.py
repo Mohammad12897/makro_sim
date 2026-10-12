@@ -6,7 +6,10 @@ import streamlit as st
 import logging
 
 
-from risk_dashboard.data_utils import fetch_prices_from_yf, find_price_for_ticker, normalize_ticker, fetch_last_prices, safe_rerun
+from core.yf_helper import _safe_read_csv_text
+from risk_dashboard.data_utils import find_price_for_ticker, normalize_ticker, fetch_last_prices, safe_rerun
+from risk_dashboard.time_utils import _harmonize_index_tz, _make_index_naive
+from risk_dashboard.price_utils import _pick_price_column, _extract_price_series_from_yf
 from risk_dashboard.data_utils import fetch_prices_for_ticker, normalize_prices
 logger = logging.getLogger(__name__)
 
@@ -65,9 +68,20 @@ def handle_portfolio_upload_with_price_lookup(prefix="profile"):
         with open("data/holdings/portfolio.csv", "wb") as f:
             f.write(uploaded.getbuffer())
 
+        # robustes Einlesen: versuche pd.read_csv, sonst _safe_read_csv_text
         uploaded.seek(0)
-        df = pd.read_csv(uploaded)
-        df.columns = [c.strip() for c in df.columns]
+        try:
+            df = pd.read_csv(uploaded)
+        except Exception:
+            uploaded.seek(0)
+            text = uploaded.read()
+            df = _safe_read_csv_text(text)
+            if df is None:
+                st.error("Konnte die Datei nicht als CSV/TSV einlesen.")
+                return None
+
+        # normalize column names and map variants
+        df.columns = [str(c).strip() for c in df.columns]
         colmap = {c.lower(): c for c in df.columns}
 
         if "ticker" not in colmap and "symbol" not in colmap:
@@ -83,44 +97,50 @@ def handle_portfolio_upload_with_price_lookup(prefix="profile"):
             colmap.get("market_value",""): "market_value"
         })
 
-        df["quantity"] = pd.to_numeric(df.get("quantity"), errors="coerce")
-        if "price" in df.columns:
-            df["price"] = pd.to_numeric(df.get("price"), errors="coerce")
-        if "market_value" in df.columns:
-            df["market_value"] = pd.to_numeric(df.get("market_value"), errors="coerce")
+        # numeric parsing: replace comma decimals and coerce
+        if "quantity" in df.columns:
+            df["quantity"] = pd.to_numeric(df["quantity"].astype(str).str.replace(",", "."), errors="coerce")
+        else:
+            df["quantity"] = 0
 
+        if "price" in df.columns:
+            df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
+        if "market_value" in df.columns:
+            df["market_value"] = pd.to_numeric(df["market_value"].astype(str).str.replace(",", "."), errors="coerce")
+
+        # compute market_value if missing
         if "market_value" not in df.columns or df["market_value"].isna().any():
             if "price" in df.columns and not df["price"].isna().all():
                 df["market_value"] = df["quantity"] * df["price"]
             else:
-                df = df.dropna(subset=["market_value"])
-                if df.empty:
-                    st.error("Keine gültigen Marktwerte vorhanden.")
-                    return None
+                # keep rows with market_value only if present; otherwise try to fill later from prices_for_bt
+                df["market_value"] = df.get("market_value", pd.Series(dtype=float))
 
-        df = df.dropna(subset=["ticker","quantity","market_value"])
-        df = df.groupby("ticker", as_index=False).agg({"quantity":"sum","market_value":"sum"})
-        total_mv = df["market_value"].sum()
-        if total_mv == 0 or pd.isna(total_mv):
-            st.error("Gesamtmarktwert ist 0 oder ungültig.")
-            return None
-        df["weight"] = df["market_value"] / total_mv
+        # drop rows without ticker or quantity
+        df = df.dropna(subset=["ticker"])
+        df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
 
-        # persist in session_state
+        # If market_value still missing for all rows, we allow it and rely on compute_market_values_from_prices
+        # aggregate quantities and market_value where present
+        df = df.groupby("ticker", as_index=False).agg({
+            "quantity": "sum",
+            "price": lambda s: pd.to_numeric(s, errors="coerce").dropna().iloc[0] if s.dropna().any() else pd.NA,
+            "market_value": "sum"
+        })
+
+        # persist cleaned df once
         st.session_state["portfolio_df"] = df
-        st.session_state["weights_by_ticker"] = dict(zip(df["ticker"], df["weight"]))
-        st.session_state["portfolio_total_value"] = float(total_mv)
 
-        st.success(f"Portfolio geladen: {len(df)} Positionen, Gesamtwert {total_mv:,.2f}")
+        # If prices_for_bt exists, compute market values from prices; otherwise handle_holdings_analyse will try
+        from risk_dashboard.handlers import handle_holdings_analyse
+        ok = handle_holdings_analyse()
+        if ok:
+            st.session_state["navigate_to"] = "Holdings Analyse"
+            from risk_dashboard.data_utils import safe_rerun
+            safe_rerun(stop=False)
+
+        st.success(f"Portfolio geladen: {len(df)} Positionen, Gesamtwert {st.session_state.get('portfolio_total_value', 'n/a')}")
         st.write(df)
-
-        # setze navigate_to statt direkten Widget-Wert
-        st.session_state["navigate_to"] = "Holdings Analyse"
-
-        # sichere Neuladung / Navigation
-        from risk_dashboard.data_utils import safe_rerun
-        safe_rerun()
-
         return df
 
     except Exception as e:
@@ -131,111 +151,104 @@ def handle_portfolio_upload_with_price_lookup(prefix="profile"):
 
 def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
     """
-    Fügt Ticker mit default_qty ins portfolio_df ein.
-    new_tickers: List[str] (z. B. ["AAPL", "CSPX.L"])
+    Fügt Ticker mit default_qty in st.session_state['portfolio_df'] ein.
+    new_tickers: List[str] (z. B. ['AAPL', 'CSPX.L'])
     """
     if not new_tickers:
         return
 
-    new_tickers_norm = [normalize_ticker(t) for t in new_tickers]
+    # normalize input tickers
+    new_tickers_norm = [normalize_ticker(str(t)) for t in new_tickers if t and str(t).strip()]
+    if not new_tickers_norm:
+        return
 
-    df = st.session_state.get("portfolio_df")
-    if df is None:
-        df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
+    # ensure portfolio_df exists and has correct columns/types
+    portfolio = st.session_state.get("portfolio_df")
+    if portfolio is None or portfolio.empty:
+        portfolio = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
 
-    # existing tickers (upper) verhindern doppelte Einträge
-    existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()]
+    # normalize existing tickers and ensure dtypes
+    portfolio = portfolio.copy()
+    if "ticker" not in portfolio.columns:
+        portfolio["ticker"] = ""
+    portfolio["ticker"] = portfolio["ticker"].astype(str).str.strip().str.upper()
+    if "quantity" not in portfolio.columns:
+        portfolio["quantity"] = 0
+    portfolio["quantity"] = pd.to_numeric(portfolio["quantity"], errors="coerce").fillna(0).astype(int)
 
-    to_add = []
-    for t in new_tickers_norm:
-        if t.upper() in existing:
-            continue
-        to_add.append((t, default_qty))
+    # build list of tickers to actually add (avoid duplicates)
+    existing_set = set(portfolio["ticker"].tolist())
+    to_add = [t for t in new_tickers_norm if t and t.upper() not in existing_set]
 
-    if to_add:
-        # Reuse the with-quantities function to avoid code duplication
-        add_new_tickers_to_portfolio_with_quantities(to_add, default_qty=default_qty)
+    if not to_add:
+        # nothing to add
+        st.info("Keine neuen Ticker zum Hinzufügen.")
+        st.session_state["portfolio_df"] = portfolio
+        return
+
+    # create DataFrame for new rows with correct dtypes
+    new_rows = pd.DataFrame([{"ticker": t.upper(), "quantity": int(default_qty), "price": pd.NA, "market_value": pd.NA, "weight": pd.NA} for t in to_add])
+    # ensure dtypes
+    new_rows["ticker"] = new_rows["ticker"].astype(str)
+    new_rows["quantity"] = pd.to_numeric(new_rows["quantity"], errors="coerce").fillna(0).astype(int)
+
+    # append and consolidate
+    portfolio = pd.concat([portfolio, new_rows], ignore_index=True)
+    portfolio = portfolio.groupby(portfolio["ticker"].astype(str).str.strip().str.upper(), as_index=False).agg({
+        "quantity": "sum",
+        "price": lambda s: pd.to_numeric(s.dropna().astype(str).str.replace(",", "."), errors="coerce").iloc[0] if s.dropna().any() else pd.NA,
+        "market_value": "sum",
+        "weight": "first"
+    })
+
+    # persist
+    st.session_state["portfolio_df"] = portfolio
+    st.success(f"{len(to_add)} neue Ticker hinzugefügt.")
+    return
 
 def add_new_tickers_to_portfolio_with_quantities(pairs: List[Tuple[str,int]], default_qty: int = 1):
     """
-    pairs: List of (ticker, qty)
-    Fügt Ticker mit exakter Menge ins portfolio_df ein.
-    Aktualisiert st.session_state['portfolio_df'] und st.session_state['prices_for_bt'].
+    pairs: list of (ticker, qty)
     """
     if not pairs:
         return
 
-    # Normalisiere Eingaben und baue qty_map
-    qty_map = {normalize_ticker(str(t)): int(q) if q is not None else default_qty for t, q in pairs}
+    # normalize pairs
+    pairs_norm = [(normalize_ticker(str(t)).upper(), int(q) if q is not None else int(default_qty)) for t,q in pairs]
 
-    # Lade oder initialisiere portfolio_df
-    df = st.session_state.get("portfolio_df")
-    if df is None:
-        df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
+    portfolio = st.session_state.get("portfolio_df")
+    if portfolio is None or portfolio.empty:
+        portfolio = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
 
-    # Preiscache aus Session
-    prices_cache = st.session_state.get("prices_for_bt")
-    prices_df = prices_cache if isinstance(prices_cache, pd.DataFrame) else None
+    portfolio = portfolio.copy()
+    if "ticker" not in portfolio.columns:
+        portfolio["ticker"] = ""
+    portfolio["ticker"] = portfolio["ticker"].astype(str).str.strip().str.upper()
+    if "quantity" not in portfolio.columns:
+        portfolio["quantity"] = 0
+    portfolio["quantity"] = pd.to_numeric(portfolio["quantity"], errors="coerce").fillna(0).astype(int)
 
-    # Sammle Ticker, die wir neu holen müssen
-    need_fetch = []
-    last_prices = {}
-
-    existing_tickers_upper = [str(x).upper() for x in df["ticker"].astype(str).tolist()]
-
-    for t_norm, qty in qty_map.items():
-        # überspringe, wenn bereits in portfolio vorhanden
-        if t_norm in existing_tickers_upper:
-            continue
-        # versuche Preis aus prices_df zu finden
-        if prices_df is not None:
-            series = find_price_for_ticker(prices_df, t_norm)
-            if series is not None and not series.empty:
-                try:
-                    last_prices[t_norm] = float(series.ffill().iloc[-1])
-                    continue
-                except Exception:
-                    pass
-        need_fetch.append(t_norm)
-
-    # Fallback: fetch_last_prices für fehlende Ticker
-    if need_fetch:
-        fetched = fetch_last_prices(need_fetch, lookback_days=365)
-        for k, v in fetched.items():
-            last_prices[normalize_ticker(k)] = v
-
-    # Füge Zeilen hinzu
-    for t_norm, qty in qty_map.items():
-        if t_norm in existing_tickers_upper:
-            # Optional: hier könntest du Menge addieren statt überspringen
-            continue
-        price = last_prices.get(t_norm)
-        mv = float(qty) * float(price) if price is not None else 0.0
-        row = {"ticker": t_norm, "quantity": int(qty), "price": price if price is not None else None,
-               "market_value": mv, "weight": 0.0}
-        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-
-    # Recompute weights
-    total_mv = df["market_value"].sum() if not df.empty else 0.0
-    if total_mv > 0:
-        df["weight"] = (df["market_value"] / total_mv) * 100.0
-    else:
-        df["weight"] = 0.0
-
-    # Update session
-    st.session_state["portfolio_df"] = df
-    st.session_state["portfolio_total_value"] = float(total_mv)
-
-    # Update price cache: prefer DataFrame, sonst dict of last prices
-    if isinstance(prices_df, pd.DataFrame) and not prices_df.empty:
-        st.session_state["prices_for_bt"] = prices_df
-    else:
-        existing_cache = st.session_state.get("prices_for_bt", {})
-        if isinstance(existing_cache, dict):
-            existing_cache.update(last_prices)
-            st.session_state["prices_for_bt"] = existing_cache
+    # append each pair
+    new_rows = []
+    for t, q in pairs_norm:
+        if t in portfolio["ticker"].values:
+            portfolio.loc[portfolio["ticker"] == t, "quantity"] += int(q)
         else:
-            st.session_state["prices_for_bt"] = last_prices
+            new_rows.append({"ticker": t, "quantity": int(q), "price": pd.NA, "market_value": pd.NA, "weight": pd.NA})
+
+    if new_rows:
+        portfolio = pd.concat([portfolio, pd.DataFrame(new_rows)], ignore_index=True)
+
+    portfolio = portfolio.groupby(portfolio["ticker"].astype(str).str.strip().str.upper(), as_index=False).agg({
+        "quantity": "sum",
+        "price": lambda s: pd.to_numeric(s.dropna().astype(str).str.replace(",", "."), errors="coerce").iloc[0] if s.dropna().any() else pd.NA,
+        "market_value": "sum",
+        "weight": "first"
+    })
+
+    st.session_state["portfolio_df"] = portfolio
+    st.success(f"{len(pairs_norm)} Ticker verarbeitet.")
+    return
 
 def consolidate_portfolio_df(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -300,19 +313,8 @@ def consolidate_portfolio_df(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_grouped[cols]
 
-def add_tickers_and_fetch(tickers_with_qty, prefix="etf", start=None, end=None):
-    """
-    Load price series for tickers and persist quantities into session_state portfolio.
 
-    - Accepts either:
-        * list[str] (tickers)
-        * list[tuple[str,int]] or list[list] (ticker, qty)
-    - Loads prices (uses fetch_prices_for_ticker and normalize_prices)
-    - Updates st.session_state["user_tickers"], st.session_state["prices_for_bt"]
-    - If qty information provided, updates st.session_state["portfolio"]
-    - Returns (success, failed, combined_df)
-    """
-    # Normalize input: detect (ticker, qty) pairs or plain ticker list
+def add_tickers_and_fetch(tickers_with_qty, prefix="etf", start=None, end=None):
     qty_map = {}
     if tickers_with_qty and isinstance(tickers_with_qty[0], (list, tuple)):
         tickers = [str(t).strip().upper() for t, _ in tickers_with_qty]
@@ -351,75 +353,116 @@ def add_tickers_and_fetch(tickers_with_qty, prefix="etf", start=None, end=None):
             logger.debug("add_tickers_and_fetch: normalized empty for %s", t)
             continue
 
-        # pick sensible column (prefer Close)
+        # pick sensible column and set normalized series name
         try:
-            if df_norm.shape[1] > 1:
-                col = "Close" if "Close" in df_norm.columns else df_norm.columns[0]
-                prices_accum[t] = df_norm[col]
-            else:
-                prices_accum[t] = df_norm.iloc[:, 0]
+            col = _pick_price_column(df_norm)
+            series = df_norm[col].copy()
+            series.name = normalize_ticker(t)
+            prices_accum[series.name] = series
             success.append(t)
         except Exception:
             logger.exception("add_tickers_and_fetch: error selecting price series for %s", t)
             failed.append(t)
             continue
 
-    # Build combined DataFrame from accumulated series
+    # Build combined DataFrame from accumulated series (dict of Series -> clean columns)
     combined = pd.DataFrame()
     if prices_accum:
         try:
             combined = pd.concat(prices_accum, axis=1)
             # ensure simple string column names
-            combined.columns = [str(c) for c in combined.columns]
+            if isinstance(combined.columns, pd.MultiIndex):
+                combined.columns = ["_".join(map(str, c)).strip() for c in combined.columns]
+            else:
+                combined.columns = [str(c).strip() for c in combined.columns]
         except Exception:
-            # fallback: try constructing DataFrame directly
             try:
                 combined = pd.DataFrame(prices_accum)
             except Exception:
                 logger.exception("add_tickers_and_fetch: failed to build combined DataFrame")
                 combined = pd.DataFrame()
 
-    # Persist user_tickers and prices_for_bt in session_state
+    # Persist user_tickers
     st.session_state.setdefault("user_tickers", [])
     for t in success:
         if t not in st.session_state["user_tickers"]:
             st.session_state["user_tickers"].append(t)
 
+    # Merge into existing prices_for_bt (harmonize tz first)
     existing = st.session_state.get("prices_for_bt")
     if existing is None or (hasattr(existing, "empty") and existing.empty):
         st.session_state["prices_for_bt"] = combined
     else:
+        existing = st.session_state.get("prices_for_bt", pd.DataFrame())
+
+        # If combined contains OHLC multi-columns, extract price series
+        combined = _extract_price_series_from_yf(combined, prefer="ADJ CLOSE")
+
+        # Harmonize tz (recommended: UTC)
+        existing = _harmonize_index_tz(existing, target_tz="UTC")
+        combined = _harmonize_index_tz(combined, target_tz="UTC")
+
+        # sort indices
+        try:
+            existing = existing.sort_index()
+            combined = combined.sort_index()
+        except Exception:
+            pass
+
+        # attempt concat, with fallback to making indices naive if tz mismatch persists
         try:
             merged = pd.concat([existing, combined], axis=1)
+        except TypeError as e:
+            logger.warning("Concat TypeError, trying naive fallback: %s", e)
+            try:
+                existing = _make_index_naive(existing)
+                combined = _make_index_naive(combined)
+                merged = pd.concat([existing, combined], axis=1)
+            except Exception as e2:
+                logger.error("add_tickers_and_fetch: merging prices_for_bt failed after fallback: %s; replacing with combined", e2)
+                st.session_state["prices_for_bt"] = combined
+                merged = None
+
+        if merged is not None:
             merged = merged.loc[:, ~merged.columns.duplicated()]
             st.session_state["prices_for_bt"] = merged
-        except Exception:
-            logger.exception("add_tickers_and_fetch: merging prices_for_bt failed, replacing with combined")
-            st.session_state["prices_for_bt"] = combined
 
-    # After successful loads, update portfolio quantities from qty_map
+    # Update portfolio quantities from qty_map
     if qty_map:
         portfolio = st.session_state.get("portfolio")
-        if portfolio is None:
+        if portfolio is None or portfolio.empty:
             portfolio = pd.DataFrame(columns=["ticker", "quantity"])
-        # ensure ticker column exists
+        # ensure types
         if "ticker" not in portfolio.columns:
-            portfolio["ticker"] = []
+            portfolio["ticker"] = portfolio.get("ticker", pd.Series(dtype=str))
         if "quantity" not in portfolio.columns:
-            portfolio["quantity"] = 0
+            portfolio["quantity"] = portfolio.get("quantity", pd.Series(dtype=int))
+        portfolio["ticker"] = portfolio["ticker"].astype(str)
+        portfolio["quantity"] = pd.to_numeric(portfolio["quantity"], errors="coerce").fillna(0).astype(int)
 
         for t in success:
             q = int(qty_map.get(t, 1))
             if t in portfolio["ticker"].values:
-                portfolio.loc[portfolio["ticker"] == t, "quantity"] = (
-                    portfolio.loc[portfolio["ticker"] == t, "quantity"].astype(int) + q
-                )
+                portfolio.loc[portfolio["ticker"] == t, "quantity"] += q
             else:
-                portfolio = pd.concat([portfolio, pd.DataFrame([{"ticker": t, "quantity": q}])], ignore_index=True)
+                new_row = pd.DataFrame([{"ticker": t, "quantity": q}])
+                portfolio = pd.concat([portfolio, new_row], ignore_index=True)
 
+        portfolio = portfolio.groupby("ticker", as_index=False).agg({"quantity": "sum"})
         st.session_state["portfolio"] = portfolio
 
-    return success, failed, combined
+    # final_df: what we actually stored
+    final_df = st.session_state.get("prices_for_bt", combined)
+
+    # debug tz info
+    try:
+        logger.debug("prices_for_bt index tz=%s combined index tz=%s",
+                     getattr(final_df.index, "tz", None),
+                     getattr(combined.index, "tz", None))
+    except Exception:
+        pass
+
+    return success, failed, final_df
 
 def persist_portfolio_df(df: pd.DataFrame):
     # normalize columns

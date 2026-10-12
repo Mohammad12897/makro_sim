@@ -120,14 +120,21 @@ def _sanitize_date_param(d):
             return None
     return None
 
-def safe_rerun():
+def safe_rerun(stop: bool = True):
+    """
+    Versucht st.experimental_rerun(); falls nicht vorhanden, setzt nur eine Flag.
+    Wichtig: wir schreiben NICHT direkt app_sidebar_page_choice hier, weil das Widget
+    bereits existieren könnte und Streamlit das nicht erlaubt.
+    """
     rerun_fn = getattr(st, "experimental_rerun", None)
     if callable(rerun_fn):
         rerun_fn()
     else:
         st.session_state["_needs_rerun"] = True
-        st.stop()
-
+        if stop:
+            st.stop()
+        # kein direktes Setzen von app_sidebar_page_choice hier
+        
 def run_analysis():
     logging.info("Analyse gestartet")
     # Beispiel: Dummy-Ergebnis
@@ -145,7 +152,7 @@ def analyze_callback():
         logging.exception("analysis failed")
     finally:
         st.session_state["_analyzing"] = False
-        safe_rerun()
+        safe_rerun(stop=True)
 
 def do_add_tickers(holdings_list, prefix, asset_key, prices=None):
     """
@@ -354,19 +361,22 @@ def _normalize_tickers(tickers: Sequence[str]) -> List[str]:
 
 def normalize_ticker(t: str) -> str:
     t = str(t).strip().upper()
-    # einfache Heuristiken; erweitere nach Bedarf
+    if not t:
+        return t
+    # Crypto mapping
+    if t in ("BTC", "BTCUSD"):
+        return "BTC-USD"
+    # Heuristiken
     if t.endswith(".OQ"):
-        return t.replace(".OQ", ".US")
+        return t[:-3] + ".US"
+    # keep .L (LSE) as-is; remove leading $ and replace ":" with "."
+    t = t.lstrip("$").replace(":", ".")
     return t
 
 def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = None,
                          interval: str = "1d", auto_adjust: bool = False,
                          threads: bool = False, **kwargs) -> pd.DataFrame:
-    """
-    Lädt Zeitreihen mit yfinance.download.
-    - Wenn lookback_days gesetzt und start None: berechne start = end - lookback_days.
-    - Niemals lookback_days an yf.download weiterreichen.
-    """
+    
     if isinstance(tickers, str):
         tickers = [tickers]
     tickers = _normalize_tickers(tickers)
@@ -394,7 +404,6 @@ def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = Non
 
     try:
         if start_s is None and end_s is None:
-            logger.debug("Using period fallback for yf.download (5y)")
             raw = yf.download(
                 tickers,
                 period="5y",
@@ -424,27 +433,37 @@ def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = Non
         logger.exception("Unexpected error calling yf.download for %s", tickers)
         raw = None
 
-    # danach wie gehabt prüfen, ob df None oder leer ist
+    # innerhalb deiner fetch function (nach raw = yf.download(...))
     if raw is None or (hasattr(raw, "empty") and raw.empty):
         logger.warning("fetch_prices_from_yf returned empty DataFrame for %s (start=%s end=%s)", tickers, start_s, end_s)
-        # handle empty according to eure Logik (retry, return empty, etc.)
         return pd.DataFrame()
 
-    df = flatten_yf_dataframe(raw)
 
-    # Spalten normalisieren für Matching
-    df.columns = [str(c).upper() for c in df.columns]
-    df.columns = [c.replace(".OQ", ".US") for c in df.columns]
+    # Extrahiere 'Adj Close' falls MultiIndex, sonst nutze raw
+    if isinstance(raw.columns, pd.MultiIndex):
+        if 'Adj Close' in raw.columns.levels[0]:
+            adj = raw['Adj Close'].copy()
+        else:
+            # fallback: wähle die erste Ebene der Spalten (vorsichtig)
+            first_level = raw.columns.levels[0][0]
+            adj = raw[first_level].copy()
+    else:
+        adj = raw.copy()
 
+    # Normalisiere Spaltennamen
+    adj.columns = [normalize_ticker(c) for c in adj.columns]
+
+    # Index in Datetime und sortieren
     try:
-        df.index = pd.to_datetime(df.index)
+        adj.index = pd.to_datetime(adj.index)
     except Exception:
         pass
-    df = df.sort_index()
+    adj = adj.sort_index()
 
     logger.debug("fetch_prices_from_yf returning dataframe with columns %s and index length %d",
-                 list(df.columns), len(df.index))
-    return df
+                list(adj.columns), len(adj.index))
+    return adj
+
 
 def fetch_last_prices(tickers, lookback_days: int = 365) -> dict:
     """
@@ -700,29 +719,35 @@ def extract_close_series(df, ticker):
 from multiprocessing import Process, Queue
 import traceback
 
+
 def _worker_download(q, tickers, start, end, auto_adjust, threads):
-    # sanitize incoming start/end
     start_s = _sanitize_date_param(start)
     end_s = _sanitize_date_param(end)
-
-    # Debug log vor dem Download
     logger.debug("yf.download tickers=%s start=%s end=%s", tickers, start_s, end_s)
 
     try:
         if start_s is None and end_s is None:
-            # Fallback: period statt start/end (z. B. 5y)
-            raw = yf.download(tickers, period="5y", progress=False,
-                                group_by="ticker", auto_adjust=auto_adjust, threads=threads)
+            raw = yf.download(
+                tickers,
+                period="5y",
+                progress=False,
+                group_by="ticker",
+                auto_adjust=auto_adjust,
+                threads=threads
+            )
         else:
-            raw = yf.download(tickers, start=start_s, end=end_s, progress=False,
-                                group_by="ticker", auto_adjust=auto_adjust, threads=threads)
-        
+            raw = yf.download(
+                tickers,
+                start=start_s,
+                end=end_s,
+                progress=False,
+                group_by="ticker",
+                auto_adjust=auto_adjust,
+                threads=threads
+            )
         q.put(("ok", raw))
-    except ValueError as e:
+    except Exception:
         q.put(("err", traceback.format_exc()))
-    except Exception as e:
-        q.put(("err", traceback.format_exc()))
-
 
 def safe_yf_download(tickers, start, end, auto_adjust=False, threads=False, timeout=60):
     q = Queue()
@@ -856,64 +881,83 @@ def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
                                  start: str = DEFAULT_START_STR,
                                  end: Optional[str] = None,
                                  auto_adjust: bool = False,
-                                 threads: bool = True,
+                                 threads: bool = False,
                                  progress: bool = False) -> Tuple[Optional[str], pd.DataFrame]:
-    """
-    Lade Close/Adj Close Preise für tickers via yfinance.
-    Rückgabe: (used_ticker_or_column_name, dataframe)
-    """
     if isinstance(tickers, str):
         tickers = [tickers]
     tickers = _normalize_tickers(tickers)
     if not tickers:
         return None, pd.DataFrame()
 
-    # sanitize incoming start/end
     start_s = _sanitize_date_param(start)
     end_s = _sanitize_date_param(end)
-
-    # Debug log vor dem Download
-    logger.debug("fetch_prices_quiet_with_used tickers=%s start=%s end=%s ", tickers, start_s, end_s)
+    logger.debug("fetch_prices_quiet_with_used tickers=%s start=%s end=%s", tickers, start_s, end_s)
 
     try:
         if start_s is None and end_s is None:
-            # Fallback: period statt start/end (z. B. 5y)
             raw = yf.download(
-                        tickers,
-                        period="5y",
-                        progress=False,
-                        group_by="ticker",
-                        auto_adjust=auto_adjust,
-                        threads=False
-                    )
+                tickers,
+                period="5y",
+                progress=False,
+                group_by="ticker",
+                auto_adjust=auto_adjust,
+                threads=threads
+            )
         else:
             raw = yf.download(
-                        tickers,
-                        start=start_s,
-                        end=end_s,
-                        progress=False,
-                        group_by="ticker",
-                        auto_adjust=auto_adjust,
-                        threads=False
-                    )
-    
+                tickers,
+                start=start_s,
+                end=end_s,
+                progress=False,
+                group_by="ticker",
+                auto_adjust=auto_adjust,
+                threads=threads
+            )
 
-        # danach wie gehabt prüfen, ob df None oder leer ist
         if raw is None or (hasattr(raw, "empty") and raw.empty):
-            logger.warning("fetch_prices_from_yf returned empty DataFrame for %s (start=%s end=%s)", tickers, start_s, end_s)
-            # handle empty according to eure Logik (retry, return empty, etc.)
+            logger.warning("fetch_prices_quiet_with_used: empty result for %s", tickers)
             raise RuntimeError("yf.download returned empty")
 
-        df = _normalize_yf_raw(raw, tickers, auto_adjust=auto_adjust)
-        df.columns = [c.upper() for c in df.columns]
-        df.index = pd.to_datetime(df.index, errors="ignore")
-        df = df.sort_index()
-        used = next((t for t in tickers if t.upper() in df.columns), None)
-        return used, df
+        # Extrahiere Adj Close falls MultiIndex, sonst nutze raw
+        if isinstance(raw.columns, pd.MultiIndex):
+            if 'Adj Close' in raw.columns.levels[0]:
+                adj = raw['Adj Close'].copy()
+            elif 'Close' in raw.columns.levels[0]:
+                adj = raw['Close'].copy()
+            else:
+                # fallback: versuche xs auf erste Ebene
+                first_level = raw.columns.levels[0][0]
+                adj = raw.xs(first_level, axis=1, level=0).copy()
+        else:
+            # Single level: suche 'Adj Close' oder 'Close' oder nimm erste numerische Spalte
+            cols = raw.columns
+            if 'Adj Close' in cols:
+                adj = raw['Adj Close'].copy()
+            elif 'Close' in cols:
+                adj = raw['Close'].copy()
+            else:
+                numeric_cols = raw.select_dtypes(include='number').columns
+                if len(numeric_cols) > 0:
+                    adj = raw[numeric_cols[0]].to_frame().copy()
+                else:
+                    raise RuntimeError("No numeric price column found in yf.download result")
+
+        # Normalisiere Spaltennamen
+        adj.columns = [normalize_ticker(c) for c in adj.columns]
+
+        # Index in Datetime und sortieren
+        try:
+            adj.index = pd.to_datetime(adj.index)
+        except Exception:
+            pass
+        adj = adj.sort_index()
+
+        used = next((t for t in tickers if normalize_ticker(t) in adj.columns), None)
+        return used, adj
 
     except Exception as e:
-        logger.warning("yfinance download failed or returned empty for %s: %s", tickers, e)
-        # fallback: sequentielles Laden pro Ticker (robust, langsamer)
+        logger.warning("fetch_prices_quiet_with_used failed for %s: %s", tickers, e)
+        # Fallback: sequentielles Laden pro Ticker
         used, df = fetch_prices_sequential(tickers, start, end, auto_adjust=auto_adjust)
         return used, df
 

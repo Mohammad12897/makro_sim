@@ -9,9 +9,8 @@ import json, os, re
 from risk_dashboard.core.etf_tools import get_etf_candidates_for_index, compute_etf_score_components, get_preset_weights
 from risk_dashboard.utils.persistence import save_user_tickers
 from risk_dashboard.core.data_loader import parse_tickers
-from risk_dashboard.ui.helpers import normalize_ticker
 from risk_dashboard.config import DEFAULT_START_STR
-from risk_dashboard.data_utils import _sanitize_date_param, cached_download_prices, do_add_tickers,safe_rerun, analyze_callback
+from risk_dashboard.data_utils import _sanitize_date_param, cached_download_prices, do_add_tickers,safe_rerun, analyze_callback,normalize_ticker
 import uuid
 import logging
 
@@ -167,9 +166,13 @@ def render_etf_selection_ui(prefix: str = "etf"):
             if st.button("Kandidaten speichern", key=f"{prefix}_save_candidates"):
                 from risk_dashboard.etf_candidates import add_etf_candidates
                 add_etf_candidates(index_choice, [t.strip() for t in new_etfs.split(",") if t.strip()])
-                # sichere Neuladung / Navigation
-                st.session_state["navigate_to"] = "Holdings Analyse"
-                safe_rerun()
+
+                from risk_dashboard.handlers import handle_holdings_analyse
+                ok = handle_holdings_analyse()
+                if ok:
+                    st.session_state["navigate_to"] = "Holdings Analyse"
+                    from risk_dashboard.data_utils import safe_rerun
+                    safe_rerun(stop=False)
 
     # --- Ende Sidebar Block ---
 
@@ -281,7 +284,10 @@ def render_etf_selection_ui(prefix: str = "etf"):
         st.success("CSV und JSON erfolgreich exportiert!")
 
     # --- Auto select top N / manual selection ---
-    top_n = st.number_input("Top N automatisch auswählen", min_value=1, max_value=min(10, len(df_scores)), value=2, key=f"{prefix}_top_n")
+    max_val = min(10, len(df_scores))
+    default_val = min(2, max_val) if max_val >= 1 else 1
+    top_n = st.number_input("Top N automatisch auswählen", min_value=1, max_value=max_val, value=default_val, key=f"{prefix}_top_n")
+
     auto_select = st.checkbox("Top N automatisch auswählen", value=True, key=f"{prefix}_auto_select")
     if auto_select:
         selected = df_scores["ticker"].tolist()[:top_n]

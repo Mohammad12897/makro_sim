@@ -19,13 +19,14 @@ import yaml
 import tempfile, os, json
 import logging, inspect, pathlib
 
+from risk_dashboard.core.yf_helper import _safe_read_csv_text
 from risk_dashboard.core.data import portfolio
 from risk_dashboard.etf_candidates import add_etf_candidates
-from risk_dashboard.data_utils import fetch_price_history_bulk, price_history_to_prices_df, _safe_serialize_value, normalize_envelope
+from risk_dashboard.data_utils import fetch_price_history_bulk, price_history_to_prices_df, _safe_serialize_value, normalize_envelope, normalize_ticker
 from risk_dashboard.core.screening import screen_and_rank
 from risk_dashboard.core.config import load_profiles, save_profile, load_etf_universe
 from risk_dashboard.core.utils import resolve_components, analyze_portfolio_components, classify_etf
-from risk_dashboard.ui.helpers  import render_backtest, normalize_ticker, detect_type, safe_backtest_call
+from risk_dashboard.ui.helpers  import render_backtest, detect_type, safe_backtest_call
 
 from risk_dashboard.data.etf_universes import ETF_UNIVERSES
 from risk_dashboard.core.holdings import load_ishares_holdings, etf_to_isin_map, load_holdings_with_fallback
@@ -177,46 +178,53 @@ def load_etf_yaml():
         st.warning("Fehler beim Laden von ETF YAML; benutze leeres Mapping.")
     return {}
 
-
 def show_prices_uploader(prefix="profile", label=None):
-    """
-    Zeigt genau einen file_uploader für Preisdaten an (eindeutiger key).
-    Bei erfolgreichem Einlesen persistiert es DataFrame in st.session_state['prices_for_bt'].
-    Gibt das DataFrame zurück oder None.
-    """
     uploader_key = f"prices_uploader_{prefix}"
     label = label or "CSV mit Preisdaten hochladen (Date, Close oder mehrere Spalten mit Tickers)"
-    # Wenn das Widget bereits registriert ist, erzeugen wir es trotzdem nicht mehrfach,
-    # aber Streamlit benötigt die Aufrufstelle — deshalb rufen wir die uploader-Funktion
-    # immer an dieser zentralen Stelle auf.
     uploaded = st.file_uploader(label, type=["csv"], key=uploader_key, accept_multiple_files=False)
 
     if uploaded is None:
         return None
 
     try:
-        df = pd.read_csv(uploaded, parse_dates=["Date"], dayfirst=False)
+        # robustes Einlesen: versuche parse_dates, sonst flexible Reader
+        try:
+            df = pd.read_csv(uploaded, parse_dates=["Date"], dayfirst=False)
+        except Exception:
+            # fallback: robustes Text‑Parsing (z. B. _safe_read_csv_text)
+            uploaded.seek(0)
+            text = uploaded.read()
+            df = _safe_read_csv_text(text)
+            if df is None:
+                st.error("Konnte die Datei nicht als CSV/TSV einlesen.")
+                return None
+
+        # Datum als Index setzen
         if "Date" in df.columns:
             df = df.set_index("Date").sort_index()
         else:
             # Versuch: Index als Datum interpretieren
             try:
-                df.index = pd.to_datetime(df.index)
+                df.index = pd.to_datetime(df.index, errors="coerce")
+                if not isinstance(df.index, pd.DatetimeIndex) or df.index.isna().all():
+                    raise ValueError("Kein gültiges Datum im Index")
                 df = df.sort_index()
             except Exception:
-                st.error("Die hochgeladene Datei enthält keine erkennbare 'Date' Spalte.")
+                st.error("Die hochgeladene Datei enthält keine erkennbare 'Date' Spalte oder Datumsindex.")
                 return None
 
+        # Wenn nur eine Spalte, benenne sie 'Close'
         if df.shape[1] == 1 and "Close" not in df.columns:
             df.columns = ["Close"]
 
+        # Spaltennamen säubern
         df.columns = [str(c).strip() for c in df.columns]
 
         if df.shape[0] < 2 or df.shape[1] < 1:
             st.error("Hochgeladene Preisdaten enthalten zu wenige Zeilen/Spalten.")
             return None
 
-        # persist
+        # persistiere sauber (einmalig)
         st.session_state["prices_for_bt"] = df
         st.session_state["price_data_uploaded_from_csv"] = True
         st.success(f"Preisdaten erfolgreich hochgeladen ({getattr(uploaded, 'name', 'uploaded file')}).")
@@ -245,13 +253,15 @@ def show_holdings_uploader(prefix="profile", label=None):
         st.session_state["last_holdings_upload"] = uploaded
     return uploaded
 
+
+
 def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
-    # 1. Versuche session_state
+    # 1) Versuche session_state
     df = st.session_state.get(session_key)
     logger.debug("session_state keys: %s", list(st.session_state.keys()))
     logger.debug("portfolio_df present in session: %s", session_key in st.session_state)
 
-    # 2. File uploader (UI) — eindeutiger key
+    # 2) File uploader (UI)
     uploaded = st.file_uploader(
         "Portfolio CSV (ticker, quantity, price, market_value optional)",
         type=["csv"],
@@ -259,25 +269,62 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
     )
     if uploaded is not None:
         try:
-            df = pd.read_csv(uploaded)
-            logger.debug("Loaded portfolio from uploader shape=%s columns=%s", getattr(df, "shape", None), list(df.columns))
-            # Optional: einfache Validierung
-            if "ticker" not in [c.lower() for c in df.columns]:
-                st.warning("Die CSV enthält keine Spalte 'ticker' (Groß-/Kleinschreibung beachten).")
+            uploaded.seek(0)
+            # robust einlesen
+            try:
+                df = pd.read_csv(uploaded)
+            except Exception:
+                uploaded.seek(0)
+                df = _safe_read_csv_text(uploaded.read())
+                if df is None:
+                    st.error("Konnte die Datei nicht einlesen.")
+                    return pd.DataFrame()
+
+            # normalize column names early
+            df.columns = [c.strip().lower() for c in df.columns]
+
+            if "ticker" not in df.columns:
+                st.warning("Die CSV enthält keine Spalte 'ticker'.")
+                return pd.DataFrame()
+
+            # numeric parsing
+            if "price" in df.columns:
+                df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
+            else:
+                df["price"] = pd.NA
+
+            df["quantity"] = pd.to_numeric(df.get("quantity", 0), errors="coerce").fillna(0)
+
+            # compute market_value if missing
+            if "market_value" not in df.columns or df["market_value"].isna().any():
+                df["market_value"] = df["quantity"] * df["price"]
+
+            # drop rows without ticker
+            df = df.dropna(subset=["ticker"])
+            # persist cleaned df once
             st.session_state[session_key] = df
             st.success("Portfolio erfolgreich geladen.")
             return df
+
         except Exception as e:
             logger.exception("Failed to parse uploaded portfolio CSV: %s", e)
             st.error("Fehler beim Einlesen der hochgeladenen CSV.")
             return pd.DataFrame()
-        
-    # 3. Fallback: Datei auf Disk
-    disk_path = Path("risk_dashboard/data/portfolio.csv")  # oder holdings/portfolio.csv
+
+    # 3) Fallback: Datei auf Disk
+    disk_path = Path("risk_dashboard/data/portfolio.csv")
     logger.debug("Trying to load CSV from %s exists=%s", disk_path, disk_path.exists())
     if disk_path.exists():
         try:
             df = pd.read_csv(disk_path)
+            df.columns = [c.strip().lower() for c in df.columns]
+            if "price" in df.columns:
+                df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
+            else:
+                df["price"] = pd.NA
+            df["quantity"] = pd.to_numeric(df.get("quantity", 0), errors="coerce").fillna(0)
+            if "market_value" not in df.columns or df["market_value"].isna().any():
+                df["market_value"] = df["quantity"] * df["price"]
             st.session_state[session_key] = df
             logger.debug("Loaded portfolio from disk shape=%s", df.shape)
             return df
@@ -286,11 +333,11 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
             st.error("Fehler beim Lesen der Portfolio‑CSV von der Festplatte.")
             return pd.DataFrame()
 
-    # 4. Kein Portfolio gefunden -> leeres DataFrame
+    # 4) Kein Portfolio gefunden -> leeres DataFrame
     logger.debug("No portfolio found; returning empty DataFrame")
     return pd.DataFrame()
 
-
+ 
 # Hilfsfunktionen
 def compute_portfolio_value(df: pd.DataFrame) -> float:
     if "market_value" not in df.columns:
@@ -306,38 +353,47 @@ def load_etf_holdings(uploaded_file):
     # read
     df = pd.read_csv(uploaded_file)
 
-    # Debug: zeigt dir, was wirklich eingelesen wurde
-    logger.debug(
-        "read df shape=%s columns=%s sample=%s",
-        getattr(df, 'shape', None),
-        list(df.columns),
-        df.head().to_dict(orient='records')[:3]
-    )
-    # normalize column names
+    # normalize column names early (so we use consistent names afterwards)
     df.columns = df.columns.str.strip().str.lower()
-    # mögliche Varianten prüfen
-    if "weight_in_etf" in df.columns:
-        col = "weight_in_etf"
-    elif "weight" in df.columns:
-        col = "weight"
-    elif "weight_in_etf%" in df.columns:
-        col = "weight_in_etf%"
+
+    # parse numeric columns robustly
+    if "price" in df.columns:
+        df['price'] = pd.to_numeric(df['price'].astype(str).str.replace(',', '.'), errors='coerce')
     else:
-        # keine Gewichtsspalte: Fallback oder Fehlerbehandlung
+        df['price'] = pd.NA
+
+    df['quantity'] = pd.to_numeric(df.get('quantity', 0), errors='coerce').fillna(0)
+
+    # compute market_value where possible
+    df['market_value'] = df['quantity'] * df['price']
+
+    # weight column handling (normalize and create canonical column 'weight_in_etf')
+    weight_col = None
+    for cand in ("weight_in_etf", "weight", "weight_in_etf%"):
+        if cand in df.columns:
+            weight_col = cand
+            break
+
+    if weight_col is None:
         st.warning("CSV enthält keine Spalte 'weight_in_etf' oder 'weight'. Demo‑Werte werden verwendet.")
         df["weight_in_etf"] = 0.0
-        return df
+    else:
+        def to_float(x):
+            try:
+                if isinstance(x, str) and x.strip().endswith("%"):
+                    return float(x.strip().rstrip("%")) / 100.0
+                return float(str(x).replace(',', '.'))
+            except Exception:
+                return 0.0
+        df["weight_in_etf"] = df[weight_col].apply(to_float)
 
-    # Konvertieren und normalisieren (z. B. Prozentangaben wie '30%' behandeln)
-    def to_float(x):
-        try:
-            if isinstance(x, str) and x.strip().endswith("%"):
-                return float(x.strip().rstrip("%")) / 100.0
-            return float(x)
-        except Exception:
-            return 0.0
+    # persist final df once
+    st.session_state['portfolio_df'] = df
 
-    df["weight_in_etf"] = df[col].apply(to_float)
+    # debug log
+    logger.debug("load_etf_holdings: read df shape=%s columns=%s sample=%s",
+                 getattr(df, 'shape', None), list(df.columns), df.head().to_dict(orient='records')[:3])
+
     return df
 
 def normalize_holdings_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -505,7 +561,7 @@ def render_etf_tab(session_state=None):
             st.info("Keine vordefinierten ETFs gefunden. Bitte füge Kandidaten im Profil hinzu.")
             if st.button("Profil öffnen: Kandidaten hinzufügen", key=f"{prefix}_open_profile_editor"):
                 ss["show_profile_editor"] = True
-                safe_rerun()
+                safe_rerun(stop=False)
             return
 
     # 2) Optionen bauen
@@ -527,7 +583,7 @@ def render_etf_tab(session_state=None):
         st.info("Keine vordefinierten ETFs gefunden. Bitte füge Kandidaten im Profil hinzu.")
         if st.button("Profil öffnen: Kandidaten hinzufügen", key=f"{prefix}_open_profile_editor"):
             ss["show_profile_editor"] = True
-            safe_rerun()
+            safe_rerun(stop=False)
         return
 
     # 5) Multiselect mit gefilterten Defaults
@@ -551,15 +607,15 @@ def render_etf_tab(session_state=None):
     with col1:
         if st.button("KI Vorschlag: Konservativ", key=f"{prefix}_ki_conservative"):
             ss["user_weights_mapped"] = {"CASH": 0.2, "BOND": 0.5, "EQUITY": 0.3}  # Beispiel
-            safe_rerun()
+            safe_rerun(stop=False)
     with col2:
         if st.button("KI Vorschlag: Ausgewogen", key=f"{prefix}_ki_balanced"):
             ss["user_weights_mapped"] = {"CASH": 0.1, "BOND": 0.4, "EQUITY": 0.5}
-            safe_rerun()
+            safe_rerun(stop=False)
     with col3:
         if st.button("KI Vorschlag: Wachstum", key=f"{prefix}_ki_growth"):
             ss["user_weights_mapped"] = {"CASH": 0.0, "BOND": 0.2, "EQUITY": 0.8}
-            safe_rerun()
+            safe_rerun(stop=False)
 
     # Defensive defaults for session keys
     ss.setdefault("user_weights_mapped", {})
@@ -581,7 +637,7 @@ def render_etf_tab(session_state=None):
         st.write(f"Summe Gewichte: {total:.4f}")
         if st.button("Übernehme geänderte Gewichte", key=f"{prefix}_apply_weights"):
             ss["user_weights_mapped"] = {k: float(v) for k, v in parsed.items()}
-            safe_rerun()
+            safe_rerun(stop=False)
     except Exception as e:
         st.error("Ungültiges JSON: " + str(e))
 
@@ -943,7 +999,7 @@ def profile_form_ui(
         if st.button("Neu laden (Presets)"):
             cfg = load_profiles()
             profiles = cfg.get("profiles", {}) if isinstance(cfg, dict) else {}
-            safe_rerun()
+            safe_rerun(stop=False)
 
     # Aktuelles Profil / Defaults bestimmen
     if selected != "<Neu>":
@@ -1098,7 +1154,7 @@ def profile_form_ui(
             # optional: lokale Variable aktualisieren
             price_data = df
             # safe_rerun() nur falls nötig, weil session_state gesetzt wurde
-            safe_rerun()
+            safe_rerun(stop=False)
 
 
     # 3) Loader nur aufrufen, wenn price_data fehlt
@@ -1346,7 +1402,7 @@ def profile_form_ui(
                 st.session_state.pop("combined_universe", None)
                 st.session_state.pop("price_data", None)
                 st.session_state["show_profile_editor"] = False
-                safe_rerun()
+                safe_rerun(stop=False)
                 return
             except Exception as e:
                 logger.exception("Fehler beim Hinzufügen von Kandidaten: %s", e)
@@ -1399,7 +1455,7 @@ def profile_form_ui(
             # optional: lokale Variable aktualisieren
             price_data = df
             # safe_rerun() nur falls nötig, weil session_state gesetzt wurde
-            safe_rerun()
+            safe_rerun(stop=False)
 
 
     # 3) Loader nur aufrufen, wenn price_data fehlt
@@ -1463,7 +1519,7 @@ def profile_form_ui(
             # optional: lokale Variable aktualisieren
             price_data = df
             # safe_rerun() nur falls nötig, weil session_state gesetzt wurde
-            safe_rerun()
+            safe_rerun(stop=False)
 
 
 
@@ -1503,7 +1559,7 @@ def profile_form_ui(
             # optional: lokale Variable aktualisieren
             price_data = df
             # safe_rerun() nur falls nötig, weil session_state gesetzt wurde
-            safe_rerun()
+            safe_rerun(stop=False)
 
 
     # Build portfolio only when price_data is available
@@ -2299,7 +2355,7 @@ def profile_form_ui(
             ss["show_profile_editor"] = False
             ss.pop("combined_universe", None)
             ss.pop("price_data", None)
-            safe_rerun()
+            safe_rerun(stop=False)
             return
 
         except Exception as e:
@@ -2362,7 +2418,7 @@ def profile_form_ui(
                 ss["show_profile_editor"] = False
                 ss.pop("combined_universe", None)
                 ss.pop("price_data", None)
-                safe_rerun()
+                safe_rerun(stop=False)
                 return
 
             except Exception as e:
