@@ -27,6 +27,7 @@ from risk_dashboard.core.screening import screen_and_rank
 from risk_dashboard.core.config import load_profiles, save_profile, load_etf_universe
 from risk_dashboard.core.utils import resolve_components, analyze_portfolio_components, classify_etf
 from risk_dashboard.ui.helpers  import render_backtest, detect_type, safe_backtest_call
+from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
 
 from risk_dashboard.data.etf_universes import ETF_UNIVERSES
 from risk_dashboard.core.holdings import load_ishares_holdings, etf_to_isin_map, load_holdings_with_fallback
@@ -190,6 +191,7 @@ def show_prices_uploader(prefix="profile", label=None):
         # robustes Einlesen: versuche parse_dates, sonst flexible Reader
         try:
             df = pd.read_csv(uploaded, parse_dates=["Date"], dayfirst=False)
+            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
         except Exception:
             # fallback: robustes Text‑Parsing (z. B. _safe_read_csv_text)
             uploaded.seek(0)
@@ -273,6 +275,7 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
             # robust einlesen
             try:
                 df = pd.read_csv(uploaded)
+                logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
             except Exception:
                 uploaded.seek(0)
                 df = _safe_read_csv_text(uploaded.read())
@@ -317,6 +320,7 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
     if disk_path.exists():
         try:
             df = pd.read_csv(disk_path)
+            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
             df.columns = [c.strip().lower() for c in df.columns]
             if "price" in df.columns:
                 df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
@@ -352,6 +356,7 @@ def compute_etf_breakdown(etf_market_value: float, holdings_df: pd.DataFrame, po
 def load_etf_holdings(uploaded_file):
     # read
     df = pd.read_csv(uploaded_file)
+    logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
 
     # normalize column names early (so we use consistent names afterwards)
     df.columns = df.columns.str.strip().str.lower()
@@ -705,7 +710,9 @@ def load_attribute_table_try(paths):
     for p in paths:
         try:
             if p.exists():
-                return pd.read_csv(p, encoding="utf-8-sig")
+                df = pd.read_csv(p, encoding="utf-8-sig")
+                logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+                return df
         except Exception as e:
             # loggen, aber weitermachen zum nächsten Pfad
             import logging
@@ -725,7 +732,9 @@ Dividendenrendite,Ertragskomponente
 Tracking Error,Für ETFs: Abweichung vom Index
 Währung / Domizil / Steuer,Wechselkurs‑ und Steuerimplikationen
 """
-    return pd.read_csv(StringIO(CSV_TEXT))
+    out_df = pd.read_csv(StringIO(CSV_TEXT))
+    logger.debug("read out_df shape=%s columns=%s sample=%s", getattr(out_df,'shape',None), list(out_df.columns), safe_head_preview(out_df, DUMP_MARKERS))
+    return out_df
 
 # Einmaliges Laden
 attr_df = load_attribute_table_try(CSV_CANDIDATES)
@@ -1182,13 +1191,21 @@ def profile_form_ui(
     else:
         regimes_aligned = None
 
-
-
     # Load stock universe (static file) — use project path, handle missing file
     try:
-        stock_universe = pd.read_csv("risk_dashboard/data/stock_universe.csv")
-    except Exception as e:
-        logger.exception("Failed to load stock_universe.csv: %s", e)
+        data_path = Path("risk_dashboard") / "data" / "stock_universe.csv"
+        stock_universe = pd.read_csv(data_path)
+        logger.debug(
+            "read stock_universe shape=%s columns=%s sample=%s",
+            getattr(stock_universe, "shape", None),
+            list(stock_universe.columns),
+            safe_head_preview(stock_universe, DUMP_MARKERS),
+        )
+    except FileNotFoundError:
+        logger.exception("stock_universe.csv not found at %s", data_path)
+        stock_universe = None
+    except Exception:
+        logger.exception("Failed to load stock_universe.csv")
         stock_universe = None
 
     def build_combined_universe(etf_universe, stock_universe):

@@ -12,9 +12,28 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 os.makedirs("risk_dashboard/data", exist_ok=True)
+
+
+def prepare_for_backtest(prices_df, weights_dict, min_overlap_days=180):
+    # normalize keys
+    from risk_dashboard.ticker_utils import normalize_weights_keys
+    from risk_dashboard.backtest_utils import compute_common_range
+    price_cols = [str(c).strip().upper() for c in prices_df.columns]
+    weights = normalize_weights_keys(weights_dict, price_cols)
+    # compute common range and removed tickers
+    common_index, removed = compute_common_range(prices_df[weights.keys()], min_overlap_days=min_overlap_days)
+    if common_index is None:
+        return None, weights, removed
+    # slice to common_index and drop columns not in weights
+    sliced = prices_df.loc[common_index, list(weights.keys())].ffill().dropna(axis=1, how='all')
+    # remove any columns with too many NaNs
+    valid_cols = [c for c in sliced.columns if sliced[c].notna().sum() >= min_overlap_days]
+    sliced = sliced[valid_cols]
+    weights = {k: v for k, v in weights.items() if k in valid_cols}
+    return sliced, weights, removed
 
 # ---------------------------------------------------------
 # 1. Regime erkennen

@@ -10,6 +10,8 @@ from pathlib import Path
 from pyparsing import results
 import streamlit as st
 
+from ticker_utils import normalize_weights_keys
+from risk_dashboard.core.macro_pipeline import run_backtest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 from risk_dashboard.core.data import etf
 from risk_dashboard.core.utils import prepare_prices_for_backtest, extract_close_series, compute_market_value_from_holdings
-from risk_dashboard.core.macro_pipeline import run_backtest  # dein Backtest-Entry
+  # dein Backtest-Entry
 
 try:
     from risk_dashboard.core.weights import compute_abs_weights
@@ -78,10 +80,22 @@ def preflight_check(selected_tickers, price_data, min_common_days=250):
     return valid, removed, common
 
 def run_backtest_flow(ss, prefix, price_data, weights_map, min_common_days=250, **bt_kwargs):
+    """
+    price_data: DataFrame with price series (index=dates)
+    weights_map: mapping ticker -> weight (may be unnormalized)
+    Returns a consistent dict with ok/message/payload/result
+    """
+    # 1) selected tickers (UI selection) and preflight check using the provided price_data
     selected_tickers = ss.get(f"{prefix}_selected_etfs", []) or []
-    valid, removed, common = preflight_check(selected_tickers, price_data, min_common_days=min_common_days)
+    valid, removed_by_preflight, common = preflight_check(selected_tickers, price_data, min_common_days=min_common_days)
 
-    payload = {"valid": valid, "removed": removed, "common_shape": None, "common_range": None, "weights_for_bt": {}}
+    payload = {
+        "valid": valid,
+        "removed": removed_by_preflight,
+        "common_shape": None,
+        "common_range": None,
+        "weights_for_bt": {}
+    }
 
     if common is None or common.shape[0] < 30:
         if common is not None:
@@ -92,7 +106,13 @@ def run_backtest_flow(ss, prefix, price_data, weights_map, min_common_days=250, 
     payload["common_shape"] = common.shape
     payload["common_range"] = (common.index.min(), common.index.max())
 
-    w_list = [weights_map.get(t, 0.0) for t in valid]
+    # 2) build normalized weight vector for the valid tickers (use weights_map param)
+    from risk_dashboard.ticker_utils import normalize_weights_keys
+    price_cols = [str(c).strip().upper() for c in price_data.columns]
+    weights_norm = normalize_weights_keys(weights_map or {}, price_cols)
+
+    # weights for the valid tickers (in the same order)
+    w_list = [weights_norm.get(t, 0.0) for t in valid]
     w = np.array(w_list, dtype=float)
     if w.sum() == 0:
         payload["weights_for_bt"] = {}
@@ -101,13 +121,34 @@ def run_backtest_flow(ss, prefix, price_data, weights_map, min_common_days=250, 
     weights_for_bt = {t: float(w[i]) for i, t in enumerate(valid)}
     payload["weights_for_bt"] = weights_for_bt
 
+    # 3) prepare_for_backtest: compute common index, filter and return prices_bt and weights_bt
+    from risk_dashboard.backtest_utils import prepare_for_backtest
+    prices_bt, weights_bt, removed_by_prepare = prepare_for_backtest(price_data, weights_for_bt, min_overlap_days=min_common_days)
+
+    # merge removed lists for payload
+    payload["removed"] = list(set(payload.get("removed", []) + removed_by_prepare))
+
+    if prices_bt is None or not weights_bt:
+        return {"ok": False, "message": "Insufficient common price data after filtering", "payload": payload, "result": {}}
+
+    # 4) debug log
+    logger.debug(
+        "Preparing backtest: prices_bt type=%s shape=%s weights_count=%d",
+        type(prices_bt),
+        getattr(prices_bt, "shape", None),
+        len(weights_bt),
+    )
+
+    # 5) call the actual backtest with the filtered inputs
     try:
-        res = run_backtest(tickers=valid, prices_df=common, weights=weights_for_bt, **bt_kwargs)
+        res = run_backtest(tickers=list(weights_bt.keys()), prices_df=prices_bt, weights=weights_bt, **bt_kwargs)
     except Exception as e:
         logger.exception("run_backtest failed: %s", e)
         return {"ok": False, "message": f"run_backtest error: {e}", "payload": payload, "result": {}}
 
+    # 6) return consistent result
     return {"ok": True, "message": "ok", "payload": payload, "result": res if isinstance(res, dict) else {"portfolio_value": res}}
+
 
 def run_all_etf_backtests(
     selected_etfs: list,

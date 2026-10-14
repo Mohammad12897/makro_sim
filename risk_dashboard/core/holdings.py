@@ -8,6 +8,7 @@ import streamlit as st
 from typing import Optional, Iterable, Sequence, Tuple, List
 import io, os
 from urllib.parse import urlparse
+from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
 
 logger = logging.getLogger(__name__)
 
@@ -35,48 +36,78 @@ etf_to_isin_map = {
     "CASH": None,
 }
 
-def load_ishares_holdings(isin: str) -> pd.DataFrame:
-    """
-    Lädt echte ETF-Holdings direkt von iShares (UK, DE, US).
-    Versucht mehrere Domains und Produkt-IDs.
-    Gibt ein DataFrame mit Spalten ['ticker', 'weight_in_etf'] zurück.
-    """
-    product_map = {
-        "IE00B5BMR087": ["253741", "251802"],  # CSPX
-        "IE00B4L5Y983": ["251802", "251615"],  # EQQQ
-        "IE00B3RBWM25": ["251615"],            # VWRL
-    }
+def read_table_from_string(content_bytes: bytes) -> pd.DataFrame | None:
+    try:
+        text = content_bytes.decode("utf-8")
+    except Exception:
+        try:
+            text = content_bytes.decode("latin-1")
+        except Exception:
+            return None
+    try:
+        df = pd.read_csv(io.StringIO(text), sep=None, engine="python")
+        logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+        return df
+    except Exception:
+        return None
 
+
+def load_ishares_holdings(isin: str) -> pd.DataFrame:
+    product_map = {
+        "IE00B5BMR087": ["253741", "251802"],
+        "IE00B4L5Y983": ["251802", "251615"],
+        "IE00B3RBWM25": ["251615"],
+    }
     domains = [
         "https://www.ishares.com/uk/individual/en/products",
         "https://www.ishares.com/de/privatanleger/de/produkte",
         "https://www.ishares.com/us/products",
     ]
-
     if isin not in product_map:
-        raise ValueError(f"Keine Produkt-ID für ISIN {isin} hinterlegt.")
+        raise ValueError(f"No product IDs for ISIN {isin}")
 
     for domain in domains:
         for pid in product_map[isin]:
             url = f"{domain}/{pid}/{isin}/1467271812596.ajax?fileType=csv&fileName={isin}_holdings&dataType=fund"
             try:
-                response = requests.get(url)
-                if response.status_code == 200 and "Ticker" in response.text:
-                    df = pd.read_csv(url, skiprows=9)
-                    # Debug: zeigt dir, was wirklich eingelesen wurde
-                    logger.debug(
-                        "read df shape=%s columns=%s sample=%s",
-                        getattr(df, 'shape', None),
-                        list(df.columns),
-                        df.head().to_dict(orient='records')[:3]
-                    )
-                    df = df.rename(columns={"Ticker": "ticker", "Weight (%)": "weight_pct"})
-                    df["weight_in_etf"] = df["weight_pct"] / 100
-                    return df[["ticker", "weight_in_etf"]]
+                resp = requests.get(url, timeout=15)
+                if resp.status_code != 200:
+                    continue
+                # try to parse robustly using read_csv from bytes
+                try:
+                    df = pd.read_csv(io.StringIO(resp.text), skiprows=9)
+                    logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+                except Exception:
+                    # fallback: try automatic sep detection
+                    df = read_table_from_string(resp.content)
+                if df is None or df.empty:
+                    continue
+                # normalize columns
+                df.columns = [c.strip() for c in df.columns]
+                colmap = {c.lower(): c for c in df.columns}
+                if "ticker" in colmap:
+                    ticker_col = colmap["ticker"]
+                elif "ticker symbol" in colmap:
+                    ticker_col = colmap["ticker symbol"]
+                else:
+                    continue
+                # weight column variants
+                weight_col = None
+                for cand in ("weight (%)", "weight", "weight_pct", "weight%"):
+                    if cand in colmap:
+                        weight_col = colmap[cand]
+                        break
+                if weight_col is None:
+                    continue
+                df = df.rename(columns={ticker_col: "ticker", weight_col: "weight_pct"})
+                df["weight_in_etf"] = pd.to_numeric(df["weight_pct"].astype(str).str.replace(",", "."), errors="coerce") / 100.0
+                df = df[["ticker", "weight_in_etf"]].dropna(subset=["ticker"])
+                return df
             except Exception:
                 continue
 
-    raise FileNotFoundError(f"Keine gültige iShares-CSV für ISIN {isin} gefunden.")
+    raise FileNotFoundError(f"No valid iShares CSV for ISIN {isin}")
+
 
 def read_table(path: Path) -> pd.DataFrame:
     suffix = path.suffix.lower()
@@ -85,12 +116,14 @@ def read_table(path: Path) -> pd.DataFrame:
     if suffix == ".ods":
         return pd.read_excel(path, engine="odf")
 
+    # try auto-detect
     try:
         df = pd.read_csv(path, sep=None, engine="python")
         logger.debug("read_table: auto-detected sep, shape=%s", getattr(df, "shape", None))
+        logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
         return df
-    except Exception as e:
-        logger.debug("read_table: auto-detect failed: %s", e)
+    except Exception:
+        pass
 
     encodings = ["utf-8", "utf-8-sig", "latin-1", "cp1252"]
     seps = [",", ";", "\t", "|"]
@@ -99,6 +132,7 @@ def read_table(path: Path) -> pd.DataFrame:
             try:
                 df = pd.read_csv(path, encoding=enc, sep=sep)
                 logger.debug("read_table: success enc=%s sep=%r shape=%s", enc, sep, getattr(df, "shape", None))
+                logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
                 return df
             except Exception:
                 continue
@@ -111,20 +145,21 @@ def read_table(path: Path) -> pd.DataFrame:
             try:
                 df = pd.read_csv(path, encoding=enc, sep=None, engine="python")
                 logger.debug("read_table: chardet detected %s", enc)
+                logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
                 return df
             except Exception:
                 logger.debug("read_table: chardet read failed with encoding %s", enc)
     except Exception:
         logger.debug("read_table: chardet not available or failed")
 
+    # final fallback
     try:
         df = pd.read_csv(path, encoding="latin-1", sep=",")
-        logger.debug("read_table: fallback latin-1, shape=%s", getattr(df, "shape", None))
+        logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
         return df
     except Exception as e:
         logger.exception("read_table: all attempts failed for %s: %s", path, e)
         raise
-
 
 def map_holdings_to_pricecols(holdings: Iterable, price_columns: Sequence[str]) -> Tuple[List[str], List[str]]:
     """
@@ -281,6 +316,7 @@ def try_relaxed_holdings(path_or_df):
     if isinstance(path_or_df, (str, Path)):
         try:
             df = pd.read_csv(path_or_df)
+            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
         except Exception as e:
             return False, f"read failed: {e}"
     elif isinstance(path_or_df, pd.DataFrame):
@@ -369,6 +405,7 @@ def fetch_from_provider_csv(ticker: str) -> pd.DataFrame:
             return pd.DataFrame()
         try:
             df = pd.read_csv(path, encoding="utf8")
+            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
         except Exception as e:
             logger.warning("Failed to read local holdings file %s: %s", path, e)
             return pd.DataFrame()
@@ -382,6 +419,7 @@ def fetch_from_provider_csv(ticker: str) -> pd.DataFrame:
             return pd.DataFrame()
         try:
             df = pd.read_csv(io.StringIO(r.text))
+            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
         except Exception as e:
             logger.warning("Failed to parse CSV from %s: %s", csv_url, e)
             return pd.DataFrame()

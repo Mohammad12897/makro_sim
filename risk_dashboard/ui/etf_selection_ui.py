@@ -10,7 +10,7 @@ from risk_dashboard.core.etf_tools import get_etf_candidates_for_index, compute_
 from risk_dashboard.utils.persistence import save_user_tickers
 from risk_dashboard.core.data_loader import parse_tickers
 from risk_dashboard.config import DEFAULT_START_STR
-from risk_dashboard.data_utils import _sanitize_date_param, cached_download_prices, do_add_tickers,safe_rerun, analyze_callback,normalize_ticker
+from risk_dashboard.data_utils import _sanitize_date_param, cached_download_prices, do_add_tickers, normalize_prices,safe_rerun, analyze_callback
 import uuid
 import logging
 
@@ -422,13 +422,20 @@ def render_etf_selection_ui(prefix: str = "etf"):
 
                 # 4) call backtest runner (use central run_backtest_flow)
                 from risk_dashboard.core.backtest import run_backtest_flow
-
                 with st.spinner("Backtest läuft..."):
                     try:
+                        # normalize price DF (if not already)
+                        prices_df = normalize_prices(prices_df)
+                        # normalize mapped weights against price columns
+                        from risk_dashboard.ticker_utils import normalize_weights_keys
+                        weights_norm = normalize_weights_keys(user_weights_mapped, list(prices_df.columns))
+
                         result = run_backtest_flow(
-                            selected=mapped_selected,
-                            prices_source=prices_df,            # sicherstellen, dass prices_df vorhanden ist
-                            weights=user_weights_mapped,
+                            ss=st.session_state,
+                            prefix=prefix,
+                            price_data=prices_df,
+                            weights_map=weights_norm,
+                            min_common_days=250,
                             start=start_s,
                             end=end_s,
                             strategy=st.session_state.get(f"{prefix}_strategy", "equal"),

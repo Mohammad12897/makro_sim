@@ -15,7 +15,6 @@ start = DEFAULT_START_STR
 end = None
 
 # Daten laden
-# statt direktem yf.download: benutze fetch_prices_quiet
 data = safe_fetch(etfs, start=start, end=end, auto_adjust=True, threads=False)
 
 

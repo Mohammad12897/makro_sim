@@ -28,7 +28,6 @@ import logging
 import threading
 from pathlib import Path
 
-
 # Project root and output dirs
 project_root = Path(__file__).resolve().parents[1]
 if str(project_root) not in sys.path:
@@ -391,7 +390,8 @@ from risk_dashboard.ui_helpers import (
     status_legend,
     consolidate_portfolio_df,
 )
-from risk_dashboard.data_utils import fetch_prices_from_yf, normalize_ticker
+from risk_dashboard.data_utils import fetch_prices_from_yf
+from risk_dashboard.ticker_utils import normalize_ticker
 
 # Page config ganz oben
 st.set_page_config(page_title="Risk Dashboard", layout="wide")
@@ -423,13 +423,19 @@ combined = st.session_state.get("prices_for_bt", pd.DataFrame())
 st.sidebar.write("DEBUG combined columns", list(combined.columns))
 
 if not combined.empty:
-    st.sidebar.write("DEBUG index range", combined.index.min(), combined.index.max())
-    st.sidebar.write("DEBUG null counts", combined.isna().sum().to_dict())
-    st.sidebar.write("DEBUG first_valid_index", {c: combined[c].first_valid_index() for c in combined.columns})
-    # nur ausgewählte head‑Ausgabe, nicht ganze DF
-    cols = [c for c in ['BTC','NVDA'] if c in combined.columns]
-    if cols:
-        st.sidebar.write("DEBUG head BTC,NVDA", combined[cols].head(10))
+    # 1) Was ist in prices_for_bt?
+    combined = st.session_state.get("prices_for_bt", pd.DataFrame())
+    st.sidebar.write("DEBUG prices_for_bt type", type(combined), "shape", getattr(combined, "shape", None))
+    st.sidebar.write("DEBUG prices_for_bt cols", list(combined.columns))
+    if not combined.empty:
+        st.sidebar.write("DEBUG prices_for_bt index tz", getattr(combined.index, "tz", None))
+        st.sidebar.write("DEBUG prices_for_bt first_valid_index per col", {c: combined[c].first_valid_index() for c in combined.columns})
+        st.sidebar.write("DEBUG prices_for_bt last_valid_index per col", {c: combined[c].last_valid_index() for c in combined.columns})
+
+    
+    # 2) Portfolio / Weights
+    st.sidebar.write("DEBUG portfolio_df head", st.session_state.get("portfolio_df", pd.DataFrame()).head(10))
+    st.sidebar.write("DEBUG weights_by_ticker", st.session_state.get("weights_by_ticker"))
 
 st.sidebar.write("DEBUG _needs_rerun", st.session_state.get("_needs_rerun"))
 
@@ -1750,8 +1756,10 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
         if uploaded is not None:
             try:
                 # Lese die Datei einmal und persistiere DataFrame
+                from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
                 uploaded.seek(0)
                 uploaded_df = pd.read_csv(uploaded)
+                logger.debug("read uploaded_df shape=%s columns=%s sample=%s", getattr(uploaded_df,'shape',None), list(uploaded_df.columns), safe_head_preview(uploaded_df, DUMP_MARKERS))
                 # normalize column names
                 uploaded_df.columns = uploaded_df.columns.str.strip().str.lower()
                 # coerce numeric
@@ -1847,30 +1855,30 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
 
     # 2) Aufruf innerhalb einer Funktion / UI‑Handler (z. B. in profile_form_ui)
 
-    # --- Hauptblock: Backtest nur ausführen, wenn Preise und Gewichte vorhanden sind ---
-    # oben im Modul (falls noch nicht importiert)
-
     # --- Backtest Ausführung nur wenn Preise und Gewichte vorhanden sind ---
     if "prices_for_bt" in st.session_state and "weights_by_ticker" in st.session_state:
-        # Lese aus session_state (sichere .get Verwendung)
         prices_for_bt = st.session_state.get("prices_for_bt")
         weights_by_ticker = st.session_state.get("weights_by_ticker", {})
 
-        # Defensive Prüfung
         if is_prices_empty(prices_for_bt) or not weights_by_ticker:
             st.error("Keine Preisdaten oder Gewichte vorhanden. Bitte lade Preisdaten oder wähle ETFs.")
             st.stop()
 
-        # Normalisiere prices_for_bt zu DataFrame und schreibe zurück in session_state
+        # normalize price DF and persist
         prices_for_bt = normalize_prices(prices_for_bt)
         st.session_state["prices_for_bt"] = prices_for_bt
 
-        # Debug‑Log (nur logger)
+        # normalize weights against the actual price columns (use prices_for_bt, not combined)
+        from risk_dashboard.ticker_utils import normalize_weights_keys
+        weights = normalize_weights_keys(weights_by_ticker, list(prices_for_bt.columns))
+        st.session_state["weights_for_bt"] = weights
+
+        # Debug‑Log (nur logger) — use normalized weights length
         logger.debug(
             "Preparing backtest: prices_for_bt type=%s shape=%s weights_count=%d",
             type(prices_for_bt),
             getattr(prices_for_bt, "shape", None),
-            len(weights_by_ticker),
+            len(weights),
         )
 
         # Import und Backtest-Aufruf
@@ -1884,7 +1892,7 @@ Makrodaten → FX‑Modell → Risiko‑Score → Szenario → Regime → Portfo
                 ss=ss,
                 prefix=prefix,
                 price_data=prices_for_bt,
-                weights_map=weights_by_ticker,
+                weights_map=weights,                # <-- pass normalized weights here
                 min_common_days=250,
                 initial_cash=ss.get("initial_cash", 100000),
                 strategy=ss.get("selected_strategy", "equal"),

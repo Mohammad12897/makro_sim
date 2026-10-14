@@ -16,6 +16,7 @@ import re, json
 
 
 from risk_dashboard.core.holdings import map_holdings_to_pricecols
+from risk_dashboard.ticker_utils import normalize_ticker,_normalize_tickers
 
 logger = logging.getLogger(__name__)
 
@@ -348,30 +349,6 @@ def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
             new_cols.append(key)
     df.columns = new_cols
     return df
-
-def _normalize_tickers(tickers: Sequence[str]) -> List[str]:
-    out = []
-    for t in tickers:
-        if not t:
-            continue
-        s = str(t).strip().upper()
-        s = s.replace(" ", "").replace("/", "")
-        out.append(s)
-    return out
-
-def normalize_ticker(t: str) -> str:
-    t = str(t).strip().upper()
-    if not t:
-        return t
-    # Crypto mapping
-    if t in ("BTC", "BTCUSD"):
-        return "BTC-USD"
-    # Heuristiken
-    if t.endswith(".OQ"):
-        return t[:-3] + ".US"
-    # keep .L (LSE) as-is; remove leading $ and replace ":" with "."
-    t = t.lstrip("$").replace(":", ".")
-    return t
 
 def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = None,
                          interval: str = "1d", auto_adjust: bool = False,

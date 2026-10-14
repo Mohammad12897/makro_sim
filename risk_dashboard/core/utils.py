@@ -435,7 +435,17 @@ def prepare_prices_for_backtest(hdf: pd.DataFrame, project_root: Path, load_pric
         logger.exception("prepare_prices_for_backtest: load_price_data failed: %s", e)
         price_path = Path(project_root) / "risk_dashboard" / "data" / "price_data.csv"
         logger.debug("prepare_prices_for_backtest: falling back to %s", price_path)
-        prices = pd.read_csv(price_path, parse_dates=True, index_col=0)
+        prices = pd.read_csv(price_path, index_col=0)
+        from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
+        logger.debug("read prices shape=%s columns=%s sample=%s", getattr(prices,'shape',None), list(prices.columns), safe_head_preview(prices, DUMP_MARKERS))
+        try:
+            prices.index = pd.to_datetime(prices.index)
+        except Exception:
+            # fallback: versuche Spalte 'Date'
+            if "Date" in prices.columns:
+                prices["Date"] = pd.to_datetime(prices["Date"], errors="coerce")
+                prices = prices.set_index("Date")
+
         return prices
 
 

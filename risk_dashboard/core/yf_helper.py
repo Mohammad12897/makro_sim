@@ -10,7 +10,7 @@ import io
 import pandas as pd
 import yfinance as yf
 
-from risk_dashboard.data_utils import flatten_yf_dataframe, safe_fetch
+from risk_dashboard.data_utils import fetch_prices_quiet_with_used, flatten_yf_dataframe, safe_fetch
 # weitere lokale Hilfen wie wait_for_rate_slot, CACHE_DIR, CACHE_TTL_SECONDS etc. bleiben unverändert
 # oben in risk_dashboard/core/yf_helper.py
 from risk_dashboard.core.utils import _ensure_date_fx_columns
@@ -164,41 +164,60 @@ def download_batch_with_backoff(tickers: List[str], period: str = "max", retries
         logger.debug("Sleeping %.2fs before next batch attempt", sleep)
         time.sleep(sleep)
 
-    # 2) Letzter Fallback: versuche direkten yf.download (nur wenn unbedingt nötig)
+    # 2) Letzter Fallback: Chunked fetch per smaller batches (robust, langsamer)
     try:
-        wait_for_rate_slot()
-        logger.info("Final fallback: yf.download() for %d tickers", len(tickers))
-        df = yf.download(tickers, period=period, group_by='ticker', threads=True, progress=False, auto_adjust=False)
-        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
-            logger.warning("Final fallback returned None for %s", tickers)
+        logger.info("Final fallback: chunked fetch for %d tickers", len(tickers))
+        combined = pd.DataFrame()
+        failed = []
+
+        # konfigurierbare Chunkgröße
+        chunk_size = 10
+
+        # Hilfsfunktion: erzeugt Chunks aus tickers
+        def _chunks(lst, n):
+            for i in range(0, len(lst), n):
+                yield lst[i:i + n]
+
+        for chunk in _chunks(tickers, chunk_size):
+            try:
+                wait_for_rate_slot()
+                used, df_chunk = fetch_prices_quiet_with_used(chunk, start=None, end=None, auto_adjust=False, threads=False)
+            except Exception as e:
+                logger.warning("Chunk fetch exception for %s: %s", chunk, e)
+                df_chunk = pd.DataFrame()
+                used = None
+
+            if df_chunk is None or (isinstance(df_chunk, pd.DataFrame) and df_chunk.empty):
+                logger.warning("No data for chunk %s", chunk)
+                failed.extend(chunk)
+                # kleine Pause, um Rate‑Limits zu schonen
+                time.sleep(0.2)
+                continue
+
+            # concatieren; doppelte Spalten später entfernen
+            combined = pd.concat([combined, df_chunk], axis=1)
+
+        # dedupliziere Spalten, sortiere Index
+        if not combined.empty:
+            combined = combined.loc[:, ~combined.columns.duplicated()]
+            combined = combined.sort_index()
+            # tz localize falls nötig
+            try:
+                if hasattr(combined.index, "tz") and combined.index.tz is None:
+                    combined.index = combined.index.tz_localize("UTC")
+            except Exception:
+                logger.debug("Could not tz_localize combined index")
+            logger.info("Chunked fetch successful: %d columns, index length %d", len(combined.columns), len(combined.index))
+            if failed:
+                logger.warning("No data for tickers: %s", failed)
+            return combined
+        else:
+            logger.warning("Chunked fetch returned empty DataFrame for %s", tickers)
             return None
 
-        if isinstance(df, pd.DataFrame):
-            df = df.dropna(how="all", axis=1)
-            if df.empty:
-                logger.warning("After dropna no valid series for %s", tickers)
-                return None
-
-        try:
-            if hasattr(df.index, "tz") and df.index.tz is None:
-                df.index = df.index.tz_localize("UTC")
-        except Exception:
-            logger.debug("Could not tz_localize index for final fallback")
-
-        # defensiv flattenen
-        if isinstance(df.columns, pd.MultiIndex):
-            try:
-                df = flatten_yf_dataframe(df)
-            except Exception:
-                pass
-
-        logger.info("Final fallback successful for %d tickers", len(tickers))
-        return df
-
     except Exception as e:
-        logger.warning("Final fallback download Exception for %s: %s", tickers, e)
-
-    return None
+        logger.warning("Chunked fallback download Exception for %s: %s", tickers, e)
+        return None
 
 def _safe_read_csv_text(text_or_bytes) -> Optional[pd.DataFrame]:
     """Robustes Lesen von CSV/TSV-Text (bytes oder str)."""
@@ -236,6 +255,8 @@ def _safe_read_csv_text(text_or_bytes) -> Optional[pd.DataFrame]:
     for s in (sep, ",", ";", "\t"):
         try:
             df = pd.read_csv(io.StringIO(text), sep=s, engine="python", skipinitialspace=True)
+            from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
+            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
             # Debug: zeigt dir, was wirklich eingelesen wurde
             logger.debug(
                 "read df shape=%s columns=%s sample=%s",
@@ -244,7 +265,11 @@ def _safe_read_csv_text(text_or_bytes) -> Optional[pd.DataFrame]:
                 df.head().to_dict(orient='records')[:3]
             )
             if df is not None and not df.empty:
+                # nach erfolgreichem Einlesen
                 df.columns = [str(c).strip() for c in df.columns]
+                if df.shape[1] <= 1:
+                    logger.debug("read_csv produced single column; trying alternative seps")
+                    # weiter versuchen
                 return df
         except Exception:
             continue

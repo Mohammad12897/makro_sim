@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import Tuple, Dict, List, Any
-from risk_dashboard.ui.helpers import passes_liquidity, normalize_ticker
+from risk_dashboard.ui.helpers import passes_liquidity
+from risk_dashboard.ticker_utils import normalize_ticker
 
 def momentum(series: pd.Series) -> float:
     # robust: berechne Renditen nur, wenn genügend Werte vorhanden und handle NaNs
