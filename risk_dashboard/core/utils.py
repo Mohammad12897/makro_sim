@@ -437,7 +437,7 @@ def prepare_prices_for_backtest(hdf: pd.DataFrame, project_root: Path, load_pric
         logger.debug("prepare_prices_for_backtest: falling back to %s", price_path)
         prices = pd.read_csv(price_path, index_col=0)
         from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
-        logger.debug("read prices shape=%s columns=%s sample=%s", getattr(prices,'shape',None), list(prices.columns), safe_head_preview(prices, DUMP_MARKERS))
+        logger.debug("AFTER prices columns=%s head=%s", getattr(prices, "columns", []).tolist() if hasattr(prices, "columns") else [], safe_head_preview(prices, DUMP_MARKERS))
         try:
             prices.index = pd.to_datetime(prices.index)
         except Exception:
@@ -506,38 +506,81 @@ def extract_close_series(prices):
     close_df.index = pd.to_datetime(close_df.index)
     return close_df
 
-def compute_market_value_from_holdings(hdf, prices, portfolio_value):
+def compute_market_value_from_holdings(hdf: pd.DataFrame, prices: pd.DataFrame | None, portfolio_value: float):
     """
-    Returns hdf with 'market_value' column.
+    Returns (h, method) where h has column 'market_value' and 'price' filled if possible.
     Priority:
-      1. If 'weight_in_etf' present -> market_value = weight_in_etf * portfolio_value
-      2. Else if 'shares' present and prices available -> market_value = shares * last_price
-      3. Else -> equal distribution fallback
+      1. weight_in_etf -> market_value = weight_in_etf * portfolio_value
+      2. shares or quantity -> try shares * last_price (from prices or session)
+      3. fallback equal distribution
     """
     h = hdf.copy()
+
+    # 1) weight_in_etf path
     if "weight_in_etf" in h.columns:
         h["market_value"] = h["weight_in_etf"].astype(float) * float(portfolio_value)
         method = "weight_in_etf"
-    else:
-        # try shares * last_price
-        if "shares" in h.columns:
-            last_prices = extract_close_series(prices).iloc[-1]
-            h = h.set_index("ticker")
-            # map last price; missing tickers -> NaN
-            h["last_price"] = h.index.map(last_prices.to_dict())
-            # if many NaNs, fallback to equal distribution
-            if h["last_price"].isna().sum() / len(h) > 0.5:
-                # too many missing prices -> fallback
-                n = max(len(h), 1)
-                h["market_value"] = float(portfolio_value) / n
-                method = "fallback_equal_due_to_missing_prices"
-            else:
-                h["market_value"] = h["shares"].astype(float) * h["last_price"].astype(float)
-                method = "shares_times_last_price"
-            h = h.reset_index()
-        else:
-            # equal distribution fallback
+        return h, method
+
+    # 2) shares / quantity path
+    if "shares" in h.columns or "quantity" in h.columns:
+        from risk_dashboard.price_utils import build_last_price_map
+        from risk_dashboard.ticker_utils import normalize_ticker_simple
+
+        # choose qty column
+        qty_col = "shares" if "shares" in h.columns else "quantity"
+
+        # get prices DataFrame: prefer passed prices, else session
+        prices_df = prices if isinstance(prices, pd.DataFrame) else st.session_state.get("prices_for_bt", pd.DataFrame())
+
+        # normalize tickers in h and prepare lookup
+        h["ticker"] = h["ticker"].astype(str).apply(normalize_ticker_simple)
+        tickers = h["ticker"].astype(str).unique().tolist()
+        last_prices = build_last_price_map(prices_df, tickers, normalize_ticker_simple)
+
+        # fill market_value using last_prices where possible
+        def _fill_mv(row):
+            mv = row.get("market_value")
+            if pd.notna(mv) and float(mv) > 0:
+                return float(mv)
+            p = last_prices.get(normalize_ticker_simple(row["ticker"]))
+            qty = float(row.get(qty_col, 0) or 0)
+            if p is not None and qty:
+                return qty * float(p)
+            return pd.NA
+
+        h["market_value"] = h.apply(_fill_mv, axis=1)
+
+        # if too many missing, fallback to equal distribution
+        missing_ratio = h["market_value"].isna().sum() / max(len(h), 1)
+        if missing_ratio > 0.5:
             n = max(len(h), 1)
             h["market_value"] = float(portfolio_value) / n
-            method = "equal_distribution"
+            method = "fallback_equal_due_to_missing_prices"
+        else:
+            method = "shares_times_last_price"
+
+        # set price column from market_value/quantity if price missing and quantity>0
+        def _set_price(row):
+            if pd.notna(row.get("price")) and row.get("price") not in (pd.NA, None):
+                return row["price"]
+            qty = float(row.get(qty_col, 0) or 0)
+            if qty:
+                mv = row.get("market_value")
+                if pd.notna(mv):
+                    return float(mv) / qty
+            return pd.NA
+
+        h["price"] = h.apply(_set_price, axis=1)
+
+        # ensure types
+        h["market_value"] = pd.to_numeric(h["market_value"], errors="coerce").fillna(0.0)
+        h["price"] = pd.to_numeric(h["price"], errors="coerce")
+
+        return h, method
+
+    # 3) equal distribution fallback
+    n = max(len(h), 1)
+    h["market_value"] = float(portfolio_value) / n
+    method = "equal_distribution"
     return h, method

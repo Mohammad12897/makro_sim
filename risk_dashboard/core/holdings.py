@@ -46,7 +46,7 @@ def read_table_from_string(content_bytes: bytes) -> pd.DataFrame | None:
             return None
     try:
         df = pd.read_csv(io.StringIO(text), sep=None, engine="python")
-        logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+        logger.debug("AFTER df columns=%s sample=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
         return df
     except Exception:
         return None
@@ -76,7 +76,7 @@ def load_ishares_holdings(isin: str) -> pd.DataFrame:
                 # try to parse robustly using read_csv from bytes
                 try:
                     df = pd.read_csv(io.StringIO(resp.text), skiprows=9)
-                    logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+                    logger.debug("AFTER df columns=%s sample=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
                 except Exception:
                     # fallback: try automatic sep detection
                     df = read_table_from_string(resp.content)
@@ -120,7 +120,7 @@ def read_table(path: Path) -> pd.DataFrame:
     try:
         df = pd.read_csv(path, sep=None, engine="python")
         logger.debug("read_table: auto-detected sep, shape=%s", getattr(df, "shape", None))
-        logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+        logger.debug("AFTERdf columns=%s head=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
         return df
     except Exception:
         pass
@@ -132,7 +132,7 @@ def read_table(path: Path) -> pd.DataFrame:
             try:
                 df = pd.read_csv(path, encoding=enc, sep=sep)
                 logger.debug("read_table: success enc=%s sep=%r shape=%s", enc, sep, getattr(df, "shape", None))
-                logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+                logger.debug("AFTER df columns=%s sample=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
                 return df
             except Exception:
                 continue
@@ -145,7 +145,7 @@ def read_table(path: Path) -> pd.DataFrame:
             try:
                 df = pd.read_csv(path, encoding=enc, sep=None, engine="python")
                 logger.debug("read_table: chardet detected %s", enc)
-                logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+                logger.debug("AFTER df columns=%s head=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
                 return df
             except Exception:
                 logger.debug("read_table: chardet read failed with encoding %s", enc)
@@ -155,7 +155,7 @@ def read_table(path: Path) -> pd.DataFrame:
     # final fallback
     try:
         df = pd.read_csv(path, encoding="latin-1", sep=",")
-        logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+        logger.debug("AFTER df columns=%s head=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
         return df
     except Exception as e:
         logger.exception("read_table: all attempts failed for %s: %s", path, e)
@@ -316,7 +316,7 @@ def try_relaxed_holdings(path_or_df):
     if isinstance(path_or_df, (str, Path)):
         try:
             df = pd.read_csv(path_or_df)
-            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+            logger.debug("AFTER df columns=%s head=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
         except Exception as e:
             return False, f"read failed: {e}"
     elif isinstance(path_or_df, pd.DataFrame):
@@ -405,7 +405,7 @@ def fetch_from_provider_csv(ticker: str) -> pd.DataFrame:
             return pd.DataFrame()
         try:
             df = pd.read_csv(path, encoding="utf8")
-            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+            logger.debug("AFTER df columns=%s head=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
         except Exception as e:
             logger.warning("Failed to read local holdings file %s: %s", path, e)
             return pd.DataFrame()
@@ -419,7 +419,7 @@ def fetch_from_provider_csv(ticker: str) -> pd.DataFrame:
             return pd.DataFrame()
         try:
             df = pd.read_csv(io.StringIO(r.text))
-            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+            logger.debug("AFTER df columns=%s head=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
         except Exception as e:
             logger.warning("Failed to parse CSV from %s: %s", csv_url, e)
             return pd.DataFrame()

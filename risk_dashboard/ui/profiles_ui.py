@@ -40,7 +40,6 @@ from risk_dashboard.core.macro_pipeline import (
 )
 
 from risk_dashboard.core.holdings import try_relaxed_holdings
-from risk_dashboard.core.etf_tools import download_prices
 from risk_dashboard.core.macro_loader import load_and_validate_macro_data
 from risk_dashboard.core.data_loader import parse_tickers, load_price_data
 from risk_dashboard.config import DEFAULT_START_STR, DEFAULT_END_STR, ALLOW_TEST_UNIVERSE,UNIVERSE_PATHS
@@ -191,7 +190,7 @@ def show_prices_uploader(prefix="profile", label=None):
         # robustes Einlesen: versuche parse_dates, sonst flexible Reader
         try:
             df = pd.read_csv(uploaded, parse_dates=["Date"], dayfirst=False)
-            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+            logger.debug("AFTER df columns=%s head=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
         except Exception:
             # fallback: robustes Text‑Parsing (z. B. _safe_read_csv_text)
             uploaded.seek(0)
@@ -275,7 +274,7 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
             # robust einlesen
             try:
                 df = pd.read_csv(uploaded)
-                logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+                logger.debug("AFTER df columns=%s head=%s", getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
             except Exception:
                 uploaded.seek(0)
                 df = _safe_read_csv_text(uploaded.read())
@@ -320,7 +319,7 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
     if disk_path.exists():
         try:
             df = pd.read_csv(disk_path)
-            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+            logger.debug("AFTER df columns=%s head=%s", getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
             df.columns = [c.strip().lower() for c in df.columns]
             if "price" in df.columns:
                 df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
@@ -356,7 +355,7 @@ def compute_etf_breakdown(etf_market_value: float, holdings_df: pd.DataFrame, po
 def load_etf_holdings(uploaded_file):
     # read
     df = pd.read_csv(uploaded_file)
-    logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+    logger.debug("AFTER df columns=%s head=%s", getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
 
     # normalize column names early (so we use consistent names afterwards)
     df.columns = df.columns.str.strip().str.lower()
@@ -711,7 +710,7 @@ def load_attribute_table_try(paths):
         try:
             if p.exists():
                 df = pd.read_csv(p, encoding="utf-8-sig")
-                logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+                logger.debug("AFTER df columns=%s head=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
                 return df
         except Exception as e:
             # loggen, aber weitermachen zum nächsten Pfad
@@ -733,7 +732,7 @@ Tracking Error,Für ETFs: Abweichung vom Index
 Währung / Domizil / Steuer,Wechselkurs‑ und Steuerimplikationen
 """
     out_df = pd.read_csv(StringIO(CSV_TEXT))
-    logger.debug("read out_df shape=%s columns=%s sample=%s", getattr(out_df,'shape',None), list(out_df.columns), safe_head_preview(out_df, DUMP_MARKERS))
+    logger.debug("AFTER out_df columns=%s sample=%s", getattr(out_df, "columns", []).tolist() if hasattr(out_df, "columns") else [], safe_head_preview(out_df, DUMP_MARKERS))
     return out_df
 
 # Einmaliges Laden
@@ -1195,12 +1194,7 @@ def profile_form_ui(
     try:
         data_path = Path("risk_dashboard") / "data" / "stock_universe.csv"
         stock_universe = pd.read_csv(data_path)
-        logger.debug(
-            "read stock_universe shape=%s columns=%s sample=%s",
-            getattr(stock_universe, "shape", None),
-            list(stock_universe.columns),
-            safe_head_preview(stock_universe, DUMP_MARKERS),
-        )
+        logger.debug("AFTER stock_universe columns=%s head=%s",getattr(stock_universe, "columns", []).tolist() if hasattr(stock_universe, "columns") else [], safe_head_preview(stock_universe, DUMP_MARKERS))
     except FileNotFoundError:
         logger.exception("stock_universe.csv not found at %s", data_path)
         stock_universe = None

@@ -16,7 +16,8 @@ import re, json
 
 
 from risk_dashboard.core.holdings import map_holdings_to_pricecols
-from risk_dashboard.ticker_utils import normalize_ticker,_normalize_tickers
+from risk_dashboard.ticker_utils import normalize_ticker,_normalize_tickers, normalize_ticker_simple
+from risk_dashboard.price_utils import to_wide_prices
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,71 @@ def cached_download_prices(tickers, start, end, **kwargs):
     from risk_dashboard.core.etf_tools import download_prices
     return download_prices(tickers, start=start, end=end, **kwargs)
 
+def finalize_buckets(low, medium, high, prices_df: pd.DataFrame | None):
+    """
+    Normalize, dedupe and filter bucket lists against available price columns.
+    Returns (low_final, med_final, high_final) as lists of normalized tickers.
+    """
+    def _prepare(bucket):
+        seen = set()
+        out = []
+        for t in bucket or []:
+            if not t:
+                continue
+            tn = normalize_ticker_simple(str(t)).upper()
+            if tn in seen:
+                continue
+            seen.add(tn)
+            out.append(tn)
+        if isinstance(prices_df, pd.DataFrame) and not prices_df.empty:
+            available = {c.upper() for c in prices_df.columns}
+            out = [t for t in out if t in available]
+        return out
+
+    low_final = _prepare(low)
+    med_final = _prepare(medium)
+    high_final = _prepare(high)
+    return low_final, med_final, high_final
+
+def extract_ticker_from_col(colname: str) -> str:
+    """
+    Robustly extract a ticker token from a flattened yfinance column name.
+    Heuristics (in order):
+      1) prefer tokens that match ticker_pattern AND contain '.' or a digit or are ALL UPPERCASE (likely tickers)
+      2) then prefer any token that matches ticker_pattern
+      3) fallback: remove common words like adj/close/open and try again
+      4) final fallback: return original string
+    """
+    s = str(colname)
+    parts = re.split(r'[_\s]+', s)
+    ticker_pattern = re.compile(r'^[A-Za-z0-9\.\-]{1,40}$')
+
+    # 1) prefer tokens that look most like tickers (dot, digit, or all uppercase)
+    candidates_strong = []
+    for p in parts:
+        if not p:
+            continue
+        if ticker_pattern.match(p):
+            if ('.' in p) or any(ch.isdigit() for ch in p) or (p.isalpha() and p.upper() == p and len(p) > 1):
+                candidates_strong.append(p)
+
+    if candidates_strong:
+        # prefer rightmost strong candidate (handles 'Adj Close_TICKER' and 'TICKER_Adj Close')
+        return candidates_strong[-1]
+
+    # 2) fallback: any token matching ticker pattern (rightmost)
+    candidates_any = [p for p in parts if p and ticker_pattern.match(p)]
+    if candidates_any:
+        return candidates_any[-1]
+
+    # 3) try removing common words and re-evaluate
+    cleaned = re.sub(r'(?i)\b(adj|close|open|high|low|volume|adjclose|adj_close)\b', '', s)
+    cleaned = cleaned.strip('_ ').strip()
+    if ticker_pattern.match(cleaned):
+        return cleaned
+
+    # 4) final fallback: return original string
+    return s
 
 def _safe_serialize_value(v: Any):
     """Return a JSON-serializable representation for mixed payload values."""
@@ -353,27 +419,22 @@ def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
 def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = None,
                          interval: str = "1d", auto_adjust: bool = False,
                          threads: bool = False, **kwargs) -> pd.DataFrame:
-    
     if isinstance(tickers, str):
         tickers = [tickers]
     tickers = _normalize_tickers(tickers)
     if not tickers:
         return pd.DataFrame()
 
-    # berechne start/end wenn lookback_days gegeben
+    # compute start/end if lookback_days given
     if lookback_days is not None and start is None:
-        # robustes Handling: akzeptiert date, datetime oder string (mit/ohne Zeit)
         end_date = end or datetime.utcnow().date().isoformat()
-        # parse sicher mit pandas (tolerant gegenüber Zeitanteilen)
         end_ts = pd.to_datetime(end_date, errors="coerce")
         if pd.isna(end_ts):
-            # Fallback: benutze heute als Enddatum
             end_ts = pd.Timestamp.utcnow()
         start_dt = (end_ts - pd.Timedelta(days=lookback_days)).date()
         start = start_dt.isoformat()
         end = end_ts.date().isoformat()
 
-    # sanitize incoming start/end
     start_s = _sanitize_date_param(start)
     end_s = _sanitize_date_param(end)
 
@@ -410,56 +471,97 @@ def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = Non
         logger.exception("Unexpected error calling yf.download for %s", tickers)
         raw = None
 
-    # innerhalb deiner fetch function (nach raw = yf.download(...))
     if raw is None or (hasattr(raw, "empty") and raw.empty):
-        logger.warning("fetch_prices_from_yf returned empty DataFrame for %s (start=%s end=%s)", tickers, start_s, end_s)
+        logger.warning("fetch_prices_from_yf returned empty DataFrame for %s", tickers)
         return pd.DataFrame()
 
-
-    # Extrahiere 'Adj Close' falls MultiIndex, sonst nutze raw
-    if isinstance(raw.columns, pd.MultiIndex):
-        if 'Adj Close' in raw.columns.levels[0]:
-            adj = raw['Adj Close'].copy()
-        else:
-            # fallback: wähle die erste Ebene der Spalten (vorsichtig)
-            first_level = raw.columns.levels[0][0]
-            adj = raw[first_level].copy()
-    else:
-        adj = raw.copy()
-
-    # Normalisiere Spaltennamen
-    adj.columns = [normalize_ticker(c) for c in adj.columns]
-
-    # Index in Datetime und sortieren
+    # Log original columns (helps debug different yfinance outputs)
     try:
-        adj.index = pd.to_datetime(adj.index)
+        logger.debug("fetch_prices_from_yf: raw.columns before flatten=%s", list(raw.columns))
     except Exception:
         pass
-    adj = adj.sort_index()
 
-    logger.debug("fetch_prices_from_yf returning dataframe with columns %s and index length %d",
-                list(adj.columns), len(adj.index))
+    # 1 Flatten MultiIndex columns ONCE
+    if isinstance(raw.columns, pd.MultiIndex):
+        raw.columns = ['_'.join(map(str, c)).strip() for c in raw.columns]
+
+    logger.debug("fetch_prices_from_yf: raw.columns after flatten=%s", list(raw.columns))
+
+    # 2 Try pivot long->wide if needed (single call)
+    try:
+        cols_lower = [str(c).lower() for c in raw.columns]
+        if "__ticker" in cols_lower or "ticker" in cols_lower or set(cols_lower) == {"open","high","low","close","adj close","volume"}:
+            maybe_wide = to_wide_prices(raw)
+            if not maybe_wide.empty:
+                raw = maybe_wide
+                logger.debug("fetch_prices_from_yf: converted raw to wide format with columns=%s", list(raw.columns))
+    except Exception:
+        logger.exception("fetch_prices_from_yf: pivot heuristic failed, continuing with raw")
+
+    # 3 Extract price series robustly (Adj Close / Close / numeric)
+    cols = list(raw.columns)
+    adj_candidates = [c for c in cols if 'adj close' in str(c).lower() or 'adj_close' in str(c).lower()]
+    if adj_candidates:
+        adj = raw[adj_candidates].copy()
+    else:
+        close_candidates = [c for c in cols if 'close' in str(c).lower()]
+        if close_candidates:
+            adj = raw[close_candidates].copy()
+        else:
+            numeric_cols = raw.select_dtypes(include='number').columns
+            if len(numeric_cols) > 0:
+                adj = raw[numeric_cols].copy()
+            else:
+                logger.warning("fetch_prices_from_yf: no numeric price column found for %s", tickers)
+                return pd.DataFrame()
+
+    # Log before normalization
+    logger.debug("fetch_prices_from_yf: adj.columns before normalize=%s", list(adj.columns))
+
+    # 4 Normalize column names to ticker tokens using centralized extractor
+    try:
+        adj.columns = [normalize_ticker_simple(extract_ticker_from_col(c)) for c in adj.columns]
+    except Exception:
+        logger.exception("fetch_prices_from_yf: column normalization failed; returning adj as-is")
+
+    # Log after normalization
+    logger.debug("fetch_prices_from_yf: adj.columns after normalize=%s", list(adj.columns))
+
+    # Duplicate check and diagnostic raw.columns if duplicates found
+    if any(pd.Index(adj.columns).duplicated()):
+        dup = pd.Index(adj.columns)[pd.Index(adj.columns).duplicated()].tolist()
+        logger.warning("fetch_prices_from_yf: duplicate normalized columns %s", dup)
+        logger.debug("fetch_prices_from_yf: raw.columns for duplicates=%s", list(raw.columns))
+
+    # Index in Datetime and sort, forward fill
+    try:
+        adj.index = pd.to_datetime(adj.index, errors="coerce")
+    except Exception:
+        pass
+    adj = adj.sort_index().ffill()
+
+    logger.debug("fetch_prices_from_yf returning dataframe with columns %s and index length %d", list(adj.columns), len(adj.index))
     return adj
 
-
 def fetch_last_prices(tickers, lookback_days: int = 365) -> dict:
-    """
-    Liefert dict {ticker: last_price}. Nutzt fetch_prices_from_yf intern.
-    """
     if isinstance(tickers, str):
         tickers = [tickers]
     tickers = _normalize_tickers(tickers)
     if not tickers:
         return {}
 
-    # delegiere an fetch_prices_from_yf; diese Funktion rechnet start/end wenn lookback_days gesetzt
     price_df = fetch_prices_from_yf(tickers, lookback_days=lookback_days, interval="1d")
     if price_df is None or price_df.empty:
         return {}
 
-    last_row = price_df.ffill().iloc[-1]
-    last_prices = {str(col): float(last_row[col]) for col in price_df.columns if pd.notna(last_row[col])}
-    return last_prices
+    try:
+        last_row = price_df.ffill().iloc[-1]
+        # normalize keys
+        return {t: float(last_row[col]) for col in price_df.columns
+                for t in tickers
+                if normalize_ticker_simple(str(col)) == normalize_ticker_simple(t) and pd.notna(last_row[col])}
+    except Exception:
+        return {}
 
 def find_price_for_ticker(prices_df: pd.DataFrame, ticker: str) -> Optional[pd.Series]:
     """
@@ -542,6 +644,7 @@ def safe_fetch(
                 timeout=timeout_seconds,
                 **fetch_kwargs
             )
+            
             if df is not None and not df.empty:
                 if cache is not None and cache_key is not None:
                     cache[cache_key] = df
@@ -747,30 +850,42 @@ def safe_yf_download(tickers, start, end, auto_adjust=False, threads=False, time
         return None, pd.DataFrame()
 
 
-def _normalize_yf_raw(raw, tickers, auto_adjust=False) -> pd.DataFrame:
+def _normalize_yf_raw(raw, tickers):
     """
     Normalize yfinance raw download output to DataFrame with columns = uppercased tickers.
-    Handles MultiIndex (ticker, field) and single-level DataFrame/Series.
+    Returns DataFrame or raises ValueError on unrecognized format.
     """
     if raw is None:
-        raise ValueError("raw is None")
+        return pd.DataFrame()
 
-    # Series -> DataFrame
+    # Series -> DataFrame (single ticker)
     if isinstance(raw, pd.Series):
         df = raw.to_frame()
-        df.columns = [tickers[0].upper()]
+        df.columns = [normalize_ticker_simple(tickers[0])]
         return df
 
-    # MultiIndex columns
+    # flatten MultiIndex once (prevents tuple errors)
+    if isinstance(raw.columns, pd.MultiIndex):
+        raw.columns = ['_'.join(map(str, c)).strip() for c in raw.columns]
+
+    # try pivot long->wide (to_wide_prices returns empty DF if not applicable)
+    from risk_dashboard.price_utils import to_wide_prices
+    try:
+        maybe_wide = to_wide_prices(raw)
+        if not maybe_wide.empty:
+            raw = maybe_wide
+    except Exception:
+        logger.debug("_normalize_yf_raw: to_wide_prices pivot attempt failed, continuing")
+
+    # If still MultiIndex (rare after flatten), try common patterns using level values
     if isinstance(raw.columns, pd.MultiIndex):
         cols = raw.columns
         lvl0 = cols.get_level_values(0)
         lvl1 = cols.get_level_values(1)
-        field_candidates = ['Close', 'Adj Close', 'close', 'adj close', 'AdjClose', 'adjclose']
+        field_candidates = ['close', 'adj close', 'adj_close', 'adjclose']
 
-        # common pattern: (ticker, field)
-        if any(str(v).lower() in [fc.lower() for fc in field_candidates] for v in lvl1):
-            # prefer 'Close' then 'Adj Close'
+        # pattern: (ticker, field)
+        if any(str(v).lower() in field_candidates for v in lvl1):
             for field in ['Close', 'Adj Close']:
                 try:
                     df = raw.xs(field, axis=1, level=1, drop_level=True)
@@ -779,8 +894,8 @@ def _normalize_yf_raw(raw, tickers, auto_adjust=False) -> pd.DataFrame:
                 except Exception:
                     continue
 
-        # alternative pattern: (field, ticker)
-        if any(str(v).lower() in [fc.lower() for fc in field_candidates] for v in lvl0):
+        # pattern: (field, ticker)
+        if any(str(v).lower() in field_candidates for v in lvl0):
             for field in ['Close', 'Adj Close']:
                 try:
                     df = raw.xs(field, axis=1, level=0, drop_level=True)
@@ -789,29 +904,45 @@ def _normalize_yf_raw(raw, tickers, auto_adjust=False) -> pd.DataFrame:
                 except Exception:
                     continue
 
-        # fallback: try to pick numeric column per ticker
+        # fallback: try to pick numeric column per ticker from flattened MultiIndex
         flattened = {}
         for t in tickers:
-            matches = [col for col in cols if t.upper() in (str(col[0]).upper(), str(col[1]).upper())]
-            for m in matches:
-                s = raw[m]
-                if pd.api.types.is_numeric_dtype(s):
-                    flattened[t.upper()] = s
-                    break
+            t_up = t.upper()
+            for col in raw.columns:
+                # col may be tuple; compare stringified parts
+                if t_up in str(col).upper():
+                    s = raw[col]
+                    if pd.api.types.is_numeric_dtype(s):
+                        flattened[t_up] = s
+                        break
         if flattened:
             return pd.concat(flattened, axis=1).sort_index()
 
         raise ValueError("Unable to normalize MultiIndex yfinance output")
 
-    # Single-level DataFrame
+    # Single-level DataFrame handling
     if isinstance(raw, pd.DataFrame):
-        # If single column likely Close/Adj Close for single ticker
+        # single-column -> assume single ticker series
         if raw.shape[1] == 1:
             colname = raw.columns[0]
             df = raw.rename(columns={colname: tickers[0].upper()})
             return df
 
-        # Keep numeric columns and uppercase names
+        # prefer columns that look like Adj Close / Close
+        cols = list(raw.columns)
+        adj_candidates = [c for c in cols if 'adj close' in str(c).lower() or 'adj_close' in str(c).lower()]
+        if adj_candidates:
+            df = raw[adj_candidates].copy()
+            df.columns = [normalize_ticker_simple(c) for c in df.columns]
+            return df
+
+        close_candidates = [c for c in cols if 'close' in str(c).lower()]
+        if close_candidates:
+            df = raw[close_candidates].copy()
+            df.columns = [normalize_ticker_simple(c) for c in df.columns]
+            return df
+
+        # fallback: keep numeric columns and uppercase names
         numeric_cols = [c for c in raw.columns if pd.api.types.is_numeric_dtype(raw[c])]
         if numeric_cols:
             df = raw[numeric_cols].copy()
@@ -895,32 +1026,58 @@ def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
             logger.warning("fetch_prices_quiet_with_used: empty result for %s", tickers)
             raise RuntimeError("yf.download returned empty")
 
-        # Extrahiere Adj Close falls MultiIndex, sonst nutze raw
+
+        # flatten MultiIndex columns
         if isinstance(raw.columns, pd.MultiIndex):
-            if 'Adj Close' in raw.columns.levels[0]:
-                adj = raw['Adj Close'].copy()
-            elif 'Close' in raw.columns.levels[0]:
-                adj = raw['Close'].copy()
-            else:
-                # fallback: versuche xs auf erste Ebene
-                first_level = raw.columns.levels[0][0]
-                adj = raw.xs(first_level, axis=1, level=0).copy()
+            raw.columns = ['_'.join(map(str, c)).strip() for c in raw.columns]
+
+        # try pivot if long format detected
+        from risk_dashboard.price_utils import to_wide_prices
+        cols_lower = [str(c).lower() for c in raw.columns]
+        if "__ticker" in cols_lower or "ticker" in cols_lower or set(cols_lower) == {"open","high","low","close","adj close","volume"}:
+            maybe_wide = to_wide_prices(raw)
+            if not maybe_wide.empty:
+                raw = maybe_wide
+
+
+        # --- Normalize format: try to convert long-format to wide if needed ---
+        from risk_dashboard.price_utils import to_wide_prices
+        try:
+            cols_lower = [str(c).lower() for c in raw.columns]
+            if "__ticker" in cols_lower or "ticker" in cols_lower or set(cols_lower) == {"open","high","low","close","adj close","volume"}:
+                maybe_wide = to_wide_prices(raw)
+                if not maybe_wide.empty:
+                    raw = maybe_wide
+                    logger.debug("fetch_prices_quiet_with_used: converted raw to wide format with columns=%s", list(raw.columns))
+        except Exception:
+            logger.exception("fetch_prices_quiet_with_used: pivot heuristic failed, continuing with raw")
+
+        # --- Extract price series robustly (Adj Close / Close / numeric) ---
+        cols = list(raw.columns)
+        cols_lower = [str(c).lower() for c in cols]
+
+        # prefer columns that contain 'adj close' or 'adj_close'
+        adj_candidates = [c for c in cols if 'adj close' in str(c).lower() or 'adj_close' in str(c).lower()]
+        if adj_candidates:
+            adj = raw[adj_candidates].copy()
         else:
-            # Single level: suche 'Adj Close' oder 'Close' oder nimm erste numerische Spalte
-            cols = raw.columns
-            if 'Adj Close' in cols:
-                adj = raw['Adj Close'].copy()
-            elif 'Close' in cols:
-                adj = raw['Close'].copy()
+            close_candidates = [c for c in cols if 'close' in str(c).lower()]
+            if close_candidates:
+                adj = raw[close_candidates].copy()
             else:
                 numeric_cols = raw.select_dtypes(include='number').columns
                 if len(numeric_cols) > 0:
-                    adj = raw[numeric_cols[0]].to_frame().copy()
+                    adj = raw[numeric_cols].to_frame().copy()
                 else:
                     raise RuntimeError("No numeric price column found in yf.download result")
 
-        # Normalisiere Spaltennamen
-        adj.columns = [normalize_ticker(c) for c in adj.columns]
+        # Normalisiere Spaltennamen (z. B. Ticker)
+        # adj.columns = [normalize_ticker(c) for c in adj.columns]
+
+        adj.columns = [
+            normalize_ticker_simple(extract_ticker_from_col(c))
+            for c in adj.columns
+        ]
 
         # Index in Datetime und sortieren
         try:
@@ -934,7 +1091,6 @@ def fetch_prices_quiet_with_used(tickers: Sequence[str] | str,
 
     except Exception as e:
         logger.warning("fetch_prices_quiet_with_used failed for %s: %s", tickers, e)
-        # Fallback: sequentielles Laden pro Ticker
         used, df = fetch_prices_sequential(tickers, start, end, auto_adjust=auto_adjust)
         return used, df
 

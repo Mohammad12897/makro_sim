@@ -37,7 +37,7 @@ from risk_dashboard.core.etf_tools import download_prices
 logger = logging.getLogger(__name__)
 
 
-from risk_dashboard.core.safety import DUMP_MARKERS  # Liste der Marker, zentral verwaltet
+from risk_dashboard.utils.parsers import DUMP_MARKERS  # Liste der Marker, zentral verwaltet
 
 from risk_dashboard.data_utils import flatten_yf_dataframe
 from risk_dashboard.config import DEFAULT_START_STR

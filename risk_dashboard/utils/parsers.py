@@ -93,10 +93,8 @@ def safe_read_csv(uploaded_file, dump_markers: List[str] | None = None, encoding
     cleaned = "\n".join(lines)
     return pd.read_csv(StringIO(cleaned))
 
-def safe_head_preview(df: pd.DataFrame, dump_markers: List[str] | None = None, max_chars: int = 1000) -> str:
-    """
-    Safe preview for logging/UI: returns a string or a placeholder if suspicious markers found.
-    """
+
+def safe_head_preview(df, dump_markers=None, max_chars=1000):
     if dump_markers is None:
         dump_markers = []
     try:
@@ -108,42 +106,23 @@ def safe_head_preview(df: pd.DataFrame, dump_markers: List[str] | None = None, m
         return "<skipped suspicious dump>"
     return s
 
-def parse_quick_add(text: str, default_qty: int = 1) -> List[Dict]:
-    if not text:
-        return []
 
-    normalized = re.sub(r'[\r\n;]+', ',', text.strip())
-    parts = [p.strip() for p in normalized.split(',') if p.strip()]
-
-    results = []
-    for part in parts:
-        m = _QUICK_ADD_PATTERN.match(part)
-        if not m:
-            tokens = part.split()
-            if len(tokens) == 1:
-                ticker = tokens[0].upper()
-                qty = default_qty
-            elif len(tokens) >= 2:
-                ticker = tokens[0].upper()
-                try:
-                    qty = int(float(tokens[1]))
-                except Exception:
-                    qty = default_qty
-            else:
-                continue
+def parse_quick_add(text, default_qty=1):
+    items = re.split(r'[,\n;]+', text)
+    out = []
+    for it in items:
+        it = it.strip()
+        if not it:
+            continue
+        m = re.match(r'^([A-Za-z0-9\.\-]+)\s*[: ]\s*(\d+(\.\d+)?)$', it)
+        if m:
+            out.append((m.group(1).upper(), float(m.group(2))))
         else:
-            ticker = m.group("ticker").upper()
-            qty_raw = m.group("qty")
-            if qty_raw is None:
-                qty = default_qty
+            # try ticker only
+            t = re.match(r'^([A-Za-z0-9\.\-]+)$', it)
+            if t:
+                out.append((t.group(1).upper(), default_qty))
             else:
-                try:
-                    qty = int(float(qty_raw))
-                except Exception:
-                    qty = default_qty
+                logger.debug("parse_quick_add: could not parse '%s'", it)
+    return out
 
-        if qty < 0:
-            qty = default_qty
-        results.append({"ticker": ticker, "quantity": qty})
-
-    return results

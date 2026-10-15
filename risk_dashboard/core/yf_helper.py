@@ -256,7 +256,7 @@ def _safe_read_csv_text(text_or_bytes) -> Optional[pd.DataFrame]:
         try:
             df = pd.read_csv(io.StringIO(text), sep=s, engine="python", skipinitialspace=True)
             from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
-            logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+            logger.debug("AFTER df columns=%s head=%s",getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
             # Debug: zeigt dir, was wirklich eingelesen wurde
             logger.debug(
                 "read df shape=%s columns=%s sample=%s",

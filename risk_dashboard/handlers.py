@@ -6,25 +6,47 @@ import streamlit as st
 from typing import List
 
 from risk_dashboard.ticker_utils import normalize_ticker
-from risk_dashboard.utils.parsers import safe_head_preview
+from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
 
 logger = logging.getLogger(__name__)
 
 def compute_market_values_from_prices(df: pd.DataFrame) -> pd.DataFrame:
-    combined = st.session_state.get("prices_for_bt", pd.DataFrame())
-    if combined.empty:
+    prices = st.session_state.get("prices_for_bt", pd.DataFrame())
+    if prices is None or prices.empty:
         return df
-    last_prices = combined.ffill().iloc[-1]   # letzter verfügbarer Preis pro Ticker
-    df = df.copy()
-    def pick_price(row):
-        if pd.notna(row.get("price")):
-            return row["price"]
-        t = normalize_ticker(row["ticker"])   # benutze deine normalize_ticker-Funktion
-        return last_prices.get(t)
-    df['price'] = df.apply(pick_price, axis=1)
-    df['market_value'] = df['quantity'] * df['price']
-    return df
 
+    from risk_dashboard.price_utils import build_last_price_map
+    from risk_dashboard.ticker_utils import normalize_ticker_simple
+
+    df = df.copy()
+    df["ticker"] = df["ticker"].astype(str).apply(normalize_ticker_simple)
+    df["quantity"] = pd.to_numeric(df.get("quantity", 0).astype(str).str.replace(",", "."), errors="coerce").fillna(0)
+    df["price"] = pd.to_numeric(df.get("price", pd.Series(dtype=float)).astype(str).str.replace(",", "."), errors="coerce")
+    df["market_value"] = pd.to_numeric(df.get("market_value", pd.Series(dtype=float)), errors="coerce")
+
+    # compute market_value from price if possible
+    if df["market_value"].isna().any():
+        df["market_value"] = df["market_value"].fillna(df["quantity"] * df["price"])
+
+    # fill remaining missing market_values using last prices from prices_for_bt
+    missing_mask = df["market_value"].isna() | (df["market_value"] == 0)
+    if missing_mask.any():
+        tickers = df.loc[missing_mask, "ticker"].astype(str).unique().tolist()
+        last_prices = build_last_price_map(prices, tickers, normalize_ticker_simple)
+        def _fill(row):
+            if pd.notna(row["market_value"]) and float(row["market_value"]) > 0:
+                return float(row["market_value"])
+            p = last_prices.get(normalize_ticker_simple(row["ticker"]))
+            if p is not None:
+                return float(row["quantity"]) * float(p)
+            return 0.0
+        df.loc[missing_mask, "market_value"] = df.loc[missing_mask].apply(_fill, axis=1)
+
+    # set price from market_value/quantity if price missing
+    price_missing = df["price"].isna() & (df["quantity"] > 0)
+    df.loc[price_missing, "price"] = df.loc[price_missing].apply(lambda r: (r["market_value"] / r["quantity"]) if r["quantity"] else pd.NA, axis=1)
+
+    return df
 
 def handle_holdings_analyse() -> bool:
     """
@@ -146,6 +168,7 @@ def handle_holdings_analyse() -> bool:
             st.error("Gesamtmarktwert ist 0 oder ungültig. Bitte prüfen Sie die hochgeladene Datei und die verfügbaren Preisdaten.")
             # persist grouped df anyway for inspection
             st.session_state["portfolio_df"] = df_grouped
+            logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), safe_head_preview(df_grouped, DUMP_MARKERS))
             st.session_state["portfolio_total_value"] = float(total_mv)
             return False
 
@@ -154,11 +177,16 @@ def handle_holdings_analyse() -> bool:
 
         # 9) Persistiere Ergebnisse in session_state
         st.session_state["portfolio_df"] = df_grouped
+        logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), safe_head_preview(df_grouped, DUMP_MARKERS))
         st.session_state["weights_by_ticker"] = dict(zip(df_grouped["ticker"], df_grouped["weight"]))
         st.session_state["portfolio_total_value"] = total_mv
 
         # 10) Defensive Sicherung von prices_for_bt in session_state
         combined = st.session_state.get("prices_for_bt")
+        logger.debug("prices_for_bt type=%s shape=%s cols=%s", type(combined), getattr(combined,'shape',None), list(getattr(combined,'columns',[])))
+        if isinstance(combined, pd.DataFrame) and not combined.empty:
+            logger.debug("prices_for_bt sample=%s", safe_head_preview(combined, DUMP_MARKERS))
+    
         st.session_state["prices_for_bt"] = combined if isinstance(combined, pd.DataFrame) and not combined.empty else pd.DataFrame()
 
         # 11) Debug Sidebar (sichere Preview)

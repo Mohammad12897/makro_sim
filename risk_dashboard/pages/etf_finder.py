@@ -80,7 +80,7 @@ def vol_target_leverage(portfolio_returns, target_vol=0.10, cap=2.0):
 def load_meta_for_universe(tickers, path="data/etf_meta.csv"):
     df = pd.read_csv(path, index_col=0)
     from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
-    logger.debug("read df shape=%s columns=%s sample=%s", getattr(df,'shape',None), list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+    logger.debug("AFTER df columns=%s head=%s", getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
     return df.reindex(tickers)
 
 
@@ -115,7 +115,7 @@ except Exception:
     if os.path.exists(meta_path):
         meta_df = pd.read_csv(meta_path, index_col=0).reindex(tickers)
         from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
-        logger.debug("read meta_df shape=%s columns=%s sample=%s", getattr(meta_df,'shape',None), list(meta_df.columns), safe_head_preview(meta_df, DUMP_MARKERS))
+        logger.debug("AFTER meta_df columns=%s head=%s",getattr(meta_df, "columns", []).tolist() if hasattr(meta_df, "columns") else [], safe_head_preview(meta_df, DUMP_MARKERS))
     else:
         meta_df = pd.DataFrame(index=tickers, data={"TER":[None]*len(tickers), "AUM_mio":[None]*len(tickers)})
 

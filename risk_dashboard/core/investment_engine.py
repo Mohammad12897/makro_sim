@@ -1,4 +1,5 @@
 # risk_dashboard/core/investment_engine.py
+import re
 import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 import logging
@@ -386,7 +387,7 @@ def regime_etf_universe(low, medium, high):
     }
 
 # ---------------------------------------------------------
-# C) PORTFOLIO-OPTIMIERUNG MIT VOLATILITÃ„TEN (RISK PARITY)
+# C) PORTFOLIO-OPTIMIERUNG MIT VOLATILITÄTEN (RISK PARITY)
 # ---------------------------------------------------------
 def risk_parity_weights(returns_df: pd.DataFrame):
     """
@@ -399,32 +400,70 @@ def risk_parity_weights(returns_df: pd.DataFrame):
     weights = inv_vol / inv_vol.sum()
     return weights.to_dict()
 
-
 def build_regime_risk_parity_portfolio(low, medium, high, period="10y"):
-    # 1) Tickerliste bauen
-    tickers = list(set(low + medium + high))
+    """
+    Liefert (rp_struct, rets, missing)
+    rp_struct: dict mit Gewichten pro Regime
+    rets: DataFrame mit täglichen Renditen (Spalten = normalisierte Ticker)
+    missing: Liste angefragter Ticker, die in den Preisen nicht gefunden wurden
+    """
+    # 1) Tickerliste bauen (einheitlich uppercase)
+    tickers = sorted({t.upper() for t in list(low) + list(medium) + list(high)})
 
-    # Debug: Tickerliste anzeigen
-    st.write("ETF-Loader— angefragte Ticker:", tickers)
+    # Debug: Tickerliste anzeigen (klein, nicht ganze DataFrames)
+    logger.debug("build_regime_risk_parity_portfolio: requested tickers=%s", tickers)
 
-    # 2) Preisdaten laden
+    # 2) Preisdaten laden (load_etf_prices sollte normalisierte Spalten liefern)
     prices = load_etf_prices(tickers, start=None, end=None)
 
-    # Debug: Rohdaten anzeigen
-    st.write("ETF-Loader— geladene Daten:", prices.head())
+    # Defensive Prüfung: prices muss DataFrame sein
+    if prices is None or not isinstance(prices, pd.DataFrame) or prices.empty:
+        logger.warning("build_regime_risk_parity_portfolio: no price data returned for tickers=%s", tickers)
+        return {}, pd.DataFrame(), tickers
 
-    # 3) Returns berechnen
-    rets = prices.pct_change().dropna()
+    # Debug: nur Spalten und Index‑Range loggen
+    logger.debug("build_regime_risk_parity_portfolio: prices columns=%s index_range=%s..%s",
+                 list(prices.columns), prices.index.min(), prices.index.max())
 
-    # 4) Portfolio-Struktur erstellen
+    # 3) Spalten normalisieren: sichere Extraktion von Ticker‑Tokens
+    # (falls load_etf_prices das noch nicht macht)
+    def _extract_ticker(col):
+        s = str(col)
+        parts = re.split(r'[_\s]+', s)
+        ticker_pattern = re.compile(r'^[A-Za-z0-9\.\-]{1,20}$')
+        for p in reversed(parts):
+            if ticker_pattern.match(p):
+                return p.upper()
+        for p in parts:
+            if ticker_pattern.match(p):
+                return p.upper()
+        return s.upper()
+
+    # Falls Spalten nicht eindeutig sind, versuche zu extrahieren
+    try:
+        new_cols = [_extract_ticker(c) for c in prices.columns]
+        # wenn sich etwas ändert, setze neue Spaltennamen
+        if len(set(new_cols)) == len(new_cols):
+            prices.columns = new_cols
+        else:
+            # falls Duplikate entstehen, loggen und weiter versuchen
+            logger.debug("build_regime_risk_parity_portfolio: normalized columns contain duplicates: %s", new_cols)
+            prices.columns = new_cols  # trotzdem setzen; caller muss prüfen
+    except Exception:
+        logger.exception("build_regime_risk_parity_portfolio: column normalization failed")
+
+    # 4) Returns berechnen (täglich) und NaNs entfernen
+    rets = prices.pct_change().dropna(how="all")
+
+    # 5) Portfolio-Struktur erstellen (gleichgewichtet pro Bucket)
     rp_struct = {
-        "Low": {"weights": {t: 1/len(low) for t in low}},
-        "Medium": {"weights": {t: 1/len(medium) for t in medium}},
-        "High": {"weights": {t: 1/len(high) for t in high}},
+        "Low": {"weights": {t.upper(): 1/len(low) for t in low}} if low else {"weights": {}},
+        "Medium": {"weights": {t.upper(): 1/len(medium) for t in medium}} if medium else {"weights": {}},
+        "High": {"weights": {t.upper(): 1/len(high) for t in high}} if high else {"weights": {}},
     }
 
-    # 5) Fehlende Ticker melden
-    missing = [t for t in tickers if t not in prices.columns]
+    # 6) Fehlende Ticker melden (gegen normalisierte price columns)
+    missing = [t for t in tickers if t not in rets.columns]
 
     return rp_struct, rets, missing
 

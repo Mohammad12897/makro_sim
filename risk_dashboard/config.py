@@ -13,6 +13,11 @@ UNIVERSE_PATHS = {
     "Nikkei 225": "risk_dashboard/data/universe_nikkei.yaml",
 }
 
+# config.py
+LOW_BUCKET = ["AGGG.L", "EUNU.DE"]        # defensive ETFs
+MED_BUCKET = ["IMEU.L", "SGLN.L"]         # mittleres Risiko
+HIGH_BUCKET = ["CSPX.L", "IQQ0.DE"]       # Aktien / höheres Risiko
+
 
 # Strings als Canonical Defaults (lesbar in Configs)
 DEFAULT_START_STR = "2016-01-01"

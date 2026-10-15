@@ -138,6 +138,7 @@ def handle_portfolio_upload_with_price_lookup(prefix: str = "profile", persist_p
 
         # persist cleaned df into session state
         st.session_state["portfolio_df"] = df_grouped
+        logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), safe_head_preview(df_grouped, DUMP_MARKERS))
         st.session_state["portfolio_total_value"] = float(df_grouped["market_value"].sum())
 
         # debug output (safe)
@@ -170,6 +171,7 @@ def handle_portfolio_upload_with_price_lookup(prefix: str = "profile", persist_p
                     df_grouped["market_value"] = df_grouped.apply(fill_mv, axis=1)
                     # update totals and session
                     st.session_state["portfolio_df"] = df_grouped
+                    logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), safe_head_preview(df_grouped, DUMP_MARKERS))
                     st.session_state["portfolio_total_value"] = float(df_grouped["market_value"].sum())
             except Exception:
                 logger.exception("Failed to fill market_value from prices_for_bt")
@@ -228,6 +230,7 @@ def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
         # nothing to add
         st.info("Keine neuen Ticker zum Hinzufügen.")
         st.session_state["portfolio_df"] = portfolio
+        logger.debug("persisting portfolio_df columns=%s head=%s", list(portfolio.columns), safe_head_preview(portfolio, DUMP_MARKERS))
         return
 
     # create DataFrame for new rows with correct dtypes
@@ -247,6 +250,7 @@ def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
 
     # persist
     st.session_state["portfolio_df"] = portfolio
+    logger.debug("persisting portfolio_df columns=%s head=%s", list(portfolio.columns), safe_head_preview(portfolio, DUMP_MARKERS))
     st.success(f"{len(to_add)} neue Ticker hinzugefügt.")
     return
 
@@ -281,6 +285,10 @@ def add_new_tickers_to_portfolio_with_quantities(pairs: List[Tuple[str,int]], de
 
     # prepare price cache (DataFrame preferred)
     prices_cache = st.session_state.get("prices_for_bt")
+    logger.debug("prices_for_bt type=%s shape=%s cols=%s", type(prices_cache), getattr(prices_cache,'shape',None), list(getattr(prices_cache,'columns',[])))
+    if isinstance(prices_cache, pd.DataFrame) and not prices_cache.empty:
+        logger.debug("prices_for_bt sample=%s", safe_head_preview(prices_cache, DUMP_MARKERS))
+
     prices_df = prices_cache if isinstance(prices_cache, pd.DataFrame) and not prices_cache.empty else None
 
     # collect last_prices for missing tickers
@@ -350,6 +358,7 @@ def add_new_tickers_to_portfolio_with_quantities(pairs: List[Tuple[str,int]], de
 
     # persist
     st.session_state["portfolio_df"] = df
+    logger.debug("persisting portfolio_df columns=%s head=%s", list(df.columns), safe_head_preview(df, DUMP_MARKERS))
     st.session_state["portfolio_total_value"] = total_mv
 
     # update price cache: prefer DataFrame; if not, merge last_prices into dict
@@ -506,6 +515,10 @@ def add_tickers_and_fetch(tickers_with_qty, prefix="etf", start=None, end=None):
 
     # Merge into existing prices_for_bt (harmonize tz first)
     existing = st.session_state.get("prices_for_bt")
+    logger.debug("prices_for_bt type=%s shape=%s cols=%s", type(existing), getattr(existing,'shape',None), list(getattr(existing,'columns',[])))
+    if isinstance(existing, pd.DataFrame) and not existing.empty:
+        logger.debug("prices_for_bt sample=%s", safe_head_preview(existing, DUMP_MARKERS))
+
     if existing is None or (hasattr(existing, "empty") and existing.empty):
         st.session_state["prices_for_bt"] = combined
     else:
@@ -589,4 +602,5 @@ def persist_portfolio_df(df: pd.DataFrame):
         if col not in df.columns:
             df[col] = None
     st.session_state["portfolio_df"] = df[["ticker","quantity","price","market_value","weight"]]
+    logger.debug("persisting portfolio_df columns=%s head=%s", list(df.columns), safe_head_preview(df, DUMP_MARKERS))
 
