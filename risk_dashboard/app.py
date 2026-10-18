@@ -1052,7 +1052,14 @@ def render_sidebar(available_etfs):
     ticker_raw = st.sidebar.text_area("Mehrere Ticker (eine Zeile = ein Eintrag)", key=f"{prefix}_bulk_ticker_raw", height=120)
     if st.sidebar.button("Hinzufügen", key=f"{prefix}_btn_add_tickers"):
         # parse_quick_add liefert List[Tuple[ticker, qty]]
-        parsed = parse_quick_add(ticker_raw, default_qty=float(qty_default))
+        parsed = parse_quick_add(ticker_raw, default_qty=int(qty_default))
+        rows = []
+        for t, q in parsed:
+            t_norm = normalize_ticker_simple(str(t)).upper()
+            q_val = float(q) if q is not None else float(qty_default)
+            if q_val <= 0:
+                continue
+            rows.append({"ticker": t_norm, "quantity": q_val})
 
         # Debug: show parsed and session state
         logger.debug("quick_add parsed entries=%s", parsed)
@@ -1135,6 +1142,19 @@ def render_sidebar(available_etfs):
                 logger.exception("Konnte add_tickers_and_fetch nicht importieren/ausführen")
                 st.error("Interner Fehler beim Laden der Preisdaten")
                 success, failed, combined_prices = [], tickers, pd.DataFrame()
+
+            logger.debug("AFTER add_tickers_and_fetch: combined_prices cols=%s", None if combined_prices is None else list(combined_prices.columns))
+            # --- normalize combined_prices and set session state (insert immediately after add_tickers_and_fetch) ---
+            if isinstance(combined_prices, pd.DataFrame) and not combined_prices.empty:
+                combined_prices = combined_prices.copy()
+                # normalize column tokens to uppercase for consistent matching
+                combined_prices.columns = [str(c).strip().upper() for c in combined_prices.columns]
+                st.session_state["prices_for_bt"] = combined_prices
+                logger.debug("set prices_for_bt cols=%s", list(combined_prices.columns))
+            else:
+                # keep existing prices_for_bt if present, else empty df
+                st.session_state["prices_for_bt"] = st.session_state.get("prices_for_bt", pd.DataFrame())
+                logger.debug("no combined_prices returned; prices_for_bt unchanged")
 
             # set session prices BEFORE finalize_buckets
             st.session_state["prices_for_bt"] = combined_prices if (combined_prices is not None and not combined_prices.empty) else st.session_state.get("prices_for_bt", pd.DataFrame())
