@@ -76,8 +76,6 @@ def _safe_linkage_from_dist(dist, method="single"):
 # Verwendung:
 # link = _safe_linkage_from_dist(dist, method="single")
 
-
-
 def classify_scenario_from_score(score: float) -> str:
     if score < 0.25:
         return "Rezession"
@@ -93,8 +91,19 @@ def classify_scenario_from_score(score: float) -> str:
 def load_etf_prices(tickers: List[str], start: Optional[str]=None, end: Optional[str]=None) -> pd.DataFrame:
     st.write("ETF-Loader — angefragte Ticker:", tickers)
 
+    # --- DEBUG: session prices snapshot (insert here) ---
+    try:
+        prices_session = st.session_state.get("prices_for_bt", None)
+    except Exception:
+        prices_session = None
+    logger.debug("load_etf_prices: incoming tickers=%s", tickers)
+    logger.debug("load_etf_prices: session prices_for_bt cols=%s",
+                 list(prices_session.columns) if isinstance(prices_session, pd.DataFrame) else None)
+    # --- end debug ---
+    
     # zentrale Funktion verwenden
     try:
+        logger.debug("About to fetch prices for tickers=%s", tickers)
         data = safe_fetch(tickers, start=start, end=end, interval="1d", auto_adjust=True, threads=False)
     except Exception as e:
         logger.exception("safe_fetch failed: %s", e)
@@ -408,12 +417,26 @@ def build_regime_risk_parity_portfolio(low, medium, high, period="10y"):
     missing: Liste angefragter Ticker, die in den Preisen nicht gefunden wurden
     """
     # 1) Tickerliste bauen (einheitlich uppercase)
-    tickers = sorted({t.upper() for t in list(low) + list(medium) + list(high)})
+    low = list(low or [])
+    medium = list(medium or [])
+    high = list(high or [])
+    tickers = sorted({str(t).upper() for t in low + medium + high if t})
 
-    # Debug: Tickerliste anzeigen (klein, nicht ganze DataFrames)
     logger.debug("build_regime_risk_parity_portfolio: requested tickers=%s", tickers)
 
-    # 2) Preisdaten laden (load_etf_prices sollte normalisierte Spalten liefern)
+    # 2) Defensive: falls keine tickers aus Buckets, versuche fallback auf session prices_for_bt
+    if not tickers:
+        prices_session = st.session_state.get("prices_for_bt", None)
+        if isinstance(prices_session, pd.DataFrame) and not prices_session.empty:
+            fallback = [str(c).upper() for c in prices_session.columns]
+            logger.warning("No tickers from buckets; falling back to prices_for_bt columns: %s", fallback)
+            tickers = sorted(set(fallback))
+        else:
+            logger.warning("build_regime_risk_parity_portfolio: no tickers provided and no prices_for_bt fallback available")
+            return {}, pd.DataFrame(), []
+
+    # 3) Preisdaten laden (load_etf_prices sollte normalisierte Spalten liefern)
+    logger.debug("build_regime_risk_parity_portfolio: loading prices for tickers=%s", tickers)
     prices = load_etf_prices(tickers, start=None, end=None)
 
     # Defensive Prüfung: prices muss DataFrame sein
@@ -422,48 +445,64 @@ def build_regime_risk_parity_portfolio(low, medium, high, period="10y"):
         return {}, pd.DataFrame(), tickers
 
     # Debug: nur Spalten und Index‑Range loggen
-    logger.debug("build_regime_risk_parity_portfolio: prices columns=%s index_range=%s..%s",
-                 list(prices.columns), prices.index.min(), prices.index.max())
+    try:
+        logger.debug("build_regime_risk_parity_portfolio: prices columns=%s index_range=%s..%s",
+                     list(prices.columns), prices.index.min(), prices.index.max())
+    except Exception:
+        logger.debug("build_regime_risk_parity_portfolio: prices preview unavailable")
 
-    # 3) Spalten normalisieren: sichere Extraktion von Ticker‑Tokens
-    # (falls load_etf_prices das noch nicht macht)
+    # 4) Spalten normalisieren: sichere Extraktion von Ticker‑Tokens
     def _extract_ticker(col):
         s = str(col)
-        parts = re.split(r'[_\s]+', s)
+        parts = re.split(r'[_\s\|:]+', s)
         ticker_pattern = re.compile(r'^[A-Za-z0-9\.\-]{1,20}$')
+        # prefer last token that matches
         for p in reversed(parts):
             if ticker_pattern.match(p):
                 return p.upper()
         for p in parts:
             if ticker_pattern.match(p):
                 return p.upper()
-        return s.upper()
+        # fallback: strip non-alnum and uppercase
+        cleaned = re.sub(r'[^A-Za-z0-9\.\-]', '', s)
+        return cleaned.upper() if cleaned else s.upper()
 
-    # Falls Spalten nicht eindeutig sind, versuche zu extrahieren
     try:
         new_cols = [_extract_ticker(c) for c in prices.columns]
         # wenn sich etwas ändert, setze neue Spaltennamen
         if len(set(new_cols)) == len(new_cols):
             prices.columns = new_cols
         else:
-            # falls Duplikate entstehen, loggen und weiter versuchen
             logger.debug("build_regime_risk_parity_portfolio: normalized columns contain duplicates: %s", new_cols)
-            prices.columns = new_cols  # trotzdem setzen; caller muss prüfen
+            prices.columns = new_cols
     except Exception:
         logger.exception("build_regime_risk_parity_portfolio: column normalization failed")
 
-    # 4) Returns berechnen (täglich) und NaNs entfernen
+    # 5) Returns berechnen (täglich) und NaNs entfernen
     rets = prices.pct_change().dropna(how="all")
 
-    # 5) Portfolio-Struktur erstellen (gleichgewichtet pro Bucket)
+    # 6) Portfolio-Struktur erstellen (gleichgewichtet pro Bucket)
+    def _weights_for(bucket):
+        bucket = [str(t).upper() for t in (bucket or []) if t]
+        if not bucket:
+            return {}
+        n = len(bucket)
+        return {t: 1.0 / n for t in bucket}
+
     rp_struct = {
-        "Low": {"weights": {t.upper(): 1/len(low) for t in low}} if low else {"weights": {}},
-        "Medium": {"weights": {t.upper(): 1/len(medium) for t in medium}} if medium else {"weights": {}},
-        "High": {"weights": {t.upper(): 1/len(high) for t in high}} if high else {"weights": {}},
+        "Low": {"weights": _weights_for(low)},
+        "Medium": {"weights": _weights_for(medium)},
+        "High": {"weights": _weights_for(high)},
     }
 
-    # 6) Fehlende Ticker melden (gegen normalisierte price columns)
-    missing = [t for t in tickers if t not in rets.columns]
+    # 7) Fehlende Ticker melden (gegen normalisierte price columns)
+    available_cols = [str(c).upper() for c in rets.columns]
+    requested = [t.upper() for t in tickers]
+    missing = [t for t in requested if t not in available_cols]
+
+    if missing:
+        logger.warning("build_regime_risk_parity_portfolio: missing tickers in price data: %s", missing)
+        st.warning(f"Fehlende Preisdaten für: {', '.join(missing)}")
 
     return rp_struct, rets, missing
 

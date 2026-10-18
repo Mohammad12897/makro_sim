@@ -8,7 +8,6 @@ import pandas as pd
 import logging
 from pathlib import Path
 
-
 logger = logging.getLogger(__name__)
 
 # --- Marker loader (liest kurze tokens aus docs, keine langen Dumps) ---
@@ -107,22 +106,81 @@ def safe_head_preview(df, dump_markers=None, max_chars=1000):
     return s
 
 
-def parse_quick_add(text, default_qty=1):
-    items = re.split(r'[,\n;]+', text)
+def parse_quick_add(text: str, default_qty: float = 1.0):
+    """
+    Parse a quick-add text into a list of (ticker, quantity) tuples.
+    Accepted separators between entries: comma, semicolon, newline.
+    Accepted ticker/qty separators: colon, equals, whitespace.
+    Examples:
+      "DAX 2,BTC:3" -> [("DAX", 2.0), ("BTC", 3.0)]
+      "NVDA; ETH=0.5\nAAPL" -> [("NVDA", 1.0), ("ETH", 0.5), ("AAPL", 1.0)]
+    Returns: List[Tuple[str, float]]
+    """
+    if not text or not isinstance(text, str):
+        return []
+
     out = []
+    # split entries by comma, semicolon or newline
+    items = re.split(r'[,\n;]+', text)
+    # patterns for ticker+qty and ticker only
+    # ticker: letters, numbers, dot, dash; qty: integer or decimal (dot or comma)
+    pair_re = re.compile(r'^\s*([A-Za-z0-9\.\-]+)\s*(?:[:=]|\s)\s*([0-9]+(?:[.,][0-9]+)?)\s*$', flags=re.IGNORECASE)
+    ticker_only_re = re.compile(r'^\s*([A-Za-z0-9\.\-]+)\s*$', flags=re.IGNORECASE)
+
     for it in items:
         it = it.strip()
         if not it:
             continue
-        m = re.match(r'^([A-Za-z0-9\.\-]+)\s*[: ]\s*(\d+(\.\d+)?)$', it)
-        if m:
-            out.append((m.group(1).upper(), float(m.group(2))))
-        else:
-            # try ticker only
-            t = re.match(r'^([A-Za-z0-9\.\-]+)$', it)
-            if t:
-                out.append((t.group(1).upper(), default_qty))
-            else:
-                logger.debug("parse_quick_add: could not parse '%s'", it)
-    return out
 
+        # try explicit pair first (supports "BTC:3", "ETH=0.5", "DAX 2")
+        m = pair_re.match(it)
+        if m:
+            ticker = m.group(1).upper()
+            qty_raw = m.group(2).replace(',', '.')
+            try:
+                qty = float(qty_raw)
+            except Exception:
+                logger.debug("parse_quick_add: invalid quantity '%s' for '%s', using default %s", qty_raw, ticker, default_qty)
+                qty = float(default_qty)
+            out.append((ticker, qty))
+            continue
+
+        # try formats like "DAX2" (ticker immediately followed by digits)
+        m2 = re.match(r'^\s*([A-Za-z\.\-]+)([0-9]+(?:[.,][0-9]+)?)\s*$', it)
+        if m2:
+            ticker = m2.group(1).upper()
+            qty_raw = m2.group(2).replace(',', '.')
+            try:
+                qty = float(qty_raw)
+            except Exception:
+                qty = float(default_qty)
+            out.append((ticker, qty))
+            continue
+
+        # ticker only
+        t = ticker_only_re.match(it)
+        if t:
+            ticker = t.group(1).upper()
+            out.append((ticker, float(default_qty)))
+            continue
+
+        # fallback: try to extract first token as ticker and last token as number
+        tokens = re.split(r'\s+', it)
+        if tokens:
+            first = tokens[0]
+            last = tokens[-1]
+            # if last token looks like a number, use it as qty
+            if re.match(r'^[0-9]+(?:[.,][0-9]+)?$', last):
+                try:
+                    qty = float(last.replace(',', '.'))
+                except Exception:
+                    qty = float(default_qty)
+                out.append((first.upper(), qty))
+                continue
+            # otherwise treat whole token as ticker
+            out.append((first.upper(), float(default_qty)))
+            continue
+
+        logger.debug("parse_quick_add: could not parse '%s'", it)
+
+    return out

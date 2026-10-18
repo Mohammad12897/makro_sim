@@ -1051,22 +1051,46 @@ def render_sidebar(available_etfs):
     # Bulk add area (multiple lines, parse_quick_add)
     ticker_raw = st.sidebar.text_area("Mehrere Ticker (eine Zeile = ein Eintrag)", key=f"{prefix}_bulk_ticker_raw", height=120)
     if st.sidebar.button("Hinzufügen", key=f"{prefix}_btn_add_tickers"):
-        parsed = parse_quick_add(ticker_raw, default_qty=int(qty_default))
-        logger.debug("quick_add parsed entries=%s", parsed)
+        # parse_quick_add liefert List[Tuple[ticker, qty]]
+        parsed = parse_quick_add(ticker_raw, default_qty=float(qty_default))
 
-        if not parsed:
+        # Debug: show parsed and session state
+        logger.debug("quick_add parsed entries=%s", parsed)
+        st.sidebar.write("session_state keys", list(st.session_state.keys()))
+        st.sidebar.write("add_ticker_input", st.session_state.get("add_ticker_input"))
+        st.sidebar.write("bulk_raw", st.session_state.get(f"{prefix}_bulk_ticker_raw"))
+
+        # Convert parsed tuples to dicts and normalize/validate
+        parsed_dicts = []
+        for entry in parsed:
+            try:
+                t_raw, q_raw = entry[0], entry[1]
+            except Exception:
+                logger.debug("Unexpected parsed entry format: %r", entry)
+                continue
+
+            if not t_raw:
+                continue
+
+            t_norm = normalize_ticker_simple(str(t_raw))
+            try:
+                q = float(q_raw) if q_raw is not None else float(qty_default)
+            except Exception:
+                q = float(qty_default)
+
+            if q <= 0:
+                logger.debug("Skipping zero/negative qty for %s", t_norm)
+                continue
+
+            parsed_dicts.append({"ticker": t_norm, "quantity": q})
+
+        if not parsed_dicts:
             st.warning("Keine gültigen Ticker erkannt.")
         else:
-            # Normalisiere und baue DataFrame rows
-            rows = []
-            for item in parsed:
-                t = normalize_ticker_simple(item["ticker"])
-                q = float(item.get("quantity", int(qty_default)))
-                if q <= 0:
-                    continue
-                rows.append({"ticker": t, "quantity": q})
+            # Build rows for portfolio_df
+            rows = [{"ticker": d["ticker"], "quantity": d["quantity"]} for d in parsed_dicts]
 
-            # lade bestehendes Portfolio_df oder neues
+            # load existing portfolio_df or create new
             portfolio_df = st.session_state.get(
                 "portfolio_df",
                 pd.DataFrame(columns=["ticker", "quantity", "price", "market_value"])
@@ -1074,19 +1098,20 @@ def render_sidebar(available_etfs):
 
             new_df = pd.DataFrame(rows)
             if not new_df.empty:
-                # kombiniere und aggregiere Mengen
+                # combine and aggregate quantities
                 combined = pd.concat([portfolio_df[["ticker","quantity"]], new_df[["ticker","quantity"]]], ignore_index=True)
                 combined = combined.groupby("ticker", as_index=False).agg({"quantity": "sum"})
-                # setze price/market_value leer — später füllen
                 combined["price"] = pd.NA
                 combined["market_value"] = pd.NA
                 st.session_state["portfolio_df"] = combined
                 logger.debug("persisting portfolio_df columns=%s head=%s", list(combined.columns), safe_head_preview(combined, DUMP_MARKERS))
                 st.success(f"{len(new_df)} Ticker hinzugefügt.")
 
-            # zusätzlich persistiere ein schlankes Portfolio (nur ticker+quantity) via helper
+            # persist slim portfolio (ticker + quantity)
             portfolio = st.session_state.get("portfolio", pd.DataFrame(columns=["ticker", "quantity"]))
-            for t, q in [(r["ticker"], r["quantity"]) for r in rows]:
+            for r in rows:
+                t = r["ticker"]
+                q = r["quantity"]
                 if t in portfolio["ticker"].values:
                     portfolio.loc[portfolio["ticker"] == t, "quantity"] = (
                         portfolio.loc[portfolio["ticker"] == t, "quantity"].astype(float) + q
@@ -1094,10 +1119,11 @@ def render_sidebar(available_etfs):
                 else:
                     portfolio = pd.concat([portfolio, pd.DataFrame([{"ticker": t, "quantity": q}])], ignore_index=True)
 
-            persist_portfolio_df(portfolio)  # speichert z.B. data/portfolio.csv
+            persist_portfolio_df(portfolio)
 
-            # Lade Preisdaten für die neuen Ticker
-            tickers = list({t for t, _ in [(r["ticker"], r["quantity"]) for r in rows]})
+            # Prepare tickers list for price fetch (unique, normalized)
+            tickers = sorted({r["ticker"] for r in rows})
+
             try:
                 success, failed, combined_prices = add_tickers_and_fetch(
                     tickers,
@@ -1108,17 +1134,17 @@ def render_sidebar(available_etfs):
             except Exception:
                 logger.exception("Konnte add_tickers_and_fetch nicht importieren/ausführen")
                 st.error("Interner Fehler beim Laden der Preisdaten")
-                success, failed, combined_prices = [], [], pd.DataFrame()
+                success, failed, combined_prices = [], tickers, pd.DataFrame()
 
-            # nach dem Laden: setze session prices
-            st.session_state["prices_for_bt"] = combined_prices if (combined_prices is not None and not combined_prices.empty) else pd.DataFrame()
+            # set session prices BEFORE finalize_buckets
+            st.session_state["prices_for_bt"] = combined_prices if (combined_prices is not None and not combined_prices.empty) else st.session_state.get("prices_for_bt", pd.DataFrame())
 
-            # finalize buckets hier (verwende die globalen/Session Buckets)
+            # finalize buckets now that prices_for_bt is set
             prices = st.session_state.get("prices_for_bt", pd.DataFrame())
-            low_final, med_final, high_final = finalize_buckets(low, medium, high, prices)
+            low_final, med_final, high_final = finalize_buckets(LOW_BUCKET, MED_BUCKET, HIGH_BUCKET, prices)
 
-            # Debug safe
-            st.sidebar.write("prices_for_bt cols", list(prices.columns))
+            # small debug outputs
+            st.sidebar.write("prices_for_bt cols", None if prices is None else list(prices.columns))
             st.sidebar.write("final buckets", {"low": low_final, "med": med_final, "high": high_final})
 
             if failed:
@@ -1128,6 +1154,7 @@ def render_sidebar(available_etfs):
 
             logger.debug("add_tickers success=%s failed=%s", success, failed)
 
+            # more debug for prices
             prices = st.session_state.get("prices_for_bt")
             if isinstance(prices, pd.DataFrame):
                 st.sidebar.write("prices_for_bt cols", list(prices.columns))
@@ -1135,20 +1162,8 @@ def render_sidebar(available_etfs):
                 st.sidebar.write("prices_for_bt head", prices.head().to_dict())
             else:
                 st.sidebar.write("prices_for_bt", repr(prices))
-            logger.debug("final price columns=%s", list(prices.columns) if isinstance(prices, pd.DataFrame) else None)
 
-            logger.debug("prices_for_bt type=%s shape=%s cols=%s", type(prices), getattr(prices,'shape',None), list(getattr(prices,'columns',[])))
-            if isinstance(prices, pd.DataFrame) and not prices.empty:
-                logger.debug("prices_for_bt sample=%s", safe_head_preview(prices, DUMP_MARKERS))
-
-            st.sidebar.write("DEBUG prices_for_bt cols", None if prices is None else list(prices.columns))
-            if isinstance(prices, pd.DataFrame) and not prices.empty:
-                st.sidebar.write("DEBUG prices head", safe_head_preview(prices, DUMP_MARKERS))
-                st.sidebar.write("DEBUG prices index range", prices.index.min(), prices.index.max())
-
-            st.sidebar.write("DEBUG portfolio_df", st.session_state.get("portfolio_df"))
-
-            # Führe Holdings Analyse aus (falls gewünscht)
+            # optional: trigger holdings analyse
             ok = handle_holdings_analyse()
             if ok:
                 st.session_state["navigate_to"] = "Holdings Analyse"
@@ -1156,7 +1171,7 @@ def render_sidebar(available_etfs):
                     safe_rerun(stop=False)
                 except Exception:
                     logger.debug("safe_rerun not available or failed")
-    
+
     st.sidebar.markdown("---")
 
     # ----- Einzel-Ticker Analyse (separates Feld) -----

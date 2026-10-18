@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 import streamlit as st
-from typing import List
+from typing import Dict, List, Optional
 
 from risk_dashboard.ticker_utils import normalize_ticker
 from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
@@ -54,8 +54,6 @@ def handle_holdings_analyse() -> bool:
     aus Preisen, berechnet Gewichte und persistiert Ergebnisse in session_state.
     Gibt True zurück bei Erfolg, False bei Fehler/Abbruch.
     """
-
-    # Marker‑Liste für safe_head_preview ist extern definiert (DUMP_MARKERS)
     dump_markers: List[str] = globals().get("DUMP_MARKERS", []) or []
 
     def _safe_head_preview_local(df: pd.DataFrame) -> str:
@@ -81,7 +79,6 @@ def handle_holdings_analyse() -> bool:
         prices_cols = list(st.session_state.get("prices_for_bt", pd.DataFrame()).columns)
         logger.debug("handle_holdings_analyse: prices_for_bt cols=%s", prices_cols)
     except Exception:
-        # Logging darf nicht brechen die Verarbeitung
         logger.exception("Debug logging failed in handle_holdings_analyse")
 
     try:
@@ -107,54 +104,79 @@ def handle_holdings_analyse() -> bool:
         })
 
         # 3) Normalisiere ticker und parse numerics
-        df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
+        df["ticker"] = df["ticker"].astype(str).str.strip()
+        # keep original case for display but create normalized key
+        df["ticker_norm"] = df["ticker"].str.upper()
+        # quantity numeric
         df["quantity"] = pd.to_numeric(df.get("quantity", 0).astype(str).str.replace(",", "."), errors="coerce").fillna(0)
 
+        # parse price/market_value if present
         if "price" in df.columns:
             df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
         if "market_value" in df.columns:
             df["market_value"] = pd.to_numeric(df["market_value"].astype(str).str.replace(",", "."), errors="coerce")
 
-        # 4) Versuche market_value zu berechnen, falls fehlt
+        # 4) Versuche market_value zu berechnen, falls fehlt und price vorhanden
         if "market_value" not in df.columns or df["market_value"].isna().any():
             if "price" in df.columns and not df["price"].isna().all():
                 df["market_value"] = df["quantity"] * df["price"]
             else:
-                # leave NaN for now; will try to fill from prices_for_bt below
                 if "market_value" not in df.columns:
                     df["market_value"] = pd.Series([pd.NA] * len(df))
 
-        # 5) Gruppiere nach ticker erst nachdem numerics gesetzt sind
+        # 5) Gruppiere nach ticker (verwende ticker_norm für Aggregation)
         agg_map = {"quantity": "sum", "market_value": "sum"}
         if "price" in df.columns:
+            # keep first non-null price per ticker if present
             agg_map["price"] = lambda s: pd.to_numeric(s.dropna().astype(str).str.replace(",", "."), errors="coerce").iloc[0] if s.dropna().any() else pd.NA
 
-        df_grouped = df.groupby("ticker", as_index=False).agg(agg_map)
+        df_grouped = df.groupby("ticker_norm", as_index=False).agg(agg_map)
+        # restore display ticker from normalized key (uppercase)
+        df_grouped = df_grouped.rename(columns={"ticker_norm": "ticker"})
+        df_grouped["ticker"] = df_grouped["ticker"].astype(str).str.upper()
 
         # 6) Falls market_value 0 oder NaN, versuche Preise aus prices_for_bt zu holen
         df_grouped["market_value"] = pd.to_numeric(df_grouped.get("market_value", 0), errors="coerce")
         prices = st.session_state.get("prices_for_bt", pd.DataFrame())
+
         if (df_grouped["market_value"].fillna(0) == 0).any() and isinstance(prices, pd.DataFrame) and not prices.empty:
-            # Erzeuge Map ticker -> letzter gültiger Preis (Spaltennamen normalisiert)
-            last_prices = {}
-            for col in prices.columns:
+            # Build latest price map (case-insensitive keys uppercased)
+            last_prices: Dict[str, Optional[float]] = {}
+            # ensure columns normalized to uppercase tokens
+            price_cols = [str(c).upper() for c in prices.columns]
+            for col in price_cols:
                 try:
-                    col_norm = str(col).strip().upper()
-                    last_val = prices[col].ffill().dropna()
+                    series = prices[col] if col in prices.columns else prices.loc[:, prices.columns.str.upper() == col]
+                    # series may be DataFrame if multiple matches; handle safely
+                    if isinstance(series, pd.DataFrame):
+                        # pick first matching column
+                        series = series.iloc[:, 0]
+                    last_val = series.ffill().dropna()
                     if not last_val.empty:
-                        last_prices[col_norm] = float(last_val.iloc[-1])
+                        last_prices[col] = float(last_val.iloc[-1])
+                    else:
+                        last_prices[col] = None
                 except Exception:
-                    continue
+                    last_prices[col] = None
 
             def _fill_mv(row):
                 mv = row.get("market_value")
-                if pd.notna(mv) and float(mv) > 0:
-                    return float(mv)
+                try:
+                    if pd.notna(mv) and float(mv) > 0:
+                        return float(mv)
+                except Exception:
+                    pass
                 t = str(row["ticker"]).strip().upper()
                 p = last_prices.get(t)
                 if p is not None:
                     return float(row.get("quantity", 0)) * float(p)
-                return float(mv) if pd.notna(mv) else 0.0
+                # fallback: try to match by prefix (e.g., BTC -> BTC-USD)
+                for col_key, val in last_prices.items():
+                    if val is None:
+                        continue
+                    if col_key.startswith(t) or t.startswith(col_key):
+                        return float(row.get("quantity", 0)) * float(val)
+                return 0.0
 
             df_grouped["market_value"] = df_grouped.apply(_fill_mv, axis=1)
 
@@ -166,7 +188,6 @@ def handle_holdings_analyse() -> bool:
 
         if total_mv == 0 or pd.isna(total_mv):
             st.error("Gesamtmarktwert ist 0 oder ungültig. Bitte prüfen Sie die hochgeladene Datei und die verfügbaren Preisdaten.")
-            # persist grouped df anyway for inspection
             st.session_state["portfolio_df"] = df_grouped
             logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), safe_head_preview(df_grouped, DUMP_MARKERS))
             st.session_state["portfolio_total_value"] = float(total_mv)
@@ -181,12 +202,11 @@ def handle_holdings_analyse() -> bool:
         st.session_state["weights_by_ticker"] = dict(zip(df_grouped["ticker"], df_grouped["weight"]))
         st.session_state["portfolio_total_value"] = total_mv
 
-        # 10) Defensive Sicherung von prices_for_bt in session_state
+        # 10) Defensive Sicherung von prices_for_bt in session_state (nur Preview)
         combined = st.session_state.get("prices_for_bt")
         logger.debug("prices_for_bt type=%s shape=%s cols=%s", type(combined), getattr(combined,'shape',None), list(getattr(combined,'columns',[])))
         if isinstance(combined, pd.DataFrame) and not combined.empty:
             logger.debug("prices_for_bt sample=%s", safe_head_preview(combined, DUMP_MARKERS))
-    
         st.session_state["prices_for_bt"] = combined if isinstance(combined, pd.DataFrame) and not combined.empty else pd.DataFrame()
 
         # 11) Debug Sidebar (sichere Preview)

@@ -14,7 +14,6 @@ from types import SimpleNamespace
 from collections import deque
 import re, json
 
-
 from risk_dashboard.core.holdings import map_holdings_to_pricecols
 from risk_dashboard.ticker_utils import normalize_ticker,_normalize_tickers, normalize_ticker_simple
 from risk_dashboard.price_utils import to_wide_prices
@@ -416,6 +415,39 @@ def flatten_yf_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     df.columns = new_cols
     return df
 
+# --- helper: extrahiere Ticker Token aus einer Spaltenbezeichnung ---
+def _extract_ticker_from_col(col: str) -> str:
+    """
+    Versucht, aus verschiedenen Spaltenformaten den Ticker zu extrahieren.
+    Beispiele:
+      'BTC-USD_Adj Close' -> 'BTC-USD'
+      'NVDA Adj Close' -> 'NVDA'
+      'NVDA_Close' -> 'NVDA'
+      'NVDA_Open' -> 'NVDA'
+    """
+    s = str(col).strip()
+    # 1) 'TICKER_Adj Close' oder 'TICKER_Adj_Close' oder 'TICKER Adj Close'
+    m = re.match(r'^(?P<t>.+?)[_\s]+Adj(?: |_)?Close$', s, flags=re.IGNORECASE)
+    if m:
+        return m.group('t').strip()
+    # 2) 'TICKER_Close' oder 'TICKER Close'
+    m = re.match(r'^(?P<t>.+?)[_\s]+Close$', s, flags=re.IGNORECASE)
+    if m:
+        return m.group('t').strip()
+    # 3) 'TICKER_Open' etc. -> take left token
+    if '_' in s:
+        left = s.split('_', 1)[0].strip()
+        if re.match(r'^[A-Za-z0-9\.\-]+$', left):
+            return left
+    # 4) split on common separators and pick first token that looks like ticker
+    tokens = re.split(r'[\s_\|\(\),]+', s)
+    for tok in tokens:
+        if re.match(r'^[A-Za-z0-9\.\-]+$', tok) and tok.lower() not in ('adj','close','open','high','low','volume'):
+            return tok
+    # fallback: return original string
+    return s
+
+# --- fetch_prices_from_yf (ersetzt) ---
 def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = None,
                          interval: str = "1d", auto_adjust: bool = False,
                          threads: bool = False, **kwargs) -> pd.DataFrame:
@@ -520,18 +552,19 @@ def fetch_prices_from_yf(tickers, start=None, end=None, lookback_days: int = Non
 
     # 4 Normalize column names to ticker tokens using centralized extractor
     try:
-        adj.columns = [normalize_ticker_simple(extract_ticker_from_col(c)) for c in adj.columns]
+        extracted = [_extract_ticker_from_col(c) for c in adj.columns]
+        normalized = [normalize_ticker_simple(e) for e in extracted]
+        # warn on duplicates
+        if len(set(normalized)) != len(normalized):
+            dup = pd.Index(normalized)[pd.Index(normalized).duplicated()].tolist()
+            logger.warning("fetch_prices_from_yf: duplicate normalized columns %s", dup)
+            logger.debug("fetch_prices_from_yf: raw.columns for duplicates=%s", list(adj.columns))
+        adj.columns = normalized
     except Exception:
         logger.exception("fetch_prices_from_yf: column normalization failed; returning adj as-is")
 
     # Log after normalization
     logger.debug("fetch_prices_from_yf: adj.columns after normalize=%s", list(adj.columns))
-
-    # Duplicate check and diagnostic raw.columns if duplicates found
-    if any(pd.Index(adj.columns).duplicated()):
-        dup = pd.Index(adj.columns)[pd.Index(adj.columns).duplicated()].tolist()
-        logger.warning("fetch_prices_from_yf: duplicate normalized columns %s", dup)
-        logger.debug("fetch_prices_from_yf: raw.columns for duplicates=%s", list(raw.columns))
 
     # Index in Datetime and sort, forward fill
     try:
@@ -598,6 +631,7 @@ def find_price_for_ticker(prices_df: pd.DataFrame, ticker: str) -> Optional[pd.S
 
     return None
 
+# --- safe_fetch (ersetzt) ---
 def safe_fetch(
     tickers: List[str],
     start: Optional[str] = None,
@@ -644,12 +678,16 @@ def safe_fetch(
                 timeout=timeout_seconds,
                 **fetch_kwargs
             )
-            
+
             if df is not None and not df.empty:
+                # normalize column names to uppercase tokens for consistent matching
+                df = df.copy()
+                df.columns = [str(c).upper() for c in df.columns]
                 if cache is not None and cache_key is not None:
                     cache[cache_key] = df
-                logger.debug("safe_fetch: success attempt %d rows=%d cols=%s", attempt, len(df.index), list(df.columns)[:10])
+                logger.debug("safe_fetch: success attempt %d rows=%d cols=%s", attempt, len(df.index), list(df.columns)[:50])
                 return df
+
             logger.debug("safe_fetch: empty result on attempt %d for %s", attempt, tickers)
         except RequestException as re:
             last_exc = re
@@ -658,6 +696,7 @@ def safe_fetch(
             last_exc = exc
             logger.exception("safe_fetch: unexpected error on attempt %d for %s", attempt, tickers)
 
+        # backoff with jitter
         sleep_for = backoff_factor * (2 ** (attempt - 1))
         jitter = random.uniform(0, sleep_for * 0.1)
         total_sleep = sleep_for + jitter

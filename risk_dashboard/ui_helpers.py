@@ -201,13 +201,17 @@ def handle_portfolio_upload_with_price_lookup(prefix: str = "profile", persist_p
 def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
     if not new_tickers:
         return
-    # normalize and uppercase
+
+    # normalize and uppercase tickers
     new_tickers_norm = [normalize_ticker(str(t)).upper() for t in new_tickers if t and str(t).strip()]
     if not new_tickers_norm:
         return
-    pairs = [(t, default_qty) for t in new_tickers_norm]
-    add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=default_qty)
 
+    # build pairs (ticker, qty)
+    pairs = [(t, int(default_qty)) for t in new_tickers_norm]
+
+    # delegate to the quantity-aware helper
+    add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=int(default_qty))
     # ensure portfolio_df exists and has correct columns/types
     portfolio = st.session_state.get("portfolio_df")
     if portfolio is None or portfolio.empty:
