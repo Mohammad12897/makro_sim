@@ -318,13 +318,21 @@ def load_portfolio_from_ui_or_disk(session_key="portfolio_df"):
     logger.debug("Trying to load CSV from %s exists=%s", disk_path, disk_path.exists())
     if disk_path.exists():
         try:
-            df = pd.read_csv(disk_path)
-            logger.debug("AFTER df columns=%s head=%s", getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))
+            import csv
+            text = disk_path.read_text(encoding="utf-8", errors="replace")
+            # optional quick fix: replace common double-sep
+            text = text.replace(";;", ";NaN;")
+            # detect delimiter
+            sample = "\n".join(text.splitlines()[:10])
+            delim = ","
+            if ";" in sample and sample.count(";") > sample.count(","):
+                delim = ";"
+
+            df = pd.read_csv(StringIO(text), sep=delim, engine="python", encoding="utf-8-sig")
+            logger.debug("AFTER df columns=%s head=%s", getattr(df, "columns", []).tolist() if hasattr(df, "columns") else [], safe_head_preview(df, DUMP_MARKERS))    
+            # then your normalization
             df.columns = [c.strip().lower() for c in df.columns]
-            if "price" in df.columns:
-                df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
-            else:
-                df["price"] = pd.NA
+            df["price"] = pd.to_numeric(df.get("price", "").astype(str).str.replace(",", "."), errors="coerce")
             df["quantity"] = pd.to_numeric(df.get("quantity", 0), errors="coerce").fillna(0)
             if "market_value" not in df.columns or df["market_value"].isna().any():
                 df["market_value"] = df["quantity"] * df["price"]

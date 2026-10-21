@@ -2,8 +2,10 @@
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
 from pathlib import Path
+from pandas import io
 import streamlit as st
 import tempfile
+import os
 import logging
 
 
@@ -13,6 +15,7 @@ from risk_dashboard.ticker_utils import normalize_ticker, normalize_ticker_simpl
 from risk_dashboard.time_utils import _harmonize_index_tz, _make_index_naive
 from risk_dashboard.price_utils import _pick_price_column, _extract_price_series_from_yf
 from risk_dashboard.utils.parsers import safe_read_csv, safe_head_preview, DUMP_MARKERS
+from risk_dashboard.config import DEFAULT_START_STR
 
 logger = logging.getLogger(__name__)
 
@@ -55,161 +58,494 @@ def show_intro(md_path: str):
     else:
         st.info("Einführungsdokument nicht gefunden.")
 
-def handle_portfolio_upload_with_price_lookup(prefix: str = "profile", persist_path: Optional[Path] = None):
+def analyze_single_ticker_flow(prefix):
+    ticker = st.session_state.get("add_ticker_input", "").strip()
+    if not ticker:
+        st.warning("Bitte Ticker eingeben.")
+        return
+
+    t_norm = normalize_ticker_simple(ticker).upper()
+    try:
+        success, failed, combined_prices = add_tickers_and_fetch(
+            [t_norm],
+            prefix=prefix,
+            start=DEFAULT_START_STR,
+            end=str(pd.Timestamp.today()),
+        )
+    except Exception:
+        logger.exception("Konnte add_tickers_and_fetch nicht ausführen")
+        st.error("Fehler beim Laden der Preisdaten")
+        success, failed, combined_prices = [], [t_norm], pd.DataFrame()
+
+    if isinstance(combined_prices, pd.DataFrame) and not combined_prices.empty:
+        combined_prices.columns = [str(c).strip().upper() for c in combined_prices.columns]
+        st.session_state["prices_for_bt"] = combined_prices
+    else:
+        st.session_state["prices_for_bt"] = st.session_state.get("prices_for_bt", pd.DataFrame())
+
+    # letzte Preiszahl extrahieren
+    def last_price(df, t):
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            return pd.NA
+        col = next((c for c in df.columns if normalize_ticker_simple(c).upper() == normalize_ticker_simple(t).upper()), None)
+        if col is None:
+            return pd.NA
+        s = df[col].ffill().dropna()
+        return float(s.iloc[-1]) if not s.empty else pd.NA
+
+    last = last_price(st.session_state.get("prices_for_bt", pd.DataFrame()), t_norm)
+    if pd.isna(last):
+        st.warning(f"Keine Preisdaten für {t_norm}.")
+    else:
+        st.session_state["analysis_result"] = {"ticker": t_norm, "last_price": last}
+        st.session_state["navigate_to"] = "Analyse"
+        safe_rerun(stop=False)
+
+
+def atomic_write_bytes(path: Path, data: bytes):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.replace(tmp, str(path))
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+
+
+import gzip
+import shutil
+
+def persist_dataframe_csv(
+    df: pd.DataFrame,
+    persist_dir: Path,
+    base_name: str = "combined_prices",
+    timestamp: bool = True,
+    encoding: str = "utf-8-sig",
+    sep: str = ";",
+    decimal: str = ",",
+    index: bool = True,
+    compress: Optional[str] = None
+) -> Path:
+    persist_dir = Path(persist_dir)
+    persist_dir.mkdir(parents=True, exist_ok=True)
+    ts = pd.Timestamp.utcnow().strftime("%Y%m%dT%H%M%SZ") if timestamp else ""
+    filename = f"{base_name}_{ts}.csv" if ts else f"{base_name}.csv"
+    path = persist_dir / filename
+
+    # write to temp file then replace atomically
+    fd, tmp = tempfile.mkstemp(dir=str(persist_dir))
+    try:
+        with os.fdopen(fd, "w", encoding=encoding, newline="") as f:
+            df.to_csv(f, index=index, sep=sep, decimal=decimal)
+        if compress is None:
+            os.replace(tmp, str(path))
+            return path
+        else:
+            comp = compress.lower()
+            if comp == "gzip":
+                comp_path = path.with_suffix(path.suffix + ".gz")
+                with open(tmp, "rb") as src, gzip.open(comp_path, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                os.remove(tmp)
+                return comp_path
+            else:
+                # fallback: no other compressions implemented here
+                os.replace(tmp, str(path))
+                return path
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+
+
+def persist_dataframe(df: pd.DataFrame, persist_dir: Path, base_name: str = "prices", fmt: str = "parquet", compress: str = "snappy"):
+    """
+    Persist DataFrame to disk. fmt in {'parquet','csv','feather','pickle'}.
+    Returns Path to written file.
+    """
+    persist_dir = Path(persist_dir)
+    persist_dir.mkdir(parents=True, exist_ok=True)
+    ts = pd.Timestamp.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    filename = f"{base_name}_{ts}"
+    if fmt == "parquet":
+        path = persist_dir / f"{filename}.parquet"
+        # write to temp then replace
+        tmp = path.with_suffix(".parquet.tmp")
+        df.to_parquet(tmp, engine="pyarrow", compression=compress, index=True)
+        os.replace(tmp, path)
+    elif fmt == "csv":
+        path = persist_dir / f"{filename}.csv"
+        tmp = path.with_suffix(".csv.tmp")
+        df.to_csv(tmp, index=True)
+        os.replace(tmp, path)
+    elif fmt == "feather":
+        path = persist_dir / f"{filename}.feather"
+        tmp = path.with_suffix(".feather.tmp")
+        df.reset_index().to_feather(tmp)
+        os.replace(tmp, path)
+    elif fmt == "pickle":
+        path = persist_dir / f"{filename}.pkl"
+        tmp = path.with_suffix(".pkl.tmp")
+        df.to_pickle(tmp)
+        os.replace(tmp, path)
+    else:
+        raise ValueError("Unsupported format")
+    return path
+
+def persist_per_ticker(df: pd.DataFrame, persist_dir: Path, fmt="parquet"):
+    for col in df.columns:
+        series = df[col].dropna()
+        if series.empty:
+            continue
+        s_df = series.to_frame(name=col)
+        persist_dataframe(s_df, persist_dir / col, base_name=col, fmt=fmt)
+
+
+def prepare_portfolio_with_latest_prices(portfolio_df: pd.DataFrame, prices_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Returns a copy of portfolio_df with columns:
+    ticker, quantity, price (from CSV if present), last_price (from prices_df), used_price, market_value
+    """
+    df = portfolio_df.copy()
+    # ensure ticker uppercase normalized
+    df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
+
+    # build last price map from prices_df
+    last_prices = {}
+    if isinstance(prices_df, pd.DataFrame) and not prices_df.empty:
+        for col in prices_df.columns:
+            col_norm = str(col).strip().upper()
+            s = prices_df[col].ffill().dropna()
+            if not s.empty:
+                last_prices[col_norm] = float(s.iloc[-1])
+
+    # compute last_price, used_price, market_value
+    def get_last_price(t):
+        return last_prices.get(str(t).strip().upper())
+
+    df["last_price"] = df["ticker"].apply(get_last_price)
+    # if user provided a manual price column, keep it; otherwise NaN
+    if "price" not in df.columns:
+        df["price"] = pd.NA
+    df["used_price"] = df["price"].fillna(df["last_price"])
+    df["market_value"] = df["quantity"].astype(float) * df["used_price"].fillna(0.0).astype(float)
+
+    # reorder / format as desired
+    cols = ["ticker", "quantity", "price", "last_price", "used_price", "market_value"]
+    return df[cols]
+
+def make_csv_bytes(df: pd.DataFrame, sep=";", decimal=",", encoding="utf-8-sig", index=False) -> bytes:
+    """
+    Return CSV bytes ready for download. Use utf-8-sig + semicolon + comma decimal for Excel DE.
+    """
+    buf = io.StringIO()
+    df.to_csv(buf, sep=sep, decimal=decimal, index=index)
+    return buf.getvalue().encode(encoding)
+
+def offer_portfolio_download(prefix="profile"):
+    portfolio_df = st.session_state.get("portfolio_df", pd.DataFrame())
+    prices_df = st.session_state.get("prices_for_bt", pd.DataFrame())
+
+    if portfolio_df is None or portfolio_df.empty:
+        st.info("Keine Portfolio‑Daten vorhanden.")
+        return
+
+    df_for_download = prepare_portfolio_with_latest_prices(portfolio_df, prices_df)
+
+    # create CSV bytes
+    csv_bytes = make_csv_bytes(df_for_download, sep=";", decimal=",", encoding="utf-8-sig", index=False)
+
+    # filename with timestamp
+    fname = f"portfolio_with_prices_{pd.Timestamp.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
+
+    # Streamlit download button
+    st.download_button(
+        label="Portfolio als CSV herunterladen",
+        data=csv_bytes,
+        file_name=fname,
+        mime="text/csv"
+    )
+
+    # optional: also show preview
+    st.dataframe(df_for_download.head(20))
+
+
+def persist_csv_bytes(csv_bytes: bytes, persist_dir: Path, filename: str) -> Path:
+    """
+    Atomically write csv_bytes to persist_dir/filename and return the Path.
+    """
+    persist_dir = Path(persist_dir)
+    persist_dir.mkdir(parents=True, exist_ok=True)
+    path = persist_dir / filename
+
+    # write to temp file in same directory then replace atomically
+    fd, tmp_path = tempfile.mkstemp(dir=str(persist_dir))
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(csv_bytes)
+        os.replace(tmp_path, str(path))
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+    return path
+
+
+# Beispiel nach make_csv_bytes:
+# saved = persist_csv_bytes(csv_bytes, Path.cwd() / "data" / "exports", fname)
+# st.success(f"CSV gespeichert: {saved}")
+
+# from pathlib import Path
+# fname = f"portfolio_with_prices_{pd.Timestamp.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
+# saved_path = persist_csv_bytes(csv_bytes, Path.cwd() / "data" / "exports", fname)
+# st.success(f"CSV serverseitig gespeichert: {saved_path}")
+
+
+# Defensive import for safe_rerun helper (module scope)
+try:
+    from risk_dashboard.data_utils import safe_rerun
+except Exception:
+    safe_rerun = None
+
+def handle_portfolio_upload_with_price_lookup(
+    prefix: str = "profile",
+    persist_path: Optional[Path] = None,
+    persist_if_requested: bool = False
+) -> Optional[pd.DataFrame]:
     """
     Upload handler for portfolio CSV.
-    - persist_path: optional Path to save the raw uploaded file; if None default is data/holdings/portfolio.csv
-    - reads CSV with safe_read_csv (filters dump markers),
-    - normalizes columns, parses numerics, computes market_value if possible,
-    - groups by ticker and stores cleaned df in st.session_state['portfolio_df'].
+    - Reads the uploaded file once, normalizes columns and tickers,
+      parses numerics, computes market_value if possible, groups by ticker,
+      stores cleaned df in st.session_state['portfolio_df'].
+    - Optionally persists the raw uploaded file if persist_path is provided
+      or persist_if_requested==True (then uses uploaded.name).
+    - Fetches prices once via add_tickers_and_fetch and fills missing market_value.
+    - Sets st.session_state['prices_for_bt'], 'portfolio_df', 'portfolio_total_value'
+      and navigates to 'Holdings Analyse' (safe_rerun).
     """
     uploader_key = f"portfolio_uploader_{prefix}"
-    uploaded = st.file_uploader("Portfolio CSV (ticker, quantity, price or market_value)", type=["csv"], key=uploader_key)
-    if uploaded is None:
+    uploaded = st.file_uploader("Portfolio-CSV (ticker, quantity, price or market_value)", type=["csv"], key=uploader_key)
+    if not uploaded:
         return None
+
+    # --- Read uploaded once (ensure pointer at start) ---
+    try:
+        uploaded.seek(0)
+    except Exception:
+        # some UploadedFile implementations don't support seek; ignore
+        pass
 
     try:
-        # determine persist path
-        if persist_path is None:
-            persist_path = Path("data") / "holdings" / "portfolio.csv"
-        # optional: use temp dir instead if you don't want persistent files
-        # persist_path = Path(tempfile.gettempdir()) / f"portfolio_{prefix}.csv"
-
-        persist_path.parent.mkdir(parents=True, exist_ok=True)
-        # write raw bytes safely
-        with open(persist_path, "wb") as f:
-            f.write(uploaded.getbuffer())
-
-        # --- robust read using markers from docs ---
-        # safe_read_csv muss uploaded.seek(0) intern aufrufen
-        df = safe_read_csv(uploaded, dump_markers=DUMP_MARKERS)
-
-        # --- normalize column names first (so we can safely access columns) ---
-        df.columns = [str(c).strip() for c in df.columns]
-        colmap = {c.lower(): c for c in df.columns}
-
-        if "ticker" not in colmap and "symbol" not in colmap:
-            st.error("CSV benötigt Spalte 'ticker' oder 'symbol'.")
-            return None
-
-        # rename to canonical names
-        df = df.rename(columns={
-            colmap.get("ticker", ""): "ticker",
-            colmap.get("symbol", ""): "ticker",
-            colmap.get("quantity", ""): "quantity",
-            colmap.get("shares", ""): "quantity",
-            colmap.get("price", ""): "price",
-            colmap.get("market_value", ""): "market_value"
-        })
-
-        # ensure ticker column exists and normalize tickers
-        df["ticker"] = df["ticker"].astype(str).apply(normalize_ticker_simple)
-
-        # parse numerics robustly (comma -> dot)
-        df["quantity"] = pd.to_numeric(df.get("quantity", 0).astype(str).str.replace(",", "."), errors="coerce").fillna(0)
-        if "price" in df.columns:
-            df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
-        if "market_value" in df.columns:
-            df["market_value"] = pd.to_numeric(df["market_value"].astype(str).str.replace(",", "."), errors="coerce")
-
-        # compute market_value if missing or NaN
-        if "market_value" not in df.columns or df["market_value"].isna().any():
-            if "price" in df.columns and not df["price"].isna().all():
-                df["market_value"] = df["quantity"] * df["price"]
-            else:
-                # leave market_value as NaN for now; try to fill from prices_for_bt later
-                df["market_value"] = df.get("market_value", pd.Series([pd.NA] * len(df)))
-
-        # drop rows without ticker
-        df = df.dropna(subset=["ticker"])
-        # normalize tickers again (defensive)
-        df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
-
-        # group and aggregate AFTER numeric conversion and market_value computation
-        agg_map = {"quantity": "sum", "market_value": "sum"}
-        if "price" in df.columns:
-            agg_map["price"] = lambda s: pd.to_numeric(s.dropna().astype(str).str.replace(",", "."), errors="coerce").iloc[0] if s.dropna().any() else pd.NA
-
-        df_grouped = df.groupby("ticker", as_index=False).agg(agg_map)
-
-        # ensure numeric market_value and quantity
-        df_grouped["market_value"] = pd.to_numeric(df_grouped.get("market_value", 0), errors="coerce").fillna(0.0)
-        df_grouped["quantity"] = pd.to_numeric(df_grouped.get("quantity", 0), errors="coerce").fillna(0)
-
-        # persist cleaned df into session state
-        st.session_state["portfolio_df"] = df_grouped
-        logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), safe_head_preview(df_grouped, DUMP_MARKERS))
-        st.session_state["portfolio_total_value"] = float(df_grouped["market_value"].sum())
-
-        # debug output (safe)
-        st.success(f"Portfolio geladen: {len(df_grouped)} Positionen, Gesamtwert {st.session_state['portfolio_total_value']:,.2f}")
-        st.sidebar.write("DEBUG portfolio_df head", safe_head_preview(df_grouped, DUMP_MARKERS))
-        st.sidebar.write("DEBUG portfolio_df dtypes", df_grouped.dtypes.to_dict())
-
-        # attempt to fill missing market_value from prices_for_bt if any market_value == 0
-        if (df_grouped["market_value"] == 0).any():
-            try:
-                prices = st.session_state.get("prices_for_bt", pd.DataFrame())
-                if isinstance(prices, pd.DataFrame) and not prices.empty:
-                    # build last price map (normalize price columns)
-                    last_prices = {}
-                    for col in prices.columns:
-                        col_norm = normalize_ticker_simple(str(col))
-                        last_series = prices[col].ffill().dropna()
-                        if not last_series.empty:
-                            last_prices[col_norm] = float(last_series.iloc[-1])
-                    # apply mapping
-                    def fill_mv(row):
-                        mv = row.get("market_value")
-                        if pd.notna(mv) and float(mv) > 0:
-                            return float(mv)
-                        t = normalize_ticker_simple(row["ticker"])
-                        p = last_prices.get(t)
-                        if p is not None:
-                            return float(row["quantity"]) * float(p)
-                        return float(mv) if pd.notna(mv) else 0.0
-                    df_grouped["market_value"] = df_grouped.apply(fill_mv, axis=1)
-                    # update totals and session
-                    st.session_state["portfolio_df"] = df_grouped
-                    logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), safe_head_preview(df_grouped, DUMP_MARKERS))
-                    st.session_state["portfolio_total_value"] = float(df_grouped["market_value"].sum())
-            except Exception:
-                logger.exception("Failed to fill market_value from prices_for_bt")
-
-        # optionally trigger analysis handler if available
-        try:
-            from risk_dashboard.handlers import handle_holdings_analyse
-            ok = handle_holdings_analyse()
-            if ok:
-                st.session_state["navigate_to"] = "Holdings Analyse"
-                # safe rerun if you have such helper
-                try:
-                    from risk_dashboard.data_utils import safe_rerun
-                    safe_rerun(stop=False)
-                except Exception:
-                    pass
-        except Exception:
-            logger.debug("handle_holdings_analyse not available or failed")
-
-        return df_grouped
-
+        raw_df = pd.read_csv(uploaded)
     except Exception as e:
-        logger.exception("Fehler beim Upload/Verarbeiten: %s", e)
-        st.error(f"Fehler beim Einlesen: {e}")
+        logger.exception("Fehler beim Einlesen der hochgeladenen CSV: %s", e)
+        st.error(f"Fehler beim Einlesen der CSV: {e}")
         return None
+
+    # --- Normalize column names and map canonical names ---
+    raw_df.columns = [str(c).strip() for c in raw_df.columns]
+    colmap = {c.lower(): c for c in raw_df.columns}
+
+    if "ticker" not in colmap and "symbol" not in colmap:
+        st.error("CSV benötigt Spalte 'ticker' oder 'symbol'.")
+        return None
+
+    df = raw_df.rename(columns={
+        colmap.get("ticker", ""): "ticker",
+        colmap.get("symbol", ""): "ticker",
+        colmap.get("quantity", ""): "quantity",
+        colmap.get("shares", ""): "quantity",
+        colmap.get("price", ""): "price",
+        colmap.get("market_value", ""): "market_value"
+    })
+
+    # --- Normalize tickers and parse numerics ---
+    df["ticker"] = df["ticker"].astype(str).apply(lambda x: normalize_ticker_simple(x).strip().upper())
+
+    df["quantity"] = pd.to_numeric(df.get("quantity", 0).astype(str).str.replace(",", "."), errors="coerce").fillna(0)
+    if "price" in df.columns:
+        df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
+    if "market_value" in df.columns:
+        df["market_value"] = pd.to_numeric(df["market_value"].astype(str).str.replace(",", "."), errors="coerce")
+
+    # --- Compute market_value if possible ---
+    if "market_value" not in df.columns or df["market_value"].isna().any():
+        if "price" in df.columns and not df["price"].isna().all():
+            df["market_value"] = df["quantity"] * df["price"]
+        else:
+            df["market_value"] = df.get("market_value", pd.Series([pd.NA] * len(df)))
+
+    # --- Drop rows without ticker and defensive normalization ---
+    df = df.dropna(subset=["ticker"])
+    df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
+
+    # --- Group / aggregate ---
+    agg_map = {"quantity": "sum", "market_value": "sum"}
+    if "price" in df.columns:
+        agg_map["price"] = lambda s: pd.to_numeric(s.dropna().astype(str).str.replace(",", "."), errors="coerce").iloc[0] if s.dropna().any() else pd.NA
+
+    df_grouped = df.groupby("ticker", as_index=False).agg(agg_map)
+
+    # --- Types & NaN handling ---
+    df_grouped["quantity"] = pd.to_numeric(df_grouped.get("quantity", 0), errors="coerce").fillna(0)
+    df_grouped["market_value"] = pd.to_numeric(df_grouped.get("market_value", 0), errors="coerce").fillna(0.0)
+
+    # --- Persist raw upload if requested or persist_path provided ---
+    if persist_path is None and persist_if_requested:
+        # derive path from uploaded.name if available, else default filename
+        filename = getattr(uploaded, "name", "portfolio.csv")
+        persist_path = Path.cwd() / "data" / "holdings" / filename
+
+    if persist_path is not None:
+        try:
+            persist_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(persist_path, "wb") as f:
+                f.write(uploaded.getbuffer())
+            logger.debug("Persisted uploaded portfolio to %s", persist_path)
+        except Exception:
+            logger.exception("Konnte hochgeladene Datei nicht persistieren an %s", persist_path)
+            st.warning("Konnte hochgeladene Datei nicht speichern (Berechtigung/Path).")
+
+    # --- Store normalized df in session ---
+    df_normalized = df_grouped
+    st.session_state["portfolio_df"] = df_normalized
+    logger.debug("persisting portfolio_df columns=%s head=%s", list(df_normalized.columns), safe_head_preview(df_normalized, DUMP_MARKERS) if 'DUMP_MARKERS' in globals() else df_normalized.head().to_dict())
+
+    # --- Fetch prices ONCE for all tickers ---
+    tickers = [t for t in df_normalized["ticker"].unique() if t]
+    try:
+        from risk_dashboard.ui_helpers import add_tickers_and_fetch  # adjust import path if needed
+    except Exception:
+        # fallback: assume function is available in current module
+        try:
+            from risk_dashboard.data_utils import add_tickers_and_fetch
+        except Exception:
+            add_tickers_and_fetch = None
+
+    if add_tickers_and_fetch is None:
+        logger.debug("add_tickers_and_fetch not available; skipping price fetch")
+        success, failed, combined_prices = [], tickers, pd.DataFrame()
+    else:
+        try:
+            success, failed, combined_prices = add_tickers_and_fetch(
+                tickers,
+                prefix=prefix,
+                start=DEFAULT_START_STR,
+                end=str(pd.Timestamp.today()),
+            )
+        except Exception:
+            logger.exception("Konnte add_tickers_and_fetch nicht ausführen")
+            success, failed, combined_prices = [], tickers, pd.DataFrame()
+
+    # --- Normalize and persist prices_for_bt once ---
+    # after add_tickers_and_fetch returned combined_prices
+    if isinstance(combined_prices, pd.DataFrame) and not combined_prices.empty:
+        # make an explicit copy to avoid aliasing / side effects
+        combined_prices = combined_prices.copy()
+
+        # normalize column names for consistent matching
+        combined_prices.columns = [str(c).strip().upper() for c in combined_prices.columns]
+
+        # Persist as CSV instead of Parquet
+        try:
+            persist_dir = Path.cwd() / "risk_dashboard" / "data" / "prices"   # oder konfigurierbarer Pfad
+            persist_dir.mkdir(parents=True, exist_ok=True)
+            file_path = persist_dir / f"combined_prices_{pd.Timestamp.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
+            saved_path = persist_dataframe_csv(
+                combined_prices,
+                persist_dir,
+                base_name="combined_prices",
+                timestamp=True,
+                encoding="utf-8-sig",
+                sep=";",        # setze ";" falls du Semikolon bevorzugst
+                decimal=",",    # setze "," falls du Komma als Dezimaltrennzeichen brauchst
+                index=True,      # True speichert Datumsindex als erste Spalte
+                compress="gzip"  # optional
+            )
+
+            logger.debug("Saved combined_prices CSV to %s", saved_path)
+        except Exception:
+            logger.exception("Failed to persist combined_prices as CSV")
+
+        # set session state to the safe copy
+        st.session_state["prices_for_bt"] = combined_prices
+        logger.debug("set prices_for_bt cols=%s", list(combined_prices.columns))
+    else:
+        st.session_state["prices_for_bt"] = st.session_state.get("prices_for_bt", pd.DataFrame())
+        logger.debug("no combined_prices returned; prices_for_bt unchanged")
+
+    # --- Fill missing market_value from last prices if any market_value == 0 ---
+    try:
+        prices = st.session_state.get("prices_for_bt", pd.DataFrame())
+        if isinstance(prices, pd.DataFrame) and not prices.empty:
+            last_prices = {}
+            for col in prices.columns:
+                col_norm = normalize_ticker_simple(str(col)).upper()
+                s = prices[col].ffill().dropna()
+                if not s.empty:
+                    last_prices[col_norm] = float(s.iloc[-1])
+
+            def fill_mv(row):
+                mv = row.get("market_value", 0)
+                if pd.notna(mv) and float(mv) > 0:
+                    return float(mv)
+                t = normalize_ticker_simple(row["ticker"]).upper()
+                p = last_prices.get(t)
+                if p is not None:
+                    return float(row["quantity"]) * float(p)
+                return 0.0
+
+            df_normalized["market_value"] = df_normalized.apply(fill_mv, axis=1)
+            st.session_state["portfolio_df"] = df_normalized
+            st.session_state["portfolio_total_value"] = float(df_normalized["market_value"].sum())
+    except Exception:
+        logger.exception("Failed to fill market_value from prices_for_bt")
+
+    # --- Inform user about failed tickers (if any) ---
+    if 'failed' in locals() and failed:
+        st.warning(f"Keine Preisdaten für: {', '.join(failed)}. Bitte prüfen oder manuell Preis eingeben.")
+        logger.debug("failed tickers from add_tickers_and_fetch: %s", failed)
+
+    # --- Navigation to analysis and safe rerun (LAST) ---
+    st.session_state["navigate_to"] = "Holdings Analyse"
+    if safe_rerun is not None:
+        try:
+            safe_rerun(stop=False)
+        except Exception:
+            logger.exception("safe_rerun failed")
+    else:
+        try:
+            st.experimental_rerun()
+        except Exception:
+            logger.debug("No rerun available")
+
+    return df_normalized
+
 
 def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
     if not new_tickers:
         return
+    # if input already contains pairs (ticker, qty), detect and delegate
+    if all(isinstance(x, (list, tuple)) and len(x) == 2 for x in new_tickers):
+        pairs = [(normalize_ticker(str(t)).upper(), int(q) if q is not None else int(default_qty)) for t, q in new_tickers]
+        add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=int(default_qty))
+        return
 
-    # normalize and uppercase tickers
+    # otherwise existing behavior
     new_tickers_norm = [normalize_ticker(str(t)).upper() for t in new_tickers if t and str(t).strip()]
     if not new_tickers_norm:
         return
-
     # build pairs (ticker, qty)
     pairs = [(t, int(default_qty)) for t in new_tickers_norm]
-
     # delegate to the quantity-aware helper
     add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=int(default_qty))
     # ensure portfolio_df exists and has correct columns/types
@@ -259,110 +595,206 @@ def add_new_tickers_to_portfolio(new_tickers: List[str], default_qty: int = 1):
     return
 
 
-def add_new_tickers_to_portfolio_with_quantities(pairs: List[Tuple[str,int]], default_qty: int = 1):
-    if not pairs:
+def _safe_preview(obj, max_len: int = 1000) -> str:
+    """
+    Kurze, sichere Vorschau für Logging / Sidebar.
+    - DataFrame: nur Spaltenliste + Indexbereich
+    - dict/list: redigiere bekannte sensible Keys und kürze Inhalte
+    - sonst: kurze Stringrepräsentation
+    """
+    try:
+        if isinstance(obj, pd.DataFrame):
+            cols = list(obj.columns)
+            try:
+                idx_min = obj.index.min()
+                idx_max = obj.index.max()
+            except Exception:
+                idx_min = None
+                idx_max = None
+            return f"DataFrame cols={cols} index_range=({idx_min},{idx_max})"
+        if isinstance(obj, (list, tuple)):
+            preview_items = []
+            for i, it in enumerate(obj):
+                if i >= 5:
+                    break
+                s = str(it)
+                preview_items.append(s[:200] + ("…" if len(s) > 200 else ""))
+            return f"{type(obj).__name__} len={len(obj)} sample={preview_items}"
+        s = str(obj)
+        return s[:max_len] + ("…" if len(s) > max_len else "")
+    except Exception:
+        return "<preview failed>"
+
+
+def add_new_tickers_to_portfolio_with_quantities(
+    pairs: List[Tuple[str, int]],
+    default_qty: int = 1,
+) -> None:
+    def _coerce_qty(q, fallback):
+        try:
+            return int(q)
+        except Exception:
+            try:
+                return int(float(str(q).replace(",", ".")))
+            except Exception:
+                return int(fallback)
+
+    logger.debug("add_new_tickers_to_portfolio_with_quantities: incoming pairs=%s", pairs)
+
+    # 0) Input normalisieren: akzeptiere auch reine ticker-Strings
+    norm_pairs: List[Tuple[str, int]] = []
+    for item in pairs:
+        if isinstance(item, (list, tuple)) and len(item) == 2:
+            t_raw, q_raw = item
+            t = normalize_ticker(str(t_raw)).upper()
+            q = _coerce_qty(q_raw, default_qty)
+            if t:
+                norm_pairs.append((t, q))
+        else:
+            t = normalize_ticker(str(item)).upper()
+            if t:
+                norm_pairs.append((t, int(default_qty)))
+
+    if not norm_pairs:
+        logger.debug("add_new_tickers: no valid pairs to add")
         return
 
-    # Normalize input pairs (ticker -> normalized uppercase)
-    norm_pairs = []
-    for t, q in pairs:
-        tn = normalize_ticker(str(t)).upper()
-        try:
-            qn = int(q) if q is not None else int(default_qty)
-        except Exception:
-            qn = int(default_qty)
-        norm_pairs.append((tn, qn))
-
-    # Load or init portfolio_df with correct columns and dtypes
+    # 1) Load or create portfolio_df
     df = st.session_state.get("portfolio_df")
-    if df is None or df.empty:
+    if df is None or not isinstance(df, pd.DataFrame):
         df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
     df = df.copy()
 
-    # normalize existing tickers and ensure dtypes
+    # 2) Ensure ticker/quantity columns exist and have safe dtypes
     if "ticker" not in df.columns:
         df["ticker"] = ""
     df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
+
     if "quantity" not in df.columns:
         df["quantity"] = 0
     df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
 
-    # prepare price cache (DataFrame preferred)
+    # 3) Prepare price cache safely
     prices_cache = st.session_state.get("prices_for_bt")
-    logger.debug("prices_for_bt type=%s shape=%s cols=%s", type(prices_cache), getattr(prices_cache,'shape',None), list(getattr(prices_cache,'columns',[])))
-    if isinstance(prices_cache, pd.DataFrame) and not prices_cache.empty:
-        logger.debug("prices_for_bt sample=%s", safe_head_preview(prices_cache, DUMP_MARKERS))
-
+    logger.debug("add_new_tickers: prices_for_bt preview=%s", _safe_preview(prices_cache))
     prices_df = prices_cache if isinstance(prices_cache, pd.DataFrame) and not prices_cache.empty else None
 
-    # collect last_prices for missing tickers
-    last_prices = {}
-    need_fetch = []
+    # 4) Build existing set BEFORE logging it
+    existing_set = set(df["ticker"].astype(str).str.upper().tolist())
+    logger.debug("add_new_tickers: existing_set=%s", existing_set)
 
-    existing_set = set(df["ticker"].tolist())
+    # 5) Try to find last prices for new tickers, collect need_fetch
+    last_prices: Dict[str, Optional[float]] = {}
+    need_fetch: List[str] = []
 
     for t, q in norm_pairs:
+        t = str(t).strip().upper()
+        q = _coerce_qty(q, default_qty)
+
         if t in existing_set:
-            # add quantity to existing row
-            df.loc[df["ticker"] == t, "quantity"] = df.loc[df["ticker"] == t, "quantity"].astype(int) + int(q)
+            # accumulate into existing rows (we'll consolidate later)
+            try:
+                df.loc[df["ticker"] == t, "quantity"] = df.loc[df["ticker"] == t, "quantity"].astype(int) + int(q)
+                # update market_value incrementally if existing price present
+                try:
+                    existing_price = pd.to_numeric(df.loc[df["ticker"] == t, "price"], errors="coerce").iloc[0]
+                    if pd.notna(existing_price):
+                        df.loc[df["ticker"] == t, "market_value"] = pd.to_numeric(df.loc[df["ticker"] == t, "market_value"], errors="coerce").fillna(0) + int(q) * float(existing_price)
+                except Exception:
+                    pass
+            except Exception:
+                df = pd.concat(
+                    [df, pd.DataFrame([{"ticker": t, "quantity": int(q), "price": pd.NA, "market_value": pd.NA, "weight": pd.NA}])],
+                    ignore_index=True,
+                )
             continue
-        # try to find price in prices_df
+
         price_found = None
         if prices_df is not None:
-            # direct column match (case-insensitive)
             for col in prices_df.columns:
-                if normalize_ticker(str(col)).upper() == t:
-                    try:
+                try:
+                    if normalize_ticker(str(col)).upper() == t:
                         series = prices_df[col]
-                        price_found = float(series.ffill().iloc[-1])
-                        break
-                    except Exception:
-                        price_found = None
+                        last_valid = series.ffill().dropna()
+                        if not last_valid.empty:
+                            price_found = float(last_valid.iloc[-1])
+                            break
+                except Exception:
+                    price_found = None
+
         if price_found is not None:
             last_prices[t] = price_found
         else:
             need_fetch.append(t)
 
-    # fetch missing last prices (fallback)
+    # 6) Fetch missing prices as fallback
     if need_fetch:
-        fetched = fetch_last_prices(need_fetch, lookback_days=365)  # returns dict ticker->price
-        for k, v in fetched.items():
-            last_prices[normalize_ticker(k).upper()] = v
+        try:
+            fetched = fetch_last_prices(need_fetch, lookback_days=365)  # erwartet dict ticker->price
+            if isinstance(fetched, dict):
+                for k, v in fetched.items():
+                    if k:
+                        last_prices[normalize_ticker(k).upper()] = v
+        except Exception:
+            logger.exception("add_new_tickers: fetch_last_prices failed for %s", need_fetch)
 
-    # append new rows
+    # 7) Build new_rows for tickers not in existing_set (set market_value if price known)
     new_rows = []
     for t, q in norm_pairs:
+        t = str(t).strip().upper()
+        qn = _coerce_qty(q, default_qty)
         if t in existing_set:
-            continue  # already added above
-        price = last_prices.get(t)
-        mv = float(q) * float(price) if price is not None else pd.NA
-        new_rows.append({"ticker": t, "quantity": int(q), "price": price if price is not None else pd.NA,
-                         "market_value": mv, "weight": pd.NA})
+            continue
+        price_val = last_prices.get(t, pd.NA)
+        mv_val = float(price_val) * int(qn) if (price_val is not None and pd.notna(price_val)) else pd.NA
+        new_rows.append({"ticker": t, "quantity": int(qn), "price": price_val, "market_value": mv_val, "weight": pd.NA})
 
     if new_rows:
+        logger.debug("add_new_tickers: appending new_rows count=%d sample=%s", len(new_rows), new_rows[:5])
         df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
 
-    # consolidate and compute weights
-    df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
+    # 8) Consolidate duplicates and ensure numeric types
+    df["ticker"] = df["ticker"].astype(str).str.upper()
     df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
     df["market_value"] = pd.to_numeric(df.get("market_value", 0), errors="coerce").fillna(0.0)
 
+    # aggregate: sum quantities and market_value, pick first numeric price if present
+    def _first_numeric_price(s):
+        try:
+            s2 = s.dropna().astype(str).str.replace(",", ".")
+            nums = pd.to_numeric(s2, errors="coerce").dropna()
+            return float(nums.iloc[0]) if not nums.empty else pd.NA
+        except Exception:
+            return pd.NA
+
     df = df.groupby("ticker", as_index=False).agg({
         "quantity": "sum",
-        "price": lambda s: pd.to_numeric(s.dropna().astype(str).str.replace(",", "."), errors="coerce").iloc[0] if s.dropna().any() else pd.NA,
-        "market_value": "sum",
-        "weight": "first"
+        "price": _first_numeric_price,
+        "market_value": "sum"
     })
 
+    # --- ensure price is numeric and compute market_value fallback (single place) ---
+    df["price"] = pd.to_numeric(df.get("price", pd.Series([pd.NA] * len(df))).astype(str).str.replace(",", "."), errors="coerce")
+    df["market_value"] = pd.to_numeric(df.get("market_value", 0), errors="coerce").fillna(0.0)
+
+    mask_price_available = df["price"].notna() & (df["quantity"].fillna(0) != 0)
+    df.loc[mask_price_available, "market_value"] = (df.loc[mask_price_available, "quantity"].astype(float)
+                                                    * df.loc[mask_price_available, "price"].astype(float))
+
+    df["market_value"] = pd.to_numeric(df["market_value"], errors="coerce").fillna(0.0)
+    df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
+
+    # compute weights (percent)
     total_mv = float(df["market_value"].sum()) if not df.empty else 0.0
     if total_mv > 0:
         df["weight"] = (df["market_value"] / total_mv) * 100.0
     else:
         df["weight"] = 0.0
 
-    # persist
+    # 9) Persist back to session_state
     st.session_state["portfolio_df"] = df
-    logger.debug("persisting portfolio_df columns=%s head=%s", list(df.columns), safe_head_preview(df, DUMP_MARKERS))
+    logger.debug("add_new_tickers: portfolio_df updated rows=%d", len(df))
+    logger.debug("persisting portfolio_df columns=%s head=%s", list(df.columns), _safe_preview(df))
     st.session_state["portfolio_total_value"] = total_mv
 
     # update price cache: prefer DataFrame; if not, merge last_prices into dict
@@ -376,8 +808,16 @@ def add_new_tickers_to_portfolio_with_quantities(pairs: List[Tuple[str,int]], de
         else:
             st.session_state["prices_for_bt"] = last_prices
 
-    st.success(f"{len(new_rows)} neue Ticker hinzugefügt, Gesamtwert {total_mv:,.2f}")
+    # user feedback counts
+    added_count = len(new_rows)
+    updated_count = sum(1 for t, _ in norm_pairs if t in existing_set)
+    try:
+        st.success(f"{added_count} neue Ticker hinzugefügt, {updated_count} bestehende aktualisiert, Gesamtwert {total_mv:,.2f}")
+    except Exception:
+        logger.debug("Could not write success message to Streamlit UI")
+
     return
+
 
 def consolidate_portfolio_df(df: pd.DataFrame) -> pd.DataFrame:
     """

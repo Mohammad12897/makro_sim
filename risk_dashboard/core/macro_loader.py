@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Optional
 import pandas as pd
 import requests
+import csv
+from io import StringIO
 from risk_dashboard.core.config_loader import load_config
 from pandas_datareader import data as web
 from risk_dashboard.core.market_engine import download_etf_history, build_market_risk_factors
@@ -53,7 +55,7 @@ def _fetch_from_fred(series_id: str) -> pd.DataFrame:
     return df
 
 
-def load_macro_series(series_id: str) -> pd.DataFrame:
+def load_macro_series_old(series_id: str) -> pd.DataFrame:
     """
     Lädt eine einzelne Makroserie von FRED.
     Gibt DataFrame mit Spalten: date, value
@@ -63,6 +65,57 @@ def load_macro_series(series_id: str) -> pd.DataFrame:
     df.index.name = "date"
     df = df.reset_index()
     return df
+
+def load_macro_series(series_id: str) -> pd.DataFrame:
+    try:
+        df = web.DataReader(series_id, "fred")
+        df = df.rename(columns={series_id: "value"})
+        df.index.name = "date"
+        return df.reset_index()
+    except Exception as e:
+        logger.exception("DataReader failed, trying manual fetch: %s", e)
+
+    url = f"https://fred.stlouisfed.org/series/{series_id}/downloaddata/{series_id}.csv"
+    try:
+        r = requests.get(url, timeout=15)
+        text = r.text or ""
+        logger.debug("Manual fetch status=%s len=%d url=%s", r.status_code, len(text), url)
+
+        # Quick sanity check: HTML statt CSV
+        if r.status_code != 200 or "<html" in text.lower():
+            logger.error("Unexpected response from FRED (not CSV). status=%s", r.status_code)
+            Path(f"debug_fred_{series_id}.txt").write_text(text, encoding="utf-8", errors="replace")
+            return pd.DataFrame(columns=["date", "value"])
+
+        # Detect delimiter best-effort
+        sample = "\n".join(text.splitlines()[:20])
+        try:
+            sniffer = csv.Sniffer()
+            dialect = sniffer.sniff(sample)
+            delim = dialect.delimiter
+        except Exception:
+            delim = ";" if ";" in sample and sample.count(";") > sample.count(",") else ","
+
+        df = pd.read_csv(
+            StringIO(text),
+            index_col=0,
+            parse_dates=True,
+            engine="python",
+            sep=delim,
+            on_bad_lines="warn",
+            encoding="utf-8-sig"
+        )
+
+        # Normalize column name to 'value'
+        if series_id in df.columns:
+            df = df.rename(columns={series_id: "value"})
+        else:
+            df = df.rename(columns={df.columns[0]: "value"})
+        df.index.name = "date"
+        return df.reset_index()
+    except Exception:
+        logger.exception("Manual fetch/parse failed for %s", series_id)
+        return pd.DataFrame(columns=["date", "value"])
 
 def load_macro_data() -> pd.DataFrame:
     try:

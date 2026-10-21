@@ -178,7 +178,7 @@ def render_etf_selection_ui(prefix: str = "etf"):
 
     # Debug nach Sidebar (nur logger)
     log.debug("After sidebar; asset_type=%s stable_input=%s",
-              extra={"asset_type": st.session_state.get(asset_key), "stable_input": st.session_state.get(stable_input_key)})
+    extra={"asset_type": st.session_state.get(asset_key), "stable_input": st.session_state.get(stable_input_key)})
 
     # ---------------- Hauptbereich (restlicher Code) ----------------
     preset = st.selectbox(

@@ -80,6 +80,7 @@ from risk_dashboard.ui.profiles_ui import show_holdings_uploader
 from risk_dashboard.handlers import handle_holdings_analyse
 from risk_dashboard.utils.parsers import safe_head_preview, DUMP_MARKERS
 from risk_dashboard.config import LOW_BUCKET, HIGH_BUCKET, MED_BUCKET, DEFAULT_START_STR, UNIVERSE_PATHS
+from risk_dashboard.utils.parsers import parse_quick_add
 print(">>> APP STARTED: TOP OF app.py", flush=True)
 
 st.session_state.setdefault("low_bucket", LOW_BUCKET.copy())
@@ -89,76 +90,6 @@ st.session_state.setdefault("high_bucket", HIGH_BUCKET.copy())
 low = st.session_state["low_bucket"]
 medium = st.session_state["med_bucket"]
 high = st.session_state["high_bucket"]
-
-def add_ticker_callback(prefix, asset_key, stable_input_key):
-    """
-    Safe callback to add a single ticker from a text input stored in session_state[stable_input_key].
-    - reads raw_val
-    - calls do_add_tickers (which may update prices)
-    - updates session_state and finalizes buckets after prices are updated
-    - writes small debug previews to sidebar
-    """
-    if st.session_state.get("_processing_add", False):
-        return
-    st.session_state["_processing_add"] = True
-
-    try:
-        raw_val = (st.session_state.get(stable_input_key, "") or "").strip()
-        if not raw_val:
-            # nothing to do
-            return
-
-        # read current prices (may be empty)
-        prices_before = st.session_state.get("prices_for_bt", pd.DataFrame())
-        logger.debug("add_ticker_callback start: raw_val=%s prices_before cols=%s",
-                     raw_val, list(prices_before.columns) if isinstance(prices_before, pd.DataFrame) else None)
-
-        # Try to map/add the ticker(s). do_add_tickers should return (mapped, missing)
-        # and ideally update prices or return new prices (depends on your implementation).
-        mapped, missing = do_add_tickers([raw_val], prefix, asset_key, prices=prices_before)
-
-        # Clear input
-        st.session_state[stable_input_key] = ""
-
-        # If do_add_tickers updated prices in session_state, read them; otherwise, try to fetch
-        prices_after = st.session_state.get("prices_for_bt", pd.DataFrame())
-
-        # If do_add_tickers returns new prices (combined), you may want to set them explicitly:
-        # if combined_prices is not None: st.session_state["prices_for_bt"] = combined_prices
-
-        # Finalize buckets now that prices arfinalize_bucketse (possibly) updated
-        low_final, med_final, high_final = finalize_buckets(low, medium, high, prices_after)
-        logger.debug("finalized buckets after quick-add: low=%s med=%s high=%s", low_final, med_final, high_final)
-
-        # Debug / UI feedback (small previews only)
-        st.sidebar.write("DEBUG add_ticker mapped", mapped)
-        st.sidebar.write("DEBUG add_ticker missing", missing)
-        if isinstance(prices_after, pd.DataFrame) and not prices_after.empty:
-            st.sidebar.write("prices_for_bt cols", list(prices_after.columns))
-            st.sidebar.write("prices_for_bt index range", prices_after.index.min(), prices_after.index.max())
-            st.sidebar.write("prices_for_bt head", prices_after.head().to_dict())
-        else:
-            st.sidebar.write("prices_for_bt", repr(prices_after))
-
-        logger.debug("add_ticker_callback mapped=%s missing=%s", mapped, missing)
-
-        # Optional: show a user message
-        if missing:
-            st.warning(f"Automatisches Mapping fehlgeschlagen für: {', '.join(missing)}")
-        else:
-            st.success(f"Ticker hinzugefügt: {', '.join(mapped)}" if mapped else "Ticker verarbeitet")
-
-    except Exception:
-        logger.exception("Fehler in add_ticker_callback")
-        st.error("Interner Fehler beim Hinzufügen des Tickers")
-    finally:
-        st.session_state["_processing_add"] = False
-        # safe_rerun falls du die App neu rendern willst; optional
-        try:
-            safe_rerun(stop=False)
-        except Exception:
-            # safe_rerun kann in Tests/Headless-Umgebungen fehlen
-            pass
 
 
 # UTF-8 erzwingen (sicher)
@@ -228,7 +159,7 @@ from risk_dashboard.core.data_loader import (
     load_price_data,
     filter_valid_tickers
 )
-from risk_dashboard.core.ticker_cache import validate_ticker_with_cache
+#from risk_dashboard.core.ticker_cache import validate_ticker_with_cache
 from risk_dashboard.data_cache import load_price_data_cached
 
 # Streamlit optional importieren, mit sauberem Shim als Fallback
@@ -437,8 +368,10 @@ def analyze_single_etf_using_df(ticker: str, price_df: pd.DataFrame):
 
 # --- Docs / dynamische Seitenliste ---
 from risk_dashboard.ui_helpers import (
+    analyze_single_ticker_flow,
     handle_portfolio_upload_with_price_lookup,
     load_markdown_safe,
+    offer_portfolio_download,
     show_intro,
     status_legend,
     consolidate_portfolio_df,
@@ -478,7 +411,7 @@ st.sidebar.write("DEBUG combined columns", list(combined.columns))
 if not combined.empty:
     # 1) Was ist in prices_for_bt?
     combined = st.session_state.get("prices_for_bt", pd.DataFrame())
-    st.sidebar.write("DEBUG prices_for_bt type", type(combined), "shape", getattr(combined, "shape", None))
+    # st.sidebar.write("DEBUG prices_for_bt type", type(combined), "shape", getattr(combined, "shape", None))
     st.sidebar.write("DEBUG prices_for_bt cols", list(combined.columns))
     if not combined.empty:
         st.sidebar.write("DEBUG prices_for_bt index tz", getattr(combined.index, "tz", None))
@@ -506,6 +439,13 @@ st.title("Macroeconomic Risk Dashboard")
 ss = st.session_state
 ss["_rendered_widget_keys"] = []
 
+qty_default = st.sidebar.number_input(
+    "Menge (Default für Einträge ohne Menge)",
+    min_value=0,
+    value=1,
+    step=1,
+    key=f"main_sidebar_qty_default",
+)
 
 # --- Seiteninhalt ---
 if choice == "Dashboard":
@@ -566,10 +506,9 @@ elif choice == "Upload":
     new_tickers = [t for t in user_tickers if t and t.upper() not in existing]
 
     if new_tickers:
-        from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio
-
-        # Portfolio aktualisieren (kein Fetch hier)
-        add_new_tickers_to_portfolio(new_tickers)
+        from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio_with_quantities
+        pairs = [(t, int(qty_default)) for t in new_tickers]   # oder echte Mengen, falls vorhanden
+        add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=int(qty_default))
 
         ok = handle_holdings_analyse()
         if ok:
@@ -627,14 +566,28 @@ elif choice == "Holdings Analyse":
         else:
             df = pd.DataFrame(columns=["ticker", "quantity", "price", "market_value", "weight"])
 
+    # show helpful message if no data
+    if df is None or df.empty:
+        st.info("Kein Portfolio geladen. Bitte CSV hochladen oder Positionen anlegen.")
+    else:
+        # offer download and preview only when we have data
+        try:
+            offer_portfolio_download()
+        except Exception:
+            logger.exception("offer_portfolio_download failed or not available")
+    
+    
+    
     # Normalisiere vorhandene ticker-Liste
     existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()] if not df.empty else []
 
     # Neue Ticker automatisch mit Preisen hinzufügen (nur wenn noch nicht vorhanden)
     new_tickers = [t for t in user_tickers if t and t.upper() not in existing]
     if new_tickers:
-        from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio
-        add_new_tickers_to_portfolio(new_tickers)
+        from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio_with_quantities
+        pairs = [(t, int(qty_default)) for t in new_tickers]   # oder echte Mengen, falls vorhanden
+        add_new_tickers_to_portfolio_with_quantities(pairs, default_qty=int(qty_default))
+
 
     # lade aktualisiertes df aus session (falls add_new... es aktualisiert hat)
     df = st.session_state.get("portfolio_df", df)
@@ -999,7 +952,6 @@ AVAILABLE_ETF = [
 # Kopierfertig: aktualisierte Sidebar-Funktion
 def render_sidebar(available_etfs):
     # Lokale Importe (anpassen, falls Pfade anders sind)
-    from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio_with_quantities
     from risk_dashboard.input_parsing import parse_ticker_input
 
     # Optional: falls analyze_ticker in einem Modul liegt
@@ -1023,175 +975,49 @@ def render_sidebar(available_etfs):
         height=100,
     )
 
-    qty_default = st.sidebar.number_input(
-        "Menge (Default für Einträge ohne Menge)",
-        min_value=0,
-        value=1,
-        step=1,
-        key=f"{prefix}_sidebar_qty_default",
-    )
+    #qty_default = st.sidebar.number_input(
+    #    "Menge (Default für Einträge ohne Menge)",
+    #    min_value=0,
+    #    value=1,
+    #    step=1,
+    #    key=f"{prefix}_sidebar_qty_default",
+    #)
 
-    from risk_dashboard.utils.parsers import parse_quick_add
-    # oben: importiere die funktion einmal statisch (empfohlen)
-    from risk_dashboard.ui_helpers import add_tickers_and_fetch  # oder korrekter Pfad
-
-    # oben imports
-    from risk_dashboard.ticker_utils import normalize_ticker_simple
-    from risk_dashboard.ui_helpers import persist_portfolio_df
     
 
-    # Quick Add single ticker (text input + button)
-    st.sidebar.text_input("Ticker hinzufügen", key="add_ticker_input")
-    st.sidebar.button(
-        "Add ticker",
-        on_click=add_ticker_callback,
-        args=(prefix, asset_key, "add_ticker_input")
+    # Bulk add area (multiple lines, parse_quick_add)
+    ticker_raw = st.sidebar.text_area(
+        "Mehrere Ticker (eine Zeile = ein Eintrag)",
+        key=f"{prefix}_bulk_ticker_raw",
+        height=120
     )
 
-    # Bulk add area (multiple lines, parse_quick_add)
-    ticker_raw = st.sidebar.text_area("Mehrere Ticker (eine Zeile = ein Eintrag)", key=f"{prefix}_bulk_ticker_raw", height=120)
     if st.sidebar.button("Hinzufügen", key=f"{prefix}_btn_add_tickers"):
-        # parse_quick_add liefert List[Tuple[ticker, qty]]
+
+        # 1) Text aus dem Eingabefeld parsen → liefert echte Mengen
         parsed = parse_quick_add(ticker_raw, default_qty=int(qty_default))
-        rows = []
-        for t, q in parsed:
-            t_norm = normalize_ticker_simple(str(t)).upper()
-            q_val = float(q) if q is not None else float(qty_default)
-            if q_val <= 0:
-                continue
-            rows.append({"ticker": t_norm, "quantity": q_val})
+        logger.debug("Bulk-Add parsed entries=%s", parsed)
 
-        # Debug: show parsed and session state
-        logger.debug("quick_add parsed entries=%s", parsed)
-        st.sidebar.write("session_state keys", list(st.session_state.keys()))
-        st.sidebar.write("add_ticker_input", st.session_state.get("add_ticker_input"))
-        st.sidebar.write("bulk_raw", st.session_state.get(f"{prefix}_bulk_ticker_raw"))
+        # 2) Existierende Ticker aus Portfolio laden
+        df = st.session_state.get("portfolio_df", pd.DataFrame())
+        existing = [str(x).upper() for x in df["ticker"].astype(str).tolist()] if not df.empty else []
 
-        # Convert parsed tuples to dicts and normalize/validate
-        parsed_dicts = []
-        for entry in parsed:
-            try:
-                t_raw, q_raw = entry[0], entry[1]
-            except Exception:
-                logger.debug("Unexpected parsed entry format: %r", entry)
-                continue
+        # 3) Nur neue Ticker herausfiltern
+        new_pairs = [(t, q) for t, q in parsed if t and t.upper() not in existing]
+        logger.debug("Bulk-Add new_pairs=%s", new_pairs)
 
-            if not t_raw:
-                continue
+        # 4) Falls neue Ticker vorhanden → mit Mengen hinzufügen
+        if new_pairs:
+            from risk_dashboard.ui_helpers import add_new_tickers_to_portfolio_with_quantities
+            add_new_tickers_to_portfolio_with_quantities(new_pairs, default_qty=int(qty_default))
 
-            t_norm = normalize_ticker_simple(str(t_raw))
-            try:
-                q = float(q_raw) if q_raw is not None else float(qty_default)
-            except Exception:
-                q = float(qty_default)
-
-            if q <= 0:
-                logger.debug("Skipping zero/negative qty for %s", t_norm)
-                continue
-
-            parsed_dicts.append({"ticker": t_norm, "quantity": q})
-
-        if not parsed_dicts:
-            st.warning("Keine gültigen Ticker erkannt.")
-        else:
-            # Build rows for portfolio_df
-            rows = [{"ticker": d["ticker"], "quantity": d["quantity"]} for d in parsed_dicts]
-
-            # load existing portfolio_df or create new
-            portfolio_df = st.session_state.get(
-                "portfolio_df",
-                pd.DataFrame(columns=["ticker", "quantity", "price", "market_value"])
-            )
-
-            new_df = pd.DataFrame(rows)
-            if not new_df.empty:
-                # combine and aggregate quantities
-                combined = pd.concat([portfolio_df[["ticker","quantity"]], new_df[["ticker","quantity"]]], ignore_index=True)
-                combined = combined.groupby("ticker", as_index=False).agg({"quantity": "sum"})
-                combined["price"] = pd.NA
-                combined["market_value"] = pd.NA
-                st.session_state["portfolio_df"] = combined
-                logger.debug("persisting portfolio_df columns=%s head=%s", list(combined.columns), safe_head_preview(combined, DUMP_MARKERS))
-                st.success(f"{len(new_df)} Ticker hinzugefügt.")
-
-            # persist slim portfolio (ticker + quantity)
-            portfolio = st.session_state.get("portfolio", pd.DataFrame(columns=["ticker", "quantity"]))
-            for r in rows:
-                t = r["ticker"]
-                q = r["quantity"]
-                if t in portfolio["ticker"].values:
-                    portfolio.loc[portfolio["ticker"] == t, "quantity"] = (
-                        portfolio.loc[portfolio["ticker"] == t, "quantity"].astype(float) + q
-                    )
-                else:
-                    portfolio = pd.concat([portfolio, pd.DataFrame([{"ticker": t, "quantity": q}])], ignore_index=True)
-
-            persist_portfolio_df(portfolio)
-
-            # Prepare tickers list for price fetch (unique, normalized)
-            tickers = sorted({r["ticker"] for r in rows})
-
-            try:
-                success, failed, combined_prices = add_tickers_and_fetch(
-                    tickers,
-                    prefix=prefix,
-                    start=DEFAULT_START_STR,
-                    end=str(pd.Timestamp.today()),
-                )
-            except Exception:
-                logger.exception("Konnte add_tickers_and_fetch nicht importieren/ausführen")
-                st.error("Interner Fehler beim Laden der Preisdaten")
-                success, failed, combined_prices = [], tickers, pd.DataFrame()
-
-            logger.debug("AFTER add_tickers_and_fetch: combined_prices cols=%s", None if combined_prices is None else list(combined_prices.columns))
-            # --- normalize combined_prices and set session state (insert immediately after add_tickers_and_fetch) ---
-            if isinstance(combined_prices, pd.DataFrame) and not combined_prices.empty:
-                combined_prices = combined_prices.copy()
-                # normalize column tokens to uppercase for consistent matching
-                combined_prices.columns = [str(c).strip().upper() for c in combined_prices.columns]
-                st.session_state["prices_for_bt"] = combined_prices
-                logger.debug("set prices_for_bt cols=%s", list(combined_prices.columns))
-            else:
-                # keep existing prices_for_bt if present, else empty df
-                st.session_state["prices_for_bt"] = st.session_state.get("prices_for_bt", pd.DataFrame())
-                logger.debug("no combined_prices returned; prices_for_bt unchanged")
-
-            # set session prices BEFORE finalize_buckets
-            st.session_state["prices_for_bt"] = combined_prices if (combined_prices is not None and not combined_prices.empty) else st.session_state.get("prices_for_bt", pd.DataFrame())
-
-            # finalize buckets now that prices_for_bt is set
-            prices = st.session_state.get("prices_for_bt", pd.DataFrame())
-            low_final, med_final, high_final = finalize_buckets(LOW_BUCKET, MED_BUCKET, HIGH_BUCKET, prices)
-
-            # small debug outputs
-            st.sidebar.write("prices_for_bt cols", None if prices is None else list(prices.columns))
-            st.sidebar.write("final buckets", {"low": low_final, "med": med_final, "high": high_final})
-
-            if failed:
-                st.warning(f"Keine Preisdaten für: {', '.join(failed)} (möglicherweise delisted)")
-            if success:
-                st.success(f"Erfolgreich geladen: {', '.join(success)}")
-
-            logger.debug("add_tickers success=%s failed=%s", success, failed)
-
-            # more debug for prices
-            prices = st.session_state.get("prices_for_bt")
-            if isinstance(prices, pd.DataFrame):
-                st.sidebar.write("prices_for_bt cols", list(prices.columns))
-                st.sidebar.write("prices_for_bt index range", prices.index.min(), prices.index.max())
-                st.sidebar.write("prices_for_bt head", prices.head().to_dict())
-            else:
-                st.sidebar.write("prices_for_bt", repr(prices))
-
-            # optional: trigger holdings analyse
             ok = handle_holdings_analyse()
             if ok:
                 st.session_state["navigate_to"] = "Holdings Analyse"
-                try:
-                    safe_rerun(stop=False)
-                except Exception:
-                    logger.debug("safe_rerun not available or failed")
-
+                safe_rerun(stop=False)
+        else:
+            st.warning("Keine neuen Ticker gefunden.")
+            
     st.sidebar.markdown("---")
 
     # ----- Einzel-Ticker Analyse (separates Feld) -----
@@ -1200,6 +1026,7 @@ def render_sidebar(available_etfs):
         "Ticker für Analyse (einzeln)", key="new_ticker", placeholder="z. B. AAPL oder CSPX.L"
     )
     if st.sidebar.button("Analysieren", key="analyze_main"):
+        analyze_single_ticker_flow(prefix)
         ticker = (single_ticker or "").strip().upper()
         if not ticker:
             st.sidebar.warning("Bitte ein Ticker-Kürzel eingeben.")

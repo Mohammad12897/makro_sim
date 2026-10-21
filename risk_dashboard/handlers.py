@@ -53,27 +53,62 @@ def handle_holdings_analyse() -> bool:
     """
     Verarbeitet st.session_state['portfolio_df'], validiert, füllt fehlende market_value
     aus Preisen, berechnet Gewichte und persistiert Ergebnisse in session_state.
+    Niemals lesbare Browser-/Tab‑Metadaten oder große Rohobjekte in Logs/Sidebar schreiben.
     Gibt True zurück bei Erfolg, False bei Fehler/Abbruch.
     """
-    dump_markers: List[str] = globals().get("DUMP_MARKERS", []) or []
 
+    # --- Hilfsfunktionen (lokal, sicher) ---
     def _safe_head_preview_local(df: pd.DataFrame) -> str:
         try:
             s = df.head().to_string()
         except Exception:
             s = str(df)[:1000]
         low = s.lower()
+        dump_markers: List[str] = globals().get("DUMP_MARKERS", []) or []
         if any(marker.lower() in low for marker in dump_markers):
             return "<skipped suspicious dump>"
         return s
 
+    def _safe_preview(obj, max_len: int = 1000) -> str:
+        """
+        Kurze, sichere Vorschau für Logging / Sidebar.
+        - DataFrame: nur Spaltenliste + Indexbereich
+        - dict/list: redigiere bekannte sensible Keys und kürze Inhalte
+        - sonst: kurze Stringrepräsentation
+       """
+        try:
+            if isinstance(obj, pd.DataFrame):
+                cols = list(obj.columns)
+                try:
+                    idx_min = obj.index.min()
+                    idx_max = obj.index.max()
+                except Exception:
+                    idx_min = None
+                    idx_max = None
+                return f"DataFrame cols={cols} index_range=({idx_min},{idx_max})"
+            if isinstance(obj, (list, tuple)):
+                preview_items = []
+                for i, it in enumerate(obj):
+                    if i >= 5:
+                        break
+                    s = str(it)
+                    preview_items.append(s[:200] + ("…" if len(s) > 200 else ""))
+                return f"{type(obj).__name__} len={len(obj)} sample={preview_items}"
+            s = str(obj)
+            return s[:max_len] + ("…" if len(s) > max_len else "")
+        except Exception:
+            return "<preview failed>"
+
+    # --- 0) portfolio_df laden ---
     df = st.session_state.get("portfolio_df")
     if df is None:
         st.error("Interner Fehler: portfolio_df nicht gefunden.")
         return False
 
+    # --- 0b) Laufzeit: entferne versehentliche Browser Dumps aus session_state ---
+    # --- 1) Sicheres Debugging (nur sichere Vorschau) ---
     try:
-        logger.debug("handle_holdings_analyse: incoming df dtypes=%s", df.dtypes.to_dict())
+        logger.debug("handle_holdings_analyse: incoming df dtypes=%s", getattr(df, "dtypes", None))
         logger.debug("handle_holdings_analyse: incoming df head=%s", _safe_head_preview_local(df))
         prices_cols = list(st.session_state.get("prices_for_bt", pd.DataFrame()).columns)
         logger.debug("handle_holdings_analyse: prices_for_bt cols=%s", prices_cols)
@@ -81,10 +116,8 @@ def handle_holdings_analyse() -> bool:
         logger.exception("Debug logging failed in handle_holdings_analyse")
 
     try:
-        # defensive copy
+        # --- 2) Defensive copy und Spaltennormalisierung ---
         df = df.copy()
-
-        # normalize column names and map synonyms
         df.columns = [str(c).strip() for c in df.columns]
         colmap = {c.lower(): c for c in df.columns}
         if "ticker" not in colmap and "symbol" not in colmap:
@@ -100,18 +133,17 @@ def handle_holdings_analyse() -> bool:
             colmap.get("market_value", ""): "market_value"
         })
 
-        # keep original ticker for display, create normalized key
+        # --- 3) Ticker normalisieren und Numerics parsen ---
         df["ticker"] = df["ticker"].astype(str).str.strip()
         df["ticker_norm"] = df["ticker"].str.upper()
-
-        # numeric parsing
         df["quantity"] = pd.to_numeric(df.get("quantity", 0).astype(str).str.replace(",", "."), errors="coerce").fillna(0)
+
         if "price" in df.columns:
             df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(",", "."), errors="coerce")
         if "market_value" in df.columns:
             df["market_value"] = pd.to_numeric(df["market_value"].astype(str).str.replace(",", "."), errors="coerce")
 
-        # compute market_value if price present
+        # --- 4) market_value berechnen falls möglich ---
         if "market_value" not in df.columns or df["market_value"].isna().any():
             if "price" in df.columns and not df["price"].isna().all():
                 df["market_value"] = df["quantity"] * df["price"]
@@ -119,7 +151,7 @@ def handle_holdings_analyse() -> bool:
                 if "market_value" not in df.columns:
                     df["market_value"] = pd.Series([pd.NA] * len(df))
 
-        # aggregate by normalized ticker
+        # --- 5) Aggregation nach normalized ticker ---
         agg_map = {"quantity": "sum", "market_value": "sum"}
         if "price" in df.columns:
             agg_map["price"] = lambda s: pd.to_numeric(s.dropna().astype(str).str.replace(",", "."), errors="coerce").iloc[0] if s.dropna().any() else pd.NA
@@ -128,41 +160,52 @@ def handle_holdings_analyse() -> bool:
         df_grouped = df_grouped.rename(columns={"ticker_norm": "ticker"})
         df_grouped["ticker"] = df_grouped["ticker"].astype(str).str.upper()
 
-        # fill missing market_value from prices_for_bt
+        # --- 6) Preise aus session_state holen (sicher) ---
         df_grouped["market_value"] = pd.to_numeric(df_grouped.get("market_value", 0), errors="coerce")
         prices = st.session_state.get("prices_for_bt", pd.DataFrame())
 
-        # Debug: show tickers and price columns at function entry
-        logger.debug("ENTER handle_holdings_analyse: portfolio_df tickers=%s", list(df['ticker'].astype(str).str.upper().unique()))
-        logger.debug("ENTER handle_holdings_analyse: prices_for_bt cols=%s", None if prices is None else list(prices.columns))
+        # sichere Entry‑Logs
+        try:
+            logger.debug("ENTER handle_holdings_analyse: portfolio_df tickers=%s", list(df['ticker'].astype(str).str.upper().unique()))
+            logger.debug("ENTER handle_holdings_analyse: prices_for_bt preview=%s", _safe_preview(prices))
+        except Exception:
+            logger.exception("Failed to log entry debug info")
 
-        if (df_grouped["market_value"].fillna(0) == 0).any() and isinstance(prices, pd.DataFrame) and not prices.empty:
-            # build latest price map (uppercase keys) with simplified token fallback
-            last_prices: Dict[str, Optional[float]] = {}
-
-            # actual column names from prices (may already be uppercased)
+        # --- 7) last_prices Map aufbauen (vor dem Füllen) ---
+        last_prices: Dict[str, Optional[float]] = {}
+        if isinstance(prices, pd.DataFrame) and not prices.empty:
             price_cols_actual = list(prices.columns)
-
-            # create mapping col_upper -> last_value
             for col in price_cols_actual:
                 try:
                     col_up = str(col).strip().upper()
-                    # get series safely (handle if prices has unexpected structure)
-                    series = prices[col] if col in prices.columns else prices.loc[:, prices.columns.str.upper() == col_up]
-                    if isinstance(series, pd.DataFrame):
-                        series = series.iloc[:, 0]
-                    last_val_series = series.ffill().dropna()
-                    last_prices[col_up] = float(last_val_series.iloc[-1]) if not last_val_series.empty else None
+                    # safe access: exact or case-insensitive match
+                    if col in prices.columns:
+                        series = prices[col]
+                    else:
+                        matches = [c for c in prices.columns if str(c).upper() == col_up]
+                        series = prices[matches[0]] if matches else None
+
+                    if series is None:
+                        last_prices[col_up] = None
+                    else:
+                        if isinstance(series, pd.DataFrame):
+                            series = series.iloc[:, 0]
+                        last_val_series = series.ffill().dropna()
+                        last_prices[col_up] = float(last_val_series.iloc[-1]) if not last_val_series.empty else None
                 except Exception:
                     last_prices[col_up] = None
 
-                # also add simplified token (remove suffixes like -USD, .DE, _XXX)
+                # simplified token fallback (z. B. BTC -> BTC-USD)
                 simple = re.sub(r'[-\._].*$', '', col_up)
                 if simple and simple not in last_prices:
                     last_prices[simple] = last_prices[col_up]
 
             logger.debug("handle_holdings_analyse: last_prices sample=%s", {k: last_prices[k] for k in list(last_prices)[:10]})
+        else:
+            logger.debug("handle_holdings_analyse: prices_for_bt is empty or not a DataFrame")
 
+        # --- 8) market_value füllen falls noch 0/NaN ---
+        if (df_grouped["market_value"].fillna(0) == 0).any() and last_prices:
             def _fill_mv(row):
                 mv = row.get("market_value")
                 try:
@@ -184,34 +227,36 @@ def handle_holdings_analyse() -> bool:
 
             df_grouped["market_value"] = df_grouped.apply(_fill_mv, axis=1)
 
-        # final coercion
+        # --- 9) Finalisierung, Gewichte berechnen ---
         df_grouped["market_value"] = pd.to_numeric(df_grouped.get("market_value", 0), errors="coerce").fillna(0.0)
         df_grouped["quantity"] = pd.to_numeric(df_grouped.get("quantity", 0), errors="coerce").fillna(0)
-
         total_mv = float(df_grouped["market_value"].sum())
 
         if total_mv == 0 or pd.isna(total_mv):
             st.error("Gesamtmarktwert ist 0 oder ungültig. Bitte prüfen Sie die hochgeladene Datei und die verfügbaren Preisdaten.")
             st.session_state["portfolio_df"] = df_grouped
-            logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), safe_head_preview(df_grouped, DUMP_MARKERS))
+            logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), _safe_preview(df_grouped))
             st.session_state["portfolio_total_value"] = float(total_mv)
             return False
 
-        # compute weights and persist
         df_grouped["weight"] = df_grouped["market_value"] / total_mv
         st.session_state["portfolio_df"] = df_grouped
-        logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), safe_head_preview(df_grouped, DUMP_MARKERS))
+        logger.debug("persisting portfolio_df columns=%s head=%s", list(df_grouped.columns), _safe_preview(df_grouped))
         st.session_state["weights_by_ticker"] = dict(zip(df_grouped["ticker"], df_grouped["weight"]))
         st.session_state["portfolio_total_value"] = total_mv
 
-        # defensive preview of prices_for_bt
+        # --- 10) Defensive preview von prices_for_bt (nie full dump) ---
         combined = st.session_state.get("prices_for_bt")
-        logger.debug("prices_for_bt type=%s shape=%s cols=%s", type(combined), getattr(combined,'shape',None), list(getattr(combined,'columns',[])))
-        if isinstance(combined, pd.DataFrame) and not combined.empty:
-            logger.debug("prices_for_bt sample=%s", safe_head_preview(combined, DUMP_MARKERS))
+        try:
+            logger.debug("prices_for_bt type=%s shape=%s cols=%s", type(combined), getattr(combined, "shape", None), list(getattr(combined, "columns", [])) if isinstance(combined, pd.DataFrame) else None)
+            logger.debug("prices_for_bt safe preview=%s", _safe_preview(combined))
+        except Exception:
+            logger.exception("Failed to preview prices_for_bt")
+
+        # ensure session_state contains DataFrame (keine rohen Dumps)
         st.session_state["prices_for_bt"] = combined if isinstance(combined, pd.DataFrame) and not combined.empty else pd.DataFrame()
 
-        # sidebar debug
+        # --- 11) Sidebar debug (nur sichere Vorschau) ---
         try:
             st.sidebar.write("DEBUG portfolio_df head", _safe_head_preview_local(df_grouped))
             st.sidebar.write("DEBUG portfolio_df dtypes", df_grouped.dtypes.to_dict())
