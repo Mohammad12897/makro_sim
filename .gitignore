@@ -104,3 +104,5 @@ scripts/
 .streamlit/secrets.toml
 debug_fred_*.txt
 risk_dashboard/data/prices/*.csv.gz
+debug_fred_*.txt
+risk_dashboard/data/prices/*.csv.gz
