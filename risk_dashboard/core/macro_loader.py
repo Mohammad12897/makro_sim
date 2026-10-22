@@ -66,56 +66,133 @@ def load_macro_series_old(series_id: str) -> pd.DataFrame:
     df = df.reset_index()
     return df
 
-def load_macro_series(series_id: str) -> pd.DataFrame:
+
+
+import logging
+import requests
+import pandas as pd
+import csv
+import time
+from io import StringIO
+from pandas_datareader import data as web
+from pathlib import Path
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+
+def _requests_session_with_retries(total=3, backoff_factor=0.5, status_forcelist=(429,500,502,503,504)):
+    s = requests.Session()
+    retries = Retry(total=total, backoff_factor=backoff_factor, status_forcelist=list(status_forcelist),
+                    allowed_methods=frozenset(["GET", "POST"]))
+    s.mount("https://", HTTPAdapter(max_retries=retries))
+    return s
+
+def _safe_write_debug(text: str, series_id: str):
+    debug_dir = Path.home() / ".makro_sim_debug"
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    fname = debug_dir / f"fred_{series_id}_response_{int(time.time())}.txt"
+    try:
+        fname.write_text(text, encoding="utf-8", errors="replace")
+    except Exception:
+        logger.exception("Failed to write debug response to %s", fname)
+
+def _safe_write_cache(df: pd.DataFrame, series_id: str):
+    cache_dir = Path.home() / ".makro_sim_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        df.to_csv(cache_dir / f"{series_id}.csv", index=True)
+    except Exception:
+        logger.exception("Failed to write cache for %s", series_id)
+
+def _read_cache(series_id: str) -> pd.DataFrame | None:
+    cache_file = Path.home() / ".makro_sim_cache" / f"{series_id}.csv"
+    if cache_file.exists():
+        try:
+            df = pd.read_csv(cache_file, index_col=0, parse_dates=True, engine="python", encoding="utf-8-sig")
+            if df.shape[1] >= 1:
+                if df.columns[0] != "value":
+                    df = df.rename(columns={df.columns[0]: "value"})
+                df.index.name = "date"
+                return df.reset_index()
+        except Exception:
+            logger.exception("Failed to read cache for %s", series_id)
+    return None
+
+def load_macro_series(series_id: str, max_retries: int = 3, backoff: float = 1.0) -> pd.DataFrame:
+    """
+    Robuster Loader für FRED Serien.
+    Liefert DataFrame mit Spalten: date, value.
+    Bei Fehlern: leeres DataFrame statt Exception.
+    """
+    # 0) Try local cache first
+    try:
+        cached = _read_cache(series_id)
+        if cached is not None:
+            logger.debug("Loaded %s from local cache", series_id)
+            return cached
+    except Exception:
+        logger.exception("Cache read failed for %s", series_id)
+
+    # 1) Try pandas_datareader
     try:
         df = web.DataReader(series_id, "fred")
         df = df.rename(columns={series_id: "value"})
         df.index.name = "date"
+        _safe_write_cache(df, series_id)
         return df.reset_index()
     except Exception as e:
-        logger.exception("DataReader failed, trying manual fetch: %s", e)
+        logger.exception("DataReader failed, will try manual fetch: %s", e)
 
+    # 2) Manual fetch with retries and robust parsing
     url = f"https://fred.stlouisfed.org/series/{series_id}/downloaddata/{series_id}.csv"
-    try:
-        r = requests.get(url, timeout=15)
-        text = r.text or ""
-        logger.debug("Manual fetch status=%s len=%d url=%s", r.status_code, len(text), url)
+    session = _requests_session_with_retries(total=max_retries, backoff_factor=0.5)
 
-        # Quick sanity check: HTML statt CSV
-        if r.status_code != 200 or "<html" in text.lower():
-            logger.error("Unexpected response from FRED (not CSV). status=%s", r.status_code)
-            Path(f"debug_fred_{series_id}.txt").write_text(text, encoding="utf-8", errors="replace")
-            return pd.DataFrame(columns=["date", "value"])
-
-        # Detect delimiter best-effort
-        sample = "\n".join(text.splitlines()[:20])
+    for attempt in range(1, max_retries + 1):
         try:
-            sniffer = csv.Sniffer()
-            dialect = sniffer.sniff(sample)
-            delim = dialect.delimiter
+            r = session.get(url, timeout=20, headers={"User-Agent": "makro_sim/1.0"})
+            text = r.text or ""
+            logger.debug("Manual fetch attempt=%d status=%s len=%d url=%s", attempt, r.status_code, len(text), url)
+
+            # If response is HTML or not 200, save debug and break/continue
+            if r.status_code != 200 or "<html" in text.lower():
+                _safe_write_debug(text, series_id)
+                logger.error("Unexpected response from FRED (not CSV). status=%s", r.status_code)
+                if "<html" in text.lower():
+                    break
+            else:
+                sample = "\n".join(text.splitlines()[:20])
+                try:
+                    sniffer = csv.Sniffer()
+                    dialect = sniffer.sniff(sample)
+                    delim = dialect.delimiter
+                except Exception:
+                    delim = ";" if ";" in sample and sample.count(";") > sample.count(",") else ","
+
+                df = pd.read_csv(
+                    StringIO(text),
+                    index_col=0,
+                    parse_dates=True,
+                    engine="python",
+                    sep=delim,
+                    on_bad_lines="warn",
+                    encoding="utf-8-sig"
+                )
+
+                if series_id in df.columns:
+                    df = df.rename(columns={series_id: "value"})
+                else:
+                    if len(df.columns) >= 1:
+                        df = df.rename(columns={df.columns[0]: "value"})
+                df.index.name = "date"
+                _safe_write_cache(df, series_id)
+                return df.reset_index()
         except Exception:
-            delim = ";" if ";" in sample and sample.count(";") > sample.count(",") else ","
+            logger.exception("Manual fetch/parse attempt %d failed for %s", attempt, series_id)
 
-        df = pd.read_csv(
-            StringIO(text),
-            index_col=0,
-            parse_dates=True,
-            engine="python",
-            sep=delim,
-            on_bad_lines="warn",
-            encoding="utf-8-sig"
-        )
+        time.sleep(backoff * (2 ** (attempt - 1)))
 
-        # Normalize column name to 'value'
-        if series_id in df.columns:
-            df = df.rename(columns={series_id: "value"})
-        else:
-            df = df.rename(columns={df.columns[0]: "value"})
-        df.index.name = "date"
-        return df.reset_index()
-    except Exception:
-        logger.exception("Manual fetch/parse failed for %s", series_id)
-        return pd.DataFrame(columns=["date", "value"])
+    logger.warning("Returning empty DataFrame for %s after failed attempts", series_id)
+    return pd.DataFrame(columns=["date", "value"])
 
 def load_macro_data() -> pd.DataFrame:
     try:
